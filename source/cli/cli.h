@@ -22,6 +22,5 @@ sp_cli_result_t spn_cli_index_sync(sp_cli_t* cli);
 
 sp_cli_cmd_t* spn_cli(void);
 bool spn_cli_requires_manifest(sp_cli_cmd_t* cmd);
-void spn_cli_commit(void);
 
 #endif

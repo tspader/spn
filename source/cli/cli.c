@@ -3,8 +3,6 @@
 #include "cli/types.h"
 #include "ctx/types.h"
 
-static spn_cli_raw_t spn_cli_raw;
-
 static sp_cli_cmd_t cmd_init = {
   .name = "init",
   .summary = "Scaffold a new project",
@@ -20,8 +18,9 @@ static sp_cli_cmd_t cmd_init = {
     {
       .name = "path",
       .arity = SP_CLI_ARG_OPTIONAL,
+      .kind = SP_CLI_OPT_STR,
       .summary = "Directory to scaffold into",
-      .ptr = &spn_cli_raw.init.path,
+      .ptr = &spn.cli.init.path,
     },
   },
   .handler = spn_cli_init,
@@ -47,8 +46,9 @@ static sp_cli_cmd_t cmd_add = {
   .args = {
     {
       .name = "package",
+      .kind = SP_CLI_OPT_STR,
       .summary = "Package to add (name or name@version)",
-      .ptr = &spn_cli_raw.add.package,
+      .ptr = &spn.cli.add.package,
     },
   },
   .handler = spn_cli_add,
@@ -61,10 +61,10 @@ static sp_cli_cmd_t cmd_clean = {
     {
       .brief = "p",
       .name = "profile",
-      .kind = SP_CLI_OPT_CSTR,
+      .kind = SP_CLI_OPT_STR,
       .summary = "Only remove this profile's outputs",
       .placeholder = "PROFILE",
-      .ptr = &spn_cli_raw.profile.name,
+      .ptr = &spn.cli.profile.name,
     },
   },
   .handler = spn_cli_clean,
@@ -84,10 +84,10 @@ static sp_cli_cmd_t cmd_build = {
     {
       .brief = "p",
       .name = "profile",
-      .kind = SP_CLI_OPT_CSTR,
+      .kind = SP_CLI_OPT_STR,
       .summary = "Profile to use for building",
       .placeholder = "PROFILE",
-      .ptr = &spn_cli_raw.profile.name,
+      .ptr = &spn.cli.profile.name,
     },
     {
       .name = "bin",
@@ -115,60 +115,60 @@ static sp_cli_cmd_t cmd_build = {
     },
     {
       .name = "toolchain",
-      .kind = SP_CLI_OPT_CSTR,
+      .kind = SP_CLI_OPT_STR,
       .summary = "Override toolchain",
       .placeholder = "NAME",
-      .ptr = &spn_cli_raw.profile.toolchain,
+      .ptr = &spn.cli.profile.toolchain,
     },
     {
       .brief = "m",
       .name = "mode",
-      .kind = SP_CLI_OPT_CSTR,
+      .kind = SP_CLI_OPT_STR,
       .summary = "Override build mode (debug, release)",
       .placeholder = "MODE",
-      .ptr = &spn_cli_raw.profile.mode,
+      .ptr = &spn.cli.profile.mode,
     },
     {
       .name = "opt",
-      .kind = SP_CLI_OPT_CSTR,
+      .kind = SP_CLI_OPT_STR,
       .summary = "Override optimization level (0, 1, 2, 3, s, z)",
       .placeholder = "LEVEL",
-      .ptr = &spn_cli_raw.profile.opt,
+      .ptr = &spn.cli.profile.opt,
     },
     {
       .name = "sanitize",
-      .kind = SP_CLI_OPT_CSTR,
+      .kind = SP_CLI_OPT_STR,
       .summary = "Enable sanitizers (address, thread, undefined, memory, leak)",
       .placeholder = "LIST",
-      .ptr = &spn_cli_raw.profile.sanitize,
+      .ptr = &spn.cli.profile.sanitize,
     },
     {
       .name = "target",
-      .kind = SP_CLI_OPT_CSTR,
+      .kind = SP_CLI_OPT_STR,
       .summary = "Target triple (e.g. aarch64-linux-gnu)",
       .placeholder = "TRIPLE",
-      .ptr = &spn_cli_raw.profile.target,
+      .ptr = &spn.cli.profile.target,
     },
     {
       .name = "os",
-      .kind = SP_CLI_OPT_CSTR,
+      .kind = SP_CLI_OPT_STR,
       .summary = "Override target OS (linux, macos, windows)",
       .placeholder = "OS",
-      .ptr = &spn_cli_raw.profile.os,
+      .ptr = &spn.cli.profile.os,
     },
     {
       .name = "arch",
-      .kind = SP_CLI_OPT_CSTR,
+      .kind = SP_CLI_OPT_STR,
       .summary = "Override target architecture (x86_64, aarch64)",
       .placeholder = "ARCH",
-      .ptr = &spn_cli_raw.profile.arch,
+      .ptr = &spn.cli.profile.arch,
     },
     {
       .name = "abi",
-      .kind = SP_CLI_OPT_CSTR,
+      .kind = SP_CLI_OPT_STR,
       .summary = "Override target ABI (gnu, musl, mingw)",
       .placeholder = "ABI",
-      .ptr = &spn_cli_raw.profile.abi,
+      .ptr = &spn.cli.profile.abi,
     },
   },
   .args = {
@@ -188,46 +188,47 @@ static sp_cli_cmd_t cmd_run = {
     {
       .brief = "p",
       .name = "profile",
-      .kind = SP_CLI_OPT_CSTR,
+      .kind = SP_CLI_OPT_STR,
       .summary = "Profile to use when resolving build dependencies",
       .placeholder = "PROFILE",
-      .ptr = &spn_cli_raw.profile.name,
+      .ptr = &spn.cli.profile.name,
     },
     {
       .name = "toolchain",
-      .kind = SP_CLI_OPT_CSTR,
+      .kind = SP_CLI_OPT_STR,
       .summary = "Override toolchain",
       .placeholder = "NAME",
-      .ptr = &spn_cli_raw.profile.toolchain,
+      .ptr = &spn.cli.profile.toolchain,
     },
     {
       .brief = "m",
       .name = "mode",
-      .kind = SP_CLI_OPT_CSTR,
+      .kind = SP_CLI_OPT_STR,
       .summary = "Override build mode (debug, release)",
       .placeholder = "MODE",
-      .ptr = &spn_cli_raw.profile.mode,
+      .ptr = &spn.cli.profile.mode,
     },
     {
       .name = "opt",
-      .kind = SP_CLI_OPT_CSTR,
+      .kind = SP_CLI_OPT_STR,
       .summary = "Override optimization level (0, 1, 2, 3, s, z)",
       .placeholder = "LEVEL",
-      .ptr = &spn_cli_raw.profile.opt,
+      .ptr = &spn.cli.profile.opt,
     },
     {
       .name = "sanitize",
-      .kind = SP_CLI_OPT_CSTR,
+      .kind = SP_CLI_OPT_STR,
       .summary = "Enable sanitizers (address, thread, undefined, memory, leak)",
       .placeholder = "LIST",
-      .ptr = &spn_cli_raw.profile.sanitize,
+      .ptr = &spn.cli.profile.sanitize,
     },
   },
   .args = {
     {
       .name = "entry",
+      .kind = SP_CLI_OPT_STR,
       .summary = "Script target name or relative .c file",
-      .ptr = &spn_cli_raw.run.entry,
+      .ptr = &spn.cli.run.entry,
     },
   },
   .handler = spn_cli_run,
@@ -240,47 +241,48 @@ static sp_cli_cmd_t cmd_test = {
     {
       .brief = "p",
       .name = "profile",
-      .kind = SP_CLI_OPT_CSTR,
+      .kind = SP_CLI_OPT_STR,
       .summary = "Profile to use for building",
       .placeholder = "PROFILE",
-      .ptr = &spn_cli_raw.profile.name,
+      .ptr = &spn.cli.profile.name,
     },
     {
       .name = "toolchain",
-      .kind = SP_CLI_OPT_CSTR,
+      .kind = SP_CLI_OPT_STR,
       .summary = "Override toolchain",
       .placeholder = "NAME",
-      .ptr = &spn_cli_raw.profile.toolchain,
+      .ptr = &spn.cli.profile.toolchain,
     },
     {
       .brief = "m",
       .name = "mode",
-      .kind = SP_CLI_OPT_CSTR,
+      .kind = SP_CLI_OPT_STR,
       .summary = "Override build mode (debug, release)",
       .placeholder = "MODE",
-      .ptr = &spn_cli_raw.profile.mode,
+      .ptr = &spn.cli.profile.mode,
     },
     {
       .name = "opt",
-      .kind = SP_CLI_OPT_CSTR,
+      .kind = SP_CLI_OPT_STR,
       .summary = "Override optimization level (0, 1, 2, 3, s, z)",
       .placeholder = "LEVEL",
-      .ptr = &spn_cli_raw.profile.opt,
+      .ptr = &spn.cli.profile.opt,
     },
     {
       .name = "sanitize",
-      .kind = SP_CLI_OPT_CSTR,
+      .kind = SP_CLI_OPT_STR,
       .summary = "Enable sanitizers (address, thread, undefined, memory, leak)",
       .placeholder = "LIST",
-      .ptr = &spn_cli_raw.profile.sanitize,
+      .ptr = &spn.cli.profile.sanitize,
     },
   },
   .args = {
     {
       .name = "name",
       .arity = SP_CLI_ARG_OPTIONAL,
+      .kind = SP_CLI_OPT_STR,
       .summary = "Test target name to run",
-      .ptr = &spn_cli_raw.test.name,
+      .ptr = &spn.cli.test.name,
     },
   },
   .handler = spn_cli_test,
@@ -293,24 +295,24 @@ static sp_cli_cmd_t cmd_publish = {
     {
       .brief = "i",
       .name = "index",
-      .kind = SP_CLI_OPT_CSTR,
+      .kind = SP_CLI_OPT_STR,
       .summary = "Index to publish to",
       .placeholder = "NAME",
-      .ptr = &spn_cli_raw.publish.index,
+      .ptr = &spn.cli.publish.index,
     },
     {
       .name = "source-url",
-      .kind = SP_CLI_OPT_CSTR,
+      .kind = SP_CLI_OPT_STR,
       .summary = "Source repository URL (autodetected if omitted)",
       .placeholder = "URL",
-      .ptr = &spn_cli_raw.publish.source_url,
+      .ptr = &spn.cli.publish.source_url,
     },
     {
       .name = "source-rev",
-      .kind = SP_CLI_OPT_CSTR,
+      .kind = SP_CLI_OPT_STR,
       .summary = "Source commit (autodetected if omitted)",
       .placeholder = "REV",
-      .ptr = &spn_cli_raw.publish.source_rev,
+      .ptr = &spn.cli.publish.source_rev,
     },
     {
       .name = "dry",
@@ -340,8 +342,9 @@ static sp_cli_cmd_t cmd_index_path = {
     {
       .name = "name",
       .arity = SP_CLI_ARG_OPTIONAL,
+      .kind = SP_CLI_OPT_STR,
       .summary = "Index name (default: core)",
-      .ptr = &spn_cli_raw.index.name,
+      .ptr = &spn.cli.index.name,
     },
   },
   .handler = spn_cli_index_path,
@@ -354,8 +357,9 @@ static sp_cli_cmd_t cmd_index_sync = {
     {
       .name = "name",
       .arity = SP_CLI_ARG_OPTIONAL,
+      .kind = SP_CLI_OPT_STR,
       .summary = "Only sync this index",
-      .ptr = &spn_cli_raw.index.name,
+      .ptr = &spn.cli.index.name,
     },
   },
   .handler = spn_cli_index_sync,
@@ -379,26 +383,26 @@ static sp_cli_cmd_t cmd_root = {
     {
       .brief = "C",
       .name = "project-dir",
-      .kind = SP_CLI_OPT_CSTR,
+      .kind = SP_CLI_OPT_STR,
       .summary = "Specify the directory containing project file",
       .placeholder = "DIR",
-      .ptr = &spn_cli_raw.project_dir,
+      .ptr = &spn.cli.project_dir,
     },
     {
       .brief = "f",
       .name = "file",
-      .kind = SP_CLI_OPT_CSTR,
+      .kind = SP_CLI_OPT_STR,
       .summary = "Specify the project file path",
       .placeholder = "FILE",
-      .ptr = &spn_cli_raw.project_file,
+      .ptr = &spn.cli.project_file,
     },
     {
       .brief = "o",
       .name = "output",
-      .kind = SP_CLI_OPT_CSTR,
+      .kind = SP_CLI_OPT_STR,
       .summary = "Output mode: interactive, noninteractive, quiet, none, json",
       .placeholder = "MODE",
-      .ptr = &spn_cli_raw.output,
+      .ptr = &spn.cli.output,
     },
     {
       .brief = "v",
@@ -469,30 +473,3 @@ bool spn_cli_requires_manifest(sp_cli_cmd_t* cmd) {
   return cmd != &cmd_index;
 }
 
-void spn_cli_commit(void) {
-  spn.cli.project_dir = sp_cstr_as_str(spn_cli_raw.project_dir);
-  spn.cli.project_file = sp_cstr_as_str(spn_cli_raw.project_file);
-  spn.cli.output = sp_cstr_as_str(spn_cli_raw.output);
-
-  spn.cli.profile.name = sp_cstr_as_str(spn_cli_raw.profile.name);
-  spn.cli.profile.toolchain = sp_cstr_as_str(spn_cli_raw.profile.toolchain);
-  spn.cli.profile.mode = sp_cstr_as_str(spn_cli_raw.profile.mode);
-  spn.cli.profile.opt = sp_cstr_as_str(spn_cli_raw.profile.opt);
-  spn.cli.profile.sanitize = sp_cstr_as_str(spn_cli_raw.profile.sanitize);
-  spn.cli.profile.target = sp_cstr_as_str(spn_cli_raw.profile.target);
-  spn.cli.profile.os = sp_cstr_as_str(spn_cli_raw.profile.os);
-  spn.cli.profile.arch = sp_cstr_as_str(spn_cli_raw.profile.arch);
-  spn.cli.profile.abi = sp_cstr_as_str(spn_cli_raw.profile.abi);
-
-  spn.cli.init.path = sp_cstr_as_str(spn_cli_raw.init.path);
-  spn.cli.add.package = sp_cstr_as_str(spn_cli_raw.add.package);
-
-  spn.cli.run.entry = sp_cstr_as_str(spn_cli_raw.run.entry);
-  spn.cli.test.name = sp_cstr_as_str(spn_cli_raw.test.name);
-
-  spn.cli.publish.index = sp_cstr_as_str(spn_cli_raw.publish.index);
-  spn.cli.publish.source_url = sp_cstr_as_str(spn_cli_raw.publish.source_url);
-  spn.cli.publish.source_rev = sp_cstr_as_str(spn_cli_raw.publish.source_rev);
-
-  spn.cli.index.name = sp_cstr_as_str(spn_cli_raw.index.name);
-}
