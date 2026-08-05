@@ -54,10 +54,6 @@ add_dependencies(toolchain headers)
 set(GEN_DIR ${CMAKE_SOURCE_DIR}/source/codegen/gen)
 file(MAKE_DIRECTORY ${GEN_DIR})
 
-add_executable(yyjson_stub yyjson_stub.c)
-set_target_properties(yyjson_stub PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
-target_link_libraries(yyjson_stub PRIVATE yyjson)
-
 set(SCHEMA_DIR ${CMAKE_SOURCE_DIR}/source/codegen/schema)
 set(GEN_FILES
   ${GEN_DIR}/common.gen.h
