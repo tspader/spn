@@ -102,9 +102,7 @@ spn_err_union_t spn_op_configure(spn_session_t* s) {
     if (!configure) {
       continue;
     }
-    if (spn_dag_build_add_target(dag, configure)) {
-      return (spn_err_union_t) { .kind = SPN_ERR_BUILD_GRAPH, .build_graph = { .file = get_target_output_path(s->mem, configure) } };
-    }
+    try_union(spn_dag_build_add_target(dag, configure));
   }
 
   sp_om_for(s->units.packages, it) {

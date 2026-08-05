@@ -1137,6 +1137,32 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
           );
           break;
         }
+        case SPN_ERR_SCRIPT_MISSING: {
+          sp_fmt_io(
+            &w.base,
+            "script {.yellow} has no binary at {.cyan}",
+            sp_fmt_str(event->err.script.name),
+            sp_fmt_str(spn_tui_contextual_path(mem, event->err.script.path))
+          );
+          break;
+        }
+        case SPN_ERR_SCRIPT_FAILED: {
+          sp_fmt_io(
+            &w.base,
+            "script {.yellow} failed with exit code {}",
+            sp_fmt_str(event->err.script.name),
+            sp_fmt_int(event->err.script.code)
+          );
+          break;
+        }
+        case SPN_ERR_DAG_DUPLICATE_OUTPUT: {
+          sp_io_write_str(&w.base, sp_str_lit("two build actions produce the same output file"), SP_NULLPTR);
+          break;
+        }
+        case SPN_ERR_DAG_OUTPUT_NAME: {
+          sp_io_write_str(&w.base, sp_str_lit("a build action output has no file name"), SP_NULLPTR);
+          break;
+        }
         default: {
           sp_io_write_str(&w.base, sp_str_lit("unknown error"), SP_NULLPTR);
           break;
