@@ -94,17 +94,8 @@ static void on_signal(sp_os_signal_t signal, void* userdata) {
 
 static sp_app_result_t on_init(sp_app_t* sp) {
   entry.sp = sp;
+  spn_shell_init(&shell);
 
-  sp_io_stream_writer_from_fd(&shell.logger.out, sp_sys_stdout, SP_IO_CLOSE_MODE_NONE);
-  sp_io_stream_writer_from_fd(&shell.logger.err, sp_sys_stderr, SP_IO_CLOSE_MODE_NONE);
-  if (sp_sys_is_tty(sp_sys_stdout)) sp_sys_tty_use_vt(sp_sys_stdout);
-  if (sp_sys_is_tty(sp_sys_stderr)) sp_sys_tty_use_vt(sp_sys_stderr);
-#ifdef SP_WIN32
-  if (sp_sys_is_tty(sp_sys_stdout) || sp_sys_is_tty(sp_sys_stderr)) {
-    SetConsoleCP(CP_UTF8);
-    SetConsoleOutputCP(CP_UTF8);
-  }
-#endif
   spn_cli_t* cli = &shell.cli;
   spn_command_t command = sp_zero;
   sp_cli_t parsed = sp_cli_parse((sp_cli_desc_t) {
@@ -135,32 +126,13 @@ static sp_app_result_t on_init(sp_app_t* sp) {
     sp->fps = 100000;
   }
 
+  spn_shell_open(&shell);
+
   spn_ctx_init(&spn);
   sp_os_register_signal_handler(SP_OS_SIGNAL_INTERRUPT, on_signal, SP_NULLPTR);
 
-  spn_tui_mode_t output_mode = SPN_OUTPUT_MODE_INTERACTIVE;
-  if (!sp_str_empty(shell.cli.output)) {
-    output_mode = spn_output_mode_from_str(shell.cli.output);
-  }
-  spn_tui_init(&shell.tui, output_mode, &shell.logger);
-
   try(spn_ctx_mount(&spn));
-
-  {
-    sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-    sp_str_t jsonl_path = sp_fs_join_path(scratch.mem, spn.paths.log, sp_str_lit("build.jsonl"));
-    sp_fs_create_file(jsonl_path);
-    sp_io_file_writer_from_path(&shell.logger.jsonl, jsonl_path);
-    sp_mem_end_scratch(scratch);
-  }
-
-  if (cli->quiet) {
-    shell.logger.verbosity = SPN_VERBOSITY_QUIET;
-  } else if (cli->verbose) {
-    shell.logger.verbosity = SPN_VERBOSITY_VERBOSE;
-  } else {
-    shell.logger.verbosity = SPN_VERBOSITY_NORMAL;
-  }
+  spn_shell_open_log(&shell, spn.paths.log);
 
   try(spn_ctx_load_project(&spn, cli->project_dir, cli->refresh));
   if (spn_cli_requires_manifest(parsed.cmd)) {

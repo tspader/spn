@@ -1500,9 +1500,9 @@ void spn_tui_detach_prompt(spn_tui_t* tui) {
   spn_tui_line_writer_flush(&tui->line_writer);
 }
 
-void spn_tui_init(spn_tui_t* tui, spn_tui_mode_t mode, spn_logger_t* logger) {
+void spn_tui_init(spn_tui_t* tui, sp_mem_t mem, spn_tui_mode_t mode, spn_logger_t* logger) {
   tui->mode = mode;
-  tui->mem = sp_mem_arena_as_allocator(sp_mem_arena_new(spn.mem));
+  tui->mem = sp_mem_arena_as_allocator(sp_mem_arena_new(mem));
   tui->logger = logger;
   tui->line_writer = (spn_tui_line_writer_t) {
     .base.write = spn_tui_line_writer_write,
@@ -1549,7 +1549,7 @@ static void prompt_start(spn_tui_t* tui) {
   if (tui->mode != SPN_OUTPUT_MODE_INTERACTIVE) return;
   if (!sp_sys_is_tty(sp_sys_stdout)) return;
 
-  tui->prompt.ctx = sp_prompt_begin(spn.mem);
+  tui->prompt.ctx = sp_prompt_begin(tui->mem);
   if (!tui->prompt.ctx) return;
 
   prompt_tui = tui;

@@ -8,6 +8,7 @@
 #include "tui/types.h"
 
 struct spn_shell_t {
+  sp_mem_t mem;
   spn_cli_t cli;
   spn_tui_t tui;
   spn_logger_t logger;
