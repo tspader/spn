@@ -42,7 +42,7 @@ static spn_err_union_t run_script(spn_session_t* session, spn_target_unit_t* uni
       .command = command,
     }
   });
-  spn_poll(shell.sp);
+  spn_shell_flush();
 
   sp_ps_t ps = sp_ps_create(session->mem, (sp_ps_config_t) {
     .command = command,

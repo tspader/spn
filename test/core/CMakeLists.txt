@@ -121,7 +121,6 @@ add_executable(core
   ${SRC}/event/build.c
   ${SRC}/event/event.c
   ${SRC}/event/log.c
-  ${SRC}/external/cJSON.c
   ${SRC}/external/git.c
   ${SRC}/external/tom.c
   ${SRC}/filter/filter.c

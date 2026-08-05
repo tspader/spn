@@ -3,7 +3,6 @@
 
 #include "event/types.h"
 #include "log/types.h"
-#include "tui/types.h"
 
 typedef struct {
   const c8* name;
