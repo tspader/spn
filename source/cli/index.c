@@ -4,7 +4,7 @@
 #include "ctx/types.h"
 #include "enum/enum.h"
 #include "index/index.h"
-#include "log/log.h"
+#include "shell/shell.h"
 #include "op/op.h"
 
 sp_cli_result_t spn_cli_index(sp_cli_t* cli) {

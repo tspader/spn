@@ -8,6 +8,20 @@
 #include "pkg/types.h"
 #include "unit/types.h"
 
+typedef enum {
+  SPN_LOG_LEVEL_ERROR,
+  SPN_LOG_LEVEL_WARN,
+  SPN_LOG_LEVEL_INFO,
+  SPN_LOG_LEVEL_DEBUG,
+} spn_log_level_t;
+
+typedef enum {
+  SPN_VERBOSITY_QUIET,
+  SPN_VERBOSITY_NORMAL,
+  SPN_VERBOSITY_VERBOSE,
+  SPN_VERBOSITY_DEBUG,
+} spn_verbosity_t;
+
 #define SPN_EVENT_LIST(X) \
   X(SPN_EVENT_NONE,                         "",                           "",            DEBUG,   INFO,  false, false, SPN_EVT_NONE) \
   X(SPN_EVENT_ERR,                          "err",                        "error",       QUIET,   ERROR, true,  true,  SPN_EVT_NONE) \

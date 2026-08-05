@@ -6,12 +6,10 @@
 #include "sp_sim.h"
 
 #include "ctx/types.h"
-#include "shell/types.h"
 #include "event/event.h"
 #include "intern/intern.h"
 
 spn_ctx_t spn;
-spn_shell_t shell;
 
 static sp_test_once_t spn_ctx_once;
 static sp_intern_t* spn_ctx_intern;

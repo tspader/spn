@@ -15,7 +15,6 @@
 #include "pkg/id.h"
 #include "target/mutate.h"
 #include "log/lazy/lazy.h"
-#include "log/log.h"
 #include "pkg/pkg.h"
 #include "session/invocation.h"
 #include "session/session.h"

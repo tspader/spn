@@ -1164,22 +1164,20 @@ static void dag_stage(spn_dag_build_t* b) {
   sp_mem_end_scratch(scratch);
 }
 
-static sp_str_t dag_diag_message(spn_err_t err) {
-  switch (err) {
-    case SPN_ERR_DAG_MISSING_INPUT:  return sp_str_lit("is missing, but the graph expects it as an input");
-    case SPN_ERR_DAG_MISSING_OUTPUT: return sp_str_lit("was not produced by the node that declares it as an output");
-    case SPN_ERR_DAG_STORE_READ:     return sp_str_lit("could not be read from the content store");
-    case SPN_ERR_DAG_STORE_WRITE:    return sp_str_lit("could not be written to the content store");
-    case SPN_ERR_DAG_SCRATCH:        return sp_str_lit("failed to create a scratch directory");
-    case SPN_ERR_DAG_STALLED:        return sp_str_lit("the build graph stalled before completing");
-    default:                         return sp_cstr_as_str(spn_err_to_str(err));
-  }
-}
-
-static void dag_emit_diag(spn_dag_build_t* b) {
+static spn_err_union_t dag_result(spn_dag_build_t* b) {
   spn_dag_diag_t* diag = &b->env.diag;
-  if (!diag->err || diag->err == SPN_ERR_DAG_ACTION) {
-    return;
+
+  switch (b->result) {
+    case SPN_OK: {
+      return spn_result(SPN_OK);
+    }
+    case SPN_ERR_DAG_CANCELLED:
+    case SPN_ERR_DAG_ACTION: {
+      return spn_err_reported(b->result);
+    }
+    default: {
+      break;
+    }
   }
 
   sp_str_t path = diag->path;
@@ -1191,13 +1189,10 @@ static void dag_emit_diag(spn_dag_build_t* b) {
     }
   }
 
-  spn_event_buffer_push(b->session->ctx->events, (spn_build_event_t) {
-    .kind = SPN_EVENT_NODE_FAILED,
-    .node_failed = {
-      .path = path,
-      .message = dag_diag_message(diag->err),
-    },
-  });
+  return (spn_err_union_t) {
+    .kind = diag->err ? diag->err : b->result,
+    .dag = { .path = path },
+  };
 }
 
 static void dag_emit_reports(spn_dag_build_t* b, u64 elapsed) {
@@ -1205,10 +1200,6 @@ static void dag_emit_reports(spn_dag_build_t* b, u64 elapsed) {
   bool failed = b->result != SPN_OK;
   u32 hits = (u32)sp_atomic_s32_get(&b->progress.hits);
   u32 misses = (u32)sp_atomic_s32_get(&b->progress.misses);
-
-  if (failed) {
-    dag_emit_diag(b);
-  }
 
   sp_da_for(session->plans, it) {
     spn_build_unit_t* build = session->plans[it].build;
@@ -1314,7 +1305,7 @@ spn_dag_build_t* spn_dag_build_new(spn_session_t* session) {
   return b;
 }
 
-spn_err_t spn_dag_build_run(spn_dag_build_t* b, u32 workers) {
+spn_err_union_t spn_dag_build_run(spn_dag_build_t* b, u32 workers) {
   spn_thread_pool_init(&b->pool, spn.mem, (spn_thread_pool_config_t) {
     .workers = workers,
     .on_worker_exit = spn_wasm_thread_exit,
@@ -1323,7 +1314,7 @@ spn_err_t spn_dag_build_run(spn_dag_build_t* b, u32 workers) {
   b->timer = sp_tm_start_timer();
   b->result = spn_dag_run_executor(b->graph, &b->env, &b->pool.executor);
   spn_thread_pool_deinit(&b->pool);
-  return b->result;
+  return dag_result(b);
 }
 
 spn_err_union_t spn_op_build(spn_session_t* session) {
@@ -1347,25 +1338,22 @@ spn_err_union_t spn_op_build(spn_session_t* session) {
   });
 
   sp_atomic_ptr_set(&session->ctx->progress, &b->progress);
-  spn_err_t result = spn_dag_build_run(b, 16);
+  spn_err_union_t result = spn_dag_build_run(b, 16);
   sp_atomic_ptr_set(&session->ctx->progress, SP_NULLPTR);
   u64 elapsed = sp_tm_read_timer(&b->timer);
 
-  if (result == SPN_ERR_DAG_CANCELLED) {
-    return spn_err_reported(SPN_ERROR);
+  if (b->result == SPN_ERR_DAG_CANCELLED) {
+    return result;
   }
 
-  if (!result) {
+  if (!result.kind) {
     if (!project->lock.some) {
-      spn_err_union_t updated = spn_project_update_lock(project, session->ctx->intern, session->resolve);
-      if (updated.kind) {
-        return spn_err_emit(updated);
-      }
+      try_union(spn_project_update_lock(project, session->ctx->intern, session->resolve));
     }
     dag_stage(b);
   }
 
   dag_emit_reports(b, elapsed);
 
-  return result ? spn_err_reported(SPN_ERROR) : spn_result(SPN_OK);
+  return result;
 }

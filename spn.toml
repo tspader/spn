@@ -143,7 +143,6 @@ source = [
   "source/intern/intern.c",
   "source/thread_pool/thread_pool.c",
   "source/lock/lock.c",
-  "source/log/log.c",
   "source/log/lazy/lazy.c",
   "source/op/build/build.c",
   "source/op/build/identity.c",

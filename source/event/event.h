@@ -2,7 +2,6 @@
 #define SPN_EVENT_EVENT_H
 
 #include "event/types.h"
-#include "log/types.h"
 
 typedef struct {
   const c8* name;

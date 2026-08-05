@@ -6,7 +6,6 @@
 
 #include "event/event.h"
 
-#include "log/types.h"
 #include "sp/bind.h"
 
 static const c8* level_name(s32 level) {
