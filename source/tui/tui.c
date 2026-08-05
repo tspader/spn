@@ -715,12 +715,12 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
         case SPN_ERR_COMPILER_FEATURE_UNSUPPORTED: {
           const c8* feature = "";
           switch (event->err.compiler.feature) {
-            case SPN_CC_FEATURE_COMPILE: feature = "direct compilation";
-            case SPN_CC_FEATURE_LINK_EXE: feature = "executable linking";
-            case SPN_CC_FEATURE_LINK_SHARED: feature = "shared library linking";
-            case SPN_CC_FEATURE_LINK_REACTOR: feature = "reactor module linking";
-            case SPN_CC_FEATURE_ARCHIVE: feature = "static archiving";
-            case SPN_CC_FEATURE_FRAMEWORKS: feature = "framework linking without a macOS SDK";
+            case SPN_CC_FEATURE_COMPILE: feature = "direct compilation"; break;
+            case SPN_CC_FEATURE_LINK_EXE: feature = "executable linking"; break;
+            case SPN_CC_FEATURE_LINK_SHARED: feature = "shared library linking"; break;
+            case SPN_CC_FEATURE_LINK_REACTOR: feature = "reactor module linking"; break;
+            case SPN_CC_FEATURE_ARCHIVE: feature = "static archiving"; break;
+            case SPN_CC_FEATURE_FRAMEWORKS: feature = "framework linking without a macOS SDK"; break;
           }
 
           sp_fmt_io(
