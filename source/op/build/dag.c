@@ -650,11 +650,37 @@ static spn_err_t add_object_compilation(spn_dag_build_t* b, spn_target_unit_t* t
   return SPN_OK;
 }
 
+static sp_str_t embed_object_path(sp_mem_t mem, spn_target_unit_t* unit) {
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch_for(mem);
+  sp_str_t name = sp_fmt(s.mem, "{}.embed.o", sp_fmt_str(unit->info->name)).value;
+  sp_str_t path = sp_fs_join_path(mem, unit->pkg->paths.generated, name);
+  sp_mem_end_scratch(s);
+  return path;
+}
+
+static sp_str_t embed_header_path(sp_mem_t mem, spn_target_unit_t* unit) {
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch_for(mem);
+  sp_str_t name = sp_fmt(s.mem, "{}.embed.h", sp_fmt_str(unit->info->name)).value;
+  sp_str_t path = sp_fs_join_path(mem, unit->pkg->paths.generated, name);
+  sp_mem_end_scratch(s);
+  return path;
+}
+
+static sp_str_t target_exports_path(sp_mem_t mem, spn_target_unit_t* target) {
+  spn_cc_exports_format_t format = spn_cc_exports_format(target->kind, target->pkg->build->profile.os);
+
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch_for(mem);
+  sp_str_t file_name = sp_fmt(s.mem, "{}.{}", sp_fmt_str(target->info->name), sp_fmt_cstr(spn_cc_exports_extension(format))).value;
+  sp_str_t path = sp_fs_join_path(mem, target->pkg->paths.work, file_name);
+  sp_mem_end_scratch(s);
+  return path;
+}
+
 static spn_err_union_t dag_add_exports(spn_dag_build_t* b, spn_dag_link_ctx_t* link) {
   spn_dag_t* g = b->graph;
   spn_target_unit_t* target = link->target;
 
-  sp_str_t output = spn_target_exports_path(b->mem, target);
+  sp_str_t output = target_exports_path(b->mem, target);
   spn_dag_digest_t identity = sp_zero;
   try_union(dag_exports_identity(b, link, output, &identity));
 
@@ -715,8 +741,8 @@ spn_err_union_t spn_dag_build_add_target(spn_dag_build_t* b, spn_target_unit_t* 
       .discover = dag_embed_discover,
       .user_data = embed,
     });
-    ids.embed.object = spn_dag_add_file(g, spn_embed_object_path(b->mem, target));
-    ids.embed.header = spn_dag_add_file(g, spn_embed_header_path(b->mem, target));
+    ids.embed.object = spn_dag_add_file(g, embed_object_path(b->mem, target));
+    ids.embed.header = spn_dag_add_file(g, embed_header_path(b->mem, target));
     embed->object = ids.embed.object;
     embed->header = ids.embed.header;
     try_as_union(spn_dag_action_add_output(g, ids.embed.action, ids.embed.object));
