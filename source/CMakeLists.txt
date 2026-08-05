@@ -28,6 +28,7 @@ set(SPN_SOURCES
   compiler/msvc.c
   compiler/toc.c
   ctx/ctx.c
+  ctx/init.c
   dag/dag.c
   dag/store.c
   dag/run.c

@@ -8,6 +8,7 @@
 #include "target/types.h"
 
 spn_err_union_t spn_session_init(spn_session_t* session, spn_ctx_t* ctx, sp_mem_t mem, spn_project_t* project, spn_session_config_t config);
+void spn_session_finalize(spn_session_t* session);
 spn_err_union_t spn_session_apply_options(spn_session_t* session, bool* reresolve);
 void spn_session_export_toolchain_env(spn_session_t* session);
 spn_err_union_t spn_session_validate_flags(spn_session_t* session);
