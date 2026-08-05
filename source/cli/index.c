@@ -4,8 +4,8 @@
 #include "ctx/types.h"
 #include "enum/enum.h"
 #include "index/index.h"
-#include "shell/shell.h"
 #include "op/op.h"
+#include "tui/tui.h"
 
 sp_cli_result_t spn_cli_index(sp_cli_t* cli) {
   return SP_CLI_HELP;
@@ -51,7 +51,7 @@ sp_cli_result_t spn_cli_index_list(sp_cli_t* cli) {
 }
 
 sp_cli_result_t spn_cli_index_path(sp_cli_t* cli) {
-  sp_str_t name = sp_str_empty(shell.cli.index.name) ? sp_str_lit("core") : shell.cli.index.name;
+  sp_str_t name = sp_str_empty(args.index.name) ? sp_str_lit("core") : args.index.name;
   spn_index_info_t* index = spn_find_index(name);
   if (!index) {
     return spn_cli_error(cli, "unknown index: {.cyan}", sp_fmt_str(name));
@@ -62,15 +62,15 @@ sp_cli_result_t spn_cli_index_path(sp_cli_t* cli) {
 }
 
 sp_cli_result_t spn_cli_index_sync(sp_cli_t* cli) {
-  if (!sp_str_empty(shell.cli.index.name) && !spn_find_index(shell.cli.index.name)) {
-    return spn_cli_error(cli, "unknown index '{}'", sp_fmt_str(shell.cli.index.name));
+  if (!sp_str_empty(args.index.name) && !spn_find_index(args.index.name)) {
+    return spn_cli_error(cli, "unknown index '{}'", sp_fmt_str(args.index.name));
   }
 
   spn_cli_command(cli)->op = (spn_op_desc_t) {
     .kind = SPN_OP_SYNC_INDEXES,
     .refresh = {
       .force = true,
-      .only = shell.cli.index.name,
+      .only = args.index.name,
     },
   };
   return SP_CLI_CONTINUE;

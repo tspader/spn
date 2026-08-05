@@ -32,7 +32,6 @@
 #include "event/event.h"
 #include "session/session.h"
 #include "op/op.h"
-#include "shell/shell.h"
 #include "tui/tui.h"
 
 // SINGLE HEADER
@@ -56,14 +55,13 @@
 #include "toml.h"
 
 spn_ctx_t spn;
-spn_shell_t shell;
 
 static struct {
   s32 num_args;
   const c8** args;
   spn_err_union_t result;
   struct {
-    spn_err_union_t (*finish)(spn_shell_t*);
+    spn_err_union_t (*finish)();
     spn_op_t* op;
   } exec;
 } entry;
@@ -93,9 +91,8 @@ static void on_signal(sp_os_signal_t signal, void* userdata) {
   } while (0)
 
 static sp_app_result_t on_init(sp_app_t* sp) {
-  spn_shell_init(&shell);
+  spn_tui_init(&tui);
 
-  spn_cli_t* cli = &shell.cli;
   spn_command_t command = sp_zero;
   sp_cli_t parsed = sp_cli_parse((sp_cli_desc_t) {
     .root = spn_cli(),
@@ -106,13 +103,13 @@ static sp_app_result_t on_init(sp_app_t* sp) {
 
   switch (parsed.status) {
     case SP_CLI_HELP: {
-      sp_cli_write_help(&shell.logger.out.base, &parsed);
+      sp_cli_write_help(&tui.logger.out.base, &parsed);
       return SP_APP_QUIT;
     }
     case SP_CLI_ERR: {
-      sp_fmt_io(&shell.logger.err.base, "{.red}: ", sp_fmt_cstr("error"));
-      sp_cli_err_print(&shell.logger.err.base, parsed.err);
-      sp_fmt_io(&shell.logger.err.base, "\n");
+      sp_fmt_io(&tui.logger.err.base, "{.red}: ", sp_fmt_cstr("error"));
+      sp_cli_err_print(&tui.logger.err.base, parsed.err);
+      sp_fmt_io(&tui.logger.err.base, "\n");
       return SP_APP_ERR;
     }
     case SP_CLI_OK:
@@ -121,19 +118,30 @@ static sp_app_result_t on_init(sp_app_t* sp) {
     }
   }
 
-  if (cli->ci) {
+  if (args.ci) {
     sp->fps = 100000;
   }
 
-  spn_shell_open(&shell);
+  spn_verbosity_t verbosity = SPN_VERBOSITY_NORMAL;
+  if (args.quiet) {
+    verbosity = SPN_VERBOSITY_QUIET;
+  } else if (args.verbose) {
+    verbosity = SPN_VERBOSITY_VERBOSE;
+  }
+
+  spn_tui_mode_t mode = SPN_OUTPUT_MODE_INTERACTIVE;
+  if (!sp_str_empty(args.output)) {
+    mode = spn_output_mode_from_str(args.output);
+  }
+  spn_tui_open(&tui, mode, verbosity);
 
   spn_ctx_init(&spn);
   sp_os_register_signal_handler(SP_OS_SIGNAL_INTERRUPT, on_signal, sp);
 
   try(spn_ctx_mount(&spn));
-  spn_shell_open_log(&shell, spn.paths.log);
+  spn_tui_open_log(&tui, spn.paths.log);
 
-  try(spn_ctx_load_project(&spn, cli->project_dir, cli->refresh));
+  try(spn_ctx_load_project(&spn, args.project_dir, args.refresh));
   if (spn_cli_requires_manifest(parsed.cmd)) {
     if (!spn.project) {
       entry.result = spn_err_emit((spn_err_union_t) {
@@ -144,16 +152,23 @@ static sp_app_result_t on_init(sp_app_t* sp) {
     }
   }
 
-  try(spn_cli_parse_profile(&cli->profile, &command.config.overrides));
+  try(spn_cli_parse_profile(&args.profile, &command.config.overrides));
 
   switch (sp_cli_dispatch(&parsed)) {
-    case SP_CLI_CONTINUE: break;
-    case SP_CLI_OK: return SP_APP_QUIT;
-    case SP_CLI_HELP: sp_cli_write_help(&shell.logger.out.base, &parsed); return SP_APP_QUIT;
+    case SP_CLI_CONTINUE: {
+      break;
+    }
+    case SP_CLI_OK: {
+      return SP_APP_QUIT;
+    }
+    case SP_CLI_HELP: {
+      sp_cli_write_help(&tui.logger.out.base, &parsed);
+      return SP_APP_QUIT;
+    }
     case SP_CLI_ERR: {
-      sp_fmt_io(&shell.logger.err.base, "{.red}: ", sp_fmt_cstr("error"));
-      sp_cli_err_print(&shell.logger.err.base, parsed.err);
-      sp_fmt_io(&shell.logger.err.base, "\n");
+      sp_fmt_io(&tui.logger.err.base, "{.red}: ", sp_fmt_cstr("error"));
+      sp_cli_err_print(&tui.logger.err.base, parsed.err);
+      sp_fmt_io(&tui.logger.err.base, "\n");
       return SP_APP_ERR;
     }
   }
@@ -175,8 +190,8 @@ static sp_app_result_t on_poll(sp_app_t* sp) {
     sp_atomic_s32_set(&sp->shutdown, 1);
   }
 
-  spn_shell_flush();
-  spn_prompt_pump(&shell.tui);
+  spn_tui_flush(&tui);
+  spn_prompt_pump(&tui);
 
   return SP_APP_CONTINUE;
 }
@@ -204,17 +219,17 @@ static sp_app_result_t on_update(sp_app_t* sp) {
 
     if (result.kind) {
       entry.result = spn_err_emit(result);
-      spn_prompt_stop(&shell.tui, false);
-      spn_shell_flush();
+      spn_prompt_stop(&tui, false);
+      spn_tui_flush(&tui);
       return SP_APP_ERR;
     }
 
-    spn_prompt_stop(&shell.tui, true);
-    spn_shell_flush();
+    spn_prompt_stop(&tui, true);
+    spn_tui_flush(&tui);
   }
 
   if (entry.exec.finish) {
-    spn_err_union_t err = entry.exec.finish(&shell);
+    spn_err_union_t err = entry.exec.finish();
     entry.exec.finish = SP_NULLPTR;
     if (err.kind) {
       entry.result = spn_err_emit(err);
@@ -226,9 +241,9 @@ static sp_app_result_t on_update(sp_app_t* sp) {
 }
 
 static void on_deinit(sp_app_t* sp) {
-  if (shell.tui.mode == SPN_OUTPUT_MODE_INTERACTIVE) {
-    spn_prompt_stop(&shell.tui, true);
-    sp_io_flush(&shell.logger.err.base);
+  if (tui.mode == SPN_OUTPUT_MODE_INTERACTIVE) {
+    spn_prompt_stop(&tui, true);
+    sp_io_flush(&tui.logger.err.base);
   }
 
   if (spn.events) {
@@ -246,7 +261,7 @@ static void on_deinit(sp_app_t* sp) {
     });
   }
 
-  spn_shell_flush();
+  spn_tui_flush(&tui);
 
   if (spn.session) {
     spn_session_finalize(spn.session);
