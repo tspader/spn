@@ -282,10 +282,8 @@ static sp_cli_cmd_t cmd_test = {
   .args = {
     {
       .name = "name",
-      .arity = SP_CLI_ARG_OPTIONAL,
-      .kind = SP_CLI_OPT_STR,
-      .summary = "Test target name to run",
-      .ptr = &args.test.name,
+      .arity = SP_CLI_ARG_REST,
+      .summary = "Test targets to build and run (default: all)",
     },
   },
   .handler = spn_cli_test,

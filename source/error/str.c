@@ -97,6 +97,8 @@ const c8* spn_err_to_str(spn_err_t err) {
     case SPN_ERR_CONFIGURE_SOURCE:             return "configure_source";
     case SPN_ERR_INIT_EXISTS:                  return "init_exists";
     case SPN_ERR_INIT_NAME:                    return "init_name";
+    case SPN_ERR_TEST_MISSING:                 return "test_missing";
+    case SPN_ERR_TEST_FAILED:                  return "test_failed";
     case SPN_ERR_COUNT:                        break;
   }
   return "unknown";

@@ -30,4 +30,11 @@ typedef struct {
   bool allow_dirty;
 } spn_publish_request_t;
 
+typedef struct {
+  s32 code;
+  sp_str_t out;
+  sp_str_t err;
+  u64 time;
+} spn_test_run_t;
+
 #endif

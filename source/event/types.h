@@ -49,6 +49,9 @@ typedef enum {
   X(SPN_EVENT_TARGET_BUILD_PASSED,          "target_build_passed",        "Compiled",    DEBUG,   INFO,  false, false, SPN_EVT(target.passed)) \
   X(SPN_EVENT_TARGET_BUILD_FAILED,          "target_build_failed",        "error",       QUIET,   ERROR, true,  false, SPN_EVT(target.failed)) \
   X(SPN_EVENT_TARGET_RUN,                   "target_run",                 "Running",     NORMAL,  INFO,  false, false, SPN_EVT(run)) \
+  X(SPN_EVENT_TEST_PASSED,                  "test_passed",                "Passed",      NORMAL,  INFO,  false, false, SPN_EVT(test_passed)) \
+  X(SPN_EVENT_TEST_FAILED,                  "test_failed",                "error",       QUIET,   ERROR, true,  false, SPN_EVT(test_failed)) \
+  X(SPN_EVENT_TEST_SUMMARY,                 "test_summary",               "Tested",      NORMAL,  INFO,  false, false, SPN_EVT(test_summary)) \
   X(SPN_EVENT_LINK_START,                   "link_start",                 "Linking",     VERBOSE, INFO,  false, false, SPN_EVT(target.link_start)) \
   X(SPN_EVENT_LINK_PASSED,                  "link_passed",                "Linked",      DEBUG,   INFO,  false, false, SPN_EVT(target.link_passed)) \
   X(SPN_EVENT_LINK_FAILED,                  "link_failed",                "error",       QUIET,   ERROR, true,  false, SPN_EVT(target.link_failed)) \
@@ -98,6 +101,10 @@ typedef struct {
 typedef struct { spn_profile_info_t* profile; u64 time; u32 hits; u32 misses; } spn_evt_build_passed_t;
 
 typedef struct { sp_str_t name; sp_str_t command; } spn_evt_run_t;
+
+typedef struct { sp_str_t name; u64 time; } spn_evt_test_passed_t;
+typedef struct { sp_str_t name; s32 code; sp_str_t out; sp_str_t err; u64 time; } spn_evt_test_failed_t;
+typedef struct { u32 passed; u32 failed; u64 time; } spn_evt_test_summary_t;
 
 typedef enum {
   SPN_OPTION_ERR_UNDECLARED,
@@ -204,6 +211,9 @@ struct spn_build_event_t {
       spn_evt_build_passed_t passed;
     } build;
     spn_evt_run_t run;
+    spn_evt_test_passed_t test_passed;
+    spn_evt_test_failed_t test_failed;
+    spn_evt_test_summary_t test_summary;
     spn_evt_option_t option;
     spn_evt_script_compile_t script_compile;
     spn_evt_compile_failed_t compile_failed;

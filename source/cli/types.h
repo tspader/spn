@@ -47,10 +47,6 @@ typedef struct {
 } spn_cli_run_t;
 
 typedef struct {
-  sp_str_t name;
-} spn_cli_test_t;
-
-typedef struct {
   sp_str_t index;
   sp_str_t source_url;
   sp_str_t source_rev;
@@ -77,7 +73,6 @@ struct spn_cli {
   spn_cli_init_t init;
   spn_cli_build_t build;
   spn_cli_run_t run;
-  spn_cli_test_t test;
   spn_cli_publish_t publish;
   spn_cli_index_t index;
 };
