@@ -122,11 +122,7 @@ static spn_err_union_t run(sp_mem_t mem, spn_cli_init_t* command, sp_str_t proje
   return run_unattended(mem, command, dir, name);
 }
 
-static spn_err_t finish_init() {
-  return spn_err_emit(&spn, run(spn.mem, &args.init, spn.paths.project));
-}
-
 sp_cli_result_t spn_cli_init(sp_cli_t* cli) {
-  spn_cli_exec(cli)->finish = finish_init;
-  return SP_CLI_OK;
+  spn_tui_handoff(&tui);
+  return spn_err_emit(&spn, run(spn.mem, &args.init, spn.paths.project)) ? SP_CLI_ERR : SP_CLI_OK;
 }

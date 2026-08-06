@@ -46,7 +46,6 @@ static struct {
   const c8** args;
   bool booted;
   sp_cli_t cli;
-  spn_cli_exec_t exec;
   struct {
     sp_thread_t thread;
     sp_atomic_s32_t done;
@@ -86,7 +85,6 @@ static sp_app_result_t on_init(sp_app_t* sp) {
     .root = spn_cli(),
     .args = entry.args,
     .num_args = entry.num_args,
-    .user_data = &entry.exec,
   });
 
   switch (entry.cli.status) {
@@ -141,19 +139,12 @@ static sp_app_result_t on_init(sp_app_t* sp) {
 }
 
 static sp_app_result_t on_poll(sp_app_t* sp) {
-  if (spn_ctx_cancelled(&spn)) {
-    sp_atomic_s32_set(&sp->shutdown, 1);
-  }
-
-  spn_tui_flush(&tui);
-  spn_prompt_pump(&tui);
-
+  spn_tui_poll(&tui);
   return SP_APP_CONTINUE;
 }
 
 static sp_app_result_t on_update(sp_app_t* sp) {
-  bool shutdown = sp_atomic_s32_get(&sp->shutdown) != 0;
-  if (!shutdown && !sp_atomic_s32_get(&entry.dispatch.done)) {
+  if (!sp_atomic_s32_get(&entry.dispatch.done)) {
     return SP_APP_CONTINUE;
   }
 
@@ -176,16 +167,6 @@ static sp_app_result_t on_update(sp_app_t* sp) {
     case SP_CLI_OK:
     case SP_CLI_CONTINUE: {
       break;
-    }
-  }
-
-  if (spn_ctx_cancelled(&spn)) {
-    return SP_APP_QUIT;
-  }
-
-  if (entry.exec.finish) {
-    if (entry.exec.finish()) {
-      return SP_APP_ERR;
     }
   }
 

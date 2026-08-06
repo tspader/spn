@@ -2,6 +2,8 @@
 
 #include "spn/host.h"
 
+#include "tui/tui.h"
+
 sp_cli_result_t spn_cli_test(sp_cli_t* cli) {
   spn_cli_test_t* cmd = &args.test;
 
@@ -25,6 +27,6 @@ sp_cli_result_t spn_cli_test(sp_cli_t* cli) {
   if (spn_op_build(spn.session)) {
     return SP_CLI_ERR;
   }
-  spn_cli_exec(cli)->finish = spn_cli_run_roots;
-  return SP_CLI_OK;
+  spn_tui_handoff(&tui);
+  return spn_cli_run_roots() ? SP_CLI_ERR : SP_CLI_OK;
 }

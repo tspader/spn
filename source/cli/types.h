@@ -10,10 +10,6 @@
 typedef struct spn_cli spn_cli_t;
 
 typedef struct {
-  spn_err_t (*finish)();
-} spn_cli_exec_t;
-
-typedef struct {
   sp_str_t name;
   sp_str_t toolchain;
   sp_str_t mode;

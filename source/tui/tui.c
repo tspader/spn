@@ -1482,6 +1482,7 @@ void spn_tui_init(spn_tui_t* tui) {
   sp_str_ht_init(tui->mem, tui->seen_url);
   sp_da_init(tui->mem, tui->buffered_logs);
   sp_ht_init(tui->mem, tui->thread_ids);
+  sp_semaphore_init(&tui->handoff.ready);
 }
 
 void spn_tui_open(spn_tui_t* tui, spn_tui_mode_t mode, spn_verbosity_t verbosity) {
@@ -1618,7 +1619,7 @@ void spn_prompt_stop(spn_tui_t* tui, bool ok) {
   detach_prompt(tui);
 }
 
-void spn_prompt_pump(spn_tui_t* tui) {
+static void prompt_pump(spn_tui_t* tui) {
   if (spn_ctx_cancelled(&spn)) {
     spn_prompt_stop(tui, false);
     return;
@@ -1644,4 +1645,26 @@ void spn_prompt_pump(spn_tui_t* tui) {
 
   sp_prompt_send_progress_f32(tui->prompt.ctx, value);
   sp_prompt_app_on_poll(&tui->prompt.app);
+}
+
+void spn_tui_poll(spn_tui_t* tui) {
+  if (tui->handoff.granted) {
+    return;
+  }
+
+  if (sp_atomic_s32_get(&tui->handoff.requested)) {
+    spn_prompt_stop(tui, true);
+    spn_tui_flush(tui);
+    tui->handoff.granted = true;
+    sp_semaphore_signal(&tui->handoff.ready);
+    return;
+  }
+
+  spn_tui_flush(tui);
+  prompt_pump(tui);
+}
+
+void spn_tui_handoff(spn_tui_t* tui) {
+  sp_atomic_s32_set(&tui->handoff.requested, 1);
+  sp_semaphore_wait(&tui->handoff.ready);
 }

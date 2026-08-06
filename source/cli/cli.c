@@ -452,10 +452,6 @@ sp_cli_cmd_t* spn_cli() {
   return &cmd_root;
 }
 
-spn_cli_exec_t* spn_cli_exec(sp_cli_t* cli) {
-  return (spn_cli_exec_t*)cli->user_data;
-}
-
 sp_cli_result_t spn_cli_session(sp_cli_t* cli, spn_session_config_t config) {
   sp_cli_result_t profile = spn_cli_parse_profile(cli, &config.overrides);
   if (profile != SP_CLI_OK) {
