@@ -8,7 +8,7 @@ sp_cli_result_t spn_cli_index(sp_cli_t* cli) {
   return SP_CLI_HELP;
 }
 
-static spn_err_t index_list() {
+static void index_list() {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
 
   struct { u32 name; u32 kind; u32 protocol; } width = sp_zero;
@@ -44,17 +44,12 @@ static spn_err_t index_list() {
   }
 
   sp_mem_end_scratch(scratch);
-  return SPN_OK;
 }
 
 sp_cli_result_t spn_cli_index_list(sp_cli_t* cli) {
-  spn_cli_exec(cli)->finish = index_list;
+  spn_tui_handoff(&tui);
+  index_list();
   return SP_CLI_OK;
-}
-
-static spn_err_t index_path() {
-  spn_print("{}", sp_fmt_str(spn_find_index(args.index.name)->location));
-  return SPN_OK;
 }
 
 sp_cli_result_t spn_cli_index_path(sp_cli_t* cli) {
@@ -62,7 +57,8 @@ sp_cli_result_t spn_cli_index_path(sp_cli_t* cli) {
     return spn_cli_error(cli, "unknown index: {.cyan}", sp_fmt_str(args.index.name));
   }
 
-  spn_cli_exec(cli)->finish = index_path;
+  spn_tui_handoff(&tui);
+  spn_print("{}", sp_fmt_str(spn_find_index(args.index.name)->location));
   return SP_CLI_OK;
 }
 

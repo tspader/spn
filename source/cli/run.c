@@ -73,6 +73,6 @@ sp_cli_result_t spn_cli_run(sp_cli_t* cli) {
   if (spn_op_build(spn.session)) {
     return SP_CLI_ERR;
   }
-  spn_cli_exec(cli)->finish = spn_cli_run_roots;
-  return SP_CLI_OK;
+  spn_tui_handoff(&tui);
+  return spn_cli_run_roots() ? SP_CLI_ERR : SP_CLI_OK;
 }
