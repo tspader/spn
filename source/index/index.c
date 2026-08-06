@@ -140,7 +140,7 @@ static spn_err_union_t index_release_exists(spn_index_info_t* index, sp_mem_t me
   *exists = false;
 
   spn_index_pkg_t* existing = SP_NULLPTR;
-  try_union(spn_index_jsonl_get_package(index, mem, rel->id, &existing));
+  spn_try_union(spn_index_jsonl_get_package(index, mem, rel->id, &existing));
   if (!existing) {
     return spn_result(SPN_OK);
   }

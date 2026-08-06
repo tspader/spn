@@ -45,7 +45,6 @@ const c8* spn_err_to_str(spn_err_t err) {
     case SPN_ERR_WASM_EXPORT_NOT_FOUND:        return "wasm_export_not_found";
     case SPN_ERR_PROFILE_INVALID:              return "profile_invalid";
     case SPN_ERR_PROFILE_UNDEFINED:            return "profile_undefined";
-    case SPN_ERR_FLAG_INVALID:                 return "flag_invalid";
     case SPN_ERR_SANITIZER_UNSUPPORTED:        return "sanitizer_unsupported";
     case SPN_ERR_SANITIZER_STATIC:             return "sanitizer_static";
     case SPN_ERR_COMPILER_FEATURE_UNSUPPORTED: return "compiler_feature_unsupported";

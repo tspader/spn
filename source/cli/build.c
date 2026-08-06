@@ -31,6 +31,9 @@ sp_cli_result_t spn_cli_build(sp_cli_t* cli) {
     set_rule(&config.selection.script, all_kinds || cmd->only.script, names);
   }
 
-  try_cli(spn_cli_open_session(config));
-  return spn_cli_result(cli, spn_op_build(spn.session));
+  sp_cli_result_t session = spn_cli_session(cli, config);
+  if (session != SP_CLI_OK) {
+    return session;
+  }
+  return spn_op_build(spn.session) ? SP_CLI_ERR : SP_CLI_OK;
 }

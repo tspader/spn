@@ -11,7 +11,7 @@ spn_err_union_t spn_publish_build(spn_publish_opts_t* opts, spn_index_release_t*
   sp_str_t manifest_path = sp_fs_join_path(opts->mem, opts->cwd, sp_str_lit("spn.toml"));
 
   spn_pkg_info_t info = sp_zero;
-  try_union(spn_pkg_load(opts->mem, opts->intern, manifest_path, SPN_MANIFEST_DEP, sp_str_lit(""), &info));
+  spn_try_union(spn_pkg_load(opts->mem, opts->intern, manifest_path, SPN_MANIFEST_DEP, sp_str_lit(""), &info));
 
   sp_str_t repo = sp_zero;
   if (spn_git_get_root(opts->mem, opts->cwd, &repo)) {
@@ -59,7 +59,7 @@ spn_err_union_t spn_publish_build(spn_publish_opts_t* opts, spn_index_release_t*
   }
 
   spn_index_release_t release = sp_zero;
-  try_union(spn_index_release_from_pkg(opts->mem, &info, &release));
+  spn_try_union(spn_index_release_from_pkg(opts->mem, &info, &release));
 
   spn_pkg_tree_t published = {
     .kind = SPN_PKG_TREE_GIT,

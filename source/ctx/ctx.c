@@ -31,7 +31,20 @@ bool spn_ctx_progress(spn_ctx_t* ctx, spn_progress_t* progress) {
   return true;
 }
 
+spn_err_union_t spn_ctx_require_project(spn_ctx_t* ctx) {
+  if (!ctx->project) {
+    return (spn_err_union_t) {
+      .kind = SPN_ERR_NO_MANIFEST,
+      .no_manifest = { .path = ctx->paths.project },
+    };
+  }
+  return spn_result(SPN_OK);
+}
+
 spn_index_info_t* spn_find_index(sp_str_t name) {
+  if (sp_str_empty(name)) {
+    name = sp_str_lit("core");
+  }
   sp_da_for(spn.indexes, it) {
     if (sp_str_equal(spn.indexes[it].name, name)) {
       return &spn.indexes[it];

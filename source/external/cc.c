@@ -60,10 +60,12 @@ spn_err_t spn_cc_embed_ctx_add(
 }
 
 spn_err_t spn_cc_embed_ctx_write(spn_cc_embed_ctx_t* ctx, sp_str_t object, sp_str_t header) {
-  spn_try_as(spn_obj_write(&ctx->obj, object), SPN_ERROR);
+  spn_try(spn_obj_write(&ctx->obj, object));
 
   sp_io_file_writer_t writer = sp_zero;
-  spn_try_as(sp_io_file_writer_from_path(&writer, header), SPN_ERROR);
+  if (sp_io_file_writer_from_path(&writer, header)) {
+    return SPN_ERROR;
+  }
   sp_io_writer_t* io = &writer.base;
   sp_da_for(ctx->entries, it) {
     spn_cc_embed_t entry = ctx->entries[it];

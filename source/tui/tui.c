@@ -578,60 +578,6 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
           );
           break;
         }
-        case SPN_ERR_FLAG_INVALID: {
-          const c8* flag = sp_zero;
-          const c8* expected = sp_zero;
-          switch (event->err.flag.field) {
-            case SPN_PROFILE_FIELD_TARGET: {
-              flag = "--target";
-              expected = "an <arch>-<os>-<abi> triple like x86_64-linux-gnu";
-              break;
-            }
-            case SPN_PROFILE_FIELD_ARCH: {
-              flag = "--arch";
-              expected = "x86_64, aarch64, wasm32";
-              break;
-            }
-            case SPN_PROFILE_FIELD_OS: {
-              flag = "--os";
-              expected = "linux, macos, windows, wasi";
-              break;
-            }
-            case SPN_PROFILE_FIELD_ABI: {
-              flag = "--abi";
-              expected = "gnu, musl, msvc, mingw";
-              break;
-            }
-            case SPN_PROFILE_FIELD_MODE: {
-              flag = "--mode";
-              expected = "debug, release";
-              break;
-            }
-            case SPN_PROFILE_FIELD_OPT: {
-              flag = "--opt";
-              expected = "0, 1, 2, 3, s, z";
-              break;
-            }
-            case SPN_PROFILE_FIELD_SANITIZE: {
-              flag = "--sanitize";
-              expected = "a comma-separated list of address, thread, undefined, memory, leak, or none";
-              break;
-            }
-            case SPN_PROFILE_FIELD_SANITIZE_CONFLICT: {
-              flag = "--sanitize";
-              expected = "a compatible set (thread and memory don't combine with each other, address, or leak)";
-              break;
-            }
-          }
-          sp_fmt_io(
-            &w.base,
-            "invalid value {.red} for {.yellow}; expected {}",
-            sp_fmt_str(event->err.flag.value),
-            sp_fmt_cstr(flag),
-            sp_fmt_cstr(expected)
-          );
-          break;
-        }
         case SPN_ERR_SANITIZER_UNSUPPORTED: {
           sp_fmt_io(
             &w.base,

@@ -4,7 +4,6 @@
 #include "error/types.h"
 #include "sp.h"
 
-#define try(expr) spn_try(expr)
 
 static sp_atomic_s32_t spn_dag_next_id;
 

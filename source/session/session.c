@@ -75,7 +75,7 @@ spn_err_union_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem,
   spn_triple_t host = spn_triple_host();
 
   sp_str_t builtins = sp_str((const c8*)toolchains_json, toolchains_json_size);
-  try_as_union(spn_toolchain_catalog_init(&s->catalog, builtins, s->mem));
+  spn_try_union(spn_result(spn_toolchain_catalog_init(&s->catalog, builtins, s->mem)));
   sp_str_om_for(root->toolchains, it) {
     spn_toolchain_catalog_add(&s->catalog, *sp_str_om_at(root->toolchains, it));
   }
@@ -94,7 +94,7 @@ spn_err_union_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem,
   sp_om_new(s->units.targets);
   sp_om_new(s->units.objects);
 
-  try_union(spn_profile_resolve(s->profiles, &config.overrides, host, is_shared_linkage(root), &s->profile));
+  spn_try_union(spn_profile_resolve(s->profiles, &config.overrides, host, is_shared_linkage(root), &s->profile));
 
   switch (s->profile.os) {
     case SPN_OS_MACOS: {
@@ -106,8 +106,8 @@ spn_err_union_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem,
     }
   }
 
-  try_union(spn_build_add(s, spn_build_config_target(host, s->profile), &s->units.target));
-  try_union(spn_build_add(s, spn_build_config_metaprogram(host), &s->units.metaprogram));
+  spn_try_union(spn_build_add(s, spn_build_config_target(host, s->profile), &s->units.target));
+  spn_try_union(spn_build_add(s, spn_build_config_metaprogram(host), &s->units.metaprogram));
   sp_da_push(s->units.metaprogram->include, ctx->paths.include);
 
   spn_build_plan_t plan = {

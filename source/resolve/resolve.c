@@ -368,7 +368,7 @@ static spn_err_union_t resolve_local_package(spn_resolver_t* resolver, spn_resol
 
   // If the package is local, just load it
   if (!pkg && request->source == SPN_PKG_SOURCE_FILE) {
-    try_union(spn_registry_load_file_pkg(resolver->registry, resolver->mem, resolver->intern, request->qualified, request->file.path, &pkg));
+    spn_try_union(spn_registry_load_file_pkg(resolver->registry, resolver->mem, resolver->intern, request->qualified, request->file.path, &pkg));
   }
 
   if (!pkg) {
@@ -506,7 +506,7 @@ static spn_err_union_t resolve_index_package(spn_resolver_t* resolver, spn_resol
   }
 
   spn_index_pkg_t* pkg = SP_NULLPTR;
-  try_union(spn_index_cache_get_package(resolver->index, spn_pkg_name_from_qualified(request->qualified), &pkg));
+  spn_try_union(spn_index_cache_get_package(resolver->index, spn_pkg_name_from_qualified(request->qualified), &pkg));
   if (!pkg) {
     return (spn_err_union_t) {
       .kind = SPN_ERR_PKG_UNKNOWN,
@@ -628,7 +628,7 @@ static spn_err_union_t solve_reqs(spn_resolver_t* resolver, spn_resolve_run_t* r
 
   for (u64 it = from; it < to; it++) {
     spn_requested_dep_t req = run->scopes[run->scope].reqs[it];
-    try_union(resolve_dep(resolver, run, &root, &req));
+    spn_try_union(resolve_dep(resolver, run, &root, &req));
   }
 
   return spn_result(SPN_OK);
@@ -974,7 +974,7 @@ static spn_err_union_t check_group_cycle(spn_resolver_t* resolver, spn_resolve_r
   }
 
   sp_mem_end_scratch(scratch);
-  try_union(err);
+  spn_try_union(err);
 
   *sp_ht_getp(states, key) = 2;
   return spn_result(SPN_OK);
@@ -1188,7 +1188,7 @@ static spn_err_union_t solve_once(spn_resolver_t* resolver, spn_resolve_query_t*
       progress = true;
       run->scope = (u32)it;
 
-      try_union(resolve_scope(resolver, run));
+      spn_try_union(resolve_scope(resolver, run));
 
       commit_scope(resolver, run);
       process_boundaries(resolver, run);
@@ -1196,7 +1196,7 @@ static spn_err_union_t solve_once(spn_resolver_t* resolver, spn_resolve_query_t*
   }
 
   compute_processes(run);
-  try_union(check_group_cycles(resolver, run));
+  spn_try_union(check_group_cycles(resolver, run));
 
   spn_group_hash_t memo = SP_NULLPTR;
   sp_ht_init(resolver->mem, memo);

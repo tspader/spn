@@ -73,11 +73,12 @@ void spn_obj_add_symbol(spn_obj_builder_t* obj, sp_str_t name, const void* data,
 }
 
 spn_err_t spn_obj_write(spn_obj_builder_t* obj, sp_str_t path) {
+  sp_err_t err = SP_OK;
   switch (obj->kind) {
-    case SPN_OBJ_COFF:  spn_try_as(sp_coff_write_to_file(obj->coff.coff, path), SPN_ERROR); break;
-    case SPN_OBJ_ELF:   spn_try_as(sp_elf_write_to_file(obj->elf.elf, path), SPN_ERROR); break;
-    case SPN_OBJ_MACHO: spn_try_as(sp_macho_write_to_file(obj->macho.macho, path), SPN_ERROR); break;
+    case SPN_OBJ_COFF:  err = sp_coff_write_to_file(obj->coff.coff, path); break;
+    case SPN_OBJ_ELF:   err = sp_elf_write_to_file(obj->elf.elf, path); break;
+    case SPN_OBJ_MACHO: err = sp_macho_write_to_file(obj->macho.macho, path); break;
     default: SP_ASSERT(false); break;
   }
-  return SPN_OK;
+  return err ? SPN_ERROR : SPN_OK;
 }

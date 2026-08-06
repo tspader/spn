@@ -456,28 +456,12 @@ spn_cli_exec_t* spn_cli_exec(sp_cli_t* cli) {
   return (spn_cli_exec_t*)cli->user_data;
 }
 
-sp_cli_result_t spn_cli_result(sp_cli_t* cli, spn_err_union_t err) {
-  if (err.kind) {
-    spn_cli_exec(cli)->result = err;
-    return SP_CLI_ERR;
+sp_cli_result_t spn_cli_session(sp_cli_t* cli, spn_session_config_t config) {
+  sp_cli_result_t profile = spn_cli_parse_profile(cli, &config.overrides);
+  if (profile != SP_CLI_OK) {
+    return profile;
   }
-  return SP_CLI_OK;
-}
-
-spn_err_union_t spn_cli_require_project() {
-  if (!spn.project) {
-    return (spn_err_union_t) {
-      .kind = SPN_ERR_NO_MANIFEST,
-      .no_manifest = { .path = spn.paths.project },
-    };
-  }
-  return spn_result(SPN_OK);
-}
-
-spn_err_union_t spn_cli_open_session(spn_session_config_t config) {
-  try_union(spn_cli_require_project());
-  try_union(spn_profile_parse(&args.profile, &config.overrides));
-  return spn_ctx_open_session(&spn, config);
+  return spn_ctx_open_session(&spn, config) ? SP_CLI_ERR : SP_CLI_OK;
 }
 
 sp_cli_result_t spn_cli_error(sp_cli_t* cli, const c8* fmt, ...) {

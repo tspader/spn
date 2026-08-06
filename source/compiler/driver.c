@@ -49,7 +49,7 @@ spn_err_union_t spn_cc_validate_profile(const spn_cc_toolchain_t* toolchain, con
 spn_err_union_t spn_cc_render_flags(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, spn_cc_flags_t* flags) {
   sp_da_init(mem, flags->compile);
   sp_da_init(mem, flags->link);
-  try_union(spn_cc_validate_profile(toolchain, profile));
+  spn_try_union(spn_cc_validate_profile(toolchain, profile));
   switch (toolchain->driver) {
     case SPN_CC_DRIVER_GCC:
     case SPN_CC_DRIVER_CLANG: {
@@ -68,7 +68,7 @@ spn_err_union_t spn_cc_render_flags(sp_mem_t mem, const spn_cc_toolchain_t* tool
 }
 
 spn_err_union_t spn_cc_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_compile_t* compile, spn_invocation_t* invocation) {
-  try_union(spn_cc_validate_profile(toolchain, profile));
+  spn_try_union(spn_cc_validate_profile(toolchain, profile));
   *invocation = sp_zero_s(spn_invocation_t);
   switch (toolchain->driver) {
     case SPN_CC_DRIVER_GCC:
@@ -133,7 +133,7 @@ static spn_cc_feature_t link_feature(spn_cc_output_kind_t kind) {
 }
 
 spn_err_union_t spn_cc_validate_link(const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, spn_cc_output_kind_t kind, bool frameworks) {
-  try_union(spn_cc_validate_profile(toolchain, profile));
+  spn_try_union(spn_cc_validate_profile(toolchain, profile));
   spn_cc_feature_t feature = link_feature(kind);
 
   spn_err_union_t err = {
@@ -165,7 +165,7 @@ spn_err_union_t spn_cc_validate_link(const spn_cc_toolchain_t* toolchain, const 
 spn_err_union_t spn_cc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_link_t* link, const spn_cc_link_files_t* files, spn_invocation_t* invocation) {
   sp_assert(!sp_str_empty(files->output));
   if (!sp_str_empty(files->exports.path)) sp_assert(sp_da_empty(files->exports.symbols));
-  try_union(spn_cc_validate_link(toolchain, profile, link->kind, !sp_da_empty(link->frameworks)));
+  spn_try_union(spn_cc_validate_link(toolchain, profile, link->kind, !sp_da_empty(link->frameworks)));
   *invocation = sp_zero_s(spn_invocation_t);
   switch (toolchain->driver) {
     case SPN_CC_DRIVER_GCC:
@@ -192,7 +192,7 @@ spn_err_union_t spn_cc_validate_archive(const spn_cc_toolchain_t* toolchain, con
 
 spn_err_union_t spn_cc_render_archive(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_archive_files_t* files, spn_invocation_t* invocation) {
   sp_assert(!sp_str_empty(files->output));
-  try_union(spn_cc_validate_archive(toolchain, profile));
+  spn_try_union(spn_cc_validate_archive(toolchain, profile));
   *invocation = sp_zero_s(spn_invocation_t);
 
   switch (toolchain->archiver_driver) {

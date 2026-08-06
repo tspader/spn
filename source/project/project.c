@@ -22,7 +22,7 @@ spn_err_union_t spn_project_load(sp_mem_t mem, sp_intern_t* intern, spn_event_bu
   loaded->paths.manifest = manifest;
   loaded->paths.lock = sp_fs_join_path(mem, root, sp_str_lit("spn.lock"));
 
-  try_union(spn_pkg_load(mem, intern, manifest, SPN_MANIFEST_ROOT, sp_str_lit(""), &loaded->package));
+  spn_try_union(spn_pkg_load(mem, intern, manifest, SPN_MANIFEST_ROOT, sp_str_lit(""), &loaded->package));
 
   if (sp_fs_exists(loaded->paths.lock)) {
     sp_opt_set(loaded->lock, spn_lock_file_load(mem, loaded->paths.lock, events));

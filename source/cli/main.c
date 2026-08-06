@@ -45,7 +45,6 @@ static struct {
   s32 num_args;
   const c8** args;
   bool booted;
-  spn_err_union_t result;
   sp_cli_t cli;
   spn_cli_exec_t exec;
   struct {
@@ -67,15 +66,6 @@ static void on_signal(sp_os_signal_t signal, void* userdata) {
     }
   }
 }
-
-#define try(expr) \
-  do { \
-    spn_err_union_t __err = (expr); \
-    if (__err.kind) { \
-      entry.result = spn_err_emit(__err); \
-      return SP_APP_ERR; \
-    } \
-  } while (0)
 
 static void print_error(sp_cli_err_t err) {
   sp_fmt_io(&tui.logger.err.base, "{.red}: ", sp_fmt_cstr("error"));
@@ -135,10 +125,14 @@ static sp_app_result_t on_init(sp_app_t* sp) {
   entry.booted = true;
   sp_os_register_signal_handler(SP_OS_SIGNAL_INTERRUPT, on_signal, SP_NULLPTR);
 
-  try(spn_ctx_mount(&spn));
+  if (spn_ctx_mount(&spn)) {
+    return SP_APP_ERR;
+  }
   spn_tui_open_log(&tui, spn.paths.log);
 
-  try(spn_ctx_load_project(&spn, args.project_dir, args.refresh));
+  if (spn_ctx_load_project(&spn, args.project_dir, args.refresh)) {
+    return SP_APP_ERR;
+  }
   spn_tui_flush(&tui);
 
   sp_thread_init(&entry.dispatch.thread, on_thread, SP_NULLPTR);
@@ -165,10 +159,7 @@ static sp_app_result_t on_update(sp_app_t* sp) {
 
   sp_thread_join(&entry.dispatch.thread);
 
-  if (entry.exec.result.kind) {
-    entry.result = spn_err_emit(entry.exec.result);
-  }
-  spn_prompt_stop(&tui, !entry.result.kind);
+  spn_prompt_stop(&tui, entry.dispatch.status != SP_CLI_ERR);
   spn_tui_flush(&tui);
 
   switch (entry.dispatch.status) {
@@ -177,7 +168,7 @@ static sp_app_result_t on_update(sp_app_t* sp) {
       return SP_APP_QUIT;
     }
     case SP_CLI_ERR: {
-      if (!entry.exec.result.kind) {
+      if (entry.cli.err.kind) {
         print_error(entry.cli.err);
       }
       return SP_APP_ERR;
@@ -193,9 +184,7 @@ static sp_app_result_t on_update(sp_app_t* sp) {
   }
 
   if (entry.exec.finish) {
-    spn_err_union_t err = entry.exec.finish();
-    if (err.kind) {
-      entry.result = spn_err_emit(err);
+    if (entry.exec.finish()) {
       return SP_APP_ERR;
     }
   }
@@ -210,11 +199,7 @@ static void on_deinit(sp_app_t* sp) {
   }
 
   if (entry.booted) {
-    spn_err_t result = entry.result.kind;
-    if (sp->result == SP_APP_ERR && !result) {
-      result = SPN_ERROR;
-    }
-    spn_ctx_close(&spn, result);
+    spn_ctx_close(&spn, sp->result != SP_APP_ERR);
     spn_tui_flush(&tui);
   }
 }

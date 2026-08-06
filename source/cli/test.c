@@ -18,9 +18,13 @@ sp_cli_result_t spn_cli_test(sp_cli_t* cli) {
       },
     },
   };
-
-  try_cli(spn_cli_open_session(config));
-  try_cli(spn_op_build(spn.session));
+  sp_cli_result_t session = spn_cli_session(cli, config);
+  if (session != SP_CLI_OK) {
+    return session;
+  }
+  if (spn_op_build(spn.session)) {
+    return SP_CLI_ERR;
+  }
   spn_cli_exec(cli)->finish = spn_cli_run_roots;
   return SP_CLI_OK;
 }

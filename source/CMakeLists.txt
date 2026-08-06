@@ -14,6 +14,7 @@ set(SPN_SOURCES
   cli/init.c
   cli/index.c
   cli/main.c
+  cli/profile.c
   cli/publish.c
   cli/run.c
   cli/test.c

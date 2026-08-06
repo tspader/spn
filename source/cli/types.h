@@ -10,9 +10,20 @@
 typedef struct spn_cli spn_cli_t;
 
 typedef struct {
-  spn_err_union_t result;
-  spn_err_union_t (*finish)();
+  spn_err_t (*finish)();
 } spn_cli_exec_t;
+
+typedef struct {
+  sp_str_t name;
+  sp_str_t toolchain;
+  sp_str_t mode;
+  sp_str_t opt;
+  sp_str_t sanitize;
+  sp_str_t target;
+  sp_str_t os;
+  sp_str_t arch;
+  sp_str_t abi;
+} spn_cli_profile_t;
 
 typedef struct {
   sp_str_t package;
@@ -64,7 +75,7 @@ struct spn_cli {
   bool ci;
   u32 refresh;
 
-  spn_profile_args_t profile;
+  spn_cli_profile_t profile;
 
   spn_cli_add_t add;
   spn_cli_init_t init;

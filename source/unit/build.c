@@ -63,7 +63,7 @@ static bool same_triple(spn_triple_t lhs, spn_triple_t rhs) {
 
 static spn_err_union_t bind_toolchain(spn_session_t* s, spn_toolchain_query_t query, spn_toolchain_unit_t** out) {
   spn_toolchain_resolution_t resolution = sp_zero;
-  try_union(spn_toolchain_select(&s->catalog, query, &resolution));
+  spn_try_union(spn_toolchain_select(&s->catalog, query, &resolution));
 
   sp_da_for(s->units.toolchains, it) {
     spn_toolchain_unit_t* unit = s->units.toolchains[it];
@@ -105,7 +105,7 @@ spn_err_union_t spn_build_add(spn_session_t* s, spn_build_config_t config, spn_b
   }
 
   spn_toolchain_unit_t* toolchain = SP_NULLPTR;
-  try_union(bind_toolchain(s, (spn_toolchain_query_t) {
+  spn_try_union(bind_toolchain(s, (spn_toolchain_query_t) {
     .name = config.profile.toolchain,
     .target = { config.profile.arch, config.profile.os, config.profile.abi },
     .host = config.host,

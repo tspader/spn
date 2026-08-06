@@ -5,7 +5,6 @@
 #include "sp/io.h"
 #include "sp/atomic_file.h"
 
-#define try(expr) spn_try(expr)
 
 static sp_str_t format_obs_kind(spn_dag_obs_kind_t kind) {
   switch (kind) {
@@ -124,8 +123,7 @@ static bool row_header(sp_str_t* cursor) {
 }
 
 static spn_err_t write_bytes(sp_io_writer_t* io, const void* data, u64 len) {
-  spn_try_as(sp_io_write(io, data, len, SP_NULLPTR), SPN_ERR_DAG_STORE_WRITE);
-  return SPN_OK;
+  return sp_io_write(io, data, len, SP_NULLPTR) ? SPN_ERR_DAG_STORE_WRITE : SPN_OK;
 }
 
 static spn_err_t write_header(sp_io_writer_t* io) {
@@ -133,8 +131,7 @@ static spn_err_t write_header(sp_io_writer_t* io) {
 }
 
 static spn_err_t write_row_str(sp_io_writer_t* io, sp_str_t str) {
-  spn_try_as(sp_fmt_io(io, "{}:{}", sp_fmt_uint(str.len), sp_fmt_str(str)), SPN_ERR_DAG_STORE_WRITE);
-  return SPN_OK;
+  return sp_fmt_io(io, "{}:{}", sp_fmt_uint(str.len), sp_fmt_str(str)) ? SPN_ERR_DAG_STORE_WRITE : SPN_OK;
 }
 
 static sp_str_t entry_path(sp_str_t dir, sp_mem_t mem, spn_dag_digest_t key) {
@@ -143,8 +140,10 @@ static sp_str_t entry_path(sp_str_t dir, sp_mem_t mem, spn_dag_digest_t key) {
 }
 
 static spn_err_t write_output_row(sp_io_writer_t* io, sp_mem_t mem, const spn_dag_action_output_t* output) {
-  spn_try_as(sp_fmt_io(io, "{} ", sp_fmt_str(spn_dag_digest_hex(mem, output->digest))), SPN_ERR_DAG_STORE_WRITE);
-  try(write_row_str(io, output->name));
+  if (sp_fmt_io(io, "{} ", sp_fmt_str(spn_dag_digest_hex(mem, output->digest)))) {
+    return SPN_ERR_DAG_STORE_WRITE;
+  }
+  spn_try(write_row_str(io, output->name));
   return write_bytes(io, "\n", 1);
 }
 
@@ -156,9 +155,9 @@ static bool parse_output_row(sp_str_t* cursor, spn_dag_action_output_t* out) {
 }
 
 static spn_err_t write_outputs(sp_io_writer_t* io, sp_mem_t mem, const spn_dag_action_output_t* outputs, u64 count) {
-  try(write_header(io));
+  spn_try(write_header(io));
   sp_for(it, count) {
-    try(write_output_row(io, mem, outputs + it));
+    spn_try(write_output_row(io, mem, outputs + it));
   }
   return SPN_OK;
 }
@@ -183,7 +182,7 @@ static spn_err_t write_obs_row(sp_io_writer_t* io, sp_mem_t mem, const spn_dag_r
   if (sp_str_contains(prefixed.sub, sp_str_lit("\n"))) {
     return SPN_ERR_DAG_STORE_WRITE;
   }
-  spn_try_as(sp_fmt_io(io, "{} {} {} {} {} {} {} ",
+  if (sp_fmt_io(io, "{} {} {} {} {} {} {} ",
     sp_fmt_str(format_obs_kind(obs->kind)),
     sp_fmt_uint(obs->meta.id.inode),
     sp_fmt_int((s64)obs->meta.mtime.tv_sec),
@@ -191,12 +190,14 @@ static spn_err_t write_obs_row(sp_io_writer_t* io, sp_mem_t mem, const spn_dag_r
     sp_fmt_int(obs->meta.size),
     sp_fmt_str(spn_dag_digest_hex(mem, obs->meta.digest)),
     sp_fmt_uint(prefixed.root)
-  ), SPN_ERR_DAG_STORE_WRITE);
-  if (obs->kind == SPN_DAG_OBS_ENUMERATION) {
-    try(write_row_str(io, obs->filter));
-    try(write_bytes(io, " ", 1));
+  )) {
+    return SPN_ERR_DAG_STORE_WRITE;
   }
-  try(write_bytes(io, prefixed.sub.data, prefixed.sub.len));
+  if (obs->kind == SPN_DAG_OBS_ENUMERATION) {
+    spn_try(write_row_str(io, obs->filter));
+    spn_try(write_bytes(io, " ", 1));
+  }
+  spn_try(write_bytes(io, prefixed.sub.data, prefixed.sub.len));
   return write_bytes(io, "\n", 1);
 }
 
@@ -236,9 +237,9 @@ static bool parse_obs_row(sp_str_t* cursor, const spn_dag_roots_t* roots, sp_mem
 }
 
 static spn_err_t write_obs(sp_io_writer_t* io, sp_mem_t mem, const spn_dag_roots_t* roots, const spn_dag_obs_t* obs, u64 count) {
-  try(write_header(io));
+  spn_try(write_header(io));
   sp_for(it, count) {
-    try(write_obs_row(io, mem, roots, obs + it));
+    spn_try(write_obs_row(io, mem, roots, obs + it));
   }
   return SPN_OK;
 }
@@ -712,14 +713,20 @@ spn_err_t spn_dag_store_put_tree(spn_dag_store_t* store, sp_str_t dir, spn_dag_d
     spn_dag_action_output_t entry = {
       .name = sp_str_strip_left(sp_str_strip_left(files[it].path, dir), sp_str_lit("/"))
     };
-    spn_try_goto(spn_dag_store_put_file(store, files[it].path, entry.name, &entry.digest), err, done);
+    err = spn_dag_store_put_file(store, files[it].path, entry.name, &entry.digest);
+    if (err) {
+      goto done;
+    }
     sp_da_push(entries, entry);
   }
   sp_da_sort(entries, tree_entry_order);
 
   sp_io_dyn_mem_writer_t sink = sp_zero;
   sp_io_dyn_mem_writer_init(s.mem, &sink);
-  spn_try_goto(write_outputs(&sink.base, s.mem, entries, sp_da_size(entries)), err, done);
+  err = write_outputs(&sink.base, s.mem, entries, sp_da_size(entries));
+  if (err) {
+    goto done;
+  }
 
   sp_str_t manifest = sp_io_dyn_mem_writer_as_str(&sink);
   err = spn_dag_store_put(store, manifest.data, manifest.len, sp_str_lit("tree"), digest);
@@ -731,7 +738,7 @@ done:
 
 spn_err_t spn_dag_tree_entries(spn_dag_store_t* store, spn_dag_digest_t digest, sp_mem_t mem, sp_da(spn_dag_action_output_t)* out) {
   sp_mem_slice_t manifest = sp_zero;
-  try(spn_dag_store_get(store, digest, sp_str_lit("tree"), mem, &manifest));
+  spn_try(spn_dag_store_get(store, digest, sp_str_lit("tree"), mem, &manifest));
   sp_assert(manifest.len <= SP_LIMIT_U32_MAX);
 
   *out = sp_da_new(mem, spn_dag_action_output_t);
@@ -771,13 +778,19 @@ spn_err_t spn_dag_store_materialize_tree(spn_dag_store_t* store, spn_dag_digest_
   spn_err_t err = SPN_OK;
 
   sp_da(spn_dag_action_output_t) entries = sp_zero;
-  spn_try_goto(spn_dag_tree_entries(store, digest, s.mem, &entries), err, done);
+  err = spn_dag_tree_entries(store, digest, s.mem, &entries);
+  if (err) {
+    goto done;
+  }
 
   sp_fs_remove_dir(dir);
   sp_fs_create_dir(dir);
   sp_da_for(entries, it) {
     sp_str_t path = sp_fs_join_path(s.mem, dir, entries[it].name);
-    spn_try_goto(spn_dag_store_materialize(store, entries[it].digest, entries[it].name, path), err, done);
+    err = spn_dag_store_materialize(store, entries[it].digest, entries[it].name, path);
+    if (err) {
+      goto done;
+    }
   }
 
 done:
