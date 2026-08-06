@@ -40,7 +40,7 @@ static sp_atomic_s32_t sp_fs_atomic_sequence;
 static void sp_fs_atomic_temp_name(sp_fs_atomic_t* af, sp_str_t staging) {
   sp_tm_epoch_t now = sp_tm_now_epoch();
   u64 stamp = (now.s << 20) ^ (u64)now.ns;
-  u64 sequence = (u64)(u32)sp_atomic_s32_add(&sp_fs_atomic_sequence, 1);
+  u64 sequence = (u64)(u32)sp_atomic_s32_add(&sp_fs_atomic_sequence, 1, SP_ATOMIC_SEQ_CST);
   sp_str_t parent = sp_str_empty(staging) ? sp_fs_parent_path(af->path) : staging;
   sp_str_t name = sp_fs_get_name(af->path);
 

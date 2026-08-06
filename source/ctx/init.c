@@ -205,7 +205,7 @@ spn_err_t spn_ctx_open_session(spn_ctx_t* ctx, spn_session_config_t config) {
 void spn_ctx_close(spn_ctx_t* ctx, bool ok) {
   spn_err_t result = SPN_OK;
   if (!ok) {
-    result = (spn_err_t)sp_atomic_s32_get(&ctx->error);
+    result = (spn_err_t)sp_atomic_s32_load(&ctx->error, SP_ATOMIC_SEQ_CST);
     if (!result) {
       result = SPN_ERROR;
     }

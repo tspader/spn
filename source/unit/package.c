@@ -65,7 +65,7 @@ void spn_pkg_unit_write_stamp(spn_pkg_unit_t* unit, sp_str_t path) {
 // but really we just want to add one graph node to log before anything in a package is compiled.
 // I think of of the existing nodes would even suffice for this.
 void spn_pkg_unit_announce_compile(spn_pkg_unit_t* unit) {
-  if (!sp_atomic_s32_cas(&unit->compile_announced, 0, 1)) return;
+  if (!sp_atomic_s32_cas(&unit->compile_announced, 0, 1, SP_ATOMIC_SEQ_CST)) return;
 
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_COMPILE_START,

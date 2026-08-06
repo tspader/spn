@@ -368,23 +368,23 @@ static sp_atomic_s32_t sync_failed;
 
 static void sync_package_node(void *data) {
   pkg_job_t* job = (pkg_job_t*)data;
-  if (sp_atomic_s32_get(&sync_failed) || spn_ctx_cancelled(&spn)) {
+  if (sp_atomic_s32_load(&sync_failed, SP_ATOMIC_SEQ_CST) || spn_ctx_cancelled(&spn)) {
     return;
   }
   job->err = load_package(job->session, job->pkg, &job->loaded);
   if (job->err) {
-    sp_atomic_s32_set(&sync_failed, (s32)job->err);
+    sp_atomic_s32_store(&sync_failed, (s32)job->err, SP_ATOMIC_SEQ_CST);
   }
 }
 
 static void sync_toolchain_node(void* data) {
   toolchain_job_t* job = (toolchain_job_t*)data;
-  if (sp_atomic_s32_get(&sync_failed) || spn_ctx_cancelled(&spn)) {
+  if (sp_atomic_s32_load(&sync_failed, SP_ATOMIC_SEQ_CST) || spn_ctx_cancelled(&spn)) {
     return;
   }
   job->err = setup_toolchain_unit(&spn.caches.toolchains, job->unit);
   if (job->err) {
-    sp_atomic_s32_set(&sync_failed, (s32)job->err);
+    sp_atomic_s32_store(&sync_failed, (s32)job->err, SP_ATOMIC_SEQ_CST);
   }
 }
 
@@ -449,7 +449,7 @@ spn_err_union_t spn_op_sync(spn_session_t* session, bool* reresolve) {
       .num_file = num_file,
     }});
 
-  sp_atomic_s32_set(&sync_failed, 0);
+  sp_atomic_s32_store(&sync_failed, 0, SP_ATOMIC_SEQ_CST);
 
   u32 num_jobs = (u32)(sp_da_size(packages) + sp_da_size(toolchains));
   spn_thread_pool_t pool = sp_zero;

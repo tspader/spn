@@ -11,7 +11,7 @@ spn_dag_t* spn_dag_new(sp_mem_t mem) {
   sp_mem_arena_t* arena = sp_mem_arena_new(mem);
   sp_mem_t a = sp_mem_arena_as_allocator(arena);
   spn_dag_t* g = sp_mem_allocator_alloc_type(a, spn_dag_t);
-  g->id = (u32)sp_atomic_s32_add(&spn_dag_next_id, 1);
+  g->id = (u32)sp_atomic_s32_add(&spn_dag_next_id, 1, SP_ATOMIC_SEQ_CST);
   g->arena = arena;
   g->mem = a;
   sp_da_init(a, g->artifacts);

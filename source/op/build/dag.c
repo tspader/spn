@@ -1226,8 +1226,8 @@ static spn_err_union_t dag_result(spn_dag_build_t* b) {
 static void dag_emit_reports(spn_dag_build_t* b, u64 elapsed) {
   spn_session_t* session = b->session;
   bool failed = b->result != SPN_OK;
-  u32 hits = (u32)sp_atomic_s32_get(&b->progress.hits);
-  u32 misses = (u32)sp_atomic_s32_get(&b->progress.misses);
+  u32 hits = (u32)sp_atomic_s32_load(&b->progress.hits, SP_ATOMIC_SEQ_CST);
+  u32 misses = (u32)sp_atomic_s32_load(&b->progress.misses, SP_ATOMIC_SEQ_CST);
 
   sp_da_for(session->plans, it) {
     spn_build_unit_t* build = session->plans[it].build;
@@ -1365,9 +1365,9 @@ spn_err_union_t spn_dag_build_session(spn_session_t* session) {
     }
   });
 
-  sp_atomic_ptr_set(&session->ctx->progress, &b->progress);
+  sp_atomic_ptr_store(&session->ctx->progress, &b->progress, SP_ATOMIC_SEQ_CST);
   spn_err_union_t result = spn_dag_build_run(b, 16);
-  sp_atomic_ptr_set(&session->ctx->progress, SP_NULLPTR);
+  sp_atomic_ptr_store(&session->ctx->progress, SP_NULLPTR, SP_ATOMIC_SEQ_CST);
   u64 elapsed = sp_tm_read_timer(&b->timer);
 
   if (b->result == SPN_ERR_DAG_CANCELLED) {

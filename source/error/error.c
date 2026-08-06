@@ -11,7 +11,7 @@ spn_err_t spn_err_emit(spn_ctx_t* ctx, spn_err_union_t err) {
         .err = err,
       });
     }
-    sp_atomic_s32_cas(&ctx->error, 0, err.kind);
+    sp_atomic_s32_cas(&ctx->error, 0, err.kind, SP_ATOMIC_SEQ_CST);
   }
   return err.kind;
 }

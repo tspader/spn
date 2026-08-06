@@ -3,7 +3,7 @@
 .tmp
 .build
 bootstrap
-build
+/build
 **/*.mmd
 **/*.png
 **/*.pdb
@@ -27,4 +27,5 @@ compile_commands.json
 /.clangd
 /.envrc
 /tools/dagviz/.playwright-cli
+/tools/wip
 *.actual

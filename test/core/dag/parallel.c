@@ -167,7 +167,7 @@ static s32 par_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
     }
   }
 
-  sp_atomic_s32_add(&ctx->env->runs, 1);
+  sp_atomic_s32_add(&ctx->env->runs, 1, SP_ATOMIC_SEQ_CST);
   spn_dag_artifact_t* out = spn_dag_find_artifact(ctx->g, action->produces[0]);
   sp_str_t content = sp_str_view(ctx->spec->identity);
   if (out->kind == SPN_DAG_ARTIFACT_KIND_TREE) {
@@ -287,7 +287,7 @@ static sp_err_t par_run_builds(sp_test_t* t, spn_dag_store_kind_t kind, const pa
 
     spn_err_t err = spn_dag_run_executor(g, &env.dag.env, &pool.executor);
     sp_expect_eq(t, build->expect_err, err);
-    s32 runs = sp_atomic_s32_get(&env.runs);
+    s32 runs = sp_atomic_s32_load(&env.runs, SP_ATOMIC_SEQ_CST);
     sp_expect_ge(t, runs, (s32)build->expect_runs);
     sp_expect_le(t, runs, (s32)(build->expect_runs + build->expect_requeues));
 

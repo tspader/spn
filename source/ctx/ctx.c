@@ -9,24 +9,24 @@ sp_intern_t* spn_ctx_get_intern() {
 }
 
 void spn_ctx_cancel(spn_ctx_t* ctx) {
-  sp_atomic_s32_set(&ctx->aborted, 1);
+  sp_atomic_s32_store(&ctx->aborted, 1, SP_ATOMIC_SEQ_CST);
 }
 
 bool spn_ctx_cancelled(spn_ctx_t* ctx) {
-  return sp_atomic_s32_get(&ctx->aborted) != 0;
+  return sp_atomic_s32_load(&ctx->aborted, SP_ATOMIC_SEQ_CST) != 0;
 }
 
 bool spn_ctx_progress(spn_ctx_t* ctx, spn_progress_t* progress) {
-  spn_dag_progress_t* dag = (spn_dag_progress_t*)sp_atomic_ptr_get(&ctx->progress);
+  spn_dag_progress_t* dag = (spn_dag_progress_t*)sp_atomic_ptr_load(&ctx->progress, SP_ATOMIC_SEQ_CST);
   if (!dag) {
     return false;
   }
 
   *progress = (spn_progress_t) {
-    .total = (u32)sp_atomic_s32_get(&dag->total),
-    .completed = (u32)sp_atomic_s32_get(&dag->completed),
-    .hits = (u32)sp_atomic_s32_get(&dag->hits),
-    .misses = (u32)sp_atomic_s32_get(&dag->misses),
+    .total = (u32)sp_atomic_s32_load(&dag->total, SP_ATOMIC_SEQ_CST),
+    .completed = (u32)sp_atomic_s32_load(&dag->completed, SP_ATOMIC_SEQ_CST),
+    .hits = (u32)sp_atomic_s32_load(&dag->hits, SP_ATOMIC_SEQ_CST),
+    .misses = (u32)sp_atomic_s32_load(&dag->misses, SP_ATOMIC_SEQ_CST),
   };
   return true;
 }

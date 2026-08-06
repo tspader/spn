@@ -17,18 +17,18 @@ typedef struct {
 static void smoke_run(void* data) {
   smoke_probe_t* probe = (smoke_probe_t*)data;
   probe->ran = true;
-  sp_atomic_s32_add(&smoke_runs, 1);
+  sp_atomic_s32_add(&smoke_runs, 1, SP_ATOMIC_SEQ_CST);
 }
 
 static void smoke_exit() {
-  sp_atomic_s32_add(&smoke_exits, 1);
+  sp_atomic_s32_add(&smoke_exits, 1, SP_ATOMIC_SEQ_CST);
 }
 
 sp_test(thread_pool, smoke) {
   sp_mem_t mem = sp_test_arena(t);
 
-  sp_atomic_s32_set(&smoke_runs, 0);
-  sp_atomic_s32_set(&smoke_exits, 0);
+  sp_atomic_s32_store(&smoke_runs, 0, SP_ATOMIC_SEQ_CST);
+  sp_atomic_s32_store(&smoke_exits, 0, SP_ATOMIC_SEQ_CST);
 
   spn_thread_pool_t pool = sp_zero;
   spn_thread_pool_init(&pool, mem, (spn_thread_pool_config_t) {
@@ -49,8 +49,8 @@ sp_test(thread_pool, smoke) {
   sp_must_eq(t, 0, spn_thread_pool_pending(&pool));
   spn_thread_pool_deinit(&pool);
 
-  sp_expect_eq(t, SMOKE_JOBS, sp_atomic_s32_get(&smoke_runs));
-  sp_expect_eq(t, SMOKE_WORKERS, sp_atomic_s32_get(&smoke_exits));
+  sp_expect_eq(t, SMOKE_JOBS, sp_atomic_s32_load(&smoke_runs, SP_ATOMIC_SEQ_CST));
+  sp_expect_eq(t, SMOKE_WORKERS, sp_atomic_s32_load(&smoke_exits, SP_ATOMIC_SEQ_CST));
   sp_for(it, SMOKE_JOBS) {
     sp_expect(t, probes[it].ran);
   }

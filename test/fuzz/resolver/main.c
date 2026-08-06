@@ -484,7 +484,7 @@ s32 main(s32 num_args, c8** args) {
     .summary = "Differential and metamorphic fuzzer for the dependency resolver",
     .opts = {
       {
-        .brief = "n",
+        .brief = 'n',
         .name = "iters",
         .kind = SP_CLI_OPT_S64,
         .summary = "Number of universes to run",
@@ -492,7 +492,7 @@ s32 main(s32 num_args, c8** args) {
         .ptr = &config.iters,
       },
       {
-        .brief = "i",
+        .brief = 'i',
         .name = "iter",
         .kind = SP_CLI_OPT_S64,
         .summary = "Run a single iteration, e.g. to replay a dumped failure",
@@ -500,7 +500,7 @@ s32 main(s32 num_args, c8** args) {
         .ptr = &config.iter,
       },
       {
-        .brief = "s",
+        .brief = 's',
         .name = "seed",
         .kind = SP_CLI_OPT_CSTR,
         .summary = "PRNG seed, decimal or 0x-hex; random when unset",
@@ -508,7 +508,7 @@ s32 main(s32 num_args, c8** args) {
         .ptr = &config.seed,
       },
       {
-        .brief = "k",
+        .brief = 'k',
         .name = "keep-going",
         .summary = "Run every iteration instead of stopping at the first failure",
         .ptr = &config.keep_going,

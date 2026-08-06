@@ -446,7 +446,7 @@ s32 sp_fuzz_main(s32 num_args, c8** args, const sp_fuzz_desc_t* desc) {
     .summary = desc->summary,
     .opts = {
       {
-        .brief = "n",
+        .brief = 'n',
         .name = "iters",
         .kind = SP_CLI_OPT_S64,
         .summary = "Number of iterations to run",
@@ -454,7 +454,7 @@ s32 sp_fuzz_main(s32 num_args, c8** args, const sp_fuzz_desc_t* desc) {
         .ptr = &config.iters,
       },
       {
-        .brief = "i",
+        .brief = 'i',
         .name = "iter",
         .kind = SP_CLI_OPT_S64,
         .summary = "Run a single iteration, e.g. to replay a dumped failure; overrides --iters",
@@ -462,7 +462,7 @@ s32 sp_fuzz_main(s32 num_args, c8** args, const sp_fuzz_desc_t* desc) {
         .ptr = &config.iter,
       },
       {
-        .brief = "s",
+        .brief = 's',
         .name = "seed",
         .kind = SP_CLI_OPT_CSTR,
         .summary = "PRNG seed, decimal or 0x-hex; random when unset",
@@ -470,7 +470,7 @@ s32 sp_fuzz_main(s32 num_args, c8** args, const sp_fuzz_desc_t* desc) {
         .ptr = &config.seed,
       },
       {
-        .brief = "c",
+        .brief = 'c',
         .name = "config",
         .kind = SP_CLI_OPT_CSTR,
         .summary = "TOML config with [profile.NAME] tables; profile 'default' applies unless --profile is given",
@@ -478,7 +478,7 @@ s32 sp_fuzz_main(s32 num_args, c8** args, const sp_fuzz_desc_t* desc) {
         .ptr = &config.config,
       },
       {
-        .brief = "p",
+        .brief = 'p',
         .name = "profile",
         .kind = SP_CLI_OPT_CSTR,
         .summary = "Profile to run from the config (implies --config fuzz.toml when unset)",
@@ -486,28 +486,28 @@ s32 sp_fuzz_main(s32 num_args, c8** args, const sp_fuzz_desc_t* desc) {
         .ptr = &config.profile,
       },
       {
-        .brief = "l",
+        .brief = 'l',
         .name = "list-profiles",
         .kind = SP_CLI_OPT_BOOLEAN,
         .summary = "List the profiles the config defines and exit",
         .ptr = &config.list_profiles,
       },
       {
-        .brief = "d",
+        .brief = 'd',
         .name = "dry-run",
         .kind = SP_CLI_OPT_BOOLEAN,
         .summary = "Resolve the config and print the effective settings without running",
         .ptr = &config.dry_run,
       },
       {
-        .brief = "k",
+        .brief = 'k',
         .name = "keep-going",
         .kind = SP_CLI_OPT_BOOLEAN,
         .summary = "Run every iteration instead of stopping at the first failure",
         .ptr = &config.keep_going,
       },
       {
-        .brief = "r",
+        .brief = 'r',
         .name = "render",
         .kind = SP_CLI_OPT_CSTR,
         .summary = "Render each iteration into DIR/NNN/ with everything needed to replay it",

@@ -74,18 +74,18 @@ static void print_error(sp_cli_err_t err) {
 
 static s32 on_thread(void* userdata) {
   app.thread.status = sp_cli_dispatch(&app.cli);
-  sp_atomic_s32_set(&app.thread.done, 1);
+  sp_atomic_s32_store(&app.thread.done, 1, SP_ATOMIC_SEQ_CST);
   return 0;
 }
 
 static sp_app_result_t on_init(sp_app_t* sp) {
   spn_tui_init(&tui);
 
-  app.cli = sp_cli_parse((sp_cli_desc_t) {
+  sp_cli_parse((sp_cli_desc_t) {
     .root = spn_cli(),
     .args = app.args,
     .num_args = app.num_args,
-  });
+  }, &app.cli);
 
   switch (app.cli.status) {
     case SP_CLI_HELP: {
@@ -144,7 +144,7 @@ static sp_app_result_t on_poll(sp_app_t* sp) {
 }
 
 static sp_app_result_t on_update(sp_app_t* sp) {
-  if (!sp_atomic_s32_get(&app.thread.done)) {
+  if (!sp_atomic_s32_load(&app.thread.done, SP_ATOMIC_SEQ_CST)) {
     return SP_APP_CONTINUE;
   }
 
