@@ -1304,27 +1304,27 @@ void spn_tui_log_event(spn_tui_t* tui, spn_build_event_t* event) {
 
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   sp_mem_t mem = scratch.mem;
-  sp_io_writer_t* w = tui->out;
+  sp_io_writer_t* io = &tui->writer.base;
   sp_str_t verb = sp_cstr_as_str(display->display);
 
   if (display->error) {
     sp_da_for(tui->buffered_logs, it) {
       spn_tui_buffered_log_t* log = &tui->buffered_logs[it];
-      write_event(w, mem, sp_str_lit(""), false, log->pkg, log->message);
+      write_event(io, mem, sp_str_lit(""), false, log->pkg, log->message);
     }
     sp_da_clear(tui->buffered_logs);
 
     sp_str_t detail = spn_tui_render_event_detail(mem, event);
     if (display->terminal) {
-      write_event(w, mem, sp_str_lit("Failed"), true, event_subject(event), sp_str_lit(""));
-      sp_io_write_c8(w, '\n');
-      write_error(w, mem, verb, detail);
+      write_event(io, mem, sp_str_lit("Failed"), true, event_subject(event), sp_str_lit(""));
+      sp_io_write_c8(io, '\n');
+      write_error(io, mem, verb, detail);
     } else {
       sp_str_t name = event->pkg ? event->pkg->name : sp_str_lit("");
-      write_event(w, mem, verb, true, name, detail);
+      write_event(io, mem, verb, true, name, detail);
     }
-    render_event_extra(w, event);
-    flush_writer(&tui->line_writer);
+    render_event_extra(io, event);
+    flush_writer(&tui->writer);
     sp_mem_end_scratch(scratch);
     return;
   }
@@ -1335,7 +1335,7 @@ void spn_tui_log_event(spn_tui_t* tui, spn_build_event_t* event) {
         sp_str_ht_insert(tui->seen_url, sp_str_copy(tui->mem, event->sync.url), true);
         tui->num_downloads++;
         write_event(
-          w, mem, verb, false,
+          io, mem, verb, false,
           get_short_name(event->sync.name),
           sp_fmt(mem, "{.gray}", sp_fmt_str(event->sync.url)).value
         );
@@ -1351,7 +1351,7 @@ void spn_tui_log_event(spn_tui_t* tui, spn_build_event_t* event) {
       c8 buffer [64] = sp_zero;
       sp_fmt_write_duration_buf(buffer, sizeof(buffer), event->sync_end.time);
       write_event(
-        w, mem, verb, false,
+        io, mem, verb, false,
         sp_str_lit(""),
         sp_fmt(mem, "{} {} in {.gray}",
           sp_fmt_uint(tui->num_downloads),
@@ -1364,7 +1364,7 @@ void spn_tui_log_event(spn_tui_t* tui, spn_build_event_t* event) {
 
     case SPN_EVENT_RESOLVE_END:
     case SPN_EVENT_BUILD_PASSED: {
-      write_event(w, mem, verb, false, sp_str_lit(""), spn_tui_render_event_detail(mem, event));
+      write_event(io, mem, verb, false, sp_str_lit(""), spn_tui_render_event_detail(mem, event));
       break;
     }
 
@@ -1373,24 +1373,24 @@ void spn_tui_log_event(spn_tui_t* tui, spn_build_event_t* event) {
       if (sp_str_empty(name) && event->pkg) {
         name = event->pkg->name;
       }
-      write_event(w, mem, verb, false, name, spn_tui_render_event_detail(mem, event));
+      write_event(io, mem, verb, false, name, spn_tui_render_event_detail(mem, event));
       break;
     }
 
     case SPN_EVENT_USER_LOG: {
       sp_str_t name = event->pkg ? event->pkg->name : sp_str_lit("");
-      write_event(w, mem, sp_str_lit(""), false, name, event->user_log.message);
+      write_event(io, mem, sp_str_lit(""), false, name, event->user_log.message);
       break;
     }
 
     default: {
       sp_str_t name = event->pkg ? event->pkg->name : sp_str_lit("");
-      write_event(w, mem, verb, false, name, spn_tui_render_event_detail(mem, event));
+      write_event(io, mem, verb, false, name, spn_tui_render_event_detail(mem, event));
       break;
     }
   }
 
-  flush_writer(&tui->line_writer);
+  flush_writer(&tui->writer);
   sp_mem_end_scratch(scratch);
 }
 
@@ -1446,13 +1446,13 @@ static void flush_writer(spn_tui_line_writer_t* writer) {
 }
 
 static void attach_prompt(spn_tui_t* tui, sp_prompt_ctx_t* ctx) {
-  flush_writer(&tui->line_writer);
-  tui->line_writer.prompt = ctx;
+  flush_writer(&tui->writer);
+  tui->writer.prompt = ctx;
 }
 
 static void detach_prompt(spn_tui_t* tui) {
-  tui->line_writer.prompt = SP_NULLPTR;
-  flush_writer(&tui->line_writer);
+  tui->writer.prompt = SP_NULLPTR;
+  flush_writer(&tui->writer);
 }
 
 void spn_tui_init(spn_tui_t* tui) {
@@ -1473,12 +1473,11 @@ void spn_tui_init(spn_tui_t* tui) {
   }
 #endif
 
-  tui->line_writer = (spn_tui_line_writer_t) {
+  tui->writer = (spn_tui_line_writer_t) {
     .base.write = on_write,
     .downstream = &tui->logger.err.base,
   };
-  sp_da_init(tui->mem, tui->line_writer.partial);
-  tui->out = &tui->line_writer.base;
+  sp_da_init(tui->mem, tui->writer.partial);
   sp_str_ht_init(tui->mem, tui->seen_url);
   sp_da_init(tui->mem, tui->buffered_logs);
   sp_ht_init(tui->mem, tui->thread_ids);
@@ -1498,9 +1497,10 @@ void spn_tui_open_log(spn_tui_t* tui, sp_str_t dir) {
   sp_mem_end_scratch(scratch);
 }
 
-static u32 short_thread_id(spn_tui_t* tui, u64 thread_id) {
+static u32 get_short_tid(spn_tui_t* tui, u64 thread_id) {
+  static u32 next_thread_id = 0;
   if (!sp_ht_key_exists(tui->thread_ids, thread_id)) {
-    sp_ht_insert(tui->thread_ids, thread_id, tui->next_thread_id++);
+    sp_ht_insert(tui->thread_ids, thread_id, next_thread_id++);
   }
   return *sp_ht_getp(tui->thread_ids, thread_id);
 }
@@ -1515,7 +1515,7 @@ void spn_tui_flush(spn_tui_t* tui) {
 
   sp_da_for(events, it) {
     spn_build_event_t* event = &events[it];
-    event->thread_id = short_thread_id(tui, event->thread_id);
+    event->thread_id = get_short_tid(tui, event->thread_id);
 
     if (tui->logger.jsonl.fd) {
       spn_event_log_jsonl(&tui->logger.jsonl.base, event);
