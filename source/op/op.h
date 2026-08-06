@@ -14,5 +14,6 @@ spn_err_t spn_op_publish(spn_ctx_t* ctx, spn_publish_request_t request);
 spn_err_t spn_op_publish_build(spn_ctx_t* ctx, spn_publish_request_t request, spn_index_release_t* release);
 spn_err_t spn_op_sync_indexes(spn_ctx_t* ctx, spn_index_refresh_t refresh);
 spn_err_t spn_op_run_target(spn_session_t* session, spn_target_unit_t* unit);
+spn_err_t spn_op_run_test(spn_session_t* session, spn_target_unit_t* unit, spn_test_run_t* run);
 
 #endif

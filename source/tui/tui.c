@@ -285,7 +285,39 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
       break;
     }
     case SPN_EVENT_TARGET_RUN: {
-      sp_fmt_io(&w.base, "{.gray}", sp_fmt_str(event->run.command));
+      sp_fmt_io(&w.base, "{.gray}", sp_fmt_str(get_contextual_path(mem, event->run.command)));
+      break;
+    }
+    case SPN_EVENT_TEST_PASSED: {
+      c8 buffer [64] = sp_zero;
+      sp_fmt_write_duration_buf(buffer, sizeof(buffer), event->test_passed.time);
+      sp_fmt_io(&w.base, "in {.gray}", sp_fmt_cstr(buffer));
+      break;
+    }
+    case SPN_EVENT_TEST_FAILED: {
+      sp_fmt_io(&w.base, "{.yellow} failed with exit code {}",
+        sp_fmt_str(event->test_failed.name),
+        sp_fmt_int(event->test_failed.code)
+      );
+      break;
+    }
+    case SPN_EVENT_TEST_SUMMARY: {
+      c8 buffer [64] = sp_zero;
+      sp_fmt_write_duration_buf(buffer, sizeof(buffer), event->test_summary.time);
+      if (event->test_summary.failed) {
+        sp_fmt_io(&w.base, "{} passed, {.red} failed in {.gray}",
+          sp_fmt_uint(event->test_summary.passed),
+          sp_fmt_uint(event->test_summary.failed),
+          sp_fmt_cstr(buffer)
+        );
+      }
+      else {
+        sp_fmt_io(&w.base, "{} passed, {} failed in {.gray}",
+          sp_fmt_uint(event->test_summary.passed),
+          sp_fmt_uint(event->test_summary.failed),
+          sp_fmt_cstr(buffer)
+        );
+      }
       break;
     }
     case SPN_EVENT_BUILD_PASSED: {
@@ -1030,6 +1062,19 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
           );
           break;
         }
+        case SPN_ERR_TEST_MISSING: {
+          sp_fmt_io(
+            &w.base,
+            "test {.yellow} has no binary at {.cyan}",
+            sp_fmt_str(event->err.script.name),
+            sp_fmt_str(get_contextual_path(mem, event->err.script.path))
+          );
+          break;
+        }
+        case SPN_ERR_TEST_FAILED: {
+          sp_io_write_str(&w.base, sp_str_lit("one or more tests failed"), SP_NULLPTR);
+          break;
+        }
         case SPN_ERR_SCRIPT_FAILED: {
           sp_fmt_io(
             &w.base,
@@ -1230,6 +1275,11 @@ static void render_event_extra(sp_io_writer_t* w, spn_build_event_t* event) {
       sp_io_write_str(w, event->target.link_failed.out, SP_NULLPTR);
       break;
     }
+    case SPN_EVENT_TEST_FAILED: {
+      sp_io_write_str(w, event->test_failed.out, SP_NULLPTR);
+      sp_io_write_str(w, event->test_failed.err, SP_NULLPTR);
+      break;
+    }
     case SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED: {
       sp_io_write_str(w, event->compile_failed.error, SP_NULLPTR);
       break;
@@ -1363,8 +1413,14 @@ void spn_tui_log_event(spn_tui_t* tui, spn_build_event_t* event) {
     }
 
     case SPN_EVENT_RESOLVE_END:
-    case SPN_EVENT_BUILD_PASSED: {
+    case SPN_EVENT_BUILD_PASSED:
+    case SPN_EVENT_TEST_SUMMARY: {
       write_event(io, mem, verb, false, sp_str_lit(""), spn_tui_render_event_detail(mem, event));
+      break;
+    }
+
+    case SPN_EVENT_TEST_PASSED: {
+      write_event(io, mem, verb, false, event->test_passed.name, spn_tui_render_event_detail(mem, event));
       break;
     }
 

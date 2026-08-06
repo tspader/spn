@@ -268,6 +268,40 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_TARGET_RUN] = sp_bind_builder_end(&b);
   }
 
+  // SPN_EVENT_TEST_PASSED
+  {
+    sp_bind_builder_t b = sp_bind_builder_begin(mem);
+    SP_BIND_SCHEMA(&b) {
+      SP_BIND(&b, spn_evt_test_passed_t, name, "name", SP_BIND_STR);
+      SP_BIND(&b, spn_evt_test_passed_t, time, "time_ns", SP_BIND_U64);
+    }
+    schemas[SPN_EVENT_TEST_PASSED] = sp_bind_builder_end(&b);
+  }
+
+  // SPN_EVENT_TEST_FAILED
+  {
+    sp_bind_builder_t b = sp_bind_builder_begin(mem);
+    SP_BIND_SCHEMA(&b) {
+      SP_BIND(&b, spn_evt_test_failed_t, name, "name", SP_BIND_STR);
+      SP_BIND(&b, spn_evt_test_failed_t, code, "exit_code", SP_BIND_S32);
+      SP_BIND(&b, spn_evt_test_failed_t, out, "out", SP_BIND_STR);
+      SP_BIND(&b, spn_evt_test_failed_t, err, "err", SP_BIND_STR);
+      SP_BIND(&b, spn_evt_test_failed_t, time, "time_ns", SP_BIND_U64);
+    }
+    schemas[SPN_EVENT_TEST_FAILED] = sp_bind_builder_end(&b);
+  }
+
+  // SPN_EVENT_TEST_SUMMARY
+  {
+    sp_bind_builder_t b = sp_bind_builder_begin(mem);
+    SP_BIND_SCHEMA(&b) {
+      SP_BIND(&b, spn_evt_test_summary_t, passed, "passed", SP_BIND_U32);
+      SP_BIND(&b, spn_evt_test_summary_t, failed, "failed", SP_BIND_U32);
+      SP_BIND(&b, spn_evt_test_summary_t, time, "time_ns", SP_BIND_U64);
+    }
+    schemas[SPN_EVENT_TEST_SUMMARY] = sp_bind_builder_end(&b);
+  }
+
   // SPN_EVENT_INIT_BUILD_GRAPH
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
