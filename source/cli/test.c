@@ -77,8 +77,8 @@ static spn_err_t run_tests() {
 
 sp_cli_result_t spn_cli_test(sp_cli_t* cli) {
   spn_target_names_t names = sp_da_new(spn.heap, sp_str_t);
-  sp_for(it, cli->num_rest) {
-    sp_da_push(names, sp_cstr_as_str(cli->rest[it]));
+  for (const c8** it = cli->rest; *it; it++) {
+    sp_da_push(names, sp_cstr_as_str(*it));
   }
 
   spn_session_config_t config = {

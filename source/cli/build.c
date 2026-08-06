@@ -17,8 +17,8 @@ sp_cli_result_t spn_cli_build(sp_cli_t* cli) {
 
   spn_session_config_t config = { .force = cmd->force };
   spn_target_names_t names = sp_da_new(spn.heap, sp_str_t);
-  sp_for(it, cli->num_rest) {
-    sp_da_push(names, sp_cstr_as_str(cli->rest[it]));
+  for (const c8** it = cli->rest; *it; it++) {
+    sp_da_push(names, sp_cstr_as_str(*it));
   }
 
   bool specific = cmd->only.bin || cmd->only.lib || cmd->only.test || cmd->only.script;

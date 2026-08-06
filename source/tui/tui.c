@@ -1708,7 +1708,7 @@ void spn_tui_poll(spn_tui_t* tui) {
     return;
   }
 
-  if (sp_atomic_s32_get(&tui->handoff.requested)) {
+  if (sp_atomic_s32_load(&tui->handoff.requested, SP_ATOMIC_SEQ_CST)) {
     spn_prompt_stop(tui, true);
     spn_tui_flush(tui);
     tui->handoff.granted = true;
@@ -1721,6 +1721,6 @@ void spn_tui_poll(spn_tui_t* tui) {
 }
 
 void spn_tui_handoff(spn_tui_t* tui) {
-  sp_atomic_s32_set(&tui->handoff.requested, 1);
+  sp_atomic_s32_store(&tui->handoff.requested, 1, SP_ATOMIC_SEQ_CST);
   sp_semaphore_wait(&tui->handoff.ready);
 }

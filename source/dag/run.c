@@ -145,7 +145,7 @@ static void trace_resolve(spn_dag_env_t* env, spn_dag_id_t action, bool hit, boo
 
 static void progress_total(spn_dag_env_t* env, u64 total) {
   if (env->progress) {
-    sp_atomic_s32_set(&env->progress->total, (s32)total);
+    sp_atomic_s32_store(&env->progress->total, (s32)total, SP_ATOMIC_SEQ_CST);
   }
 }
 
@@ -155,9 +155,9 @@ static void progress_count(spn_dag_env_t* env, const spn_dag_action_t* action, b
     return;
   }
   if (!action->uncacheable) {
-    sp_atomic_s32_add(hit ? &env->progress->hits : &env->progress->misses, 1);
+    sp_atomic_s32_add(hit ? &env->progress->hits : &env->progress->misses, 1, SP_ATOMIC_SEQ_CST);
   }
-  sp_atomic_s32_add(&env->progress->completed, 1);
+  sp_atomic_s32_add(&env->progress->completed, 1, SP_ATOMIC_SEQ_CST);
 }
 
 static bool is_file_settled(spn_dag_file_cache_t* files, sp_str_t path, spn_dag_digest_t digest) {
@@ -934,7 +934,7 @@ static void seed_ready(spn_dag_run_t* run, sp_mem_t mem) {
 static void finish_action(spn_dag_run_t* run, spn_dag_action_t* action) {
   spn_dag_run_state_t* state = &run->states[action->id.index];
   state->done = true;
-  state->done_epoch = (u64)(sp_atomic_s32_add(&run->completed, 1) + 1);
+  state->done_epoch = (u64)(sp_atomic_s32_add(&run->completed, 1, SP_ATOMIC_SEQ_CST) + 1);
 
   sp_da_for(action->produces, pi) {
     spn_dag_artifact_t* produced = spn_dag_find_artifact(run->g, action->produces[pi]);
@@ -963,7 +963,7 @@ static void finish_action(spn_dag_run_t* run, spn_dag_action_t* action) {
 
 static void flight_run(void* data) {
   spn_dag_flight_t* flight = (spn_dag_flight_t*)data;
-  flight->epoch = (u64)sp_atomic_s32_get(flight->completed);
+  flight->epoch = (u64)sp_atomic_s32_load(flight->completed, SP_ATOMIC_SEQ_CST);
   flight->err = execute(flight->g, &flight->attempt, flight->env);
 }
 
@@ -1004,7 +1004,7 @@ static void run_dispatch(spn_dag_run_t* run, spn_dag_id_t id) {
   if (action->discover) {
     sp_assert(run->env->discovery);
     bool requeue = false;
-    if (defer_pathset(run, action, spn_dag_weak_key(run->g, action->id), (u64)sp_atomic_s32_get(&run->completed), &requeue)) {
+    if (defer_pathset(run, action, spn_dag_weak_key(run->g, action->id), (u64)sp_atomic_s32_load(&run->completed, SP_ATOMIC_SEQ_CST), &requeue)) {
       return;
     }
     sp_assert(!requeue);
@@ -1089,7 +1089,7 @@ spn_err_t spn_dag_run_executor(spn_dag_t* g, spn_dag_env_t* env, spn_thread_pool
       turns++;
       sp_assert(turns <= turns_max);
 
-      if (!run.err && env->cancel && sp_atomic_s32_get(env->cancel)) {
+      if (!run.err && env->cancel && sp_atomic_s32_load(env->cancel, SP_ATOMIC_SEQ_CST)) {
         run.err = SPN_ERR_DAG_CANCELLED;
       }
 
@@ -1119,7 +1119,7 @@ spn_err_t spn_dag_run_executor(spn_dag_t* g, spn_dag_env_t* env, spn_thread_pool
         flight_free(run.states[it].parked);
       }
     }
-    if (!run.err && (u64)sp_atomic_s32_get(&run.completed) != n) {
+    if (!run.err && (u64)sp_atomic_s32_load(&run.completed, SP_ATOMIC_SEQ_CST) != n) {
       run.err = SPN_ERR_DAG_STALLED;
       diag_set(&env->diag, SPN_ERR_DAG_STALLED, (spn_dag_id_t) sp_zero, sp_str_lit(""));
     }

@@ -62,7 +62,7 @@ static sp_cli_cmd_t cmd_clean = {
   .summary = "Remove the project build directory",
   .opts = {
     {
-      .brief = "p",
+      .brief = 'p',
       .name = "profile",
       .kind = SP_CLI_OPT_STR,
       .summary = "Only remove this profile's outputs",
@@ -78,14 +78,14 @@ static sp_cli_cmd_t cmd_build = {
   .summary = "Build the project, including dependencies, from source",
   .opts = {
     {
-      .brief = "f",
+      .brief = 'f',
       .name = "force",
       .summary = "Force build, even if it exists in store",
       .kind = SP_CLI_OPT_BOOLEAN,
       .ptr = &args.build.force,
     },
     {
-      .brief = "p",
+      .brief = 'p',
       .name = "profile",
       .kind = SP_CLI_OPT_STR,
       .summary = "Profile to use for building",
@@ -124,7 +124,7 @@ static sp_cli_cmd_t cmd_build = {
       .ptr = &args.profile.toolchain,
     },
     {
-      .brief = "m",
+      .brief = 'm',
       .name = "mode",
       .kind = SP_CLI_OPT_STR,
       .summary = "Override build mode (debug, release)",
@@ -189,7 +189,7 @@ static sp_cli_cmd_t cmd_run = {
   .summary = "Run a manifest script target or a relative C source file",
   .opts = {
     {
-      .brief = "p",
+      .brief = 'p',
       .name = "profile",
       .kind = SP_CLI_OPT_STR,
       .summary = "Profile to use when resolving build dependencies",
@@ -204,7 +204,7 @@ static sp_cli_cmd_t cmd_run = {
       .ptr = &args.profile.toolchain,
     },
     {
-      .brief = "m",
+      .brief = 'm',
       .name = "mode",
       .kind = SP_CLI_OPT_STR,
       .summary = "Override build mode (debug, release)",
@@ -242,7 +242,7 @@ static sp_cli_cmd_t cmd_test = {
   .summary = "Build and run tests",
   .opts = {
     {
-      .brief = "p",
+      .brief = 'p',
       .name = "profile",
       .kind = SP_CLI_OPT_STR,
       .summary = "Profile to use for building",
@@ -257,7 +257,7 @@ static sp_cli_cmd_t cmd_test = {
       .ptr = &args.profile.toolchain,
     },
     {
-      .brief = "m",
+      .brief = 'm',
       .name = "mode",
       .kind = SP_CLI_OPT_STR,
       .summary = "Override build mode (debug, release)",
@@ -294,7 +294,7 @@ static sp_cli_cmd_t cmd_publish = {
   .summary = "Publish a release to an index",
   .opts = {
     {
-      .brief = "i",
+      .brief = 'i',
       .name = "index",
       .kind = SP_CLI_OPT_STR,
       .summary = "Index to publish to",
@@ -382,7 +382,7 @@ static sp_cli_cmd_t cmd_root = {
   .summary = "A package manager and build tool for C",
   .opts = {
     {
-      .brief = "C",
+      .brief = 'C',
       .name = "project-dir",
       .kind = SP_CLI_OPT_STR,
       .summary = "Specify the directory containing project file",
@@ -390,7 +390,7 @@ static sp_cli_cmd_t cmd_root = {
       .ptr = &args.project_dir,
     },
     {
-      .brief = "f",
+      .brief = 'f',
       .name = "file",
       .kind = SP_CLI_OPT_STR,
       .summary = "Specify the project file path",
@@ -398,7 +398,7 @@ static sp_cli_cmd_t cmd_root = {
       .ptr = &args.project_file,
     },
     {
-      .brief = "o",
+      .brief = 'o',
       .name = "output",
       .kind = SP_CLI_OPT_STR,
       .summary = "Output mode: interactive, noninteractive, quiet, none, json",
@@ -406,14 +406,14 @@ static sp_cli_cmd_t cmd_root = {
       .ptr = &args.output,
     },
     {
-      .brief = "v",
+      .brief = 'v',
       .name = "verbose",
       .summary = "Show verbose output",
       .kind = SP_CLI_OPT_BOOLEAN,
       .ptr = &args.verbose,
     },
     {
-      .brief = "q",
+      .brief = 'q',
       .name = "quiet",
       .summary = "Only show errors",
       .kind = SP_CLI_OPT_BOOLEAN,

@@ -177,7 +177,7 @@ static sp_cli_result_t embed_one(
 sp_cli_result_t embed_run(sp_cli_t* cli) {
   embed_t* embed = sp_cast(embed_t*, cli->user_data);
 
-  if (!cli->num_rest) {
+  if (!*cli->rest) {
     return sp_cli_set_error_c(cli, "no input files");
   }
 
@@ -207,8 +207,8 @@ sp_cli_result_t embed_run(sp_cli_t* cli) {
   sp_da(embed_entry_t) entries = SP_NULLPTR;
   sp_da_init(mem, entries);
 
-  sp_for(it, cli->num_rest) {
-    sp_str_t arg = sp_str_view(cli->rest[it]);
+  for (const c8** it = cli->rest; *it; it++) {
+    sp_str_t arg = sp_str_view(*it);
 
     sp_str_t src = arg;
     sp_str_t dest = sp_zero;

@@ -136,7 +136,7 @@ static s32 fs_lock_waiter_fn(void* user_data) {
     return 1;
   }
 
-  sp_atomic_s32_set(&waiter->acquired, 1);
+  sp_atomic_s32_store(&waiter->acquired, 1, SP_ATOMIC_SEQ_CST);
   sp_fs_lock_release(&lock);
   return 0;
 }
@@ -153,11 +153,11 @@ sp_test(fs_lock, acquire_blocks_until_release, .serial = true) {
   sp_thread_init(&thread, fs_lock_waiter_fn, &waiter);
 
   sp_os_sleep_ms(50);
-  sp_expect_eq(t, sp_atomic_s32_get(&waiter.acquired), 0);
+  sp_expect_eq(t, sp_atomic_s32_load(&waiter.acquired, SP_ATOMIC_SEQ_CST), 0);
 
   sp_fs_lock_release(&lock);
   sp_thread_join(&thread);
-  sp_expect_eq(t, sp_atomic_s32_get(&waiter.acquired), 1);
+  sp_expect_eq(t, sp_atomic_s32_load(&waiter.acquired, SP_ATOMIC_SEQ_CST), 1);
 
   return SP_OK;
 }
