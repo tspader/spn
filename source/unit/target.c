@@ -133,7 +133,7 @@ static spn_err_union_t ensure_target(spn_session_t* s, spn_pkg_unit_t* pkg, spn_
   }
   if (!target) {
     target = add_target(s, pkg, info);
-    try_union(set_target_kind(s, target));
+    spn_try_union(set_target_kind(s, target));
   }
   if (result) *result = target;
   return spn_result(SPN_OK);
@@ -311,7 +311,7 @@ static void push_frameworks(link_framework_set_t* seen, sp_da(sp_str_t)* framewo
 static spn_err_union_t render_compile_bases(sp_mem_t mem, spn_target_unit_t* target) {
   sp_da_for(target->objects, it) {
     spn_compile_unit_t* unit = target->objects[it];
-    try_union(spn_build_render_compile(mem, unit, &unit->invocation));
+    spn_try_union(spn_build_render_compile(mem, unit, &unit->invocation));
   }
   return spn_result(SPN_OK);
 }
@@ -465,7 +465,7 @@ static spn_err_union_t build_target_plan(spn_target_unit_t* target) {
   spn_cc_toolchain_t* toolchain = &pkg->build->toolchain->cc;
 
   target->link = link_plan(target);
-  try_union(render_compile_bases(pkg->session->mem, target));
+  spn_try_union(render_compile_bases(pkg->session->mem, target));
 
   switch (target->kind) {
     case SPN_CC_OUTPUT_STATIC_LIB: {
@@ -473,7 +473,7 @@ static spn_err_union_t build_target_plan(spn_target_unit_t* target) {
     }
     case SPN_CC_OUTPUT_SHARED_LIB:
     case SPN_CC_OUTPUT_REACTOR: {
-      try_union(spn_cc_validate_archive(toolchain, profile));
+      spn_try_union(spn_cc_validate_archive(toolchain, profile));
       return spn_cc_validate_link(toolchain, profile, target->kind, !sp_da_empty(target->link.cc.frameworks));
     }
     case SPN_CC_OUTPUT_EXE: {
@@ -523,7 +523,7 @@ static spn_err_union_t ensure_sibling_targets(spn_session_t* s, sp_da(spn_target
         continue;
       }
       spn_target_unit_t* target = SP_NULLPTR;
-      try_union(ensure_target(s, unit->pkg, info, &target));
+      spn_try_union(ensure_target(s, unit->pkg, info, &target));
       sp_da_push(*targets, target);
     }
   }
@@ -574,10 +574,10 @@ static spn_err_union_t add_metaprogram_targets(spn_session_t* s) {
     spn_pkg_unit_t* unit = world->packages[it];
     spn_loaded_pkg_t* loaded = sp_ht_getp(s->packages, unit->id.pkg);
     if (!sp_da_empty(loaded->configure.source)) {
-      try_union(ensure_target(s, unit, &loaded->configure, SP_NULLPTR));
+      spn_try_union(ensure_target(s, unit, &loaded->configure, SP_NULLPTR));
     }
     if (!sp_da_empty(loaded->build.source)) {
-      try_union(ensure_target(s, unit, &loaded->build, SP_NULLPTR));
+      spn_try_union(ensure_target(s, unit, &loaded->build, SP_NULLPTR));
     }
   }
 
@@ -587,14 +587,14 @@ static spn_err_union_t add_metaprogram_targets(spn_session_t* s) {
       continue;
     }
     sp_str_om_for(unit->info->libs, jt) {
-      try_union(ensure_target(s, unit, sp_str_om_at(unit->info->libs, jt), SP_NULLPTR));
+      spn_try_union(ensure_target(s, unit, sp_str_om_at(unit->info->libs, jt), SP_NULLPTR));
     }
   }
 
   sp_da(spn_target_unit_t*) targets = sp_da_new(s->mem, spn_target_unit_t*);
   collect_unit_targets(&targets, world->packages);
-  try_union(ensure_sibling_targets(s, &targets));
-  try_union(resolve_target_deps(s, targets));
+  spn_try_union(ensure_sibling_targets(s, &targets));
+  spn_try_union(resolve_target_deps(s, targets));
 
   sp_da_for(targets, it) {
     if (targets[it]->lib_kind == SPN_LIB_KIND_SOURCE) {
@@ -611,12 +611,12 @@ static spn_err_union_t add_metaprogram_targets(spn_session_t* s) {
   }
 
   sp_da_for(targets, it) {
-    try_union(build_target_plan(targets[it]));
+    spn_try_union(build_target_plan(targets[it]));
   }
   sp_da_for(world->packages, it) {
     spn_target_unit_t* configure = world->packages[it]->scripts.configure;
     if (configure) {
-      try_union(build_target_plan(configure));
+      spn_try_union(build_target_plan(configure));
     }
   }
 
@@ -702,7 +702,7 @@ static spn_err_union_t add_plan_targets(spn_session_t* s, spn_build_plan_t* plan
     }
 
     spn_target_unit_t* target = SP_NULLPTR;
-    try_union(ensure_target(s, pkg, info, &target));
+    spn_try_union(ensure_target(s, pkg, info, &target));
     if (!is_root_target(s, plan, target)) {
       sp_da_push(plan->roots, target->id);
     }
@@ -721,30 +721,30 @@ static spn_err_union_t add_plan_root_targets(spn_session_t* s) {
         continue;
       }
       sp_str_om_for(pkg->info->libs, kt) {
-        try_union(ensure_target(s, pkg, sp_str_om_at(pkg->info->libs, kt), SP_NULLPTR));
+        spn_try_union(ensure_target(s, pkg, sp_str_om_at(pkg->info->libs, kt), SP_NULLPTR));
       }
     }
 
     spn_pkg_unit_t* pkg = spn_session_find_pkg_unit(s, plan->build, root);
     sp_assert(pkg);
-    try_union(validate_target_selection(&plan->selection, pkg->info));
-    try_union(add_plan_targets(s, plan, pkg, pkg->info->libs));
-    try_union(add_plan_targets(s, plan, pkg, pkg->info->exes));
-    try_union(add_plan_targets(s, plan, pkg, pkg->info->scripts));
-    try_union(add_plan_targets(s, plan, pkg, pkg->info->tests));
+    spn_try_union(validate_target_selection(&plan->selection, pkg->info));
+    spn_try_union(add_plan_targets(s, plan, pkg, pkg->info->libs));
+    spn_try_union(add_plan_targets(s, plan, pkg, pkg->info->exes));
+    spn_try_union(add_plan_targets(s, plan, pkg, pkg->info->scripts));
+    spn_try_union(add_plan_targets(s, plan, pkg, pkg->info->tests));
   }
   return spn_result(SPN_OK);
 }
 
 static spn_err_union_t add_target_build_targets(spn_session_t* s) {
-  try_union(add_plan_root_targets(s));
+  spn_try_union(add_plan_root_targets(s));
 
   sp_da(spn_target_unit_t*) targets = sp_da_new(s->mem, spn_target_unit_t*);
   sp_da_for(s->plans, it) {
     collect_unit_targets(&targets, s->plans[it].build->packages);
   }
-  try_union(ensure_sibling_targets(s, &targets));
-  try_union(resolve_target_deps(s, targets));
+  spn_try_union(ensure_sibling_targets(s, &targets));
+  spn_try_union(resolve_target_deps(s, targets));
 
   sp_da_for(targets, it) {
     if (targets[it]->lib_kind == SPN_LIB_KIND_SOURCE) {
@@ -763,7 +763,7 @@ static spn_err_union_t add_target_build_targets(spn_session_t* s) {
   }
 
   sp_da_for(targets, it) {
-    try_union(build_target_plan(targets[it]));
+    spn_try_union(build_target_plan(targets[it]));
   }
   return spn_result(SPN_OK);
 }

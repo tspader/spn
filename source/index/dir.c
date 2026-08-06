@@ -31,7 +31,7 @@ spn_err_union_t spn_index_dir_get_package(spn_index_info_t* index, sp_mem_t mem,
   }
 
   spn_index_release_t release = sp_zero;
-  try_union(spn_index_release_from_pkg(mem, info, &release));
+  spn_try_union(spn_index_release_from_pkg(mem, info, &release));
 
   release.manifest = (spn_pkg_tree_t) { .kind = SPN_PKG_TREE_LOCAL, .local = dir };
 

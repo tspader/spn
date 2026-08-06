@@ -46,9 +46,9 @@ if you find that you are pulling in tons and tons of unrelated TUs for a unit te
 
 # Errors
 
-We return errors up the call stack as a return code or an error union, which is just a return code + structured error data. Prefer a plain return code. If your error has associated data (e.g. a name used in its rendered error message), use `spn_err_union_t`.
-- Add a kind to `spn_err_t` in `include/spn.h`
-- Optionally, dd a payload struct to `spn_err_union_t` in `source/error/types.h`
+There are two error types:
+- `spn_err_t`: a plain error code. Prefer it. Leaf modules return codes; the caller has the context.
+- `spn_err_union_t`: a code plus structured payload, for errors whose rendered message needs data. Add a kind to `spn_err_t` in `include/spn.h`, a payload struct to `spn_err_union_t` in `source/error/types.h`, and a message in `spn_tui_render_event_detail`.
 
 ```c
 spn_err_union_t spum(kram_t kram) {
@@ -62,17 +62,13 @@ spn_err_union_t spum(kram_t kram) {
 }
 ```
 
-The caller emits the error as an event and propagates the status:
+Reporting is the event stream. `spn_err_emit(ctx, err)` is the single gate between the two types: it pushes the error as an `SPN_EVENT_ERR` event exactly once (skipped when `err.reported` is set), records the first error kind on the context for the exit code, and returns the plain code. Frontends render events; they never build error messages themselves.
 
-```c
-spn_err_union_t err = spn_toolchain_select(&session->catalog, query, session->mem, &session->selection);
-if (err.kind) {
-  spn_event_buffer_push(session->events, (spn_build_event_t) { .kind = SPN_EVENT_ERR, .err = err });
-  return SPN_ERROR;
-}
-```
-
-The reporting layer (`tui.c`, `spn_tui_render_event`) is the only place messages are built:
+The rules:
+- Library internals construct unions and propagate them unreported with `spn_try_union()`.
+- Ops (`spn_op_*`) and context lifecycle (`spn_ctx_*`) return `spn_err_t`. Every union crosses `spn_err_emit()` exactly once at that boundary, so a nonzero code in hand always means "already reported"; frontends only map it to an exit status.
+- Concurrent and streaming code (build workers, sync jobs) reports at the point of occurrence -- `spn_err_emit()`, or a specialized error event like `SPN_EVENT_LINK_FAILED` -- and propagates `spn_err_reported(kind)` so the boundary skips it.
+- The reporting layer (`tui.c`, `spn_tui_render_event_detail`) is the only place messages are built:
 
 ```c
 case SPN_ERR_TOOLCHAIN_UNKNOWN: {
@@ -81,20 +77,14 @@ case SPN_ERR_TOOLCHAIN_UNKNOWN: {
 }
 ```
 
-## `try()` macros
+The complete toolkit is five names; there are deliberately no others:
+- `spn_try(expr)` propagates a code
+- `spn_try_union(expr)` propagates a union
+- `spn_result(kind)` lifts a code into a union
+- `spn_err_reported(kind)` lifts an already-reported code into a union
+- `spn_err_emit(ctx, err)` reports a union and returns its code
 
-We use `try()` macros to keep code concise. There is a family of them (`spn_try()`, `spn_try_as()`, `try_union()`, `try_union_as()`). Prefer them, unless a conditional reads more simply.
-
-```c
-spn_try(expr());
-
-// ...expands to
-spn_err_t err = fn();
-if (err != SPN_OK) {
-  return err;
-}
-
-```
+Prefer the try macros unless a conditional reads more simply; report-and-propagate composes as `spn_try(spn_err_emit(ctx, expr))`.
 
 ## Rules
 - Never, ever comment your code. Code with newly added comments will be rejected. If you're reviewing code, flag comments.

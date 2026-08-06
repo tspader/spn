@@ -3,6 +3,7 @@
 
 #include "ctx/ctx.h"
 #include "ctx/types.h"
+#include "error/error.h"
 #include "error/types.h"
 #include "event/types.h"
 #include "forward/types.h"
@@ -30,7 +31,7 @@ static void sync_index_node(void* data) {
   job->err = spn_index_sync(job->index, job->force);
 }
 
-spn_err_union_t spn_op_sync_indexes(spn_ctx_t* ctx, spn_index_refresh_t refresh) {
+static spn_err_union_t sync_indexes(spn_ctx_t* ctx, spn_index_refresh_t refresh) {
   sp_da(job_t*) jobs = sp_da_new(ctx->mem, job_t*);
 
   sp_da_for(ctx->indexes, it) {
@@ -100,4 +101,8 @@ spn_err_union_t spn_op_sync_indexes(spn_ctx_t* ctx, spn_index_refresh_t refresh)
   }
 
   return spn_result(SPN_OK);
+}
+
+spn_err_t spn_op_sync_indexes(spn_ctx_t* ctx, spn_index_refresh_t refresh) {
+  return spn_err_emit(ctx, sync_indexes(ctx, refresh));
 }

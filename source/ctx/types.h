@@ -24,6 +24,7 @@ struct spn_ctx_t {
   spn_project_t* project;
   spn_session_t* session;
   sp_atomic_s32_t aborted;
+  sp_atomic_s32_t error;
   sp_atomic_ptr_t progress;
   spn_index_arr_t indexes;
   struct {

@@ -7,7 +7,6 @@
 #include "sp/fs.h"
 #include "sp/sp_glob.h"
 
-#define try(expr) spn_try(expr)
 
 static bool is_timespec_equal(sp_sys_timespec_t a, sp_sys_timespec_t b) {
   return a.tv_sec == b.tv_sec && a.tv_nsec == b.tv_nsec;
@@ -93,7 +92,9 @@ spn_err_t spn_dag_file_cache_stat(spn_dag_file_cache_t* c, sp_str_t path, sp_sys
   }
 
   sp_sys_file_meta_t sys = sp_zero;
-  spn_try_as(sp_sys_get_path_metadata_s(sp_sys_get_root(0), path, &sys), SPN_ERR_DAG_STAT);
+  if (sp_sys_get_path_metadata_s(sp_sys_get_root(0), path, &sys)) {
+    return SPN_ERR_DAG_STAT;
+  }
 
   sp_ht_insert(c->metadata, sp_str_copy(c->mem, path), sys);
   *meta = sys;
@@ -102,7 +103,7 @@ spn_err_t spn_dag_file_cache_stat(spn_dag_file_cache_t* c, sp_str_t path, sp_sys
 
 spn_err_t spn_dag_file_cache_digest(spn_dag_file_cache_t* c, sp_str_t path, spn_dag_digest_t* digest) {
   sp_sys_file_meta_t sys = sp_zero;
-  try(spn_dag_file_cache_stat(c, path, &sys));
+  spn_try(spn_dag_file_cache_stat(c, path, &sys));
 
   spn_dag_file_meta_t fresh = file_meta_from_sys(sys);
   spn_dag_file_meta_t* cached = sp_ht_getp(c->entries, fresh.id);
@@ -111,7 +112,7 @@ spn_err_t spn_dag_file_cache_digest(spn_dag_file_cache_t* c, sp_str_t path, spn_
     return SPN_OK;
   }
 
-  try(spn_sha256_file_digest(path, digest->bytes));
+  spn_try(spn_sha256_file_digest(path, digest->bytes));
 
   fresh.digest = *digest;
   sp_ht_insert(c->entries, fresh.id, fresh);
@@ -326,7 +327,7 @@ static spn_err_t settle(spn_dag_t* g, spn_dag_action_t* action, spn_dag_env_t* e
   sp_da_for(action->produces, it) {
     spn_dag_artifact_t* artifact = spn_dag_find_artifact(g, action->produces[it]);
     if (artifact->kind == SPN_DAG_ARTIFACT_KIND_TREE) {
-      try(settle_tree(action, artifact, env, diag));
+      spn_try(settle_tree(action, artifact, env, diag));
       artifact->path = artifact->target;
       continue;
     }
@@ -484,7 +485,7 @@ static spn_err_t resolve_one(spn_dag_file_cache_t* files, spn_dag_obs_t* o) {
   }
 
   sp_sys_file_meta_t sys = sp_zero;
-  try(spn_dag_file_cache_stat(files, o->path, &sys));
+  spn_try(spn_dag_file_cache_stat(files, o->path, &sys));
 
   if (sys.kind == SP_FS_KIND_DIR) {
     o->meta = (spn_dag_file_meta_t) sp_zero;
@@ -500,7 +501,7 @@ static spn_err_t resolve_one(spn_dag_file_cache_t* files, spn_dag_obs_t* o) {
   }
 
   spn_dag_file_meta_t fresh = file_meta_from_sys(sys);
-  try(spn_dag_file_cache_digest(files, o->path, &fresh.digest));
+  spn_try(spn_dag_file_cache_digest(files, o->path, &fresh.digest));
   o->meta = fresh;
   return SPN_OK;
 }
@@ -509,7 +510,7 @@ static spn_err_t resolve_observations(spn_dag_file_cache_t* files, spn_dag_obs_t
   *changed = false;
   sp_for(it, count) {
     spn_dag_file_meta_t before = obs[it].meta;
-    try(resolve_one(files, &obs[it]));
+    spn_try(resolve_one(files, &obs[it]));
     if (!file_meta_equal(before, obs[it].meta)) {
       *changed = true;
     }
@@ -674,7 +675,7 @@ static spn_err_t commit(spn_dag_t* g, spn_dag_attempt_t* attempt, spn_dag_env_t*
   }
 
   if (action->uncacheable) {
-    try(settle(g, action, env, &attempt->diag));
+    spn_try(settle(g, action, env, &attempt->diag));
     trace_emit(env, (spn_dag_trace_event_t) { .kind = SPN_DAG_TRACE_COMMIT, .action = action->id });
     return SPN_OK;
   }
@@ -693,7 +694,7 @@ static spn_err_t commit(spn_dag_t* g, spn_dag_attempt_t* attempt, spn_dag_env_t*
     }
   }
 
-  try(settle(g, action, env, &attempt->diag));
+  spn_try(settle(g, action, env, &attempt->diag));
   if (resolved) {
     record(g, action, key, env);
   }
@@ -862,7 +863,7 @@ static bool defer_pathset(spn_dag_run_t* run, spn_dag_action_t* action, spn_dag_
 
 static spn_err_t seed_source(spn_dag_env_t* env, spn_dag_artifact_t* artifact) {
   sp_sys_file_meta_t sys = sp_zero;
-  try(spn_dag_file_cache_stat(env->files, artifact->path, &sys));
+  spn_try(spn_dag_file_cache_stat(env->files, artifact->path, &sys));
   if (sys.kind == SP_FS_KIND_DIR) {
     return SPN_ERR_DAG_MISSING_INPUT;
   }
@@ -881,7 +882,7 @@ static spn_err_t seed_source(spn_dag_env_t* env, spn_dag_artifact_t* artifact) {
   }
 
   spn_dag_file_meta_t before = obs.meta;
-  try(resolve_one(env->files, &obs));
+  spn_try(resolve_one(env->files, &obs));
   artifact->digest = obs.meta.digest;
 
   if (env->memos && !file_meta_equal(before, obs.meta)) {

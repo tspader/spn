@@ -1,10 +1,11 @@
+#include "error/error.h"
 #include "op/op.h"
 
 #include "op/build/build.h"
 #include "session/types.h"
 #include "unit/types.h"
 
-spn_err_union_t spn_op_run_target(spn_session_t* session, spn_target_unit_t* unit) {
+static spn_err_union_t run_target(spn_session_t* session, spn_target_unit_t* unit) {
   sp_str_t command = spn_target_staged_path(session->mem, unit);
   if (!sp_fs_exists(command)) {
     return (spn_err_union_t) {
@@ -32,4 +33,8 @@ spn_err_union_t spn_op_run_target(spn_session_t* session, spn_target_unit_t* uni
   }
 
   return spn_result(SPN_OK);
+}
+
+spn_err_t spn_op_run_target(spn_session_t* session, spn_target_unit_t* unit) {
+  return spn_err_emit(session->ctx, run_target(session, unit));
 }

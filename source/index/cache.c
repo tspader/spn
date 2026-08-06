@@ -21,7 +21,7 @@ spn_err_union_t spn_index_cache_get_package(spn_index_cache_t* cache, spn_pkg_na
   spn_index_pkg_t* package = SP_NULLPTR;
   sp_da_for(*cache->indexes, it) {
     spn_index_info_t* index = &(*cache->indexes)[it];
-    try_union(spn_index_get_package(index, cache->mem, cache->intern, id, &package));
+    spn_try_union(spn_index_get_package(index, cache->mem, cache->intern, id, &package));
     if (package) {
       break;
     }

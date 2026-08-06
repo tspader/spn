@@ -15,7 +15,7 @@ spn_err_union_t spn_registry_load_file_pkg(spn_pkg_registry_t* registry, sp_mem_
   *pkg = SP_NULLPTR;
 
   spn_pkg_info_t* info = sp_alloc_type(mem, spn_pkg_info_t);
-  try_union(spn_pkg_load(mem, intern, manifest, SPN_MANIFEST_DEP, qualified, info));
+  spn_try_union(spn_pkg_load(mem, intern, manifest, SPN_MANIFEST_DEP, qualified, info));
 
   // Option requests, config keys, and edge lookups all route by the name the
   // edge requested; a manifest declaring some other name would strand them

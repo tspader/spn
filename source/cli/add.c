@@ -18,12 +18,11 @@ sp_cli_result_t spn_cli_add(sp_cli_t* cli) {
     return spn_cli_error(cli, "invalid version {.red}", sp_fmt_str(spec.second));
   }
 
-  try_cli(spn_cli_require_project());
-
-  return spn_cli_result(cli, spn_op_add(&spn, (spn_add_request_t) {
+  spn_err_t err = spn_op_add(&spn, (spn_add_request_t) {
     .key = spec.first,
     .requested = spec.second,
     .range = range,
     .dep = cmd->test ? SPN_ADD_DEP_TEST : cmd->build ? SPN_ADD_DEP_BUILD : SPN_ADD_DEP_PACKAGE,
-  }));
+  });
+  return err ? SP_CLI_ERR : SP_CLI_OK;
 }

@@ -7,58 +7,27 @@
 #include "compiler/types.h"
 #include "forward/types.h"
 #include "pkg/types.h"
-#include "profile/types.h"
 #include "semver/types.h"
 
 #define spn_try(expr) \
   do { \
-    s32 __err = (expr); \
-    if (__err) return __err; \
-  } while (0)
-
-#define spn_try_goto(expr, err, label) \
-  do { \
-    err = (expr); \
-    if (err) goto label; \
-  } while (0)
-
-#define spn_try_as(expr, err) \
-  do { \
-    if (expr) return err; \
-  } while (0)
-
-#define try_union(expr) \
-  do { \
-    spn_err_union_t _err = (expr); \
-    if (_err.kind) return _err; \
-  } while (0)
-
-#define try_as_union(expr) \
-  do { \
-    spn_err_t _err = (expr); \
-    if (_err) return (spn_err_union_t) { \
-      .kind = _err \
-    }; \
-  } while (0)
-
-// @spader i know this is fucking stupid
-#define try_emit(__expr, __event_buffer) \
-  do { \
-    spn_err_union_t __err = (__expr); \
-    if (__err.kind) { \
-      spn_event_buffer_push(__event_buffer, (spn_build_event_t) { \
-        .kind = SPN_EVENT_ERR, \
-        .err = __err \
-      }); \
-      return __err.kind; \
+    spn_err_t __err = (expr); \
+    if (__err) { \
+      return __err; \
     } \
   } while (0)
 
+#define spn_try_union(expr) \
+  do { \
+    spn_err_union_t __err = (expr); \
+    if (__err.kind) { \
+      return __err; \
+    } \
+  } while (0)
+
+#define spn_result(kind_) ((spn_err_union_t) { .kind = (kind_) })
 
 #define spn_err_reported(kind_) ((spn_err_union_t) { .kind = (kind_), .reported = true })
-
-
-#define spn_result(status) (spn_err_union_t) { .kind = (status) }
 
 typedef enum {
   SPN_BUILD_GRAPH_ERR_UNKNOWN,
@@ -179,10 +148,6 @@ typedef struct {
     struct {
       sp_str_t name;
     } profile;
-    struct {
-      spn_profile_field_t field;
-      sp_str_t value;
-    } flag;
     struct {
       sp_str_t toolchain;
       spn_triple_t target;

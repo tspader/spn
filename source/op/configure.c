@@ -92,8 +92,8 @@ spn_err_union_t spn_op_configure(spn_session_t* s) {
     return (spn_err_union_t) { .kind = SPN_ERR_WASM_INIT_FAILED };
   }
 
-  try_union(spn_units_add_packages(s));
-  try_union(spn_units_add_targets(s, SPN_UNIT_SCOPE_METAPROGRAM));
+  spn_try_union(spn_units_add_packages(s));
+  spn_try_union(spn_units_add_targets(s, SPN_UNIT_SCOPE_METAPROGRAM));
 
   spn_dag_build_t* dag = spn_dag_build_new(s);
   s->dag.configure = dag;
@@ -103,7 +103,7 @@ spn_err_union_t spn_op_configure(spn_session_t* s) {
     if (!configure) {
       continue;
     }
-    try_union(spn_dag_build_add_target(dag, configure));
+    spn_try_union(spn_dag_build_add_target(dag, configure));
   }
 
   sp_om_for(s->units.packages, it) {
@@ -131,6 +131,6 @@ spn_err_union_t spn_op_configure(spn_session_t* s) {
     }
   }
 
-  try_union(spn_dag_build_run(dag, 8));
+  spn_try_union(spn_dag_build_run(dag, 8));
   return spn_result(SPN_OK);
 }

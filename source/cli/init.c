@@ -91,7 +91,7 @@ cleanup:
 
 static spn_err_union_t run_unattended(sp_mem_t mem, spn_cli_init_t* command, sp_str_t dir, sp_str_t name) {
   sp_da(sp_str_t) files = sp_da_new(mem, sp_str_t);
-  try_union(spn_project_scaffold(mem, (spn_scaffold_desc_t) {
+  spn_try_union(spn_project_scaffold(mem, (spn_scaffold_desc_t) {
     .dir = dir,
     .name = name,
     .bare = command->bare,
@@ -108,7 +108,7 @@ static spn_err_union_t run_unattended(sp_mem_t mem, spn_cli_init_t* command, sp_
 
 static spn_err_union_t run(sp_mem_t mem, spn_cli_init_t* command, sp_str_t project) {
   sp_str_t dir = get_dir(mem, command, project);
-  try_union(spn_project_scaffold(mem, (spn_scaffold_desc_t) {
+  spn_try_union(spn_project_scaffold(mem, (spn_scaffold_desc_t) {
     .dir = dir,
     .bare = command->bare,
     .check = true,
@@ -122,8 +122,8 @@ static spn_err_union_t run(sp_mem_t mem, spn_cli_init_t* command, sp_str_t proje
   return run_unattended(mem, command, dir, name);
 }
 
-static spn_err_union_t finish_init() {
-  return run(spn.mem, &args.init, spn.paths.project);
+static spn_err_t finish_init() {
+  return spn_err_emit(&spn, run(spn.mem, &args.init, spn.paths.project));
 }
 
 sp_cli_result_t spn_cli_init(sp_cli_t* cli) {

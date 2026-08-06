@@ -2,6 +2,8 @@
 
 #include "codegen/gen/config.gen.h"
 #include "codegen/lower.h"
+#include "ctx/ctx.h"
+#include "error/error.h"
 #include "event/event.h"
 #include "event/log.h"
 #include "git/cache.h"
@@ -94,7 +96,7 @@ void spn_ctx_init(spn_ctx_t* ctx) {
   spn_event_log_init(ctx->heap);
 }
 
-spn_err_union_t spn_ctx_mount(spn_ctx_t* ctx) {
+static spn_err_union_t mount(spn_ctx_t* ctx) {
   ctx->paths.cwd = sp_fs_get_cwd(ctx->heap);
   ctx->paths.bin = sp_fs_get_bin_path(ctx->heap);
   ctx->paths.patches = sp_env_get(ctx->env, sp_str_lit("SPN_PATCH_DIR"));
@@ -157,7 +159,7 @@ spn_err_union_t spn_ctx_mount(spn_ctx_t* ctx) {
   return spn_result(SPN_OK);
 }
 
-spn_err_union_t spn_ctx_load_project(spn_ctx_t* ctx, sp_str_t dir, u32 refresh) {
+static spn_err_union_t load_project(spn_ctx_t* ctx, sp_str_t dir, u32 refresh) {
   sp_assert(ctx->config.indexes);
 
   if (sp_str_valid(dir)) {
@@ -166,7 +168,7 @@ spn_err_union_t spn_ctx_load_project(spn_ctx_t* ctx, sp_str_t dir, u32 refresh) 
   else {
     ctx->paths.project = sp_str_copy(ctx->heap, ctx->paths.cwd);
   }
-  try_union(spn_project_load(ctx->heap, ctx->intern, ctx->events, ctx->paths.project, &ctx->project));
+  spn_try_union(spn_project_load(ctx->heap, ctx->intern, ctx->events, ctx->paths.project, &ctx->project));
 
   spn_index_assemble(ctx->heap, ctx->project ? &ctx->project->package.indexes : SP_NULLPTR, ctx->config.indexes, &ctx->indexes);
 
@@ -181,12 +183,34 @@ spn_err_union_t spn_ctx_load_project(spn_ctx_t* ctx, sp_str_t dir, u32 refresh) 
   return spn_result(SPN_OK);
 }
 
-spn_err_union_t spn_ctx_open_session(spn_ctx_t* ctx, spn_session_config_t config) {
+static spn_err_union_t open_session(spn_ctx_t* ctx, spn_session_config_t config) {
+  spn_try_union(spn_ctx_require_project(ctx));
+
   ctx->session = sp_alloc_type(ctx->heap, spn_session_t);
   return spn_session_init(ctx->session, ctx, ctx->heap, ctx->project, config);
 }
 
-void spn_ctx_close(spn_ctx_t* ctx, spn_err_t result) {
+spn_err_t spn_ctx_mount(spn_ctx_t* ctx) {
+  return spn_err_emit(ctx, mount(ctx));
+}
+
+spn_err_t spn_ctx_load_project(spn_ctx_t* ctx, sp_str_t dir, u32 refresh) {
+  return spn_err_emit(ctx, load_project(ctx, dir, refresh));
+}
+
+spn_err_t spn_ctx_open_session(spn_ctx_t* ctx, spn_session_config_t config) {
+  return spn_err_emit(ctx, open_session(ctx, config));
+}
+
+void spn_ctx_close(spn_ctx_t* ctx, bool ok) {
+  spn_err_t result = SPN_OK;
+  if (!ok) {
+    result = (spn_err_t)sp_atomic_s32_get(&ctx->error);
+    if (!result) {
+      result = SPN_ERROR;
+    }
+  }
+
   spn_event_buffer_push(ctx->events, (spn_build_event_t) {
     .kind = SPN_EVENT_RESULT,
     .result = {

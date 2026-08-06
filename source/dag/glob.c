@@ -4,7 +4,6 @@
 #include "sp.h"
 #include "sp/sp_glob.h"
 
-#define try(expr) spn_try(expr)
 
 #define SPN_DAG_GLOB_DEPTH_MAX 64
 
@@ -165,7 +164,7 @@ spn_err_t spn_dag_glob(sp_mem_t mem, sp_str_t root, sp_str_t pattern, sp_da(spn_
     .obs = obs,
     .matches = matches
   };
-  try(glob_walk(&walk, sp_str_empty(prefix) ? root : sp_fs_join_path(mem, root, prefix)));
+  spn_try(glob_walk(&walk, sp_str_empty(prefix) ? root : sp_fs_join_path(mem, root, prefix)));
 
   if (matches) {
     sp_da_sort(*matches, compare_matches);

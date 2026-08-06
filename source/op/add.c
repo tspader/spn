@@ -1,5 +1,7 @@
+#include "ctx/ctx.h"
 #include "ctx/types.h"
 
+#include "error/error.h"
 #include "event/event.h"
 #include "index/cache.h"
 #include "index/types.h"
@@ -44,8 +46,8 @@ static site_t find_site(spn_toml_edit_t* edit, sp_mem_t mem, sp_str_t table, sp_
   };
 }
 
-spn_err_union_t spn_op_add(spn_ctx_t* ctx, spn_add_request_t request) {
-  try_union(spn_op_sync_indexes(ctx, (spn_index_refresh_t) sp_zero));
+static spn_err_union_t add(spn_ctx_t* ctx, spn_add_request_t request) {
+  spn_try_union(spn_ctx_require_project(ctx));
 
   spn_pkg_name_t name = spn_pkg_name_from_qualified(request.key);
 
@@ -53,7 +55,7 @@ spn_err_union_t spn_op_add(spn_ctx_t* ctx, spn_add_request_t request) {
   spn_index_cache_init(&cache, ctx->heap, ctx->intern, &ctx->indexes);
 
   spn_index_pkg_t* pkg = SP_NULLPTR;
-  try_union(spn_index_cache_get_package(&cache, name, &pkg));
+  spn_try_union(spn_index_cache_get_package(&cache, name, &pkg));
   if (!pkg || sp_da_empty(pkg->releases)) {
     return (spn_err_union_t) { .kind = SPN_ERR_PKG_UNKNOWN, .unknown = { .request = { .qualified = spn_pkg_name_to_qualified(name) } } };
   }
@@ -133,4 +135,9 @@ spn_err_union_t spn_op_add(spn_ctx_t* ctx, spn_add_request_t request) {
 cleanup:
   sp_mem_end_scratch(s);
   return result;
+}
+
+spn_err_t spn_op_add(spn_ctx_t* ctx, spn_add_request_t request) {
+  spn_try(spn_op_sync_indexes(ctx, (spn_index_refresh_t) sp_zero));
+  return spn_err_emit(ctx, add(ctx, request));
 }

@@ -13,7 +13,5 @@ s32 spn_compile_object_run(spn_compile_unit_t* unit, sp_str_t object, sp_str_t d
 s32 spn_link_target_run(spn_target_unit_t* target, sp_str_t output, sp_da(sp_str_t) objects, sp_str_t exports);
 s32 spn_link_exports_run(spn_target_unit_t* target, sp_da(sp_str_t) objects, sp_str_t output);
 s32 spn_embed_write(spn_target_unit_t* unit, sp_str_t obj, sp_str_t hdr, sp_mem_t obs_mem, sp_da(spn_dag_obs_t)* obs);
-spn_err_t emit_link_passed(spn_target_unit_t* unit, spn_invocation_t* invocation, sp_str_t output, sp_str_t out, u64 elapsed);
-spn_err_t emit_link_failed(spn_target_unit_t* unit, spn_invocation_t* invocation, s32 rc, sp_str_t out, sp_str_t err);
 
 #endif

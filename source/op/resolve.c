@@ -50,7 +50,7 @@ static spn_err_t apply_patch_overrides(spn_session_t* session, spn_resolve_query
     spn_pkg_info_t* info = sp_alloc_type(spn.mem, spn_pkg_info_t);
     spn_err_union_t loaded = spn_pkg_load(spn.mem, session->ctx->intern, manifest, SPN_MANIFEST_DEP, name, info);
     if (loaded.kind) {
-      result = spn_err_emit(loaded).kind;
+      result = spn_err_emit(session->ctx, loaded);
       continue;
     }
 
@@ -115,7 +115,7 @@ spn_err_union_t spn_op_resolve(spn_session_t* session) {
 
   if (spn_resolve_from_solver(&resolver, &query)) {
     sp_da_for(query.errors, it) {
-      spn_err_emit(query.errors[it]);
+      spn_err_emit(session->ctx, query.errors[it]);
     }
     return spn_err_reported(query.errors[0].kind);
   }

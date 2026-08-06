@@ -162,14 +162,16 @@ spn_err_union_t spn_session_apply_options(spn_session_t* session, bool* reresolv
       spn_option_requests_t* asked = sp_ht_getp(requests, node->id);
 
       spn_resolved_options_t resolved = sp_zero;
-      spn_try_as(spn_pkg_options_merge(
+      if (spn_pkg_options_merge(
         mem,
         node,
         &session->profile,
         session->pkg->config,
         asked ? *asked : SP_NULLPTR,
         session->ctx->events,
-        &resolved), spn_err_reported(SPN_ERR_OPTION));
+        &resolved)) {
+        return spn_err_reported(SPN_ERR_OPTION);
+      }
 
       sp_ht_insert(session->options, node->id, resolved);
     }
@@ -230,6 +232,6 @@ spn_err_union_t spn_session_apply_options(spn_session_t* session, bool* reresolv
     break;
   }
 
-  try_union(validate_config_keys(session));
+  spn_try_union(validate_config_keys(session));
   return spn_result(SPN_OK);
 }
