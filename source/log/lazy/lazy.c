@@ -1,21 +1,28 @@
 #include "log/lazy/lazy.h"
 
-static sp_err_t spn_lazy_log_write(sp_io_writer_t* w, const void* ptr, u64 size, u64* bytes_written) {
+static sp_err_t lazy_write(sp_io_writer_t* w, const void* ptr, u64 size, u64* bytes_written) {
   spn_lazy_log_t* log = (spn_lazy_log_t*)w;
+  if (log->failed) {
+    return SP_ERR_IO;
+  }
   if (!log->opened) {
     log->opened = true;
     sp_fs_create_dir(sp_fs_parent_path(log->path));
     if (sp_io_file_writer_from_path(&log->file, log->path) != SP_OK) {
       log->failed = true;
+      return SP_ERR_IO;
     }
   }
-  if (log->failed) return SP_ERR_IO;
-  return sp_io_write(&log->file.base, ptr, size, bytes_written);
+  sp_err_t err = sp_io_write(&log->file.base, ptr, size, bytes_written);
+  if (err != SP_OK) {
+    log->failed = true;
+  }
+  return err;
 }
 
 void spn_lazy_log_init(spn_lazy_log_t* log, sp_str_t path) {
   *log = (spn_lazy_log_t) {
-    .writer = { .write = spn_lazy_log_write },
+    .writer = { .write = lazy_write },
     .path = path,
   };
 }
@@ -23,6 +30,6 @@ void spn_lazy_log_init(spn_lazy_log_t* log, sp_str_t path) {
 void spn_lazy_log_close(spn_lazy_log_t* log) {
   if (log->opened && !log->failed) {
     sp_io_file_writer_close(&log->file);
-    log->opened = false;
   }
+  log->failed = true;
 }

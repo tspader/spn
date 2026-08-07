@@ -69,3 +69,43 @@ sp_test_each(lazy_log, write, test_t, tests) {
 
   return SP_OK;
 }
+
+sp_test(lazy_log, close_latches) {
+  sp_mem_t mem = sp_test_arena(t);
+  sp_str_t path = sp_fs_join_path(mem, sp_test_dir(t), sp_str_lit("x.log"));
+
+  spn_lazy_log_t log;
+  spn_lazy_log_init(&log, path);
+  sp_io_write_str(&log.writer, sp_str_lit("kept"), SP_NULLPTR);
+  spn_lazy_log_close(&log);
+
+  sp_expect_eq(t, sp_io_write_str(&log.writer, sp_str_lit("late"), SP_NULLPTR), SP_ERR_IO);
+  sp_expect_str_eq_c(t, test_read_file(mem, path), "kept");
+
+  return SP_OK;
+}
+
+sp_test(lazy_log, close_unopened_latches) {
+  sp_mem_t mem = sp_test_arena(t);
+  sp_str_t path = sp_fs_join_path(mem, sp_test_dir(t), sp_str_lit("x.log"));
+
+  spn_lazy_log_t log;
+  spn_lazy_log_init(&log, path);
+  spn_lazy_log_close(&log);
+
+  sp_expect_eq(t, sp_io_write_str(&log.writer, sp_str_lit("late"), SP_NULLPTR), SP_ERR_IO);
+  sp_expect(t, !sp_fs_exists(path));
+
+  return SP_OK;
+}
+
+sp_test(lazy_log, failed_open_latches) {
+  spn_lazy_log_t log;
+  spn_lazy_log_init(&log, sp_test_dir(t));
+
+  sp_expect_eq(t, sp_io_write_str(&log.writer, sp_str_lit("x"), SP_NULLPTR), SP_ERR_IO);
+  sp_expect_eq(t, sp_io_write_str(&log.writer, sp_str_lit("x"), SP_NULLPTR), SP_ERR_IO);
+
+  spn_lazy_log_close(&log);
+  return SP_OK;
+}

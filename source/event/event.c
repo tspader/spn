@@ -68,7 +68,12 @@ void spn_event_buffer_push(spn_event_buffer_t* events, spn_build_event_t event) 
   sp_mutex_lock(&events->mutex);
   sp_rb_push(events->buffer, event);
   if (events->log.writer.write) {
-    spn_event_log_jsonl(&events->log.writer, &event);
+    sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+    sp_io_dyn_mem_writer_t line = sp_zero;
+    sp_io_dyn_mem_writer_init(scratch.mem, &line);
+    spn_event_log_jsonl(&line.base, &event);
+    sp_io_write(&events->log.writer, line.storage.data, line.cursor, SP_NULLPTR);
+    sp_mem_end_scratch(scratch);
   }
   sp_mutex_unlock(&events->mutex);
 }
