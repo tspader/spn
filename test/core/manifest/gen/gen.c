@@ -95,7 +95,7 @@ sp_test(manifest_gen, missing_file) {
   spn_cg_manifest_t manifest = sp_zero;
   sp_must(t, spn_codegen_load(&ctx, sp_str_lit("/nonexistent/missing.toml"), &manifest));
   sp_must_eq(t, 1, sp_da_size(ctx.issues));
-  sp_expect_eq(t, SPN_CODEGEN_ERR_FILE_MISSING, ctx.issues[0].code);
+  sp_expect_eq(t, SPN_ERR_CODEGEN_FILE_MISSING, ctx.issues[0].code);
   sp_expect_str_eq_c(t, ctx.issues[0].detail, "missing file");
 
   return SP_OK;

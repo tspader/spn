@@ -34,7 +34,7 @@ static const plan_test_t tests [] = {
   // both, private or not, while object, source, and no_link libs stay off
   {
     .name = "exe_places_all_deps_on_link_line",
-    .target = { .kind = SPN_TARGET_EXE, .source = { "main.c" } },
+    .target = { .kind = SPN_TARGET_KIND_EXE, .source = { "main.c" } },
     .graph = {
       .pkgs = {
         {
@@ -61,7 +61,7 @@ static const plan_test_t tests [] = {
   // whole so their symbols re-export, private ones link normally and stay hidden
   {
     .name = "shared_lib_splits_static_deps",
-    .target = { .kind = SPN_TARGET_LIB, .linkages = SHARED_ONLY, .source = { "app.c" } },
+    .target = { .kind = SPN_TARGET_KIND_LIB, .linkages = SHARED_ONLY, .source = { "app.c" } },
     .graph = {
       .pkgs = {
         { .name = "P1", .deps = { { "D1" }, { "D2" }, { "D3", .private = true } } },
@@ -78,7 +78,7 @@ static const plan_test_t tests [] = {
   },
   {
     .name = "siblings_link_before_packages",
-    .target = { .kind = SPN_TARGET_EXE, .source = { "main.c" }, .deps = { "L1" } },
+    .target = { .kind = SPN_TARGET_KIND_EXE, .source = { "main.c" }, .deps = { "L1" } },
     .graph = {
       .pkgs = {
         { .name = "P1",
@@ -96,7 +96,7 @@ static const plan_test_t tests [] = {
   },
   {
     .name = "cxx_static_dep_promotes_lang",
-    .target = { .kind = SPN_TARGET_EXE, .source = { "main.c" } },
+    .target = { .kind = SPN_TARGET_KIND_EXE, .source = { "main.c" } },
     .graph = {
       .pkgs = {
         { .name = "P1", .deps = { { "D1" } } },
@@ -111,7 +111,7 @@ static const plan_test_t tests [] = {
   // A shared lib already linked its own C++ runtime; the consumer stays C
   {
     .name = "cxx_shared_dep_keeps_c",
-    .target = { .kind = SPN_TARGET_EXE, .source = { "main.c" } },
+    .target = { .kind = SPN_TARGET_KIND_EXE, .source = { "main.c" } },
     .graph = {
       .pkgs = {
         { .name = "P1", .deps = { { "D1" } } },
@@ -126,7 +126,7 @@ static const plan_test_t tests [] = {
   // lib, including shared boundaries the recursion otherwise stops at
   {
     .name = "min_os_folds_over_closure",
-    .target = { .kind = SPN_TARGET_EXE, .source = { "main.c" }, .min_os = { 11, 0 } },
+    .target = { .kind = SPN_TARGET_KIND_EXE, .source = { "main.c" }, .min_os = { 11, 0 } },
     .graph = {
       .os = SPN_OS_MACOS,
       .sysroot = "/sdk",
@@ -147,7 +147,7 @@ static const plan_test_t tests [] = {
   // package-level frameworks: shared-only and no_link-only packages are skipped
   {
     .name = "frameworks_dedupe_and_respect_links_code",
-    .target = { .kind = SPN_TARGET_EXE, .source = { "main.c" }, .frameworks = { "Metal" } },
+    .target = { .kind = SPN_TARGET_KIND_EXE, .source = { "main.c" }, .frameworks = { "Metal" } },
     .graph = {
       .os = SPN_OS_MACOS,
       .sysroot = "/sdk",
@@ -168,7 +168,7 @@ static const plan_test_t tests [] = {
   },
   {
     .name = "test_target_links_test_deps",
-    .target = { .kind = SPN_TARGET_TEST, .source = { "main.c" } },
+    .target = { .kind = SPN_TARGET_KIND_TEST, .source = { "main.c" } },
     .graph = {
       .pkgs = {
         { .name = "P1", .deps = { { "T1", .kind = SPN_DEP_KIND_TEST }, { "D1" } } },
@@ -208,8 +208,8 @@ sp_test_each(link_plan, plan, plan_test_t, tests, .setup = spn_test_ctx_setup) {
 
   spn_target_info_t target = target_info(mem, &it->target);
   switch (it->target.kind) {
-    case SPN_TARGET_LIB:  sp_str_om_insert(s->pkg->libs, target.name, target); break;
-    case SPN_TARGET_TEST: sp_str_om_insert(s->pkg->tests, target.name, target); break;
+    case SPN_TARGET_KIND_LIB:  sp_str_om_insert(s->pkg->libs, target.name, target); break;
+    case SPN_TARGET_KIND_TEST: sp_str_om_insert(s->pkg->tests, target.name, target); break;
     default:              sp_str_om_insert(s->pkg->exes, target.name, target); break;
   }
 

@@ -60,12 +60,6 @@ _Static_assert(
   "spn_pkg_id_t is byte-hashed as a key; it must have no padding"
 );
 
-typedef enum {
-  SPN_DEP_KIND_PACKAGE,
-  SPN_DEP_KIND_BUILD,
-  SPN_DEP_KIND_TEST,
-} spn_dep_kind_t;
-
 typedef struct {
   sp_intern_str_t qualified;
   spn_pkg_source_t source;

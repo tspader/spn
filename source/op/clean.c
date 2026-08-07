@@ -6,8 +6,8 @@
 #include "profile/profile.h"
 #include "sp/os.h"
 
-static spn_err_union_t clean(spn_session_t* session, bool whole_build) {
-  sp_str_t path = whole_build ?
+static spn_err_union_t clean(spn_session_t* session, spn_clean_scope_t scope) {
+  sp_str_t path = scope == SPN_CLEAN_ALL ?
     session->paths.build :
     spn_profile_build_path(session->mem, session->paths.build, &session->profile);
 
@@ -18,6 +18,6 @@ static spn_err_union_t clean(spn_session_t* session, bool whole_build) {
   return spn_result(SPN_OK);
 }
 
-spn_err_t spn_op_clean(spn_session_t* session, bool whole_build) {
-  return spn_err_emit(session->ctx, clean(session, whole_build));
+spn_err_t spn_op_clean(spn_session_t* session, spn_clean_scope_t scope) {
+  return spn_err_emit(session->ctx, clean(session, scope));
 }

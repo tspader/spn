@@ -34,12 +34,12 @@ static const test_t tests [] = {
 };
 
 sp_test_each(dep_kind, applies, test_t, tests) {
-  sp_expect_eq(t, it->expect.lib, spn_dep_kind_applies(it->kind, SPN_TARGET_LIB));
-  sp_expect_eq(t, it->expect.exe, spn_dep_kind_applies(it->kind, SPN_TARGET_EXE));
-  sp_expect_eq(t, it->expect.script, spn_dep_kind_applies(it->kind, SPN_TARGET_SCRIPT));
-  sp_expect_eq(t, it->expect.test, spn_dep_kind_applies(it->kind, SPN_TARGET_TEST));
-  sp_expect_eq(t, it->expect.configure, spn_dep_kind_applies(it->kind, SPN_TARGET_CONFIGURE_METAPROGRAM));
-  sp_expect_eq(t, it->expect.build, spn_dep_kind_applies(it->kind, SPN_TARGET_BUILD_METAPROGRAM));
+  sp_expect_eq(t, it->expect.lib, spn_dep_kind_applies(it->kind, SPN_TARGET_KIND_LIB));
+  sp_expect_eq(t, it->expect.exe, spn_dep_kind_applies(it->kind, SPN_TARGET_KIND_EXE));
+  sp_expect_eq(t, it->expect.script, spn_dep_kind_applies(it->kind, SPN_TARGET_KIND_SCRIPT));
+  sp_expect_eq(t, it->expect.test, spn_dep_kind_applies(it->kind, SPN_TARGET_KIND_TEST));
+  sp_expect_eq(t, it->expect.configure, spn_dep_kind_applies(it->kind, SPN_TARGET_KIND_CONFIGURE_METAPROGRAM));
+  sp_expect_eq(t, it->expect.build, spn_dep_kind_applies(it->kind, SPN_TARGET_KIND_BUILD_METAPROGRAM));
 
   return SP_OK;
 }

@@ -130,14 +130,16 @@ static sp_str_t get_colored_name(sp_mem_t mem, sp_str_t name) {
 }
 
 static sp_str_t get_contextual_path(sp_mem_t mem, sp_str_t path) {
-  if (!sp_str_empty(spn.paths.caches.dir) && sp_str_starts_with(path, spn.paths.caches.dir)) {
-    sp_str_t rel = sp_str_strip_left(path, spn.paths.caches.dir);
+  sp_str_t cache = spn_ctx_cache_dir(&spn);
+  if (!sp_str_empty(cache) && sp_str_starts_with(path, cache)) {
+    sp_str_t rel = sp_str_strip_left(path, cache);
     rel = sp_str_strip_left(rel, sp_str_lit("/"));
     return sp_fmt(mem, "$SPN_CACHE/{}", sp_fmt_str(rel)).value;
   }
 
-  if (!sp_str_empty(spn.paths.project) && sp_str_starts_with(path, spn.paths.project)) {
-    sp_str_t rel = sp_str_strip_left(path, spn.paths.project);
+  sp_str_t project = spn_ctx_project_dir(&spn);
+  if (!sp_str_empty(project) && sp_str_starts_with(path, project)) {
+    sp_str_t rel = sp_str_strip_left(path, project);
     rel = sp_str_strip_left(rel, sp_str_lit("/"));
     rel = sp_str_strip_left(rel, sp_str_lit("./"));
     return sp_fmt(mem, "./{}", sp_fmt_str(rel)).value;
@@ -1579,6 +1581,16 @@ static u32 get_short_tid(spn_tui_t* tui, u64 thread_id) {
   return *sp_ht_getp(tui->thread_ids, thread_id);
 }
 
+static void emit_event(spn_tui_t* tui, spn_build_event_t* event) {
+  event->thread_id = get_short_tid(tui, event->thread_id);
+
+  if (tui->logger.jsonl.fd) {
+    spn_event_log_jsonl(&tui->logger.jsonl.base, event);
+  }
+
+  spn_tui_log_event(tui, event);
+}
+
 void spn_tui_flush(spn_tui_t* tui) {
   if (!spn.events) {
     return;
@@ -1589,16 +1601,36 @@ void spn_tui_flush(spn_tui_t* tui) {
 
   sp_da_for(events, it) {
     spn_build_event_t* event = &events[it];
-    event->thread_id = get_short_tid(tui, event->thread_id);
 
-    if (tui->logger.jsonl.fd) {
-      spn_event_log_jsonl(&tui->logger.jsonl.base, event);
+    switch (event->kind) {
+      case SPN_EVENT_BUILD_PASSED: {
+        spn_prompt_stop(tui, true);
+        break;
+      }
+      case SPN_EVENT_BUILD_FAILED: {
+        spn_prompt_stop(tui, false);
+        break;
+      }
+      default: {
+        break;
+      }
     }
 
-    spn_tui_log_event(tui, event);
+    emit_event(tui, event);
   }
 
   sp_mem_end_scratch(s);
+}
+
+void spn_tui_run_banner(spn_tui_t* tui, sp_str_t name, sp_str_t command) {
+  spn_build_event_t event = {
+    .kind = SPN_EVENT_TARGET_RUN,
+    .run = {
+      .name = name,
+      .command = command,
+    },
+  };
+  emit_event(tui, &event);
 }
 
 static void print_line(sp_io_writer_t* io, const c8* fmt, va_list args) {

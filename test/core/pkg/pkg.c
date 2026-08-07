@@ -17,7 +17,7 @@ static spn_pkg_info_t make_pkg(sp_mem_t mem) {
 
   spn_target_info_t bin = {
     .name = sp_str_lit("A"),
-    .kind = SPN_TARGET_EXE,
+    .kind = SPN_TARGET_KIND_EXE,
   };
   spn_target_info_init(mem, &bin);
   sp_da_push(bin.macos.frameworks, sp_str_lit("B"));

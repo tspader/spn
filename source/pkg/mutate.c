@@ -118,7 +118,7 @@ spn_target_info_t* spn_pkg_add_exe(spn_pkg_info_t* pkg, const c8* name) {
 spn_target_info_t* spn_pkg_add_exe_ex(spn_pkg_info_t* pkg, sp_str_t name) {
   spn_target_info_t exe = {
     .name = spn_intern(name),
-    .kind = SPN_TARGET_EXE,
+    .kind = SPN_TARGET_KIND_EXE,
   };
   sp_str_om_insert(pkg->exes, exe.name, exe);
   spn_target_info_t* target = sp_str_om_get(pkg->exes, exe.name);
@@ -133,7 +133,7 @@ spn_target_info_t* spn_pkg_add_script(spn_pkg_info_t* pkg, const c8* name) {
 spn_target_info_t* spn_pkg_add_script_ex(spn_pkg_info_t* pkg, sp_str_t name) {
   spn_target_info_t script = {
     .name = spn_intern(name),
-    .kind = SPN_TARGET_SCRIPT,
+    .kind = SPN_TARGET_KIND_SCRIPT,
   };
   sp_str_om_insert(pkg->scripts, script.name, script);
   spn_target_info_t* target = sp_str_om_get(pkg->scripts, script.name);
@@ -148,7 +148,7 @@ spn_target_info_t* spn_pkg_add_test(spn_pkg_info_t* pkg, const c8* name) {
 spn_target_info_t* spn_pkg_add_test_ex(spn_pkg_info_t* pkg, sp_str_t name) {
   spn_target_info_t test = {
     .name = spn_intern(name),
-    .kind = SPN_TARGET_TEST,
+    .kind = SPN_TARGET_KIND_TEST,
   };
   sp_str_om_insert(pkg->tests, test.name, test);
   spn_target_info_t* target = sp_str_om_get(pkg->tests, test.name);
@@ -159,7 +159,7 @@ spn_target_info_t* spn_pkg_add_test_ex(spn_pkg_info_t* pkg, sp_str_t name) {
 spn_target_info_t* spn_pkg_add_lib_ex(spn_pkg_info_t* pkg, sp_str_t name, spn_linkage_set_t linkage) {
   spn_target_info_t lib = {
     .name = spn_intern(name),
-    .kind = SPN_TARGET_LIB,
+    .kind = SPN_TARGET_KIND_LIB,
     .linkages = linkage
   };
   sp_str_om_insert(pkg->libs, lib.name, lib);

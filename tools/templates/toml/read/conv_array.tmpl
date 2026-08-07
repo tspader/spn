@@ -11,13 +11,13 @@
           sp_da_push(out->{{ .name }}, value);
         }
         else {
-          spn_toml_loader_issue_at(ctx, element.ok ? SPN_CODEGEN_ERR_INVALID : SPN_CODEGEN_ERR_EXPECTED_STR, sp_str_lit("{{ .key }}"));
+          spn_toml_loader_issue_at(ctx, element.ok ? SPN_ERR_CODEGEN_INVALID : SPN_ERR_CODEGEN_EXPECTED_STR, sp_str_lit("{{ .key }}"));
         }
         spn_toml_loader_pop(ctx);
       }
       spn_toml_loader_pop(ctx);
     }
     else if (spn_toml_loader_str_present(table, "{{ .key }}") || spn_toml_loader_field_present(table, "{{ .key }}")) {
-      spn_toml_loader_issue(ctx, SPN_CODEGEN_ERR_INVALID, "{{ .key }}");
+      spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "{{ .key }}");
     }
   }

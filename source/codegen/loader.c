@@ -97,7 +97,7 @@ bool spn_toml_loader_field_present(toml_table_t* table, const c8* key) {
 }
 
 static spn_err_t spn_toml_loader_required_str_err(toml_table_t* table, const c8* key) {
-  return spn_toml_loader_field_present(table, key) ? SPN_CODEGEN_ERR_EXPECTED_STR : SPN_CODEGEN_ERR_MISSING_KEY;
+  return spn_toml_loader_field_present(table, key) ? SPN_ERR_CODEGEN_EXPECTED_STR : SPN_ERR_CODEGEN_MISSING_KEY;
 }
 
 sp_str_t spn_toml_loader_str_required(spn_toml_loader_t* ctx, toml_table_t* table, const c8* key) {
@@ -137,7 +137,7 @@ bool spn_toml_loader_read_u64(spn_toml_loader_t* ctx, toml_table_t* table, const
   toml_value_t found = toml_table_int(table, key);
   if (found.ok) {
     if (found.u.i < 0) {
-      spn_toml_loader_issue(ctx, SPN_CODEGEN_ERR_EXPECTED_INT, key);
+      spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_EXPECTED_INT, key);
       return false;
     }
     *value = (u64)found.u.i;
@@ -145,7 +145,7 @@ bool spn_toml_loader_read_u64(spn_toml_loader_t* ctx, toml_table_t* table, const
   }
 
   if (spn_toml_loader_field_present(table, key)) {
-    spn_toml_loader_issue(ctx, SPN_CODEGEN_ERR_EXPECTED_INT, key);
+    spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_EXPECTED_INT, key);
   }
   return false;
 }
@@ -168,7 +168,7 @@ void spn_toml_loader_check_keys(spn_toml_loader_t* ctx, toml_table_t* table, con
       }
     }
     if (!known) {
-      spn_toml_loader_issue_at(ctx, SPN_CODEGEN_ERR_UNKNOWN_KEY, sp_str(name, (u32)len));
+      spn_toml_loader_issue_at(ctx, SPN_ERR_CODEGEN_UNKNOWN_KEY, sp_str(name, (u32)len));
     }
   }
 }
@@ -187,7 +187,7 @@ sp_da(sp_str_t) spn_toml_loader_read_str_array(spn_toml_loader_t* ctx, toml_tabl
     if (element.ok) {
       sp_da_push(values, spn_toml_loader_intern_value(ctx, element));
     } else {
-      spn_toml_loader_record(ctx, SPN_CODEGEN_ERR_EXPECTED_STR, sp_str_lit(""));
+      spn_toml_loader_record(ctx, SPN_ERR_CODEGEN_EXPECTED_STR, sp_str_lit(""));
     }
     spn_toml_loader_pop(ctx);
   }
@@ -198,62 +198,62 @@ sp_da(sp_str_t) spn_toml_loader_read_str_array(spn_toml_loader_t* ctx, toml_tabl
 const c8* spn_codegen_err_name(spn_err_t code) {
   switch (code) {
     case SPN_OK:                         return "ok";
-    case SPN_CODEGEN_ERR_EXPECTED_BOOL:  return "expected_bool";
-    case SPN_CODEGEN_ERR_EXPECTED_STR:   return "expected_str";
-    case SPN_CODEGEN_ERR_EXPECTED_INT:   return "expected_int";
-    case SPN_CODEGEN_ERR_EXPECTED_OBJECT:return "expected_object";
-    case SPN_CODEGEN_ERR_MISSING_KEY:    return "missing_key";
-    case SPN_CODEGEN_ERR_DUPLICATE_KEY:  return "duplicate_key";
-    case SPN_CODEGEN_ERR_UNKNOWN_KEY:    return "unknown_key";
-    case SPN_CODEGEN_ERR_PARSE:          return "parse";
-    case SPN_CODEGEN_ERR_FILE_MISSING:   return "file_missing";
-    case SPN_CODEGEN_ERR_INVALID:        return "invalid";
-    case SPN_CODEGEN_ERR_ROOT_ONLY:      return "root_only";
+    case SPN_ERR_CODEGEN_EXPECTED_BOOL:  return "expected_bool";
+    case SPN_ERR_CODEGEN_EXPECTED_STR:   return "expected_str";
+    case SPN_ERR_CODEGEN_EXPECTED_INT:   return "expected_int";
+    case SPN_ERR_CODEGEN_EXPECTED_OBJECT:return "expected_object";
+    case SPN_ERR_CODEGEN_MISSING_KEY:    return "missing_key";
+    case SPN_ERR_CODEGEN_DUPLICATE_KEY:  return "duplicate_key";
+    case SPN_ERR_CODEGEN_UNKNOWN_KEY:    return "unknown_key";
+    case SPN_ERR_CODEGEN_PARSE:          return "parse";
+    case SPN_ERR_CODEGEN_FILE_MISSING:   return "file_missing";
+    case SPN_ERR_CODEGEN_INVALID:        return "invalid";
+    case SPN_ERR_CODEGEN_ROOT_ONLY:      return "root_only";
     default:                             return "unknown";
   }
 }
 
 void spn_codegen_issue_write(sp_io_writer_t* w, const spn_codegen_issue_t* issue) {
   switch (issue->code) {
-    case SPN_CODEGEN_ERR_MISSING_KEY:
+    case SPN_ERR_CODEGEN_MISSING_KEY:
       sp_fmt_io(w, "missing required field {.cyan}", SP_FMT_STR(issue->path));
       break;
-    case SPN_CODEGEN_ERR_EXPECTED_STR:
+    case SPN_ERR_CODEGEN_EXPECTED_STR:
       sp_fmt_io(w, "{.cyan} must be a string", SP_FMT_STR(issue->path));
       break;
-    case SPN_CODEGEN_ERR_EXPECTED_INT:
+    case SPN_ERR_CODEGEN_EXPECTED_INT:
       sp_fmt_io(w, "{.cyan} must be a non-negative integer", SP_FMT_STR(issue->path));
       break;
-    case SPN_CODEGEN_ERR_EXPECTED_BOOL:
+    case SPN_ERR_CODEGEN_EXPECTED_BOOL:
       sp_fmt_io(w, "{.cyan} must be a boolean", SP_FMT_STR(issue->path));
       break;
-    case SPN_CODEGEN_ERR_EXPECTED_OBJECT:
+    case SPN_ERR_CODEGEN_EXPECTED_OBJECT:
       sp_fmt_io(w, "{.cyan} must be a table", SP_FMT_STR(issue->path));
       break;
-    case SPN_CODEGEN_ERR_DUPLICATE_KEY:
+    case SPN_ERR_CODEGEN_DUPLICATE_KEY:
       sp_fmt_io(w, "duplicate {.yellow} at {.cyan}", SP_FMT_STR(issue->detail), SP_FMT_STR(issue->path));
       break;
-    case SPN_CODEGEN_ERR_UNKNOWN_KEY:
+    case SPN_ERR_CODEGEN_UNKNOWN_KEY:
       if (sp_str_empty(issue->path)) {
         sp_fmt_io(w, "unknown field {.red}", SP_FMT_STR(issue->detail));
       } else {
         sp_fmt_io(w, "unknown field {.red} in {.cyan}", SP_FMT_STR(issue->detail), SP_FMT_STR(issue->path));
       }
       break;
-    case SPN_CODEGEN_ERR_INVALID:
+    case SPN_ERR_CODEGEN_INVALID:
       sp_fmt_io(w, "invalid value at {.cyan}", SP_FMT_STR(issue->path));
       break;
-    case SPN_CODEGEN_ERR_PARSE:
+    case SPN_ERR_CODEGEN_PARSE:
       if (sp_str_empty(issue->detail)) {
         sp_io_write_str(w, sp_str_lit("not valid toml"), SP_NULLPTR);
       } else {
         sp_fmt_io(w, "not valid toml: {}", SP_FMT_STR(issue->detail));
       }
       break;
-    case SPN_CODEGEN_ERR_FILE_MISSING:
+    case SPN_ERR_CODEGEN_FILE_MISSING:
       sp_io_write_str(w, sp_str_lit("file is missing"), SP_NULLPTR);
       break;
-    case SPN_CODEGEN_ERR_ROOT_ONLY:
+    case SPN_ERR_CODEGEN_ROOT_ONLY:
       sp_fmt_io(w, "{.cyan} is only allowed in the root manifest", SP_FMT_STR(issue->path));
       break;
     default:
@@ -276,14 +276,14 @@ sp_str_t spn_codegen_issues_message(sp_mem_t mem, sp_da(spn_codegen_issue_t) iss
 
 toml_table_t* spn_codegen_parse(spn_toml_loader_t* ctx, sp_str_t path) {
   if (!sp_fs_is_file(path)) {
-    spn_toml_loader_issue_at(ctx, SPN_CODEGEN_ERR_FILE_MISSING, sp_str_lit("missing file"));
+    spn_toml_loader_issue_at(ctx, SPN_ERR_CODEGEN_FILE_MISSING, sp_str_lit("missing file"));
     return SP_NULLPTR;
   }
 
   sp_str_t diag = sp_zero;
   toml_table_t* table = spn_toml_parse_diag(ctx->mem, path, &diag);
   if (!table) {
-    spn_toml_loader_issue_at(ctx, SPN_CODEGEN_ERR_PARSE, diag);
+    spn_toml_loader_issue_at(ctx, SPN_ERR_CODEGEN_PARSE, diag);
   }
   return table;
 }

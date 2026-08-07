@@ -331,7 +331,7 @@ sp_str_t spn_sanitizer_set_to_str(sp_mem_t mem, spn_sanitizer_set_t set) {
   return sp_io_dyn_mem_writer_as_str(&out);
 }
 
-bool spn_sanitizer_set_conflicting(spn_sanitizer_set_t set) {
+bool spn_sanitizer_set_has_conflict(spn_sanitizer_set_t set) {
   if ((set & SPN_SANITIZER_THREAD) && (set & (SPN_SANITIZER_ADDRESS | SPN_SANITIZER_MEMORY | SPN_SANITIZER_LEAK))) {
     return true;
   }
@@ -720,13 +720,13 @@ spn_dep_edge_t spn_dep_edge_from_str(sp_str_t str) {
 
 sp_str_t spn_index_kind_to_str(spn_index_kind_t kind) {
   switch (kind) {
-    case SPN_INDEX_WORKSPACE: {
+    case SPN_INDEX_KIND_WORKSPACE: {
       return sp_str_lit("workspace");
     }
-    case SPN_INDEX_BUILTIN: {
+    case SPN_INDEX_KIND_BUILTIN: {
       return sp_str_lit("builtin");
     }
-    case SPN_INDEX_USER: {
+    case SPN_INDEX_KIND_USER: {
       return sp_str_lit("user");
     }
   }
@@ -736,16 +736,16 @@ sp_str_t spn_index_kind_to_str(spn_index_kind_t kind) {
 
 spn_index_kind_t spn_index_kind_from_str(sp_str_t str) {
   if (sp_str_equal_cstr(str, "workspace")) {
-    return SPN_INDEX_WORKSPACE;
+    return SPN_INDEX_KIND_WORKSPACE;
   }
   if (sp_str_equal_cstr(str, "builtin")) {
-    return SPN_INDEX_BUILTIN;
+    return SPN_INDEX_KIND_BUILTIN;
   }
   if (sp_str_equal_cstr(str, "user")) {
-    return SPN_INDEX_USER;
+    return SPN_INDEX_KIND_USER;
   }
 
-  SP_UNREACHABLE_RETURN(SPN_INDEX_WORKSPACE);
+  SP_UNREACHABLE_RETURN(SPN_INDEX_KIND_WORKSPACE);
 }
 
 sp_str_t spn_index_dep_kind_to_str(spn_index_dep_kind_t kind) {

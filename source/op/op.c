@@ -9,7 +9,7 @@
 
 spn_err_t spn_op_build(spn_session_t* session) {
   spn_ctx_t* ctx = session->ctx;
-  spn_try(spn_op_sync_indexes(ctx, sp_zero_s(spn_index_refresh_t)));
+  spn_try(spn_op_sync_indexes(ctx, sp_zero_s(spn_sync_request_t)));
   bool reresolve = sp_zero;
   do {
     spn_try(spn_err_emit(ctx, spn_op_resolve(session)));

@@ -37,7 +37,7 @@ void spn_toml_loader_read_when(spn_toml_loader_t* ctx, toml_table_t* table, cons
   toml_table_t* child = toml_table_table(table, key);
   if (!child) {
     if (spn_toml_loader_field_present(table, key)) {
-      spn_toml_loader_issue(ctx, SPN_CODEGEN_ERR_EXPECTED_OBJECT, key);
+      spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_EXPECTED_OBJECT, key);
     }
     return;
   }
@@ -69,14 +69,14 @@ void spn_toml_loader_read_when(spn_toml_loader_t* ctx, toml_table_t* table, cons
         if (not_str.ok) {
           free(not_str.u.s);
         }
-        spn_toml_loader_issue(ctx, SPN_CODEGEN_ERR_INVALID, name);
+        spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, name);
         continue;
       }
       clause.negated = true;
       clause.value = not_str.ok ? spn_toml_loader_value_str(ctx, not_str) : spn_toml_loader_value_bool(not_bool);
     }
     else {
-      spn_toml_loader_issue(ctx, SPN_CODEGEN_ERR_INVALID, name);
+      spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, name);
       continue;
     }
 

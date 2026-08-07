@@ -11,6 +11,7 @@ void            spn_tui_flush(spn_tui_t* tui);
 void            spn_tui_poll(spn_tui_t* tui);
 void            spn_tui_handoff(spn_tui_t* tui);
 void            spn_tui_log_event(spn_tui_t* tui, spn_build_event_t* event);
+void            spn_tui_run_banner(spn_tui_t* tui, sp_str_t name, sp_str_t command);
 sp_str_t        spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event);
 void            spn_prompt_stop(spn_tui_t* tui, bool ok);
 spn_tui_mode_t  spn_output_mode_from_str(sp_str_t str);

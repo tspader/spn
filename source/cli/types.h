@@ -4,8 +4,7 @@
 #include "sp.h"
 #include "sp/sp_cli.h"
 
-#include "error/types.h"
-#include "profile/types.h"
+#include "spn/host.h"
 
 typedef struct spn_cli spn_cli_t;
 
@@ -77,6 +76,13 @@ struct spn_cli {
   spn_cli_index_t index;
 };
 
+typedef struct {
+  spn_ctx_t* ctx;
+  spn_session_t* session;
+  sp_mem_t mem;
+} spn_cli_host_t;
+
 extern spn_cli_t args;
+extern spn_cli_host_t host;
 
 #endif

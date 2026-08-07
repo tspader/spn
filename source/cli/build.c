@@ -1,5 +1,3 @@
-#include "spn/host.h"
-
 #include "cli/cli.h"
 
 static void set_rule(spn_target_rule_t* rule, bool selected, spn_target_names_t names) {
@@ -16,7 +14,7 @@ sp_cli_result_t spn_cli_build(sp_cli_t* cli) {
   spn_cli_build_t* cmd = &args.build;
 
   spn_session_config_t config = { .force = cmd->force };
-  spn_target_names_t names = sp_da_new(spn.heap, sp_str_t);
+  spn_target_names_t names = sp_da_new(host.mem, sp_str_t);
   for (const c8** it = cli->rest; *it; it++) {
     sp_da_push(names, sp_cstr_as_str(*it));
   }
@@ -35,5 +33,5 @@ sp_cli_result_t spn_cli_build(sp_cli_t* cli) {
   if (session != SP_CLI_OK) {
     return session;
   }
-  return spn_op_build(spn.session) ? SP_CLI_ERR : SP_CLI_OK;
+  return spn_op_build(host.session) ? SP_CLI_ERR : SP_CLI_OK;
 }

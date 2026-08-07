@@ -17,11 +17,4 @@ struct spn_project_t {
   sp_opt(spn_lock_file_t) lock;
 };
 
-typedef struct {
-  sp_str_t dir;
-  sp_str_t name;
-  bool bare;
-  bool check;
-} spn_scaffold_desc_t;
-
 #endif

@@ -56,7 +56,7 @@ static struct {
 static void on_signal(sp_os_signal_t signal, void* userdata) {
   switch (signal) {
     case SP_OS_SIGNAL_INTERRUPT: {
-      spn_ctx_cancel(&spn);
+      spn_ctx_cancel(host.ctx);
       break;
     }
     case SP_OS_SIGNAL_ABORT:
@@ -119,16 +119,20 @@ static sp_app_result_t on_init(sp_app_t* sp) {
   }
   spn_tui_open(&tui, mode, verbosity);
 
-  spn_ctx_init(&spn);
+  host.mem = sp_mem_arena_as_allocator(sp_mem_arena_new(sp_mem_os_new()));
+  host.ctx = spn_ctx_new();
   app.initted = true;
   sp_os_register_signal_handler(SP_OS_SIGNAL_INTERRUPT, on_signal, SP_NULLPTR);
 
-  if (spn_ctx_mount(&spn)) {
+  if (spn_ctx_mount(host.ctx)) {
     return SP_APP_ERR;
   }
-  spn_tui_open_log(&tui, spn.paths.log);
+  spn_tui_open_log(&tui, spn_ctx_log_dir(host.ctx));
 
-  if (spn_ctx_load_project(&spn, args.project_dir, args.refresh)) {
+  if (spn_ctx_load_project(host.ctx, (spn_project_request_t) {
+    .dir = args.project_dir,
+    .index_refresh_seconds = args.refresh,
+  })) {
     return SP_APP_ERR;
   }
   spn_tui_flush(&tui);
@@ -180,7 +184,7 @@ static void on_deinit(sp_app_t* sp) {
   }
 
   if (app.initted) {
-    spn_ctx_close(&spn, sp->result != SP_APP_ERR);
+    spn_ctx_close(host.ctx, sp->result != SP_APP_ERR);
     spn_tui_flush(&tui);
   }
 }

@@ -11,7 +11,7 @@ void spn_toml_loader_read_option_defaults(spn_toml_loader_t* ctx, toml_table_t* 
       spn_toml_loader_push_index(ctx, it);
       toml_table_t* element = toml_array_table(array, (s32)it);
       if (!element) {
-        spn_toml_loader_issue_at(ctx, SPN_CODEGEN_ERR_EXPECTED_OBJECT, sp_str_lit(""));
+        spn_toml_loader_issue_at(ctx, SPN_ERR_CODEGEN_EXPECTED_OBJECT, sp_str_lit(""));
         spn_toml_loader_pop(ctx);
         continue;
       }
@@ -23,7 +23,7 @@ void spn_toml_loader_read_option_defaults(spn_toml_loader_t* ctx, toml_table_t* 
           break;
         }
         if (!sp_cstr_equal(name, "value") && !sp_cstr_equal(name, "when")) {
-          spn_toml_loader_issue(ctx, SPN_CODEGEN_ERR_INVALID, name);
+          spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, name);
         }
       }
 
@@ -37,12 +37,12 @@ void spn_toml_loader_read_option_defaults(spn_toml_loader_t* ctx, toml_table_t* 
         entry.value = spn_toml_loader_value_bool(boolean);
       }
       else if (spn_toml_loader_field_present(element, "value")) {
-        spn_toml_loader_issue(ctx, SPN_CODEGEN_ERR_INVALID, "value");
+        spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "value");
         spn_toml_loader_pop(ctx);
         continue;
       }
       else {
-        spn_toml_loader_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, "value");
+        spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, "value");
         spn_toml_loader_pop(ctx);
         continue;
       }
@@ -67,7 +67,7 @@ void spn_toml_loader_read_option_defaults(spn_toml_loader_t* ctx, toml_table_t* 
   }
 
   if (spn_toml_loader_field_present(table, key)) {
-    spn_toml_loader_issue(ctx, SPN_CODEGEN_ERR_INVALID, key);
+    spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, key);
   }
 }
 

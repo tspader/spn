@@ -24,7 +24,7 @@ static spn_cc_compile_t spn_build_compile_desc(sp_mem_t mem, spn_compile_unit_t*
   spn_cc_compile_t compile = {
     .lang = unit->lang,
     .cxx = unit->target->info->cxx,
-    .pic = unit->target->info->kind == SPN_TARGET_LIB,
+    .pic = unit->target->info->kind == SPN_TARGET_KIND_LIB,
   };
   if (build->profile.os == SPN_OS_MACOS) {
     compile.min_os = unit->target->link.cc.min_os;

@@ -38,23 +38,23 @@ static spn_target_unit_t* add_target(spn_session_t* s, spn_pkg_unit_t* pkg, spn_
   sp_da_init(s->mem, target->deps);
 
   switch (info->kind) {
-    case SPN_TARGET_LIB: {
+    case SPN_TARGET_KIND_LIB: {
       sp_da_push(pkg->targets, target);
       sp_da_push(pkg->libs, target);
       break;
     }
-    case SPN_TARGET_EXE:
-    case SPN_TARGET_SCRIPT:
-    case SPN_TARGET_TEST: {
+    case SPN_TARGET_KIND_EXE:
+    case SPN_TARGET_KIND_SCRIPT:
+    case SPN_TARGET_KIND_TEST: {
       sp_da_push(pkg->targets, target);
       break;
     }
-    case SPN_TARGET_CONFIGURE_METAPROGRAM: {
+    case SPN_TARGET_KIND_CONFIGURE_METAPROGRAM: {
       sp_assert(pkg->build == s->units.metaprogram);
       pkg->scripts.configure = target;
       break;
     }
-    case SPN_TARGET_BUILD_METAPROGRAM: {
+    case SPN_TARGET_KIND_BUILD_METAPROGRAM: {
       sp_assert(pkg->build == s->units.metaprogram);
       pkg->scripts.build = target;
       sp_da_push(pkg->targets, target);
@@ -73,18 +73,18 @@ static spn_err_union_t set_target_kind(spn_session_t* s, spn_target_unit_t* targ
   spn_target_info_t* info = target->info;
 
   switch (info->kind) {
-    case SPN_TARGET_EXE:
-    case SPN_TARGET_SCRIPT:
-    case SPN_TARGET_TEST: {
+    case SPN_TARGET_KIND_EXE:
+    case SPN_TARGET_KIND_SCRIPT:
+    case SPN_TARGET_KIND_TEST: {
       target->kind = SPN_CC_OUTPUT_EXE;
       return spn_result(SPN_OK);
     }
-    case SPN_TARGET_CONFIGURE_METAPROGRAM:
-    case SPN_TARGET_BUILD_METAPROGRAM: {
+    case SPN_TARGET_KIND_CONFIGURE_METAPROGRAM:
+    case SPN_TARGET_KIND_BUILD_METAPROGRAM: {
       target->kind = SPN_CC_OUTPUT_REACTOR;
       return spn_result(SPN_OK);
     }
-    case SPN_TARGET_LIB: {
+    case SPN_TARGET_KIND_LIB: {
       if (spn_linkage_set_has(info->linkages, SPN_LIB_KIND_OBJECT) || info->no_link) {
         target->lib_kind = spn_linkage_set_default(info->linkages);
       }
@@ -690,7 +690,7 @@ static spn_err_union_t add_plan_targets(spn_session_t* s, spn_build_plan_t* plan
       continue;
     }
 
-    bool staged_at_root = info->kind == SPN_TARGET_EXE || info->kind == SPN_TARGET_SCRIPT;
+    bool staged_at_root = info->kind == SPN_TARGET_KIND_EXE || info->kind == SPN_TARGET_KIND_SCRIPT;
     if (staged_at_root && exe_name_reserved(info->name)) {
       return (spn_err_union_t) {
         .kind = SPN_ERR_TARGET_RESERVED,

@@ -30,17 +30,24 @@ static void sync_index_node(void* data) {
   job->err = spn_index_sync(job->index, job->force);
 }
 
-static spn_err_union_t sync_indexes(spn_ctx_t* ctx, spn_index_refresh_t refresh) {
+static spn_err_union_t sync_indexes(spn_ctx_t* ctx, spn_sync_request_t request) {
+  if (!sp_str_empty(request.only) && !spn_find_index(ctx, request.only)) {
+    return (spn_err_union_t) {
+      .kind = SPN_ERR_INDEX_UNKNOWN,
+      .index = { .name = request.only },
+    };
+  }
+
   sp_da(job_t*) jobs = sp_da_new(ctx->mem, job_t*);
 
   sp_da_for(ctx->indexes, it) {
     spn_index_info_t* index = &ctx->indexes[it];
 
-    if (!sp_str_empty(refresh.only) && !sp_str_equal(index->name, refresh.only)) {
+    if (!sp_str_empty(request.only) && !sp_str_equal(index->name, request.only)) {
       continue;
     }
 
-    if (refresh.force || spn_index_needs_fetch(index)) {
+    if (request.force || spn_index_needs_fetch(index)) {
       spn_event_buffer_push(ctx->events, (spn_build_event_t) {
         .kind = SPN_EVENT_SYNC,
         .sync = {
@@ -53,7 +60,7 @@ static spn_err_union_t sync_indexes(spn_ctx_t* ctx, spn_index_refresh_t refresh)
     *job = (job_t) {
       .ctx = ctx,
       .index = index,
-      .force = refresh.force,
+      .force = request.force,
     };
     sp_da_push(jobs, job);
   }
@@ -102,6 +109,6 @@ static spn_err_union_t sync_indexes(spn_ctx_t* ctx, spn_index_refresh_t refresh)
   return spn_result(SPN_OK);
 }
 
-spn_err_t spn_op_sync_indexes(spn_ctx_t* ctx, spn_index_refresh_t refresh) {
-  return spn_err_emit(ctx, sync_indexes(ctx, refresh));
+spn_err_t spn_op_sync_indexes(spn_ctx_t* ctx, spn_sync_request_t request) {
+  return spn_err_emit(ctx, sync_indexes(ctx, request));
 }

@@ -91,7 +91,7 @@ static const test_t tests [] = {
     .name = "metaprogram_links_build_edges",
     .graph = {
       .root = "P1",
-      .target = SPN_TARGET_BUILD_METAPROGRAM,
+      .target = SPN_TARGET_KIND_BUILD_METAPROGRAM,
       .pkgs = {
         { .name = "P1", .deps = { { "D1" }, { "D2", .kind = SPN_DEP_KIND_BUILD } } },
         { .name = "D1", .kind = SPN_LIB_KIND_STATIC },
@@ -106,7 +106,7 @@ static const test_t tests [] = {
     .name = "hide_transitive_build_edges",
     .graph = {
       .root = "P1",
-      .target = SPN_TARGET_BUILD_METAPROGRAM,
+      .target = SPN_TARGET_KIND_BUILD_METAPROGRAM,
       .pkgs = {
         { .name = "P1", .deps = { { "D1", .kind = SPN_DEP_KIND_BUILD } } },
         { .name = "D1", .kind = SPN_LIB_KIND_STATIC, .deps = { { "D2" }, { "D3", .kind = SPN_DEP_KIND_BUILD } } },
@@ -124,7 +124,7 @@ static const test_t tests [] = {
     .name = "link_test_edges_in_tests",
     .graph = {
       .root = "P1",
-      .target = SPN_TARGET_TEST,
+      .target = SPN_TARGET_KIND_TEST,
       .pkgs = {
         { .name = "P1", .deps = { { "D1", .kind = SPN_DEP_KIND_TEST } } },
         { .name = "D1", .kind = SPN_LIB_KIND_STATIC },

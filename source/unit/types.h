@@ -7,7 +7,7 @@
 
 #include "compiler/types.h"
 #include "error/types.h"
-#include "filter/types.h"
+#include "spn/session.h"
 #include "intern/types.h"
 #include "pkg/types.h"
 #include "sp/macro.h"

@@ -2,23 +2,11 @@
 #define SPN_INDEX_TYPES_H
 
 #include "sp.h"
-#include "spn/core.h"
+#include "spn/session.h"
 
 #include "sp/sp_om.h"
 #include "pkg/types.h"
 #include "semver/types.h"
-
-typedef enum {
-  SPN_INDEX_WORKSPACE,
-  SPN_INDEX_BUILTIN,
-  SPN_INDEX_USER,
-} spn_index_kind_t;
-
-typedef enum {
-  SPN_INDEX_PROTOCOL_GIT,
-  SPN_INDEX_PROTOCOL_HTTP,
-  SPN_INDEX_PROTOCOL_DIR,
-} spn_index_protocol_t;
 
 typedef enum {
   SPN_INDEX_DEP_NORMAL,

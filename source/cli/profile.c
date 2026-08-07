@@ -1,7 +1,5 @@
 #include "cli/cli.h"
 
-#include "spn/host.h"
-
 static sp_cli_result_t invalid(sp_cli_t* cli, sp_str_t value, const c8* flag, const c8* expected) {
   return spn_cli_error(cli, "invalid value {.red} for {.yellow}; expected {}",
     sp_fmt_str(value),
@@ -9,7 +7,7 @@ static sp_cli_result_t invalid(sp_cli_t* cli, sp_str_t value, const c8* flag, co
     sp_fmt_cstr(expected));
 }
 
-sp_cli_result_t spn_cli_parse_profile(sp_cli_t* cli, spn_profile_info_t* overrides) {
+sp_cli_result_t spn_cli_parse_profile(sp_cli_t* cli, spn_profile_override_t* profile) {
   spn_cli_profile_t* cmd = &args.profile;
 
   spn_triple_t target = sp_zero;
@@ -59,23 +57,19 @@ sp_cli_result_t spn_cli_parse_profile(sp_cli_t* cli, spn_profile_info_t* overrid
       sanitizers |= sanitizer;
     }
     sp_mem_end_scratch(scratch);
-    if (spn_sanitizer_set_conflicting(sanitizers)) {
+    if (spn_sanitizer_set_has_conflict(sanitizers)) {
       return invalid(cli, cmd->sanitize, "--sanitize", "a compatible set (thread and memory don't combine with each other, address, or leak)");
     }
   }
 
-  target = spn_triple_merge(target, parts);
-
-  *overrides = (spn_profile_info_t) {
+  *profile = (spn_profile_override_t) {
     .name = cmd->name,
     .toolchain = cmd->toolchain,
     .mode = mode,
     .opt = opt,
     .sanitizers = sanitizers,
     .sanitizers_set = sanitizers_set,
-    .os = target.os,
-    .arch = target.arch,
-    .abi = target.abi,
+    .triple = spn_triple_merge(target, parts),
   };
   return SP_CLI_OK;
 }

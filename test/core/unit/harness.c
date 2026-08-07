@@ -33,7 +33,7 @@ spn_pkg_id_t find_pkg_id(spn_session_t* s, unit_graph_test_t* g, const c8* name)
 static spn_target_info_t lib_info(sp_mem_t mem, const unit_lib_t* spec) {
   spn_target_info_t info = sp_zero;
   info.name = sp_str_view(spec->name);
-  info.kind = SPN_TARGET_LIB;
+  info.kind = SPN_TARGET_KIND_LIB;
   info.linkages = spec->linkages;
   info.no_link = spec->no_link;
   info.source = test_str_list(mem, spec->source, UNIT_TEST_MAX_STRS);
