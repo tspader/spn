@@ -1,6 +1,11 @@
 #include "cli/cli.h"
 
 sp_cli_result_t spn_cli_test(sp_cli_t* cli) {
+  sp_cli_result_t opened = spn_cli_open(false);
+  if (opened != SP_CLI_OK) {
+    return opened;
+  }
+
   spn_target_names_t names = sp_da_new(host.mem, sp_str_t);
   for (const c8** it = cli->rest; *it; it++) {
     sp_da_push(names, sp_cstr_as_str(*it));

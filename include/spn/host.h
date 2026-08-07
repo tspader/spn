@@ -49,6 +49,7 @@ typedef struct {
 typedef struct {
   sp_str_t dir;
   u32 index_refresh_seconds;
+  bool project_optional;
 } spn_open_request_t;
 
 typedef struct {
@@ -66,7 +67,6 @@ void spn_ctx_close(spn_ctx_t* ctx, bool ok);
 void spn_ctx_cancel(spn_ctx_t* ctx);
 bool spn_ctx_cancelled(spn_ctx_t* ctx);
 bool spn_ctx_progress(spn_ctx_t* ctx, spn_progress_t* progress);
-bool spn_ctx_has_project(spn_ctx_t* ctx);
 bool spn_ctx_find_target(spn_ctx_t* ctx, sp_str_t name, spn_target_kind_t* kind);
 sp_str_t spn_ctx_project_dir(spn_ctx_t* ctx);
 sp_str_t spn_ctx_cache_dir(spn_ctx_t* ctx);

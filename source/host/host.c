@@ -31,10 +31,6 @@ static spn_index_desc_t describe_index(spn_index_info_t* index) {
   };
 }
 
-bool spn_ctx_has_project(spn_ctx_t* ctx) {
-  return ctx->project != SP_NULLPTR;
-}
-
 bool spn_ctx_find_target(spn_ctx_t* ctx, sp_str_t name, spn_target_kind_t* kind) {
   if (!ctx->project) {
     return false;

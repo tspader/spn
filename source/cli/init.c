@@ -117,6 +117,11 @@ static spn_err_t run(sp_mem_t mem, spn_cli_init_t* command, sp_str_t project) {
 }
 
 sp_cli_result_t spn_cli_init(sp_cli_t* cli) {
+  sp_cli_result_t opened = spn_cli_open(true);
+  if (opened != SP_CLI_OK) {
+    return opened;
+  }
+
   spn_tui_handoff(&tui);
   return run(host.mem, &args.init, spn_ctx_project_dir(host.ctx)) ? SP_CLI_ERR : SP_CLI_OK;
 }

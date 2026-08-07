@@ -203,6 +203,9 @@ static spn_err_union_t open_ctx(spn_ctx_t* ctx, spn_open_request_t request) {
   }
 
   spn_try_union(spn_project_load(ctx->heap, ctx->intern, ctx->events, ctx->paths.project, &ctx->project));
+  if (!request.project_optional) {
+    spn_try_union(spn_ctx_require_project(ctx));
+  }
 
   spn_index_assemble(ctx->heap, ctx->project ? &ctx->project->package.indexes : SP_NULLPTR, ctx->config.indexes, &ctx->indexes);
 

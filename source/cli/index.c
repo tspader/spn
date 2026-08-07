@@ -46,12 +46,22 @@ static void index_list() {
 }
 
 sp_cli_result_t spn_cli_index_list(sp_cli_t* cli) {
+  sp_cli_result_t opened = spn_cli_open(true);
+  if (opened != SP_CLI_OK) {
+    return opened;
+  }
+
   spn_tui_handoff(&tui);
   index_list();
   return SP_CLI_OK;
 }
 
 sp_cli_result_t spn_cli_index_path(sp_cli_t* cli) {
+  sp_cli_result_t opened = spn_cli_open(true);
+  if (opened != SP_CLI_OK) {
+    return opened;
+  }
+
   spn_index_desc_t index = sp_zero;
   if (!spn_ctx_find_index(host.ctx, args.index.name, &index)) {
     return spn_cli_error(cli, "unknown index: {.cyan}", sp_fmt_str(args.index.name));
@@ -63,6 +73,11 @@ sp_cli_result_t spn_cli_index_path(sp_cli_t* cli) {
 }
 
 sp_cli_result_t spn_cli_index_sync(sp_cli_t* cli) {
+  sp_cli_result_t opened = spn_cli_open(true);
+  if (opened != SP_CLI_OK) {
+    return opened;
+  }
+
   spn_err_t err = spn_op_sync_indexes(host.ctx, (spn_sync_request_t) {
     .force = true,
     .only = args.index.name,
