@@ -46,6 +46,38 @@ static sp_str_t resolve_macos_sdk(sp_mem_t mem, sp_env_t* env) {
   return sp_str_trim(result.out);
 }
 
+static spn_target_rule_t copy_rule(sp_mem_t mem, spn_target_rule_t rule) {
+  spn_target_rule_t result = { .kind = rule.kind };
+  if (rule.kind == SPN_TARGET_RULE_NAMED) {
+    result.names = sp_da_new(mem, sp_str_t);
+    sp_da_for(rule.names, it) {
+      sp_da_push(result.names, sp_str_copy(mem, rule.names[it]));
+    }
+  }
+  return result;
+}
+
+static spn_session_config_t copy_config(sp_mem_t mem, spn_session_config_t config) {
+  return (spn_session_config_t) {
+    .selection = {
+      .bin = copy_rule(mem, config.selection.bin),
+      .lib = copy_rule(mem, config.selection.lib),
+      .test = copy_rule(mem, config.selection.test),
+      .script = copy_rule(mem, config.selection.script),
+    },
+    .profile = {
+      .name = sp_str_copy(mem, config.profile.name),
+      .toolchain = sp_str_copy(mem, config.profile.toolchain),
+      .mode = config.profile.mode,
+      .opt = config.profile.opt,
+      .sanitizers = config.profile.sanitizers,
+      .sanitizers_set = config.profile.sanitizers_set,
+      .triple = config.profile.triple,
+    },
+    .force = config.force,
+  };
+}
+
 static bool is_shared_linkage(spn_pkg_info_t* pkg) {
   sp_da_for(pkg->config, it) {
     spn_pkg_config_t* config = &pkg->config[it].value;
@@ -68,6 +100,7 @@ spn_err_union_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem,
   s->project = project;
   s->mem = mem;
   s->pkg = root;
+  config = copy_config(mem, config);
   s->config = config;
   s->paths.root = project->paths.root;
   s->paths.build = sp_fs_join_path(s->mem, s->paths.root, sp_str_lit("build"));

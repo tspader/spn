@@ -43,16 +43,6 @@ static spn_err_t setup_toolchain_unit(spn_toolchain_store_t* store, spn_toolchai
   spn_toolchain_info_t* toolchain = unit->info;
   sp_str_t name = toolchain->name;
 
-  struct { sp_str_t build; sp_str_t test; sp_str_t jsonl; } paths = {
-    .build = sp_fs_join_path(spn.mem, spn.paths.log, sp_fmt(spn.mem, "toolchain.{}.build.log", sp_fmt_str(name)).value),
-    .test = sp_fs_join_path(spn.mem, spn.paths.log, sp_fmt(spn.mem, "toolchain.{}.test.log", sp_fmt_str(name)).value),
-    .jsonl = sp_fs_join_path(spn.mem, spn.paths.log, sp_fmt(spn.mem, "toolchain.{}.jsonl", sp_fmt_str(name)).value),
-  };
-
-  spn_lazy_log_init(&unit->logs.build, paths.build);
-  spn_lazy_log_init(&unit->logs.test, paths.test);
-  spn_lazy_log_init(&unit->logs.jsonl, paths.jsonl);
-
   sp_tm_timer_t timer = sp_tm_start_timer();
 
   bool cached = true;

@@ -5,6 +5,7 @@ add_executable(resolver
   ${SRC}/enum/enum.c
   ${SRC}/error/str.c
   ${SRC}/event/event.c
+  ${SRC}/event/log.c
   ${SRC}/external/git.c
   ${SRC}/external/tom.c
   ${SRC}/codegen/codegen.c

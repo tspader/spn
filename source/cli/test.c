@@ -8,7 +8,6 @@ sp_cli_result_t spn_cli_test(sp_cli_t* cli) {
 
   spn_session_config_t config = {
     .selection = {
-      .kind = SPN_TARGET_SELECTION_EXPLICIT,
       .test = {
         .kind = sp_da_empty(names) ? SPN_TARGET_RULE_ALL : SPN_TARGET_RULE_NAMED,
         .names = names,

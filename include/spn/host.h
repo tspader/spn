@@ -49,12 +49,7 @@ typedef struct {
 typedef struct {
   sp_str_t dir;
   u32 index_refresh_seconds;
-} spn_project_request_t;
-
-typedef enum {
-  SPN_CLEAN_ALL,
-  SPN_CLEAN_PROFILE,
-} spn_clean_scope_t;
+} spn_open_request_t;
 
 typedef struct {
   sp_str_t name;
@@ -65,8 +60,7 @@ typedef struct {
 } spn_index_desc_t;
 
 spn_ctx_t* spn_ctx_new();
-spn_err_t spn_ctx_mount(spn_ctx_t* ctx);
-spn_err_t spn_ctx_load_project(spn_ctx_t* ctx, spn_project_request_t request);
+spn_err_t spn_ctx_open(spn_ctx_t* ctx, spn_open_request_t request);
 spn_err_t spn_ctx_open_session(spn_ctx_t* ctx, const spn_session_config_t* config, spn_session_t** session);
 void spn_ctx_close(spn_ctx_t* ctx, bool ok);
 void spn_ctx_cancel(spn_ctx_t* ctx);
@@ -75,7 +69,6 @@ bool spn_ctx_progress(spn_ctx_t* ctx, spn_progress_t* progress);
 bool spn_ctx_has_project(spn_ctx_t* ctx);
 bool spn_ctx_find_target(spn_ctx_t* ctx, sp_str_t name, spn_target_kind_t* kind);
 sp_str_t spn_ctx_project_dir(spn_ctx_t* ctx);
-sp_str_t spn_ctx_log_dir(spn_ctx_t* ctx);
 sp_str_t spn_ctx_cache_dir(spn_ctx_t* ctx);
 bool spn_ctx_find_index(spn_ctx_t* ctx, sp_str_t name, spn_index_desc_t* index);
 sp_da(spn_index_desc_t) spn_ctx_indexes(sp_mem_t mem, spn_ctx_t* ctx);
@@ -88,7 +81,8 @@ spn_err_t spn_op_scaffold_check(spn_ctx_t* ctx, spn_scaffold_request_t request);
 spn_err_t spn_op_build(spn_session_t* session);
 spn_err_t spn_op_test(spn_session_t* session);
 spn_err_t spn_op_run_target(spn_session_t* session, spn_target_t* target);
-spn_err_t spn_op_clean(spn_session_t* session, spn_clean_scope_t scope);
+spn_err_t spn_op_clean(spn_ctx_t* ctx);
+spn_err_t spn_op_clean_profile(spn_session_t* session);
 spn_target_t* spn_session_find_target(spn_session_t* session, sp_str_t name);
 sp_str_t spn_target_name(spn_target_t* target);
 sp_str_t spn_target_path(sp_mem_t mem, spn_target_t* target);
