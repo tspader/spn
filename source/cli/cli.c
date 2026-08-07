@@ -1,10 +1,7 @@
 #include "cli/cli.h"
 
-#include "spn/host.h"
-
-#include "cli/types.h"
-
 spn_cli_t args;
+spn_cli_host_t host;
 
 static sp_cli_cmd_t cmd_init = {
   .name = "init",
@@ -451,17 +448,17 @@ sp_cli_cmd_t* spn_cli() {
 }
 
 sp_cli_result_t spn_cli_session(sp_cli_t* cli, spn_session_config_t config) {
-  sp_cli_result_t profile = spn_cli_parse_profile(cli, &config.overrides);
+  sp_cli_result_t profile = spn_cli_parse_profile(cli, &config.profile);
   if (profile != SP_CLI_OK) {
     return profile;
   }
-  return spn_ctx_open_session(&spn, &config) ? SP_CLI_ERR : SP_CLI_OK;
+  return spn_ctx_open_session(host.ctx, &config, &host.session) ? SP_CLI_ERR : SP_CLI_OK;
 }
 
 sp_cli_result_t spn_cli_error(sp_cli_t* cli, const c8* fmt, ...) {
   va_list args;
   va_start(args, fmt);
-  sp_str_t message = sp_fmt_mem_v(spn.heap, sp_cstr_as_str(fmt), args).value;
+  sp_str_t message = sp_fmt_mem_v(host.mem, sp_cstr_as_str(fmt), args).value;
   va_end(args);
   return sp_cli_set_error(cli, message);
 }

@@ -5,6 +5,6 @@ static void spn_cg_{{ .object }}_read_object(spn_toml_loader_t* ctx, toml_table_
     spn_cg_{{ .object }}_read(ctx, child, out);
     spn_toml_loader_pop(ctx);
   } else if (required) {
-    spn_toml_loader_issue(ctx, SPN_CODEGEN_ERR_MISSING_KEY, key);
+    spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, key);
   }
 }

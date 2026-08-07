@@ -51,14 +51,30 @@ void overlay_profile(spn_profile_info_t* to, spn_profile_info_t* from) {
   if (!sp_da_empty(from->options.clauses)) to->options = from->options;
 }
 
-static sp_str_t spn_profile_select_name(spn_profile_info_t* overrides) {
-  if (!sp_str_empty(overrides->name))
-    return overrides->name;
+static sp_str_t select_name(const spn_profile_override_t* override) {
+  if (!sp_str_empty(override->name)) {
+    return override->name;
+  }
 
-  if (overrides->mode == SPN_BUILD_MODE_RELEASE)
+  if (override->mode == SPN_BUILD_MODE_RELEASE) {
     return sp_str_lit("release");
+  }
 
   return sp_str_lit("debug");
+}
+
+static spn_profile_info_t override_to_info(const spn_profile_override_t* override) {
+  return (spn_profile_info_t) {
+    .name = override->name,
+    .toolchain = override->toolchain,
+    .mode = override->mode,
+    .opt = override->opt,
+    .sanitizers = override->sanitizers,
+    .sanitizers_set = override->sanitizers_set,
+    .os = override->triple.os,
+    .arch = override->triple.arch,
+    .abi = override->triple.abi,
+  };
 }
 
 void spn_profile_populate(spn_profile_table_t* profiles, spn_pkg_info_t* pkg) {
@@ -127,8 +143,8 @@ static spn_abi_t spn_profile_default_abi(spn_os_t os, bool shared) {
   SP_UNREACHABLE_RETURN(SPN_ABI_NONE);
 }
 
-spn_err_union_t spn_profile_resolve(spn_profile_table_t profiles, spn_profile_info_t* overrides, spn_triple_t host, bool is_shared, spn_profile_info_t* result) {
-  sp_str_t name = spn_profile_select_name(overrides);
+spn_err_union_t spn_profile_resolve(spn_profile_table_t profiles, const spn_profile_override_t* override, spn_triple_t host, bool is_shared, spn_profile_info_t* result) {
+  sp_str_t name = select_name(override);
 
   if (sp_str_find_c8(name, '/') >= 0 || sp_str_find_c8(name, '\\') >= 0) {
     return (spn_err_union_t) {
@@ -153,7 +169,8 @@ spn_err_union_t spn_profile_resolve(spn_profile_table_t profiles, spn_profile_in
   }
 
   spn_profile_info_t merged = *info;
-  overlay_profile(&merged, overrides);
+  spn_profile_info_t lifted = override_to_info(override);
+  overlay_profile(&merged, &lifted);
 
   spn_triple_t target = { merged.arch, merged.os, merged.abi };
   bool targeted = target.arch || target.os || target.abi;

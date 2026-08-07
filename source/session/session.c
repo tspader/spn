@@ -3,7 +3,6 @@
 #include "sp.h"
 #include "ctx/types.h"
 #include "error/types.h"
-#include "filter/types.h"
 #include "core/types.h"
 #include "resolve/types.h"
 #include "session/types.h"
@@ -94,7 +93,7 @@ spn_err_union_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem,
   sp_om_new(s->units.targets);
   sp_om_new(s->units.objects);
 
-  spn_try_union(spn_profile_resolve(s->profiles, &config.overrides, host, is_shared_linkage(root), &s->profile));
+  spn_try_union(spn_profile_resolve(s->profiles, &config.profile, host, is_shared_linkage(root), &s->profile));
 
   switch (s->profile.os) {
     case SPN_OS_MACOS: {

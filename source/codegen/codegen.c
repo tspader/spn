@@ -10,7 +10,7 @@
 static bool spn_toml_loader_read_version_part(spn_toml_loader_t* ctx, toml_table_t* table, const c8* key, s64 min, u16* out) {
   toml_value_t part = toml_table_int(table, key);
   if (!part.ok || part.u.i < min || part.u.i > UINT16_MAX) {
-    return spn_toml_loader_issue(ctx, spn_toml_loader_field_present(table, key) ? SPN_CODEGEN_ERR_INVALID : SPN_CODEGEN_ERR_MISSING_KEY, key);
+    return spn_toml_loader_issue(ctx, spn_toml_loader_field_present(table, key) ? SPN_ERR_CODEGEN_INVALID : SPN_ERR_CODEGEN_MISSING_KEY, key);
   }
   *out = (u16)part.u.i;
   return true;
@@ -20,7 +20,7 @@ void spn_toml_loader_read_os_version(spn_toml_loader_t* ctx, toml_table_t* table
   toml_table_t* child = toml_table_table(table, key);
   if (!child) {
     if (spn_toml_loader_field_present(table, key)) {
-      spn_toml_loader_issue(ctx, SPN_CODEGEN_ERR_EXPECTED_OBJECT, key);
+      spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_EXPECTED_OBJECT, key);
     }
     return;
   }

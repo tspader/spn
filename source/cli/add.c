@@ -1,6 +1,4 @@
 #include "cli/cli.h"
-#include "spn/host.h"
-#include "sp/sp_cli.h"
 
 sp_cli_result_t spn_cli_add(sp_cli_t* cli) {
   spn_cli_add_t* cmd = &args.add;
@@ -13,10 +11,10 @@ sp_cli_result_t spn_cli_add(sp_cli_t* cli) {
     return spn_cli_error(cli, "expected a package name");
   }
 
-  spn_err_t err = spn_op_add(&spn, (spn_add_request_t) {
-    .key = spec.first,
-    .requested = spec.second,
-    .dep = cmd->test ? SPN_ADD_DEP_TEST : cmd->build ? SPN_ADD_DEP_BUILD : SPN_ADD_DEP_PACKAGE,
+  spn_err_t err = spn_op_add(host.ctx, (spn_add_request_t) {
+    .name = spec.first,
+    .version = spec.second,
+    .kind = cmd->test ? SPN_DEP_KIND_TEST : cmd->build ? SPN_DEP_KIND_BUILD : SPN_DEP_KIND_PACKAGE,
   });
   return err ? SP_CLI_ERR : SP_CLI_OK;
 }

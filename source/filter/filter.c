@@ -26,34 +26,34 @@ static bool spn_target_rule_pass(const spn_target_rule_t* rule, const spn_target
 bool spn_target_selection_pass(const spn_target_selection_t* selection, const spn_target_info_t* target) {
   if (selection->kind == SPN_TARGET_SELECTION_DEFAULT) {
     switch (target->kind) {
-      case SPN_TARGET_BUILD_METAPROGRAM:
-      case SPN_TARGET_CONFIGURE_METAPROGRAM:
-      case SPN_TARGET_SCRIPT: {
+      case SPN_TARGET_KIND_BUILD_METAPROGRAM:
+      case SPN_TARGET_KIND_CONFIGURE_METAPROGRAM:
+      case SPN_TARGET_KIND_SCRIPT: {
         return false;
       }
-      case SPN_TARGET_LIB:
-      case SPN_TARGET_TEST:
-      case SPN_TARGET_EXE: {
+      case SPN_TARGET_KIND_LIB:
+      case SPN_TARGET_KIND_TEST:
+      case SPN_TARGET_KIND_EXE: {
         return true;
       }
     }
   }
 
   switch (target->kind) {
-    case SPN_TARGET_EXE: {
+    case SPN_TARGET_KIND_EXE: {
       return spn_target_rule_pass(&selection->bin, target);
     }
-    case SPN_TARGET_LIB: {
+    case SPN_TARGET_KIND_LIB: {
       return spn_target_rule_pass(&selection->lib, target);
     }
-    case SPN_TARGET_TEST: {
+    case SPN_TARGET_KIND_TEST: {
       return spn_target_rule_pass(&selection->test, target);
     }
-    case SPN_TARGET_SCRIPT: {
+    case SPN_TARGET_KIND_SCRIPT: {
       return spn_target_rule_pass(&selection->script, target);
     }
-    case SPN_TARGET_CONFIGURE_METAPROGRAM:
-    case SPN_TARGET_BUILD_METAPROGRAM: {
+    case SPN_TARGET_KIND_CONFIGURE_METAPROGRAM:
+    case SPN_TARGET_KIND_BUILD_METAPROGRAM: {
       return false;
     }
   }

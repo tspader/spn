@@ -1,5 +1,4 @@
 #include "spn/host.h"
-#include "ctx/init.h"
 
 #include "codegen/gen/config.gen.h"
 #include "codegen/lower.h"
@@ -85,7 +84,7 @@ static void extract_runtime(spn_ctx_t* ctx) {
   sp_mem_end_scratch(scratch);
 }
 
-void spn_ctx_init(spn_ctx_t* ctx) {
+static void init(spn_ctx_t* ctx) {
   *ctx = sp_zero_s(spn_ctx_t);
   ctx->mem = sp_mem_os_new();
   ctx->arena = sp_mem_arena_new(ctx->mem);
@@ -95,6 +94,12 @@ void spn_ctx_init(spn_ctx_t* ctx) {
   *ctx->env = sp_env_capture(ctx->heap);
   ctx->events = spn_event_buffer_new(ctx->mem);
   spn_event_log_init(ctx->heap);
+}
+
+spn_ctx_t* spn_ctx_new() {
+  sp_assert(!spn.arena);
+  init(&spn);
+  return &spn;
 }
 
 static spn_err_union_t mount(spn_ctx_t* ctx) {
@@ -146,7 +151,7 @@ static spn_err_union_t mount(spn_ctx_t* ctx) {
     spn_err_t loaded = spn_codegen_load_config(&loader, ctx->paths.config.toml, &config);
     if (!loaded) {
       sp_da_for(config.index, it) {
-        sp_da_push(ctx->config.indexes, spn_index_lower(&loader, it, SPN_INDEX_USER, &config.index[it]));
+        sp_da_push(ctx->config.indexes, spn_index_lower(&loader, it, SPN_INDEX_KIND_USER, &config.index[it]));
       }
     }
     if (loaded || !sp_da_empty(loader.issues)) {
@@ -195,12 +200,14 @@ spn_err_t spn_ctx_mount(spn_ctx_t* ctx) {
   return spn_err_emit(ctx, mount(ctx));
 }
 
-spn_err_t spn_ctx_load_project(spn_ctx_t* ctx, sp_str_t dir, u32 refresh) {
-  return spn_err_emit(ctx, load_project(ctx, dir, refresh));
+spn_err_t spn_ctx_load_project(spn_ctx_t* ctx, spn_project_request_t request) {
+  return spn_err_emit(ctx, load_project(ctx, request.dir, request.index_refresh_seconds));
 }
 
-spn_err_t spn_ctx_open_session(spn_ctx_t* ctx, const spn_session_config_t* config) {
-  return spn_err_emit(ctx, open_session(ctx, *config));
+spn_err_t spn_ctx_open_session(spn_ctx_t* ctx, const spn_session_config_t* config, spn_session_t** session) {
+  spn_err_t err = spn_err_emit(ctx, open_session(ctx, *config));
+  *session = err ? SP_NULLPTR : ctx->session;
+  return err;
 }
 
 void spn_ctx_close(spn_ctx_t* ctx, bool ok) {

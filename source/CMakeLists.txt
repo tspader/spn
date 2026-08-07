@@ -6,7 +6,6 @@ set(SPN_SOURCES
   api/make/make.c
   api/node/node.c
   project/project.c
-  project/scaffold.c
   host/host.c
   cli/add.c
   cli/build.c
@@ -79,6 +78,7 @@ set(SPN_SOURCES
   op/index.c
   op/op.c
   op/run.c
+  op/scaffold.c
   op/publish.c
   op/resolve.c
   op/sync.c

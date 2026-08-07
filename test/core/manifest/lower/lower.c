@@ -309,14 +309,14 @@ static const test_t tests [] = {
     .name = "validate_cxx_bad_standard",
     .manifest = "validate_cxx_bad_standard",
     .issues = {
-      { SPN_CODEGEN_ERR_INVALID, "lib[0].cxx.standard" }
+      { SPN_ERR_CODEGEN_INVALID, "lib[0].cxx.standard" }
     }
   },
   {
     .name = "validate_cxx_source_on_build_script",
     .manifest = "validate_cxx_source_on_build_script",
     .issues = {
-      { SPN_CODEGEN_ERR_INVALID, "package.build.source" }
+      { SPN_ERR_CODEGEN_INVALID, "package.build.source" }
     }
   },
   {
@@ -338,63 +338,63 @@ static const test_t tests [] = {
     .name = "validate_object_mixed",
     .manifest = "validate_object_mixed",
     .issues = {
-      { SPN_CODEGEN_ERR_INVALID, "lib[0].kinds" }
+      { SPN_ERR_CODEGEN_INVALID, "lib[0].kinds" }
     }
   },
   {
     .name = "validate_link_on_bin",
     .manifest = "validate_link_on_bin",
     .issues = {
-      { SPN_CODEGEN_ERR_INVALID, "bin[0].link" }
+      { SPN_ERR_CODEGEN_INVALID, "bin[0].link" }
     }
   },
   {
     .name = "validate_link_on_script",
     .manifest = "validate_link_on_script",
     .issues = {
-      { SPN_CODEGEN_ERR_INVALID, "script[0].link" }
+      { SPN_ERR_CODEGEN_INVALID, "script[0].link" }
     }
   },
   {
     .name = "validate_link_on_test",
     .manifest = "validate_link_on_test",
     .issues = {
-      { SPN_CODEGEN_ERR_INVALID, "test[0].link" }
+      { SPN_ERR_CODEGEN_INVALID, "test[0].link" }
     }
   },
   {
     .name = "validate_toolchain_incomplete",
     .manifest = "toolchain_incomplete",
     .issues = {
-      { SPN_CODEGEN_ERR_MISSING_KEY, "toolchain[0].compiler" }
+      { SPN_ERR_CODEGEN_MISSING_KEY, "toolchain[0].compiler" }
     }
   },
   {
     .name = "validate_toolchain_url_without_sha",
     .manifest = "toolchain_no_sha",
     .issues = {
-      { SPN_CODEGEN_ERR_MISSING_KEY, "toolchain[0].sha256" }
+      { SPN_ERR_CODEGEN_MISSING_KEY, "toolchain[0].sha256" }
     }
   },
   {
     .name = "validate_duplicate_name",
     .manifest = "validate_duplicate_name",
     .issues = {
-      { SPN_CODEGEN_ERR_DUPLICATE_KEY, "bin[0]" }
+      { SPN_ERR_CODEGEN_DUPLICATE_KEY, "bin[0]" }
     }
   },
   {
     .name = "validate_upstream_url_only",
     .manifest = "validate_upstream_url_only",
     .issues = {
-      { SPN_CODEGEN_ERR_MISSING_KEY, "package.commit" }
+      { SPN_ERR_CODEGEN_MISSING_KEY, "package.commit" }
     }
   },
   {
     .name = "validate_upstream_commit_only",
     .manifest = "validate_upstream_commit_only",
     .issues = {
-      { SPN_CODEGEN_ERR_MISSING_KEY, "package.url" }
+      { SPN_ERR_CODEGEN_MISSING_KEY, "package.url" }
     }
   },
   {
@@ -475,18 +475,18 @@ static const test_t tests [] = {
         .name = "main",
         .url = "https://x",
         .protocol = SPN_INDEX_PROTOCOL_HTTP,
-        .kind = SPN_INDEX_WORKSPACE,
+        .kind = SPN_INDEX_KIND_WORKSPACE,
       },
       {
         .name = "mirror",
         .url = "https://y",
-        .kind = SPN_INDEX_WORKSPACE,
+        .kind = SPN_INDEX_KIND_WORKSPACE,
       },
       {
         .name = "local",
         .path = "index",
         .protocol = SPN_INDEX_PROTOCOL_DIR,
-        .kind = SPN_INDEX_WORKSPACE,
+        .kind = SPN_INDEX_KIND_WORKSPACE,
       },
     },
   },
@@ -494,20 +494,20 @@ static const test_t tests [] = {
     .name = "validate_index_sources",
     .manifest = "index_sources",
     .issues = {
-      { SPN_CODEGEN_ERR_INVALID, "index[0].url" },
-      { SPN_CODEGEN_ERR_MISSING_KEY, "index[1].url" },
-      { SPN_CODEGEN_ERR_INVALID, "index[2].path" },
-      { SPN_CODEGEN_ERR_MISSING_KEY, "index[2].url" },
-      { SPN_CODEGEN_ERR_INVALID, "index[3].url" },
-      { SPN_CODEGEN_ERR_INVALID, "index[3].rev" },
-      { SPN_CODEGEN_ERR_MISSING_KEY, "index[3].path" },
+      { SPN_ERR_CODEGEN_INVALID, "index[0].url" },
+      { SPN_ERR_CODEGEN_MISSING_KEY, "index[1].url" },
+      { SPN_ERR_CODEGEN_INVALID, "index[2].path" },
+      { SPN_ERR_CODEGEN_MISSING_KEY, "index[2].url" },
+      { SPN_ERR_CODEGEN_INVALID, "index[3].url" },
+      { SPN_ERR_CODEGEN_INVALID, "index[3].rev" },
+      { SPN_ERR_CODEGEN_MISSING_KEY, "index[3].path" },
     }
   },
   {
     .name = "validate_package_bad_version",
     .manifest = "package_bad_version",
     .issues = {
-      { SPN_CODEGEN_ERR_INVALID, "package.version" }
+      { SPN_ERR_CODEGEN_INVALID, "package.version" }
     }
   },
   {
@@ -537,29 +537,29 @@ static const test_t tests [] = {
     .name = "validate_when_bad_new_facts",
     .manifest = "validate_when_bad_new_facts",
     .issues = {
-      { SPN_CODEGEN_ERR_INVALID, "deps.package[0].when.opt" },
-      { SPN_CODEGEN_ERR_INVALID, "deps.package[1].when.sanitize_address" },
+      { SPN_ERR_CODEGEN_INVALID, "deps.package[0].when.opt" },
+      { SPN_ERR_CODEGEN_INVALID, "deps.package[1].when.sanitize_address" },
     },
   },
   {
     .name = "validate_profile_bad_opt",
     .manifest = "validate_profile_bad_opt",
     .issues = {
-      { SPN_CODEGEN_ERR_INVALID, "profile[0].opt" },
+      { SPN_ERR_CODEGEN_INVALID, "profile[0].opt" },
     },
   },
   {
     .name = "validate_profile_sanitize_conflict",
     .manifest = "validate_profile_sanitize_conflict",
     .issues = {
-      { SPN_CODEGEN_ERR_INVALID, "profile[0].sanitize" },
+      { SPN_ERR_CODEGEN_INVALID, "profile[0].sanitize" },
     },
   },
   {
     .name = "validate_profile_bad_sanitizer",
     .manifest = "validate_profile_bad_sanitizer",
     .issues = {
-      { SPN_CODEGEN_ERR_INVALID, "profile.dev.sanitize[0]" },
+      { SPN_ERR_CODEGEN_INVALID, "profile.dev.sanitize[0]" },
     },
   },
   {
@@ -631,107 +631,107 @@ static const test_t tests [] = {
     .name = "validate_option_define_on_enum",
     .manifest = "validate_option_define_on_enum",
     .issues = {
-      { SPN_CODEGEN_ERR_INVALID, "options[0].define" }
+      { SPN_ERR_CODEGEN_INVALID, "options[0].define" }
     },
   },
   {
     .name = "validate_config_negated_option",
     .manifest = "validate_config_negated_option",
     .issues = {
-      { SPN_CODEGEN_ERR_INVALID, "config[0].options.ssl" }
+      { SPN_ERR_CODEGEN_INVALID, "config[0].options.ssl" }
     },
   },
   {
     .name = "validate_profile_unknown_option",
     .manifest = "validate_profile_unknown_option",
     .issues = {
-      { SPN_CODEGEN_ERR_INVALID, "profile[0].options.nosuch" }
+      { SPN_ERR_CODEGEN_INVALID, "profile[0].options.nosuch" }
     },
   },
   {
     .name = "validate_when_unknown_key",
     .manifest = "validate_when_unknown_key",
     .issues = {
-      { SPN_CODEGEN_ERR_INVALID, "deps.package[0].when.simd" }
+      { SPN_ERR_CODEGEN_INVALID, "deps.package[0].when.simd" }
     },
   },
   {
     .name = "validate_when_bad_fact",
     .manifest = "validate_when_bad_fact",
     .issues = {
-      { SPN_CODEGEN_ERR_INVALID, "lib[0].source[0].when.os" },
-      { SPN_CODEGEN_ERR_INVALID, "lib[0].source[1].when.mode" },
-      { SPN_CODEGEN_ERR_INVALID, "lib[0].source[2].when.abi" }
+      { SPN_ERR_CODEGEN_INVALID, "lib[0].source[0].when.os" },
+      { SPN_ERR_CODEGEN_INVALID, "lib[0].source[1].when.mode" },
+      { SPN_ERR_CODEGEN_INVALID, "lib[0].source[2].when.abi" }
     },
   },
   {
     .name = "validate_when_kind_mismatch",
     .manifest = "validate_when_kind_mismatch",
     .issues = {
-      { SPN_CODEGEN_ERR_INVALID, "deps.package[0].when.zstd" }
+      { SPN_ERR_CODEGEN_INVALID, "deps.package[0].when.zstd" }
     },
   },
   {
     .name = "validate_when_bad_option_value",
     .manifest = "validate_when_bad_option_value",
     .issues = {
-      { SPN_CODEGEN_ERR_INVALID, "deps.package[0].when.tls" }
+      { SPN_ERR_CODEGEN_INVALID, "deps.package[0].when.tls" }
     },
   },
   {
     .name = "validate_when_in_default",
     .manifest = "validate_when_in_default",
     .issues = {
-      { SPN_CODEGEN_ERR_INVALID, "options[0].default[0].when.simd" }
+      { SPN_ERR_CODEGEN_INVALID, "options[0].default[0].when.simd" }
     },
   },
   {
     .name = "validate_option_bad_type",
     .manifest = "validate_option_bad_type",
     .issues = {
-      { SPN_CODEGEN_ERR_INVALID, "options[0].type" }
+      { SPN_ERR_CODEGEN_INVALID, "options[0].type" }
     },
   },
   {
     .name = "validate_option_enum_no_values",
     .manifest = "validate_option_enum_no_values",
     .issues = {
-      { SPN_CODEGEN_ERR_MISSING_KEY, "options[0].values" }
+      { SPN_ERR_CODEGEN_MISSING_KEY, "options[0].values" }
     },
   },
   {
     .name = "validate_option_default_kind",
     .manifest = "validate_option_default_kind",
     .issues = {
-      { SPN_CODEGEN_ERR_INVALID, "options[0].default[0].value" }
+      { SPN_ERR_CODEGEN_INVALID, "options[0].default[0].value" }
     },
   },
   {
     .name = "validate_option_default_not_in_values",
     .manifest = "validate_option_default_not_in_values",
     .issues = {
-      { SPN_CODEGEN_ERR_INVALID, "options[0].default[0].value" }
+      { SPN_ERR_CODEGEN_INVALID, "options[0].default[0].value" }
     },
   },
   {
     .name = "validate_option_default_bad_index",
     .manifest = "validate_option_default_bad_index",
     .issues = {
-      { SPN_CODEGEN_ERR_INVALID, "options[0].default[1].value" }
+      { SPN_ERR_CODEGEN_INVALID, "options[0].default[1].value" }
     },
   },
   {
     .name = "validate_option_shadows_fact",
     .manifest = "validate_option_shadows_fact",
     .issues = {
-      { SPN_CODEGEN_ERR_DUPLICATE_KEY, "options[0]" }
+      { SPN_ERR_CODEGEN_DUPLICATE_KEY, "options[0]" }
     },
   },
   {
     .name = "validate_option_bool_values",
     .manifest = "validate_option_bool_values",
     .issues = {
-      { SPN_CODEGEN_ERR_INVALID, "options[0].values" }
+      { SPN_ERR_CODEGEN_INVALID, "options[0].values" }
     },
   },
   {
@@ -761,7 +761,7 @@ static const test_t tests [] = {
     .manifest = "patch_missing_file",
     .hash_patches = true,
     .issues = {
-      { SPN_CODEGEN_ERR_FILE_MISSING, "patch.core/q[0].files" },
+      { SPN_ERR_CODEGEN_FILE_MISSING, "patch.core/q[0].files" },
     },
   },
   {
@@ -769,15 +769,15 @@ static const test_t tests [] = {
     .manifest = "patch_missing_two",
     .hash_patches = true,
     .issues = {
-      { SPN_CODEGEN_ERR_FILE_MISSING, "patch.core/q[0].files" },
-      { SPN_CODEGEN_ERR_FILE_MISSING, "patch.core/r[1].files" },
+      { SPN_ERR_CODEGEN_FILE_MISSING, "patch.core/q[0].files" },
+      { SPN_ERR_CODEGEN_FILE_MISSING, "patch.core/r[1].files" },
     },
   },
   {
     .name = "patch_duplicate_canonical_name",
     .manifest = "patch_duplicate",
     .issues = {
-      { SPN_CODEGEN_ERR_DUPLICATE_KEY, "patch" },
+      { SPN_ERR_CODEGEN_DUPLICATE_KEY, "patch" },
     },
     .patches = {
       { .name = "core/q", .files = { "patches/a.patch" } },
@@ -787,15 +787,15 @@ static const test_t tests [] = {
     .name = "patch_duplicate_after_empty_files",
     .manifest = "patch_duplicate_empty",
     .issues = {
-      { SPN_CODEGEN_ERR_MISSING_KEY, "patch.q.files" },
-      { SPN_CODEGEN_ERR_DUPLICATE_KEY, "patch" },
+      { SPN_ERR_CODEGEN_MISSING_KEY, "patch.q.files" },
+      { SPN_ERR_CODEGEN_DUPLICATE_KEY, "patch" },
     },
   },
   {
     .name = "validate_patch_files_empty",
     .manifest = "validate_patch_files_empty",
     .issues = {
-      { SPN_CODEGEN_ERR_MISSING_KEY, "patch.q.files" },
+      { SPN_ERR_CODEGEN_MISSING_KEY, "patch.q.files" },
     },
   },
   {
@@ -803,14 +803,14 @@ static const test_t tests [] = {
     .manifest = "patch_table",
     .reject_patches = true,
     .issues = {
-      { SPN_CODEGEN_ERR_ROOT_ONLY, "patch" },
+      { SPN_ERR_CODEGEN_ROOT_ONLY, "patch" },
     },
   },
   {
     .name = "validate_option_default_unknown_key",
     .manifest = "validate_option_default_unknown_key",
     .issues = {
-      { SPN_CODEGEN_ERR_INVALID, "options.tls.default[0].whne" }
+      { SPN_ERR_CODEGEN_INVALID, "options.tls.default[0].whne" }
     },
   },
 };
@@ -927,10 +927,10 @@ sp_test_each(lower, cases, test_t, tests) {
   }
 
   // Targets
-  sp_try(check_targets(t, pkg.libs,    it->libs,    SP_CARR_LEN(it->libs),    SPN_TARGET_LIB));
-  sp_try(check_targets(t, pkg.exes,    it->exes,    SP_CARR_LEN(it->exes),    SPN_TARGET_EXE));
-  sp_try(check_targets(t, pkg.scripts, it->scripts, SP_CARR_LEN(it->scripts), SPN_TARGET_SCRIPT));
-  sp_try(check_targets(t, pkg.tests,   it->tests,   SP_CARR_LEN(it->tests),   SPN_TARGET_TEST));
+  sp_try(check_targets(t, pkg.libs,    it->libs,    SP_CARR_LEN(it->libs),    SPN_TARGET_KIND_LIB));
+  sp_try(check_targets(t, pkg.exes,    it->exes,    SP_CARR_LEN(it->exes),    SPN_TARGET_KIND_EXE));
+  sp_try(check_targets(t, pkg.scripts, it->scripts, SP_CARR_LEN(it->scripts), SPN_TARGET_KIND_SCRIPT));
+  sp_try(check_targets(t, pkg.tests,   it->tests,   SP_CARR_LEN(it->tests),   SPN_TARGET_KIND_TEST));
 
   // Deps
   sp_carr_for(it->deps, d) {

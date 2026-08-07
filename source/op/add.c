@@ -50,7 +50,7 @@ static site_t find_site(spn_toml_edit_t* edit, sp_mem_t mem, sp_str_t table, sp_
 static spn_err_union_t add(spn_ctx_t* ctx, spn_add_request_t request, spn_semver_range_t range) {
   spn_try_union(spn_ctx_require_project(ctx));
 
-  spn_pkg_name_t name = spn_pkg_name_from_qualified(request.key);
+  spn_pkg_name_t name = spn_pkg_name_from_qualified(request.name);
 
   spn_index_cache_t cache = sp_zero;
   spn_index_cache_init(&cache, ctx->heap, ctx->intern, &ctx->indexes);
@@ -84,7 +84,7 @@ static spn_err_union_t add(spn_ctx_t* ctx, spn_add_request_t request, spn_semver
     }};
   }
 
-  sp_str_t version = request.requested;
+  sp_str_t version = request.version;
   if (sp_str_empty(version)) {
     version = spn_semver_to_str(ctx->heap, release->version);
   }
@@ -107,13 +107,13 @@ static spn_err_union_t add(spn_ctx_t* ctx, spn_add_request_t request, spn_semver
   }
 
   const c8* table = SP_NULLPTR;
-  switch (request.dep) {
-    case SPN_ADD_DEP_TEST:  table = "test";    break;
-    case SPN_ADD_DEP_BUILD: table = "build";   break;
-    default:                table = "package"; break;
+  switch (request.kind) {
+    case SPN_DEP_KIND_TEST:  table = "test";    break;
+    case SPN_DEP_KIND_BUILD: table = "build";   break;
+    default:                 table = "package"; break;
   }
 
-  site_t site = find_site(&edit, s.mem, sp_cstr_as_str(table), request.key, spn_pkg_name_to_qualified(name));
+  site_t site = find_site(&edit, s.mem, sp_cstr_as_str(table), request.name, spn_pkg_name_to_qualified(name));
   if (spn_toml_edit_set_str(&edit, site.path, site.num_segments, version)) {
     result = (spn_err_union_t) { .kind = SPN_ERR_MANIFEST_EDIT, .manifest_parse = { .path = manifest } };
     goto cleanup;
@@ -140,13 +140,13 @@ cleanup:
 
 spn_err_t spn_op_add(spn_ctx_t* ctx, spn_add_request_t request) {
   spn_semver_range_t range = spn_semver_any();
-  if (!sp_str_empty(request.requested) && spn_semver_parse_range(request.requested, &range)) {
+  if (!sp_str_empty(request.version) && spn_semver_parse_range(request.version, &range)) {
     return spn_err_emit(ctx, (spn_err_union_t) {
       .kind = SPN_ERR_VERSION_INVALID,
-      .version_invalid = { .requested = sp_str_copy(ctx->heap, request.requested) },
+      .version_invalid = { .requested = sp_str_copy(ctx->heap, request.version) },
     });
   }
 
-  spn_try(spn_op_sync_indexes(ctx, (spn_index_refresh_t) sp_zero));
+  spn_try(spn_op_sync_indexes(ctx, (spn_sync_request_t) sp_zero));
   return spn_err_emit(ctx, add(ctx, request, range));
 }

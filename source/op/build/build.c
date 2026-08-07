@@ -32,19 +32,19 @@ sp_str_t spn_target_unit_staged_path(sp_mem_t mem, spn_target_unit_t* target) {
 
   sp_str_t path = sp_zero;
   switch (target->info->kind) {
-    case SPN_TARGET_EXE:
-    case SPN_TARGET_SCRIPT: {
+    case SPN_TARGET_KIND_EXE:
+    case SPN_TARGET_KIND_SCRIPT: {
       path = sp_fs_join_path(mem, target->pkg->build->paths.root, file_name);
       break;
     }
-    case SPN_TARGET_TEST: {
+    case SPN_TARGET_KIND_TEST: {
       sp_str_t dir = sp_fs_join_path(s.mem, target->pkg->build->paths.root, SP_LIT("test"));
       path = sp_fs_join_path(mem, dir, file_name);
       break;
     }
-    case SPN_TARGET_LIB:
-    case SPN_TARGET_CONFIGURE_METAPROGRAM:
-    case SPN_TARGET_BUILD_METAPROGRAM: {
+    case SPN_TARGET_KIND_LIB:
+    case SPN_TARGET_KIND_CONFIGURE_METAPROGRAM:
+    case SPN_TARGET_KIND_BUILD_METAPROGRAM: {
       break;
     }
   }

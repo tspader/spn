@@ -1,7 +1,5 @@
 #include "cli/cli.h"
 
-#include "spn/host.h"
-
 #include "tui/tui.h"
 
 static spn_publish_request_t publish_request() {
@@ -17,7 +15,7 @@ static spn_publish_request_t publish_request() {
 static sp_cli_result_t publish_dry() {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   sp_str_t json = sp_zero;
-  if (spn_op_publish_dry(&spn, publish_request(), scratch.mem, &json)) {
+  if (spn_op_publish_dry(host.ctx, publish_request(), scratch.mem, &json)) {
     sp_mem_end_scratch(scratch);
     return SP_CLI_ERR;
   }
@@ -34,5 +32,5 @@ sp_cli_result_t spn_cli_publish(sp_cli_t* cli) {
     return publish_dry();
   }
 
-  return spn_op_publish(&spn, publish_request()) ? SP_CLI_ERR : SP_CLI_OK;
+  return spn_op_publish(host.ctx, publish_request()) ? SP_CLI_ERR : SP_CLI_OK;
 }

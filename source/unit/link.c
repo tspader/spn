@@ -36,10 +36,10 @@ static bool pkg_links_code(spn_pkg_unit_t* pkg) {
 }
 
 bool spn_dep_kind_applies(spn_dep_kind_t dep, spn_target_kind_t target) {
-  bool metaprogram = target == SPN_TARGET_CONFIGURE_METAPROGRAM || target == SPN_TARGET_BUILD_METAPROGRAM;
+  bool metaprogram = target == SPN_TARGET_KIND_CONFIGURE_METAPROGRAM || target == SPN_TARGET_KIND_BUILD_METAPROGRAM;
   switch (dep) {
     case SPN_DEP_KIND_PACKAGE: return !metaprogram;
-    case SPN_DEP_KIND_TEST:    return target == SPN_TARGET_TEST;
+    case SPN_DEP_KIND_TEST:    return target == SPN_TARGET_KIND_TEST;
     case SPN_DEP_KIND_BUILD:   return metaprogram;
   }
   sp_unreachable_return(false);
@@ -149,7 +149,7 @@ sp_da(spn_closure_entry_t) spn_target_link_closure(sp_mem_t mem, spn_target_unit
     .links_code = true,
   }));
 
-  if (root->info->kind == SPN_TARGET_CONFIGURE_METAPROGRAM) {
+  if (root->info->kind == SPN_TARGET_KIND_CONFIGURE_METAPROGRAM) {
     return closure;
   }
 
@@ -159,7 +159,7 @@ sp_da(spn_closure_entry_t) spn_target_link_closure(sp_mem_t mem, spn_target_unit
     .closure = sp_da_new(s.mem, spn_closure_entry_t),
   };
   sp_om_insert(search.visited, root->pkg, (u8)true);
-  collect(&search, root->pkg, CLOSURE_SEARCH_PUBLIC, root->info->kind == SPN_TARGET_TEST, root->info->kind == SPN_TARGET_BUILD_METAPROGRAM);
+  collect(&search, root->pkg, CLOSURE_SEARCH_PUBLIC, root->info->kind == SPN_TARGET_KIND_TEST, root->info->kind == SPN_TARGET_KIND_BUILD_METAPROGRAM);
 
   // The result is in post-order. Reversing us gives us a topological sort.
   sp_da_rfor(search.closure, it) {
@@ -222,7 +222,7 @@ sp_da(spn_target_unit_t*) spn_target_runtime_libs(sp_mem_t mem, spn_target_unit_
     .closure = sp_da_new(s.mem, spn_closure_entry_t),
   };
   sp_om_insert(search.visited, root->pkg, (u8)true);
-  collect_runtime(&search, root->pkg, root->info->kind == SPN_TARGET_TEST, root->info->kind == SPN_TARGET_BUILD_METAPROGRAM);
+  collect_runtime(&search, root->pkg, root->info->kind == SPN_TARGET_KIND_TEST, root->info->kind == SPN_TARGET_KIND_BUILD_METAPROGRAM);
 
   sp_da(spn_target_unit_t*) libs = sp_da_new(mem, spn_target_unit_t*);
   target_set_t seen = SP_NULLPTR;

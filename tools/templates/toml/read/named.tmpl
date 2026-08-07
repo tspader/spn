@@ -11,7 +11,7 @@ static void spn_cg_{{ .object }}_read_named(spn_toml_loader_t* ctx, toml_table_t
       {{ .type }} entry = sp_zero;
       spn_cg_{{ .object }}_read(ctx, element, &entry);
       if (sp_str_om_has(*out, entry.{{ .key_field }})) {
-        spn_toml_loader_issue_at(ctx, SPN_CODEGEN_ERR_DUPLICATE_KEY, entry.{{ .key_field }});
+        spn_toml_loader_issue_at(ctx, SPN_ERR_CODEGEN_DUPLICATE_KEY, entry.{{ .key_field }});
       } else {
         sp_str_om_insert(*out, entry.{{ .key_field }}, entry);
       }

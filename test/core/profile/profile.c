@@ -341,12 +341,20 @@ static spn_profile_info_t desc_to_info(const profile_desc_t* d) {
   };
 }
 
+static spn_profile_override_t desc_to_override(const profile_desc_t* d) {
+  return (spn_profile_override_t) {
+    .name = d->name ? sp_cstr_as_str(d->name) : (sp_str_t) sp_zero,
+    .toolchain = d->toolchain ? sp_cstr_as_str(d->toolchain) : (sp_str_t) sp_zero,
+    .triple = { .arch = d->arch, .os = d->os, .abi = d->abi },
+  };
+}
+
 sp_test_each(profile, resolve, test_t, tests, .setup = spn_test_ctx_setup) {
   sp_mem_t mem = spn.mem;
 
   spn_profile_info_t profile = desc_to_info(&it->profile);
   spn_profile_info_t derived = desc_to_info(&it->derived);
-  spn_profile_info_t overrides = desc_to_info(&it->overrides);
+  spn_profile_override_t overrides = desc_to_override(&it->overrides);
 
   spn_pkg_info_t pkg = sp_zero;
   if (!sp_str_empty(profile.name)) {

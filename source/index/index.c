@@ -342,7 +342,7 @@ void spn_index_assemble(sp_mem_t mem, spn_index_map_t* workspace, spn_index_arr_
     sp_da_push(*indexes, ((spn_index_info_t) {
       .name = sp_str_lit("core"),
       .protocol = SPN_INDEX_PROTOCOL_GIT,
-      .kind = SPN_INDEX_BUILTIN,
+      .kind = SPN_INDEX_KIND_BUILTIN,
       .git = { .url = sp_str_lit("https://github.com/tspader/spandex.git") },
     }));
   }

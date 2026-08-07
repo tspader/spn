@@ -32,7 +32,7 @@ sp_str_t spn_win_subsystem_to_str(spn_win_subsystem_t subsystem);
 spn_sanitizer_t spn_sanitizer_from_str(sp_str_t str);
 sp_str_t spn_sanitizer_to_str(spn_sanitizer_t sanitizer);
 sp_str_t spn_sanitizer_set_to_str(sp_mem_t mem, spn_sanitizer_set_t set);
-bool spn_sanitizer_set_conflicting(spn_sanitizer_set_t set);
+bool spn_sanitizer_set_has_conflict(spn_sanitizer_set_t set);
 
 spn_linkage_t spn_lib_kind_from_str(sp_str_t str);
 spn_linkage_t spn_linkage_from_str(sp_str_t str);
