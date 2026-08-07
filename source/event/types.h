@@ -71,7 +71,8 @@ typedef enum {
   X(SPN_EVENT_UPDATE_INCOMPATIBLE,          "update_incompatible",        "",            NORMAL,  INFO,  false, false, SPN_EVT(update)) \
   X(SPN_EVENT_PUBLISH,                      "publish",                    "Publishing",  NORMAL,  INFO,  false, false, SPN_EVT(publish)) \
   X(SPN_EVENT_PUBLISH_END,                  "publish_end",                "Published",   NORMAL,  INFO,  false, false, SPN_EVT(publish)) \
-  X(SPN_EVENT_RESULT,                       "result",                     "",            DEBUG,   INFO,  false, false, SPN_EVT(result))
+  X(SPN_EVENT_RESULT,                       "result",                     "",            DEBUG,   INFO,  false, false, SPN_EVT(result)) \
+  X(SPN_EVENT_OPEN,                         "open",                       "",            DEBUG,   INFO,  false, false, SPN_EVT(open))
 
 #define SPN_EVENT_ENUM(kind, ...) kind,
 typedef enum {
@@ -196,6 +197,7 @@ typedef struct { sp_str_t profile; u64 time; u32 num_errors; sp_str_t first_erro
 typedef struct { bool success; u32 hits; u32 misses; u32 total; u64 time; sp_str_t profile; } spn_evt_build_summary_t;
 typedef struct { u64 time; } spn_evt_package_ok_t;
 typedef struct { bool ok; spn_err_t err; } spn_evt_result_t;
+typedef struct { sp_str_t version; sp_str_t project; } spn_evt_open_t;
 
 typedef struct spn_build_event_t spn_build_event_t;
 
@@ -254,6 +256,7 @@ struct spn_build_event_t {
     spn_evt_build_summary_t build_summary;
     spn_evt_package_ok_t package_ok;
     spn_evt_result_t result;
+    spn_evt_open_t open;
   };
 };
 
