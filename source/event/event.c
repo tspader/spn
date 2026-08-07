@@ -1,4 +1,5 @@
 #include "event/event.h"
+#include "event/build.h"
 #include "event/log.h"
 
 #include <stddef.h>
@@ -67,14 +68,31 @@ void spn_event_buffer_push(spn_event_buffer_t* events, spn_build_event_t event) 
 
   sp_mutex_lock(&events->mutex);
   sp_rb_push(events->buffer, event);
-  if (events->log.writer.write) {
+
+  if (events->log.writer.write || event.io) {
     sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+
     sp_io_dyn_mem_writer_t line = sp_zero;
     sp_io_dyn_mem_writer_init(scratch.mem, &line);
     spn_event_log_jsonl(&line.base, &event);
-    sp_io_write(&events->log.writer, line.storage.data, line.cursor, SP_NULLPTR);
+    if (events->log.writer.write) {
+      sp_io_write(&events->log.writer, line.storage.data, line.cursor, SP_NULLPTR);
+    }
+
+    if (event.io) {
+      sp_io_write(&event.io->jsonl.writer, line.storage.data, line.cursor, SP_NULLPTR);
+
+      sp_io_dyn_mem_writer_t text = sp_zero;
+      sp_io_dyn_mem_writer_init(scratch.mem, &text);
+      spn_event_log_build(&text.base, &event);
+      if (text.cursor) {
+        sp_io_write(&event.io->build.writer, text.storage.data, text.cursor, SP_NULLPTR);
+      }
+    }
+
     sp_mem_end_scratch(scratch);
   }
+
   sp_mutex_unlock(&events->mutex);
 }
 

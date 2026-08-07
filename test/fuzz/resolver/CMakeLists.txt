@@ -4,6 +4,7 @@ add_executable(fuzz_resolver
   ${SRC}/intern/intern.c
   ${SRC}/enum/enum.c
   ${SRC}/event/event.c
+  ${SRC}/event/build.c
   ${SRC}/event/log.c
   ${SRC}/error/str.c
   ${SRC}/external/git.c

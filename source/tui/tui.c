@@ -10,7 +10,6 @@
 
 #include "enum/enum.h"
 #include "event/event.h"
-#include "event/flush.h"
 #include "event/log.h"
 #include "semver/convert.h"
 #include "toml/issue.h"
@@ -1592,7 +1591,7 @@ void spn_tui_flush(spn_tui_t* tui) {
   }
 
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-  sp_da(spn_build_event_t) events = spn_event_flush(s.mem, spn.events);
+  sp_da(spn_build_event_t) events = spn_event_buffer_drain(s.mem, spn.events);
 
   sp_da_for(events, it) {
     spn_build_event_t* event = &events[it];
