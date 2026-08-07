@@ -249,21 +249,31 @@ void spn_session_finalize(spn_session_t* session) {
 
     sp_da_for(build->packages, jt) {
       spn_pkg_unit_t* unit = build->packages[jt];
+      if (unit == requested) {
+        continue;
+      }
 
       sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-      sp_fs_create_sym_link(
+      sp_str_t links [] = {
+        sp_fs_join_path(scratch.mem, requested->paths.work, unit->logs.build),
+        sp_fs_join_path(scratch.mem, requested->paths.work, unit->logs.jsonl),
+      };
+      sp_str_t targets [] = {
         unit->paths.logs.build,
-        sp_fs_join_path(scratch.mem, requested->paths.work, unit->logs.build)
-      );
-      sp_fs_create_sym_link(
         unit->paths.logs.jsonl,
-        sp_fs_join_path(scratch.mem, requested->paths.work, unit->logs.jsonl)
-      );
+      };
+      sp_carr_for(links, lt) {
+        sp_fs_remove_file(links[lt]);
+        sp_fs_create_sym_link(targets[lt], links[lt]);
+      }
       sp_mem_end_scratch(scratch);
-
-      spn_lazy_log_close(&unit->logs.io.build);
-      spn_lazy_log_close(&unit->logs.io.jsonl);
     }
+  }
+
+  sp_om_for(session->units.packages, it) {
+    spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
+    spn_lazy_log_close(&unit->logs.io.build);
+    spn_lazy_log_close(&unit->logs.io.jsonl);
   }
 
   sp_om_for(session->units.targets, it) {
