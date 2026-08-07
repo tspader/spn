@@ -62,8 +62,8 @@ static spn_target_unit_t* add_target(spn_session_t* s, spn_pkg_unit_t* pkg, spn_
     }
   }
 
-  sp_str_t build_log = sp_fs_join_path(s->mem, pkg->paths.work, sp_fmt(s->mem, "{}.build.log", SP_FMT_STR(info->name)).value);
-  sp_str_t jsonl_log = sp_fs_join_path(s->mem, pkg->paths.work, sp_fmt(s->mem, "{}.build.jsonl", SP_FMT_STR(info->name)).value);
+  sp_str_t build_log = sp_fs_join_path(s->mem, pkg->paths.work, sp_fmt(s->mem, "{}.target.log", SP_FMT_STR(info->name)).value);
+  sp_str_t jsonl_log = sp_fs_join_path(s->mem, pkg->paths.work, sp_fmt(s->mem, "{}.target.jsonl", SP_FMT_STR(info->name)).value);
   spn_lazy_log_init(&target->logs.build, build_log);
   spn_lazy_log_init(&target->logs.jsonl, jsonl_log);
   return target;
