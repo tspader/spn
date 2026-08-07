@@ -126,6 +126,27 @@ static spn_err_union_t open_ctx(spn_ctx_t* ctx, spn_open_request_t request) {
 
   spn_try_union(extract_runtime(ctx));
 
+  if (sp_str_valid(request.dir)) {
+    ctx->paths.project = sp_fs_canonicalize_path(ctx->heap, request.dir);
+  }
+  else {
+    ctx->paths.project = ctx->paths.cwd;
+  }
+
+  spn_event_buffer_push(ctx->events, (spn_build_event_t) {
+    .kind = SPN_EVENT_OPEN,
+    .open = {
+      .version = sp_cstr_as_str(SPN_VERSION),
+      .project = ctx->paths.project,
+    },
+  });
+  if (ctx->events->log.failed) {
+    return (spn_err_union_t) {
+      .kind = SPN_ERR_FS_WRITE,
+      .fs = { .path = ctx->events->log.path },
+    };
+  }
+
   // Load the per-machine config file
   ctx->config.indexes = sp_da_new(ctx->heap, spn_index_info_t);
   if (sp_fs_exists(ctx->paths.config.toml)) {
@@ -146,12 +167,6 @@ static spn_err_union_t open_ctx(spn_ctx_t* ctx, spn_open_request_t request) {
     }
   }
 
-  if (sp_str_valid(request.dir)) {
-    ctx->paths.project = sp_fs_canonicalize_path(ctx->heap, request.dir);
-  }
-  else {
-    ctx->paths.project = ctx->paths.cwd;
-  }
   spn_try_union(spn_project_load(ctx->heap, ctx->intern, ctx->events, ctx->paths.project, &ctx->project));
 
   spn_index_assemble(ctx->heap, ctx->project ? &ctx->project->package.indexes : SP_NULLPTR, ctx->config.indexes, &ctx->indexes);

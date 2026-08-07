@@ -558,6 +558,15 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_BUILD_SCRIPT_PACKAGE_OK] = sp_bind_builder_end(&b);
   }
 
+  {
+    sp_bind_builder_t b = sp_bind_builder_begin(mem);
+    SP_BIND_SCHEMA(&b) {
+      SP_BIND(&b, spn_evt_open_t, version, "version", SP_BIND_STR);
+      SP_BIND(&b, spn_evt_open_t, project, "project", SP_BIND_STR);
+    }
+    schemas[SPN_EVENT_OPEN] = sp_bind_builder_end(&b);
+  }
+
 }
 
 // ============================================================================
