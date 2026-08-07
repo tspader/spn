@@ -13,6 +13,7 @@
 #include "project/project.h"
 #include "project/types.h"
 #include "session/session.h"
+#include "sp/fs.h"
 #include "sp/os.h"
 #include "sp/sp_glob.h"
 #include "spn.embed.h"
@@ -39,15 +40,58 @@ static bool write_file(sp_str_t path, const void* data, u64 size) {
   return written == SP_OK && closed == SP_OK;
 }
 
+static sp_str_t read_stamp(sp_mem_t mem, spn_ctx_t* ctx) {
+  sp_str_t version = sp_zero;
+  if (sp_fs_exists(ctx->paths.version)) {
+    sp_io_read_file(mem, ctx->paths.version, &version);
+    version = sp_str_trim(version);
+  }
+  return version;
+}
+
+static spn_err_union_t extract(spn_ctx_t* ctx, sp_mem_t mem, sp_str_t stamp) {
+  sp_str_t staging = sp_zero;
+  if (sp_fs_staging_dir(mem, ctx->paths.runtime, sp_str_lit("tmp"), &staging) != SP_OK) {
+    return (spn_err_union_t) { .kind = SPN_ERR_FS_WRITE, .fs = { .path = ctx->paths.runtime } };
+  }
+
+  sp_glob_set_t* glob = sp_glob_set_new(mem);
+  sp_glob_set_add(glob, "include/*");
+  sp_glob_set_build(glob);
+
+  sp_carr_for(spn_embed_manifest, it) {
+    spn_embed_entry_t entry = spn_embed_manifest[it];
+    sp_str_t rel = sp_cstr_as_str(entry.path);
+    if (!sp_glob_set_match(glob, rel)) {
+      continue;
+    }
+    sp_str_t path = sp_fs_join_path(mem, staging, rel);
+    sp_fs_create_dir(sp_fs_parent_path(path));
+    if (!write_file(path, entry.data, entry.size)) {
+      sp_fs_remove_dir(staging);
+      return (spn_err_union_t) { .kind = SPN_ERR_FS_WRITE, .fs = { .path = sp_str_copy(ctx->heap, path) } };
+    }
+  }
+
+  sp_str_t stamp_path = sp_fs_join_path(mem, staging, sp_str_lit("version.stamp"));
+  if (!write_file(stamp_path, stamp.data, stamp.len)) {
+    sp_fs_remove_dir(staging);
+    return (spn_err_union_t) { .kind = SPN_ERR_FS_WRITE, .fs = { .path = sp_str_copy(ctx->heap, stamp_path) } };
+  }
+
+  sp_fs_remove_dir(ctx->paths.runtime);
+  sp_sys_fd_t root = sp_sys_get_root(0);
+  if (sp_sys_rename_s(root, staging, root, ctx->paths.runtime)) {
+    sp_fs_remove_dir(staging);
+    return (spn_err_union_t) { .kind = SPN_ERR_FS_WRITE, .fs = { .path = ctx->paths.runtime } };
+  }
+
+  return spn_result(SPN_OK);
+}
+
 static spn_err_union_t extract_runtime(spn_ctx_t* ctx) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   spn_err_union_t result = spn_result(SPN_OK);
-
-  sp_str_t version = sp_zero;
-  if (sp_fs_exists(ctx->paths.version)) {
-    sp_io_read_file(scratch.mem, ctx->paths.version, &version);
-    version = sp_str_trim(version);
-  }
 
   // @spader Use SHA256 for this
   // The stamp must change whenever the embedded runtime does, not just on
@@ -64,30 +108,17 @@ static spn_err_union_t extract_runtime(spn_ctx_t* ctx) {
   }
   sp_str_t stamp = sp_fmt(scratch.mem, "{}:{}", sp_fmt_cstr(SPN_VERSION), sp_fmt_uint(runtime_hash)).value;
 
-  if (!sp_str_equal(version, stamp)) {
-    sp_fs_remove_dir(ctx->paths.runtime);
-    sp_fs_create_dir(ctx->paths.runtime);
-
-    sp_glob_set_t* glob = sp_glob_set_new(scratch.mem);
-    sp_glob_set_add(glob, "include/*");
-    sp_glob_set_build(glob);
-
-    sp_carr_for(spn_embed_manifest, it) {
-      spn_embed_entry_t entry = spn_embed_manifest[it];
-      sp_str_t path = sp_cstr_as_str(entry.path);
-      if (!sp_glob_set_match(glob, path)) {
-        continue;
-      }
-      path = sp_fs_join_path(scratch.mem, ctx->paths.runtime, path);
-      sp_fs_create_dir(sp_fs_parent_path(path));
-      if (!write_file(path, entry.data, entry.size)) {
-        result = (spn_err_union_t) { .kind = SPN_ERR_FS_WRITE, .fs = { .path = sp_str_copy(ctx->heap, path) } };
-        break;
-      }
+  if (!sp_str_equal(read_stamp(scratch.mem, ctx), stamp)) {
+    sp_fs_lock_t lock = sp_zero;
+    sp_str_t lock_path = sp_fs_join_path(scratch.mem, ctx->paths.storage, sp_str_lit("runtime.lock"));
+    if (sp_fs_lock_acquire(&lock, lock_path) != SP_OK) {
+      result = (spn_err_union_t) { .kind = SPN_ERR_FS_WRITE, .fs = { .path = sp_str_copy(ctx->heap, lock_path) } };
     }
-
-    if (!result.kind && !write_file(ctx->paths.version, stamp.data, stamp.len)) {
-      result = (spn_err_union_t) { .kind = SPN_ERR_FS_WRITE, .fs = { .path = ctx->paths.version } };
+    else {
+      if (!sp_str_equal(read_stamp(scratch.mem, ctx), stamp)) {
+        result = extract(ctx, scratch.mem, stamp);
+      }
+      sp_fs_lock_release(&lock);
     }
   }
 
