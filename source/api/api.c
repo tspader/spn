@@ -2,7 +2,7 @@
 #include "spn.h"
 
 #include "api/api.h"
-#include "api/core/types.h"
+#include "api/types.h"
 #include "abi.gen.h"
 #include "ctx/types.h"
 #include "event/event.h"

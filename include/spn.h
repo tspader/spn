@@ -1,150 +1,19 @@
 #ifndef SPN_SPN_H
 #define SPN_SPN_H
 
-#ifndef SP_SP_H
-  #include <stdint.h>
-  // #include <stdlib.h>
-  // #include <string.h>
-
-  typedef int8_t   s8;
-  typedef int16_t  s16;
-  typedef int32_t  s32;
-  typedef int64_t  s64;
-  typedef uint8_t  u8;
-  typedef uint16_t u16;
-  typedef uint32_t u32;
-  typedef uint64_t u64;
-  typedef float    f32;
-  typedef double   f64;
-  typedef char     c8;
+#ifdef SPN_HOST_H
+  #error "include/spn.h is the guest build script API; it cannot share a translation unit with spn/host.h"
 #endif
 
-typedef enum {
-  SPN_ABI_NONE,
-  SPN_ABI_GNU,
-  SPN_ABI_MUSL,
-  SPN_ABI_MINGW,
-  SPN_ABI_MSVC,
-} spn_abi_t;
+#include "spn/core.h"
 
-typedef enum {
-  SPN_OS_NONE,
-  SPN_OS_WINDOWS,
-  SPN_OS_LINUX,
-  SPN_OS_MACOS,
-  SPN_OS_WASI,
-} spn_os_t;
-
-typedef enum {
-  SPN_ARCH_NONE,
-  SPN_ARCH_X64,
-  SPN_ARCH_ARM64,
-  SPN_ARCH_WASM32,
-} spn_arch_t;
-
-typedef struct {
-  spn_arch_t arch;
-  spn_os_t os;
-  spn_abi_t abi;
-} spn_triple_t;
-
-typedef struct {
-  u16 major;
-  u16 minor;
-} spn_os_version_t;
-
-typedef enum {
-  SPN_BUILD_MODE_NONE,
-  SPN_BUILD_MODE_DEBUG,
-  SPN_BUILD_MODE_RELEASE,
-} spn_build_mode_t;
-
-typedef enum {
-  SPN_OPT_LEVEL_NONE,
-  SPN_OPT_LEVEL_0,
-  SPN_OPT_LEVEL_1,
-  SPN_OPT_LEVEL_2,
-  SPN_OPT_LEVEL_3,
-  SPN_OPT_LEVEL_S,
-  SPN_OPT_LEVEL_Z,
-} spn_opt_level_t;
-
-typedef enum {
-  SPN_SANITIZER_NONE      = 0,
-  SPN_SANITIZER_ADDRESS   = 1 << 0,
-  SPN_SANITIZER_THREAD    = 1 << 1,
-  SPN_SANITIZER_UNDEFINED = 1 << 2,
-  SPN_SANITIZER_MEMORY    = 1 << 3,
-  SPN_SANITIZER_LEAK      = 1 << 4,
-} spn_sanitizer_t;
-
-typedef u32 spn_sanitizer_set_t;
-
-typedef enum {
-  SPN_LIB_KIND_NONE,
-  SPN_LIB_KIND_SHARED,
-  SPN_LIB_KIND_STATIC,
-  SPN_LIB_KIND_SOURCE,
-  SPN_LIB_KIND_OBJECT,
-} spn_linkage_t;
-
-typedef enum {
-  SPN_WIN_SUBSYSTEM_NONE,
-  SPN_WIN_SUBSYSTEM_CONSOLE,
-  SPN_WIN_SUBSYSTEM_WINDOWS,
-} spn_win_subsystem_t;
-
-typedef enum {
-  SPN_LIBC_GNU = 0,
-  SPN_LIBC_MUSL = 1,
-  SPN_LIBC_COSMOPOLITAN = 2,
-  SPN_LIBC_CUSTOM = 3,
-} spn_libc_kind_t;
-
-typedef enum {
-  SPN_DIR_NONE = 0,
-  SPN_DIR_CACHE = 1,
-  SPN_DIR_STORE = 2,
-  SPN_DIR_INCLUDE = 3,
-  SPN_DIR_VENDOR = 4,
-  SPN_DIR_LIB = 5,
-  SPN_DIR_SOURCE = 6,
-  SPN_DIR_WORK = 7,
-  SPN_DIR_PROJECT = 8,
-} spn_dir_t;
-
-typedef enum {
-  SPN_C_STANDARD_NONE,
-  SPN_C11,
-  SPN_C99,
-  SPN_C89,
-} spn_c_standard_t;
-
-typedef enum {
-  SPN_CXX_STANDARD_NONE,
-  SPN_CXX11,
-  SPN_CXX14,
-  SPN_CXX17,
-  SPN_CXX20,
-  SPN_CXX23,
-} spn_cxx_standard_t;
-
-typedef enum {
-  SPN_LANG_C,
-  SPN_LANG_CXX,
-  SPN_LANG_ASM,
-} spn_lang_t;
-
-typedef enum {
-  SPN_CC_NONE,
-  SPN_CC_GCC,
-  SPN_CC_CLANG,
-  SPN_CC_MUSL_GCC,
-  SPN_CC_TCC,
-  SPN_CC_COSMOCC,
-  SPN_CC_ZIG,
-  SPN_CC_CUSTOM,
-} spn_cc_kind_t;
+#ifdef __wasm32__
+  #define SPN_API __attribute__((import_module("env")))
+  #define SPN_EXPORT __attribute__((used, visibility("default")))
+#else
+  #define SPN_API
+  #define SPN_EXPORT
+#endif
 
 typedef enum {
   SPN_CMAKE_GEN_DEFAULT,
@@ -155,135 +24,18 @@ typedef enum {
   SPN_CMAKE_GEN_MINGW,
 } spn_cmake_gen_t;
 
-typedef enum {
-  SPN_OK = 0,
-  SPN_ERROR = 1,
-  SPN_ERR_MANIFEST_PARSE,
-  SPN_ERR_MANIFEST_ISSUES,
-  SPN_ERR_NO_MANIFEST,
-  SPN_ERR_NOT_GIT_REPO,
-  SPN_ERR_GIT,
-  SPN_ERR_VERSION_EXISTS,
-  SPN_ERR_BUILD_GRAPH,
-  SPN_ERR_TOOLCHAIN_UNKNOWN,
-  SPN_ERR_TOOLCHAIN_NONE,
-  SPN_ERR_TOOLCHAIN_TARGET,
-  SPN_ERR_TOOLCHAIN_HOST,
-  SPN_ERR_TOOLCHAIN_FETCH,
-  SPN_ERR_TOOLCHAIN_NO_SHA,
-  SPN_ERR_TOOLCHAIN_SHA,
-  SPN_ERR_TOOLCHAIN_EXTRACT,
-  SPN_ERR_TOOLCHAIN_NO_CXX,
-  SPN_ERR_TOML_PARSE,
-  SPN_CODEGEN_ERR_EXPECTED_BOOL,
-  SPN_CODEGEN_ERR_EXPECTED_STR,
-  SPN_CODEGEN_ERR_EXPECTED_INT,
-  SPN_CODEGEN_ERR_EXPECTED_OBJECT,
-  SPN_CODEGEN_ERR_MISSING_KEY,
-  SPN_CODEGEN_ERR_DUPLICATE_KEY,
-  SPN_CODEGEN_ERR_UNKNOWN_KEY,
-  SPN_CODEGEN_ERR_PARSE,
-  SPN_CODEGEN_ERR_FILE_MISSING,
-  SPN_CODEGEN_ERR_INVALID,
-  SPN_CODEGEN_ERR_ROOT_ONLY,
-  SPN_ERR_WASM_INIT_FAILED,
-  SPN_ERR_WASM_REGISTER_FAILED,
-  SPN_ERR_WASM_MODULE_LOAD_FAILED,
-  SPN_ERR_WASM_MODULE_INSTANCE_FAILED,
-  SPN_ERR_WASM_CTX_FAILED,
-  SPN_ERR_WASM_MODULE_CALL_FAILED,
-  SPN_ERR_WASM_READ_FAILED,
-  SPN_ERR_WASM_THREAD_ENV_FAILED,
-  SPN_ERR_WASM_SCRIPT_ERROR,
-  SPN_ERR_WASM_NO_SCRIPT,
-  SPN_ERR_WASM_EXPORT_NOT_FOUND,
-  SPN_ERR_PROFILE_INVALID,
-  SPN_ERR_PROFILE_UNDEFINED,
-  SPN_ERR_SANITIZER_UNSUPPORTED,
-  SPN_ERR_SANITIZER_STATIC,
-  SPN_ERR_COMPILER_FEATURE_UNSUPPORTED,
-  SPN_ERR_TOC_MAGIC,
-  SPN_ERR_TOC_TRUNCATED,
-  SPN_ERR_TOC_MISSING,
-  SPN_ERR_FS_REMOVE,
-  SPN_ERR_FS_READ,
-  SPN_ERR_FS_WRITE,
-  SPN_ERR_INDEX_UNKNOWN,
-  SPN_ERR_INDEX_SYNC,
-  SPN_ERR_INDEX_PINNED,
-  SPN_ERR_INDEX_CORRUPT,
-  SPN_ERR_INDEX_PUBLISH_PROTOCOL,
-  SPN_ERR_PUBLISH_PUSH,
-  SPN_ERR_PUBLISH_DIRTY,
-  SPN_ERR_PUBLISH_UNPUSHED,
-  SPN_ERR_INDEX_PATH_DEP,
-  SPN_ERR_PKG_UNKNOWN,
-  SPN_ERR_PKG_NO_MATCH,
-  SPN_ERR_PKG_MISMATCH,
-  SPN_ERR_MANIFEST_EDIT,
-  SPN_ERR_DAG_GLOB,
-  SPN_ERR_DAG_OUTPUT_NAME,
-  SPN_ERR_DAG_DUPLICATE_OUTPUT,
-  SPN_ERR_DAG_STAT,
-  SPN_ERR_DAG_MISSING_INPUT,
-  SPN_ERR_DAG_MISSING_OUTPUT,
-  SPN_ERR_DAG_SCRATCH,
-  SPN_ERR_DAG_ACTION,
-  SPN_ERR_DAG_STORE_READ,
-  SPN_ERR_DAG_STORE_WRITE,
-  SPN_ERR_DAG_STORE_MISSING,
-  SPN_ERR_DAG_TREE,
-  SPN_ERR_DAG_STALLED,
-  SPN_ERR_DAG_CANCELLED,
-  SPN_ERR_DEP_CYCLE,
-  SPN_ERR_UNIT_CYCLE,
-  SPN_ERR_TARGET_LINKAGE,
-  SPN_ERR_TARGET_DUPLICATE,
-  SPN_ERR_TARGET_RESERVED,
-  SPN_ERR_TARGET_DEP,
-  SPN_ERR_TARGET_SELECTION,
-  SPN_ERR_SCRIPT_MISSING,
-  SPN_ERR_SCRIPT_FAILED,
-  SPN_ERR_TRIPLE_INVALID,
-  SPN_ERR_DYNAMIC_DUPLICATE,
-  SPN_ERR_RESOLVE_TOO_COMPLEX,
-  SPN_ERR_OPTION,
-  SPN_ERR_CONFIGURE_SOURCE,
-  SPN_ERR_INIT_EXISTS,
-  SPN_ERR_INIT_NAME,
-  SPN_ERR_TEST_MISSING,
-  SPN_ERR_TEST_FAILED,
-  SPN_ERR_COUNT,
-} spn_err_t;
-
 typedef struct spn              spn_t;
 typedef struct spn_config       spn_config_t;
-typedef struct spn_pkg          spn_pkg_t;
 typedef struct spn_target       spn_target_t;
 typedef struct spn_profile      spn_profile_t;
-typedef struct spn_index        spn_index_t;
 typedef struct spn_cmake        spn_cmake_t;
 typedef struct spn_make         spn_make_t;
 typedef struct spn_autoconf     spn_autoconf_t;
 typedef struct spn_node_t       spn_node_t;
 typedef struct spn_node_ctx_t   spn_node_ctx_t;
 
-#ifdef __wasm32__
-#define SPN_API __attribute__((import_module("env")))
-#define SPN_EXPORT __attribute__((used, visibility("default")))
-
-#else
-  #define SPN_API
-  #define SPN_EXPORT
-#endif
-
 typedef spn_err_t (*spn_configure_fn_t) (spn_t*, spn_config_t*);
 typedef s32       (*spn_node_fn_t)      (spn_t*, spn_node_ctx_t*);
-
-
-#define SP_EMBED_DEFAULT_SYMBOL SP_NULLPTR
-#define SP_EMBED_DEFAULT_DATA_T SP_NULLPTR
-#define SP_EMBED_DEFAULT_SIZE_T SP_NULLPTR
 
 spn_target_t* spn_get_target(spn_t* spn, const c8* name);
 const spn_t*  spn_get_dep(const spn_t* spn, const c8* name);

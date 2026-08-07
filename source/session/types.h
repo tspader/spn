@@ -5,7 +5,7 @@
 
 #include "compiler/types.h"
 #include "filter/types.h"
-#include "forward/types.h"
+#include "core/types.h"
 #include "profile/types.h"
 #include "resolve/types.h"
 #include "session/registry/types.h"
@@ -29,7 +29,7 @@ typedef struct {
   u64 elapsed;
 } spn_loaded_pkg_t;
 
-typedef struct {
+typedef struct spn_session_config_t {
   spn_target_selection_t selection;
   bool force;
   spn_profile_info_t overrides;

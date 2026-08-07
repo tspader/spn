@@ -1,12 +1,12 @@
 #include "error/error.h"
-#include "op/op.h"
+#include "spn/host.h"
 
 #include "op/build/build.h"
 #include "session/types.h"
 #include "unit/types.h"
 
 static spn_err_union_t run_target(spn_session_t* session, spn_target_unit_t* unit) {
-  sp_str_t command = spn_target_staged_path(session->mem, unit);
+  sp_str_t command = spn_target_unit_staged_path(session->mem, unit);
   if (!sp_fs_exists(command)) {
     return (spn_err_union_t) {
       .kind = SPN_ERR_SCRIPT_MISSING,
@@ -35,12 +35,12 @@ static spn_err_union_t run_target(spn_session_t* session, spn_target_unit_t* uni
   return spn_result(SPN_OK);
 }
 
-spn_err_t spn_op_run_target(spn_session_t* session, spn_target_unit_t* unit) {
-  return spn_err_emit(session->ctx, run_target(session, unit));
+spn_err_t spn_op_run_target(spn_session_t* session, spn_target_t* target) {
+  return spn_err_emit(session->ctx, run_target(session, sp_ptr_cast(spn_target_unit_t*, target)));
 }
 
 static spn_err_union_t run_test(spn_session_t* session, spn_target_unit_t* unit, spn_test_run_t* run) {
-  sp_str_t command = spn_target_staged_path(session->mem, unit);
+  sp_str_t command = spn_target_unit_staged_path(session->mem, unit);
   if (!sp_fs_exists(command)) {
     return (spn_err_union_t) {
       .kind = SPN_ERR_TEST_MISSING,
@@ -68,6 +68,6 @@ static spn_err_union_t run_test(spn_session_t* session, spn_target_unit_t* unit,
   return spn_result(SPN_OK);
 }
 
-spn_err_t spn_op_run_test(spn_session_t* session, spn_target_unit_t* unit, spn_test_run_t* run) {
-  return spn_err_emit(session->ctx, run_test(session, unit, run));
+spn_err_t spn_op_run_test(spn_session_t* session, spn_target_t* target, spn_test_run_t* run) {
+  return spn_err_emit(session->ctx, run_test(session, sp_ptr_cast(spn_target_unit_t*, target), run));
 }

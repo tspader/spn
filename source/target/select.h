@@ -2,7 +2,7 @@
 #define SPN_TARGET_SELECT_H
 
 #include "sp.h"
-#include "spn.h"
+#include "spn/core.h"
 
 #include "target/types.h"
 

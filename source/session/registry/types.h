@@ -2,7 +2,7 @@
 #define SPN_SESSION_REGISTRY_TYPES_H
 
 #include "sp.h"
-#include "spn.h"
+#include "spn/core.h"
 
 #include "pkg/types.h"
 

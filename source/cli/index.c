@@ -2,6 +2,7 @@
 
 #include "spn/host.h"
 
+#include "enum/enum.h"
 #include "tui/tui.h"
 
 sp_cli_result_t spn_cli_index(sp_cli_t* cli) {
@@ -53,17 +54,17 @@ sp_cli_result_t spn_cli_index_list(sp_cli_t* cli) {
 }
 
 sp_cli_result_t spn_cli_index_path(sp_cli_t* cli) {
-  if (!spn_find_index(args.index.name)) {
+  if (!spn_find_index(&spn, args.index.name)) {
     return spn_cli_error(cli, "unknown index: {.cyan}", sp_fmt_str(args.index.name));
   }
 
   spn_tui_handoff(&tui);
-  spn_print("{}", sp_fmt_str(spn_find_index(args.index.name)->location));
+  spn_print("{}", sp_fmt_str(spn_find_index(&spn, args.index.name)->location));
   return SP_CLI_OK;
 }
 
 sp_cli_result_t spn_cli_index_sync(sp_cli_t* cli) {
-  if (!sp_str_empty(args.index.name) && !spn_find_index(args.index.name)) {
+  if (!sp_str_empty(args.index.name) && !spn_find_index(&spn, args.index.name)) {
     return spn_cli_error(cli, "unknown index '{}'", sp_fmt_str(args.index.name));
   }
 

@@ -2,7 +2,7 @@
 #include "error/error.h"
 #include "session/types.h"
 
-#include "op/op.h"
+#include "spn/host.h"
 #include "profile/profile.h"
 #include "sp/os.h"
 

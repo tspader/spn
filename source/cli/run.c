@@ -2,6 +2,7 @@
 
 #include "spn/host.h"
 
+#include "event/event.h"
 #include "tui/tui.h"
 
 static bool is_source_entry(sp_str_t entry, spn_project_t* project) {
@@ -17,17 +18,17 @@ static bool is_source_entry(sp_str_t entry, spn_project_t* project) {
 spn_err_t spn_cli_run_roots() {
   spn_session_t* session = spn.session;
 
-  spn_target_unit_t* root = spn_session_script_root(session);
+  spn_target_t* root = spn_session_script_root(session);
   if (!root) {
     return SPN_OK;
   }
 
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_TARGET_RUN,
-    .pkg = root->pkg->info,
+    .pkg = spn_target_pkg(root),
     .run = {
-      .name = root->info->name,
-      .command = spn_target_staged_path(session->mem, root),
+      .name = spn_target_name(root),
+      .command = spn_target_staged_path(spn.heap, root),
     }
   });
   spn_tui_flush(&tui);

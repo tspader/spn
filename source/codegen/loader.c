@@ -3,7 +3,7 @@
 #include "intern/intern.h"
 #include "sp.h"
 #include "sp/macro.h"
-#include "spn.h"
+#include "spn/core.h"
 
 void spn_toml_loader_init(spn_toml_loader_t* ctx, sp_mem_t mem, sp_intern_t* intern) {
   ctx->mem = mem;

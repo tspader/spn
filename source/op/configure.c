@@ -2,10 +2,10 @@
 #include "sp/macro.h"
 #include "ctx/types.h"
 #include "error/types.h"
-#include "forward/types.h"
+#include "core/types.h"
 #include "pkg/types.h"
 #include "session/types.h"
-#include "spn.h"
+#include "spn/core.h"
 #include "unit/types.h"
 
 #include "external/wasm/wasm.h"

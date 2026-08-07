@@ -1,3 +1,4 @@
+#include "spn/host.h"
 #include "triple/triple.h"
 #include "enum/enum.h"
 

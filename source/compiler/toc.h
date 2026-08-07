@@ -2,7 +2,7 @@
 #define SPN_COMPILER_TOC_H
 
 #include "sp.h"
-#include "spn.h"
+#include "spn/core.h"
 
 #include "error/types.h"
 

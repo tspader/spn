@@ -2,10 +2,10 @@
 #define SPN_RESOLVE_TYPES_H
 
 #include "sp.h"
-#include "spn.h"
+#include "spn/core.h"
 
 #include "error/types.h"
-#include "forward/types.h"
+#include "core/types.h"
 #include "index/types.h"
 #include "intern/types.h"
 #include "pkg/types.h"

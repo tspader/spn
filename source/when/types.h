@@ -2,7 +2,7 @@
 #define SPN_WHEN_TYPES_H
 
 #include "sp.h"
-#include "spn.h"
+#include "spn/core.h"
 
 typedef enum {
   SPN_OPTION_VALUE_NONE,

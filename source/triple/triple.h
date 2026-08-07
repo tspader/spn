@@ -2,7 +2,7 @@
 #define SPN_TRIPLE_TRIPLE_H
 
 #include "sp.h"
-#include "spn.h"
+#include "spn/core.h"
 
 spn_triple_t spn_triple_from_str(sp_str_t str);
 spn_err_t spn_triple_parse(sp_str_t str, spn_triple_t* triple);

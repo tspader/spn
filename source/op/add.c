@@ -5,12 +5,13 @@
 #include "event/event.h"
 #include "index/cache.h"
 #include "index/types.h"
-#include "op/op.h"
+#include "spn/host.h"
 #include "pkg/id.h"
 #include "pkg/types.h"
 #include "project/types.h"
 #include "semver/compare.h"
 #include "semver/convert.h"
+#include "semver/parser.h"
 #include "sp/atomic_file.h"
 #include "toml/edit.h"
 
@@ -46,7 +47,7 @@ static site_t find_site(spn_toml_edit_t* edit, sp_mem_t mem, sp_str_t table, sp_
   };
 }
 
-static spn_err_union_t add(spn_ctx_t* ctx, spn_add_request_t request) {
+static spn_err_union_t add(spn_ctx_t* ctx, spn_add_request_t request, spn_semver_range_t range) {
   spn_try_union(spn_ctx_require_project(ctx));
 
   spn_pkg_name_t name = spn_pkg_name_from_qualified(request.key);
@@ -66,7 +67,7 @@ static spn_err_union_t add(spn_ctx_t* ctx, spn_add_request_t request) {
     if (candidate->yanked) {
       continue;
     }
-    if (!spn_semver_in_range(candidate->version, request.range)) {
+    if (!spn_semver_in_range(candidate->version, range)) {
       continue;
     }
     release = candidate;
@@ -78,7 +79,7 @@ static spn_err_union_t add(spn_ctx_t* ctx, spn_add_request_t request) {
       .request = {
         .qualified = spn_pkg_name_to_qualified(name),
         .source = SPN_PKG_SOURCE_INDEX,
-        .index = { .range = request.range },
+        .index = { .range = range },
       },
     }};
   }
@@ -138,6 +139,14 @@ cleanup:
 }
 
 spn_err_t spn_op_add(spn_ctx_t* ctx, spn_add_request_t request) {
+  spn_semver_range_t range = spn_semver_any();
+  if (!sp_str_empty(request.requested) && spn_semver_parse_range(request.requested, &range)) {
+    return spn_err_emit(ctx, (spn_err_union_t) {
+      .kind = SPN_ERR_VERSION_INVALID,
+      .version_invalid = { .requested = sp_str_copy(ctx->heap, request.requested) },
+    });
+  }
+
   spn_try(spn_op_sync_indexes(ctx, (spn_index_refresh_t) sp_zero));
-  return spn_err_emit(ctx, add(ctx, request));
+  return spn_err_emit(ctx, add(ctx, request, range));
 }

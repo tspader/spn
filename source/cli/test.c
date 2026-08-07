@@ -2,6 +2,8 @@
 
 #include "spn/host.h"
 
+#include "error/error.h"
+#include "event/event.h"
 #include "tui/tui.h"
 
 static spn_err_t run_tests() {
@@ -11,52 +13,50 @@ static spn_err_t run_tests() {
   u32 passed = 0;
   u32 failed = 0;
 
-  sp_da_for(session->plans, it) {
-    spn_build_plan_t* plan = &session->plans[it];
-    sp_da_for(plan->roots, jt) {
-      spn_target_unit_t* root = spn_session_get_target_unit(session, plan->roots[jt]);
-      if (root->info->kind != SPN_TARGET_TEST) {
-        continue;
-      }
+  u32 num_targets = spn_session_num_targets(session);
+  sp_for(it, num_targets) {
+    spn_target_t* root = spn_session_target_at(session, it);
+    if (spn_target_kind(root) != SPN_TARGET_TEST) {
+      continue;
+    }
 
+    spn_event_buffer_push(spn.events, (spn_build_event_t) {
+      .kind = SPN_EVENT_TARGET_RUN,
+      .pkg = spn_target_pkg(root),
+      .run = {
+        .name = spn_target_name(root),
+        .command = spn_target_staged_path(spn.heap, root),
+      }
+    });
+    spn_tui_flush(&tui);
+
+    spn_test_run_t run = sp_zero;
+    spn_try(spn_op_run_test(session, root, &run));
+
+    if (run.code) {
+      failed++;
       spn_event_buffer_push(spn.events, (spn_build_event_t) {
-        .kind = SPN_EVENT_TARGET_RUN,
-        .pkg = root->pkg->info,
-        .run = {
-          .name = root->info->name,
-          .command = spn_target_staged_path(session->mem, root),
+        .kind = SPN_EVENT_TEST_FAILED,
+        .test_failed = {
+          .name = spn_target_name(root),
+          .code = run.code,
+          .out = run.out,
+          .err = run.err,
+          .time = run.time,
         }
       });
-      spn_tui_flush(&tui);
-
-      spn_test_run_t run = sp_zero;
-      spn_try(spn_op_run_test(session, root, &run));
-
-      if (run.code) {
-        failed++;
-        spn_event_buffer_push(spn.events, (spn_build_event_t) {
-          .kind = SPN_EVENT_TEST_FAILED,
-          .test_failed = {
-            .name = root->info->name,
-            .code = run.code,
-            .out = run.out,
-            .err = run.err,
-            .time = run.time,
-          }
-        });
-      }
-      else {
-        passed++;
-        spn_event_buffer_push(spn.events, (spn_build_event_t) {
-          .kind = SPN_EVENT_TEST_PASSED,
-          .test_passed = {
-            .name = root->info->name,
-            .time = run.time,
-          }
-        });
-      }
-      spn_tui_flush(&tui);
     }
+    else {
+      passed++;
+      spn_event_buffer_push(spn.events, (spn_build_event_t) {
+        .kind = SPN_EVENT_TEST_PASSED,
+        .test_passed = {
+          .name = spn_target_name(root),
+          .time = run.time,
+        }
+      });
+    }
+    spn_tui_flush(&tui);
   }
 
   spn_event_buffer_push(spn.events, (spn_build_event_t) {

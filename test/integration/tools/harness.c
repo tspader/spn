@@ -1257,6 +1257,9 @@ sp_err_t prepare_test(sp_test_t* t, fixture_t* fixture, const c8* project, const
   setup_fixture_config(fixture, fixture->paths.config, fixture->paths.index, fixture->paths.root);
 
   sp_fs_copy(sp_fs_join_path(mem, fixture->paths.root, sp_str_lit("include/spn.h")), fixture->paths.include);
+  sp_str_t include_spn = sp_fs_join_path(mem, fixture->paths.include, sp_str_lit("spn"));
+  sp_fs_create_dir(include_spn);
+  sp_fs_copy(sp_fs_join_path(mem, fixture->paths.root, sp_str_lit("include/spn/core.h")), include_spn);
 
   if (project) {
     sp_str_t path = sp_fs_join_path(mem, fixture->paths.root, sp_str_view(project));

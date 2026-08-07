@@ -2,7 +2,7 @@
 #define SPN_SHA256_SHA256_H
 
 #include "sp.h"
-#include "spn.h"
+#include "spn/core.h"
 #include "sha256/types.h"
 
 void      spn_sha256(const void* data, u64 len, u8 digest [32]);

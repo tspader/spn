@@ -2,9 +2,9 @@
 #define SPN_CC_H
 
 #include "sp.h"
-#include "spn.h"
+#include "spn/core.h"
 
-#include "forward/types.h"
+#include "core/types.h"
 #include "compiler/types.h"
 #include "target/types.h"
 #include "toolchain/types.h"

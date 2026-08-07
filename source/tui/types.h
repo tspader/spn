@@ -7,7 +7,7 @@
 #include "sp/sp_math.h"
 #include "sp/sp_prompt.h"
 #include "event/types.h"
-#include "forward/types.h"
+#include "core/types.h"
 
 #define SPN_OUTPUT_MODE(X) \
   X(SPN_OUTPUT_MODE_INTERACTIVE) \

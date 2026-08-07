@@ -10,7 +10,7 @@
 #include "pkg/id.h"
 #include "resolve/resolve.h"
 #include "semver/parser.h"
-#include "spn.h"
+#include "spn/core.h"
 
 const c8* fz_root_qualified = "test/root";
 

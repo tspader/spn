@@ -1,3 +1,4 @@
+#include "spn/host.h"
 #include "sp/macro.h"
 #include "sp.h"
 

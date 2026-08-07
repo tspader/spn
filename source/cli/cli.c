@@ -455,7 +455,7 @@ sp_cli_result_t spn_cli_session(sp_cli_t* cli, spn_session_config_t config) {
   if (profile != SP_CLI_OK) {
     return profile;
   }
-  return spn_ctx_open_session(&spn, config) ? SP_CLI_ERR : SP_CLI_OK;
+  return spn_ctx_open_session(&spn, &config) ? SP_CLI_ERR : SP_CLI_OK;
 }
 
 sp_cli_result_t spn_cli_error(sp_cli_t* cli, const c8* fmt, ...) {

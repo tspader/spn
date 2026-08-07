@@ -1,3 +1,5 @@
+#include "spn/host.h"
+
 #include "ctx/ctx.h"
 #include "dag/types.h"
 #include "intern/intern.h"
@@ -41,13 +43,13 @@ spn_err_union_t spn_ctx_require_project(spn_ctx_t* ctx) {
   return spn_result(SPN_OK);
 }
 
-spn_index_info_t* spn_find_index(sp_str_t name) {
+spn_index_info_t* spn_find_index(spn_ctx_t* ctx, sp_str_t name) {
   if (sp_str_empty(name)) {
     name = sp_str_lit("core");
   }
-  sp_da_for(spn.indexes, it) {
-    if (sp_str_equal(spn.indexes[it].name, name)) {
-      return &spn.indexes[it];
+  sp_da_for(ctx->indexes, it) {
+    if (sp_str_equal(ctx->indexes[it].name, name)) {
+      return &ctx->indexes[it];
     }
   }
   return SP_NULLPTR;

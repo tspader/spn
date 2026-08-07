@@ -1,10 +1,10 @@
 #include "profile/profile.h"
 #include "ctx/types.h"
-#include "forward/types.h"
+#include "core/types.h"
 #include "sp/macro.h"
 #include "intern/intern.h"
 #include "pkg/types.h"
-#include "spn.h"
+#include "spn/core.h"
 #include "triple/triple.h"
 
 sp_str_t spn_profile_build_path(sp_mem_t mem, sp_str_t build, const spn_profile_info_t* profile) {

@@ -5,7 +5,7 @@
 #include "error/error.h"
 #include "error/types.h"
 #include "event/types.h"
-#include "forward/types.h"
+#include "core/types.h"
 #include "unit/types.h"
 
 #include "api/api.h"
@@ -484,15 +484,13 @@ static s32 dag_package_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_d
     if (spn_build_copy_to_include(copy, SP_NULLPTR)) {
       continue;
     }
-    sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
     sp_str_pair_t from = sp_str_cleave_c8(copy->from, '/');
     sp_str_pair_t to = sp_str_cleave_c8(copy->to, '/');
-    s32 err = spn_copy(
-      (spn_t*)unit,
-      spn_cache_dir_kind_from_str(from.first), sp_str_to_cstr(scratch.mem, from.second),
-      spn_cache_dir_kind_from_str(to.first), sp_str_to_cstr(scratch.mem, to.second)
+    s32 err = spn_api_copy_rooted(
+      unit,
+      spn_cache_dir_kind_from_str(from.first), from.second,
+      spn_cache_dir_kind_from_str(to.first), to.second
     );
-    sp_mem_end_scratch(scratch);
     if (err) {
       spn_event_buffer_push(spn.events, (spn_build_event_t) {
         .kind = SPN_EVENT_NODE_FAILED,
@@ -1162,7 +1160,7 @@ static void dag_stage(spn_dag_build_t* b) {
       }
       spn_dag_id_t output = ids->output;
 
-      sp_str_t staged_path = spn_target_staged_path(scratch.mem, target);
+      sp_str_t staged_path = spn_target_unit_staged_path(scratch.mem, target);
       dag_stage_file(b, &staged, output, staged_path);
 
       sp_str_t dir = sp_fs_parent_path(staged_path);

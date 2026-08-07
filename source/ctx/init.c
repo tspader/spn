@@ -1,3 +1,4 @@
+#include "spn/host.h"
 #include "ctx/init.h"
 
 #include "codegen/gen/config.gen.h"
@@ -55,7 +56,6 @@ static void extract_runtime(spn_ctx_t* ctx) {
   if (!sp_str_equal(version, stamp)) {
     sp_fs_remove_dir(ctx->paths.runtime);
     sp_fs_create_dir(ctx->paths.runtime);
-    sp_fs_create_dir(ctx->paths.include);
 
     sp_glob_set_t* glob = sp_glob_set_new(scratch.mem);
     sp_glob_set_add(glob, "include/*");
@@ -66,6 +66,7 @@ static void extract_runtime(spn_ctx_t* ctx) {
       sp_str_t path = sp_cstr_as_str(entry.path);
       if (sp_glob_set_match(glob, path)) {
         path = sp_fs_join_path(scratch.mem, ctx->paths.runtime, path);
+        sp_fs_create_dir(sp_fs_parent_path(path));
         sp_io_file_writer_t io = sp_zero;
         sp_io_file_writer_from_path(&io, path);
         sp_io_write(&io.base, entry.data, entry.size, SP_NULLPTR);
@@ -198,8 +199,8 @@ spn_err_t spn_ctx_load_project(spn_ctx_t* ctx, sp_str_t dir, u32 refresh) {
   return spn_err_emit(ctx, load_project(ctx, dir, refresh));
 }
 
-spn_err_t spn_ctx_open_session(spn_ctx_t* ctx, spn_session_config_t config) {
-  return spn_err_emit(ctx, open_session(ctx, config));
+spn_err_t spn_ctx_open_session(spn_ctx_t* ctx, const spn_session_config_t* config) {
+  return spn_err_emit(ctx, open_session(ctx, *config));
 }
 
 void spn_ctx_close(spn_ctx_t* ctx, bool ok) {

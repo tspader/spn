@@ -6,7 +6,7 @@
 #include "semver/types.h"
 #include "session/registry/types.h"
 #include "sp.h"
-#include "spn.h"
+#include "spn/core.h"
 
 #include "index/cache.h"
 #include "index/index.h"

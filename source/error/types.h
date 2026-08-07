@@ -2,10 +2,10 @@
 #define SPN_ERR_H
 
 #include "sp.h"
-#include "spn.h"
+#include "spn/core.h"
 
 #include "compiler/types.h"
-#include "forward/types.h"
+#include "core/types.h"
 #include "pkg/types.h"
 #include "semver/types.h"
 
@@ -145,6 +145,9 @@ typedef struct {
       sp_str_t name;
       sp_str_t version;
     } version_exists;
+    struct {
+      sp_str_t requested;
+    } version_invalid;
     struct {
       sp_str_t name;
     } profile;

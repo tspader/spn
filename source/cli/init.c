@@ -3,6 +3,8 @@
 #include "spn/host.h"
 
 #include "cli/types.h"
+#include "error/error.h"
+#include "project/scaffold.h"
 #include "sp/sp_prompt.h"
 #include "tui/tui.h"
 

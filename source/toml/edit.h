@@ -2,7 +2,7 @@
 #define SPN_TOML_EDIT_H
 
 #include "toml/types.h"
-#include "spn.h"
+#include "spn/core.h"
 
 spn_err_t              spn_toml_edit_init(spn_toml_edit_t* edit, sp_mem_t mem, sp_str_t source);
 spn_toml_edit_entry_t* spn_toml_edit_find(spn_toml_edit_t* edit, const sp_str_t* path, u32 num_segments);

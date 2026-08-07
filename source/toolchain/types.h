@@ -2,9 +2,9 @@
 #define SPN_TOOLCHAIN_TYPES_H
 
 #include "sp.h"
-#include "spn.h"
+#include "spn/core.h"
 
-#include "forward/types.h"
+#include "core/types.h"
 #include "sp/sp_om.h"
 
 typedef enum {

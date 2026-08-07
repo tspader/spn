@@ -2,8 +2,21 @@
 #define SPN_WASM_TYPES_H
 
 #include "dag/types.h"
-#include "forward/types.h"
-#include "spn.h"
+#include "core/types.h"
+#include "spn/core.h"
+
+typedef enum {
+  SPN_ABI_KIND_NONE = 0,
+  SPN_ABI_KIND_CTX,
+  SPN_ABI_KIND_CONFIG,
+  SPN_ABI_KIND_TARGET,
+  SPN_ABI_KIND_NODE,
+  SPN_ABI_KIND_NODE_CTX,
+  SPN_ABI_KIND_PROFILE,
+  SPN_ABI_KIND_MAKE,
+  SPN_ABI_KIND_AUTOCONF,
+  SPN_ABI_KIND_CMAKE,
+} spn_abi_kind_t;
 
 typedef struct WASMModuleCommon spn_wasm_module_t;
 typedef struct WASMModuleInstanceCommon spn_wasm_instance_t;

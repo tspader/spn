@@ -1,11 +1,11 @@
-#include "forward/types.h"
+#include "core/types.h"
 #include "sp/macro.h"
 #include "sp.h"
 #include "spn.h"
 #include "sp/sp_glob.h"
 
 #include "api/api.h"
-#include "api/core/types.h"
+#include "api/types.h"
 #include "ctx/types.h"
 #include "event/types.h"
 #include "pkg/types.h"
@@ -269,16 +269,19 @@ s32 spn_api_copy(sp_str_t from, sp_str_t to) {
   return err;
 }
 
-s32 spn_copy(spn_t* s, spn_dir_t from_dir, const c8* from_path, spn_dir_t to_dir, const c8* to_path) {
-  spn_pkg_unit_t* unit = spn_api_unit(s);
+s32 spn_api_copy_rooted(spn_pkg_unit_t* unit, spn_dir_t from_dir, sp_str_t from_path, spn_dir_t to_dir, sp_str_t to_path) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  sp_str_t from = sp_fs_join_path(scratch.mem, spn_api_dir(unit, from_dir), sp_str_view(from_path));
-  sp_str_t to = sp_fs_join_path(scratch.mem, spn_api_dir(unit, to_dir), sp_str_view(to_path));
+  sp_str_t from = sp_fs_join_path(scratch.mem, spn_api_dir(unit, from_dir), from_path);
+  sp_str_t to = sp_fs_join_path(scratch.mem, spn_api_dir(unit, to_dir), to_path);
   SPN_API_LOG(unit, "spn_copy", "{} -> {}", SP_FMT_STR(from), SP_FMT_STR(to));
 
   s32 err = spn_api_copy(from, to);
   sp_mem_end_scratch(scratch);
   return err;
+}
+
+s32 spn_copy(spn_t* s, spn_dir_t from_dir, const c8* from_path, spn_dir_t to_dir, const c8* to_path) {
+  return spn_api_copy_rooted(spn_api_unit(s), from_dir, sp_cstr_as_str(from_path), to_dir, sp_cstr_as_str(to_path));
 }
 
 spn_profile_t* spn_get_profile(spn_t* s) {

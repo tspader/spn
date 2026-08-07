@@ -23,8 +23,11 @@ spn build
   - `op/` is the library operations: the build pipeline (resolve, sync, configure, build), plus action verbs (add, clean, publish, index sync, run)
     - `build/` is all the code that sets up and runs inside the build graph
 - `include/`
-  - `spn.h` is the guest API included by build scripts in downstream packages
-  - `spn/host.h` is the single public header for host consumers embedding spn as a library; it is the curated library surface. If the CLI needs a library function that `spn/host.h` does not expose, that is an API gap to fix in the library, never a reason to include internal headers from cli/ or tui/.
+  - `spn/core.h` is the shared vocabulary (enums, `spn_triple_t`, `spn_err_t`) included by everything: guest scripts, host consumers, and library internals. Internal code includes `spn/core.h`, never `spn.h`.
+  - `spn.h` is the guest API included by build scripts in downstream packages. Inside the library, only the guest ABI implementation (`source/api/`, `source/external/wasm/abi.h`, `wasm.c`, `codegen/gen/abi.gen.h`) may include it.
+  - `spn/host.h` is the single public header for host consumers embedding spn as a library. It is self-contained: it includes only `sp.h` and `spn/core.h`, never internal headers, and its signatures use only public types, opaque handles (`spn_ctx_t`, `spn_session_t`, `spn_target_t`), and request structs it defines itself. Handles are pure forward declarations; the library casts them to internal types at the boundary (`source/host/host.c`, the op verbs), the same way the guest ABI puns `spn_t` to `spn_pkg_unit_t`. If the CLI needs a library capability expressible in public types, that is an API gap to fix in `spn/host.h`, never a reason to widen its includes.
+  - Two transitional exceptions are sanctioned until their publicization lands: the event/error protocol (`spn_build_event_t`, `spn_err_union_t`, their renderers) is not yet public, and the CLI still reaches the `spn` ctx global plus `spn_session_config_t`/`spn_profile_info_t` construction through internal types.h includes (`cli/cli.h`). These are gaps being closed by the ctx split and session descriptor work, not the pattern.
+  - `spn.h` and `spn/host.h` cannot be included in the same translation unit (both enforce this with `#error`): each declares its own opaque `spn_target_t`, so guest-side and host-side code must stay in separate TUs.
 - `spn.toml` is the package for spn itself; it's example of how a real downstream project would use spn
 - `test/integration/fixtures/` contains small, hermetic spn projects used in integration tests.
   - `script/build_script` is an excellent example
@@ -48,7 +51,7 @@ if you find that you are pulling in tons and tons of unrelated TUs for a unit te
 
 There are two error types:
 - `spn_err_t`: a plain error code. Prefer it. Leaf modules return codes; the caller has the context.
-- `spn_err_union_t`: a code plus structured payload, for errors whose rendered message needs data. Add a kind to `spn_err_t` in `include/spn.h`, a payload struct to `spn_err_union_t` in `source/error/types.h`, and a message in `spn_tui_render_event_detail`.
+- `spn_err_union_t`: a code plus structured payload, for errors whose rendered message needs data. Add a kind to `spn_err_t` in `include/spn/core.h`, a payload struct to `spn_err_union_t` in `source/error/types.h`, and a message in `spn_tui_render_event_detail`.
 
 ```c
 spn_err_union_t spum(kram_t kram) {

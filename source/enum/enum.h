@@ -2,7 +2,7 @@
 #define SPN_ENUM_ENUM_H
 
 #include "sp.h"
-#include "spn.h"
+#include "spn/core.h"
 #include "event/types.h"
 #include "index/types.h"
 #include "resolve/types.h"

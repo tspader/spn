@@ -38,9 +38,10 @@ add_custom_command(
     --format ${EMBED_FORMAT}
     ${EMBED_OBJ}
     ${CMAKE_SOURCE_DIR}/include/spn.h=include/spn.h
+    ${CMAKE_SOURCE_DIR}/include/spn/core.h=include/spn/core.h
     ${CMAKE_SOURCE_DIR}/source/toolchain/toolchains.json=toolchains.json
     ${CMAKE_SOURCE_DIR}/assets/init=init
-  DEPENDS embed ${CMAKE_SOURCE_DIR}/include/spn.h ${CMAKE_SOURCE_DIR}/source/toolchain/toolchains.json ${SPN_INIT_TEMPLATES}
+  DEPENDS embed ${CMAKE_SOURCE_DIR}/include/spn.h ${CMAKE_SOURCE_DIR}/include/spn/core.h ${CMAKE_SOURCE_DIR}/source/toolchain/toolchains.json ${SPN_INIT_TEMPLATES}
   COMMENT "spn.embed.o"
   VERBATIM)
 add_custom_target(spn_embed ALL DEPENDS ${EMBED_OBJ} ${EMBED_HDR})
