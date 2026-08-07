@@ -1,7 +1,7 @@
 #include "spn.h"
 
 SPN_EXPORT
-s32 phase1_fn(spn_t* spn, spn_node_ctx_t* ctx) {
+s32 phase1_fn(spn_t* spn) {
   spn_log(spn, "phase1: generating intermediate.h...");
   spn_io_write("/work/intermediate.h",
     "#ifndef INTERMEDIATE_H\n"
@@ -13,7 +13,7 @@ s32 phase1_fn(spn_t* spn, spn_node_ctx_t* ctx) {
 }
 
 SPN_EXPORT
-s32 phase2_fn(spn_t* spn, spn_node_ctx_t* ctx) {
+s32 phase2_fn(spn_t* spn) {
   spn_log(spn, "phase2: generating final.h...");
   spn_io_write("/work/final.h",
     "#ifndef FINAL_H\n"

@@ -1,6 +1,5 @@
 #include "sp.h"
 #include "external/wasm/abi.h"
-#include "unit/types.h"
 
 spn_wasm_ctx_t spn_wasm_ctx(wasm_exec_env_t env) {
   return (spn_wasm_ctx_t) {
@@ -62,12 +61,4 @@ spn_wasm_ptr_t spn_wasm_copy_str(spn_wasm_ctx_t* abi, const c8* str) {
 
 void spn_wasm_remove_handle(spn_wasm_handles_t* table, u32 token) {
   sp_ht_erase(table->map, token);
-}
-
-void spn_abi_node_set_user_data(spn_node_t* node, s32 data) {
-  spn_find_user_node(node)->user_data = (void*)(u64)(u32)data;
-}
-
-s32 spn_abi_node_ctx_get_user_data(spn_node_ctx_t* ctx) {
-  return (s32)(u32)(u64)ctx->user_data;
 }

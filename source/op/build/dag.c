@@ -160,11 +160,6 @@ static spn_dag_digest_t hash_embedding(spn_dag_build_t* b, spn_target_unit_t* ta
         spn_dag_hash_str(&ctx, embed->dir.dest);
         break;
       }
-      case SPN_EMBED_MEM: {
-        spn_dag_hash_u64(&ctx, embed->memory.size);
-        spn_dag_hash_bytes(&ctx, embed->memory.buffer, embed->memory.size);
-        break;
-      }
     }
   }
   return spn_dag_hash_final(&ctx);
@@ -275,8 +270,7 @@ static s32 dag_user_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data
 
   sp_da_init(spn.mem, ctx->obs);
   if (!sp_str_empty(node->fn)) {
-    spn_node_ctx_t node_ctx = { .user_data = node->user_data };
-    if (spn_wasm_call_export_ex(pkg, node->fn, SPN_ABI_KIND_NODE_CTX, &node_ctx, (spn_wasm_obs_t) { .mem = spn.mem, .out = &ctx->obs })) {
+    if (spn_wasm_call_export_ex(pkg, node->fn, SPN_ABI_KIND_NONE, SP_NULLPTR, (spn_wasm_obs_t) { .mem = spn.mem, .out = &ctx->obs })) {
       return 1;
     }
   }
@@ -517,8 +511,7 @@ static s32 dag_package_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_d
     });
 
     sp_tm_timer_t timer = sp_tm_start_timer();
-    spn_node_ctx_t node_ctx = sp_zero;
-    if (spn_wasm_script_call_ex(script, unit, sp_str_lit("package"), SPN_ABI_KIND_NODE_CTX, &node_ctx, (spn_wasm_obs_t) { .mem = spn.mem, .out = &ctx->obs })) {
+    if (spn_wasm_script_call_ex(script, unit, sp_str_lit("package"), SPN_ABI_KIND_NONE, SP_NULLPTR, (spn_wasm_obs_t) { .mem = spn.mem, .out = &ctx->obs })) {
       return 1;
     }
     unit->time.package = sp_tm_read_timer(&timer);

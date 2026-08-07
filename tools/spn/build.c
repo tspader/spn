@@ -15,7 +15,7 @@ static void codegen_log(void* user, sp_str_t message) {
 }
 
 SPN_EXPORT
-spn_err_t codegen(spn_t* spn, spn_node_ctx_t* ctx) {
+spn_err_t codegen(spn_t* spn) {
   sp_mem_t mem = sp_mem_heap_as_allocator(sp_mem_heap_new());
   codegen_io_t io = { .spn = spn, .mem = mem };
 

@@ -1,7 +1,7 @@
 #include "spn.h"
 
 SPN_EXPORT
-s32 gen_info(spn_t* spn, spn_node_ctx_t* ctx) {
+s32 gen_info(spn_t* spn) {
   const spn_t* dep = spn_get_dep(spn, "spum");
 
   if (dep) {
@@ -30,7 +30,7 @@ s32 gen_info(spn_t* spn, spn_node_ctx_t* ctx) {
 }
 
 SPN_EXPORT
-s32 setup_phase(spn_t* spn, spn_node_ctx_t* ctx) {
+s32 setup_phase(spn_t* spn) {
   spn_log(spn, "setup_phase: running setup...");
   return 0;
 }

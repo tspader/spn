@@ -1,7 +1,7 @@
 #include "spn.h"
 
 SPN_EXPORT
-s32 gen_source(spn_t* spn, spn_node_ctx_t* ctx) {
+s32 gen_source(spn_t* spn) {
   spn_log(spn, "gen_source: writing generated/answer.c");
   spn_fs_create_dir("/source/generated");
   spn_io_write("/source/generated/answer.c",

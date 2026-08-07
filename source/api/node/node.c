@@ -58,11 +58,3 @@ void spn_node_set_fn(spn_node_t* node, const c8* fn) {
   SPN_API_LOG(node->ctx, "spn_node_set_fn", "{}, {}", SP_FMT_STR(info->tag), SP_FMT_CSTR(fn));
   info->fn = spn_intern_cstr(fn);
 }
-
-void spn_node_set_user_data(spn_node_t* node, void* user_data) {
-  spn_find_user_node(node)->user_data = user_data;
-}
-
-void* spn_node_ctx_get_user_data(spn_node_ctx_t* ctx) {
-  return ctx->user_data;
-}

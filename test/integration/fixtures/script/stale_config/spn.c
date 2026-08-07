@@ -3,7 +3,7 @@
 static spn_config_t* stale;
 
 SPN_EXPORT
-s32 use_stale_config(spn_t* spn, spn_node_ctx_t* ctx) {
+s32 use_stale_config(spn_t* spn) {
   if (spn_add_node(stale, "smuggled")) return 1;
   return 0;
 }

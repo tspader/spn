@@ -1,7 +1,7 @@
 #include "spn.h"
 
 SPN_EXPORT
-s32 gen_header(spn_t* spn, spn_node_ctx_t* ctx) {
+s32 gen_header(spn_t* spn) {
   spn_profile_t* profile = spn_get_profile(spn);
   const c8* content = "#define GEN_VALUE 1\n";
   if (spn_profile_get_opt(profile) == SPN_OPT_LEVEL_2) {

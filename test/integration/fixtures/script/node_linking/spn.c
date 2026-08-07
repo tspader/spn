@@ -3,14 +3,14 @@
 static int setup_ran = 0;
 
 SPN_EXPORT
-s32 setup_fn(spn_t* spn, spn_node_ctx_t* ctx) {
+s32 setup_fn(spn_t* spn) {
   spn_log(spn, "setup: initializing...");
   setup_ran = 1;
   return 0;
 }
 
 SPN_EXPORT
-s32 codegen_fn(spn_t* spn, spn_node_ctx_t* ctx) {
+s32 codegen_fn(spn_t* spn) {
   spn_log(spn, "codegen: generating header...");
   spn_io_write("/work/generated.h",
     "#ifndef GENERATED_H\n"

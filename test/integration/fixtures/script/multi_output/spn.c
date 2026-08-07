@@ -1,7 +1,7 @@
 #include "spn.h"
 
 SPN_EXPORT
-s32 gen_all_headers(spn_t* spn, spn_node_ctx_t* ctx) {
+s32 gen_all_headers(spn_t* spn) {
   spn_log(spn, "gen_all_headers: creating 3 headers from single node");
 
   spn_io_write("/work/types.h",
@@ -32,7 +32,7 @@ s32 gen_all_headers(spn_t* spn, spn_node_ctx_t* ctx) {
 }
 
 SPN_EXPORT
-s32 gen_combined(spn_t* spn, spn_node_ctx_t* ctx) {
+s32 gen_combined(spn_t* spn) {
   spn_log(spn, "gen_combined: aggregating all headers");
   spn_io_write("/work/all.h",
     "#ifndef ALL_H\n"

@@ -51,7 +51,7 @@ Assertion dispositions:
 
 The script suite is rewritten from first principles into five case tables, one per feature class:
 - Node graph structure (basic node, chains, fan-in, multi-output, orphan outputs): build-only. Fixtures self-verify with `_Static_assert` on generated headers, so the expectation is just build rc + artifacts exist. Never run the binary.
-- Programmatic configuration APIs (`spn_add_*`, user data, handle misuse): same executor, simple and build-only. `embed` is the single runtime exception; embedded bytes can only be checked by running.
+- Programmatic configuration APIs (`spn_add_*`, handle misuse): same executor, simple and build-only. `embed` is the single runtime exception; embedded bytes can only be checked by running.
 - Node rerun: mutate inputs, then assert witness/output files by exact file equality.
 - Build dep identity: an executor with first-class expects — locked packages, store entries per package (distinct build identities), configure runs per package (cache hits), absent paths. Each case asserts exactly one identity property; never stack them.
 - Configure source selection and script errors: cases are {fixture, args, err}.

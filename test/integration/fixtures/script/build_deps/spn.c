@@ -3,7 +3,7 @@
 #include "spum.h"
 
 SPN_EXPORT
-s32 generate_build_dep_value(spn_t* spn, spn_node_ctx_t* ctx) {
+s32 generate_build_dep_value(spn_t* spn) {
   s32 value = SPUM_MAGIC + 1;
   if (value != 78) {
     spn_log(spn, "unexpected spum value");

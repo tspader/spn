@@ -4,28 +4,28 @@ static s32 order[4];
 static s32 order_idx = 0;
 
 SPN_EXPORT
-s32 step1_fn(spn_t* spn, spn_node_ctx_t* ctx) {
+s32 step1_fn(spn_t* spn) {
   order[order_idx++] = 1;
   spn_log(spn, "step1");
   return 0;
 }
 
 SPN_EXPORT
-s32 step2_fn(spn_t* spn, spn_node_ctx_t* ctx) {
+s32 step2_fn(spn_t* spn) {
   order[order_idx++] = 2;
   spn_log(spn, "step2");
   return 0;
 }
 
 SPN_EXPORT
-s32 step3_fn(spn_t* spn, spn_node_ctx_t* ctx) {
+s32 step3_fn(spn_t* spn) {
   order[order_idx++] = 3;
   spn_log(spn, "step3");
   return 0;
 }
 
 SPN_EXPORT
-s32 final_fn(spn_t* spn, spn_node_ctx_t* ctx) {
+s32 final_fn(spn_t* spn) {
   order[order_idx++] = 4;
   spn_log(spn, "final: writing result.h");
   spn_io_write("/work/result.h",

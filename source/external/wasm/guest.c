@@ -91,53 +91,6 @@ void spn_abi_fs_create_dir(spn_wasm_ctx_t* abi, const c8* path) {
   sp_mem_end_scratch(scratch);
 }
 
-void spn_abi_fs_cat(spn_wasm_ctx_t* abi, const c8* path, const c8* a0, const c8* a1, const c8* a2, const c8* a3) {
-  spn_pkg_unit_t* unit = guest_unit(abi);
-  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  sp_str_t dst = guest_path(abi, scratch.mem, unit, path);
-  if (sp_str_empty(dst)) {
-    sp_mem_end_scratch(scratch);
-    return;
-  }
-  SPN_API_LOG(unit, "spn_fs_cat", "{}", SP_FMT_STR(dst));
-
-  sp_str_t parent = sp_fs_parent_path(dst);
-  if (!sp_str_empty(parent)) {
-    sp_fs_create_dir(parent);
-  }
-
-  sp_io_file_writer_t writer = sp_zero;
-  if (sp_io_file_writer_from_path(&writer, dst)) {
-    wasm_runtime_set_exception(abi->instance, sp_fmt_mem_cstr(scratch.mem, "spn_fs_cat: {}", SP_FMT_STR(dst)));
-    sp_mem_end_scratch(scratch);
-    return;
-  }
-  spn_dag_wasi_observe_write(abi->instance, dst);
-
-  const c8* srcs [] = { a0, a1, a2, a3 };
-  sp_carr_for(srcs, it) {
-    if (!srcs[it]) {
-      break;
-    }
-
-    sp_str_t src = guest_path(abi, scratch.mem, unit, srcs[it]);
-    if (sp_str_empty(src)) {
-      break;
-    }
-    spn_dag_wasi_observe_read(abi->instance, src);
-
-    sp_str_t data = sp_zero;
-    if (sp_io_read_file(scratch.mem, src, &data)) {
-      wasm_runtime_set_exception(abi->instance, sp_fmt_mem_cstr(scratch.mem, "spn_fs_cat: {} -> {}", SP_FMT_STR(src), SP_FMT_STR(dst)));
-      break;
-    }
-    sp_io_write_str(&writer.base, data, SP_NULLPTR);
-  }
-
-  sp_io_file_writer_close(&writer);
-  sp_mem_end_scratch(scratch);
-}
-
 void spn_abi_io_write(spn_wasm_ctx_t* abi, const c8* path, const c8* contents) {
   spn_pkg_unit_t* unit = guest_unit(abi);
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
