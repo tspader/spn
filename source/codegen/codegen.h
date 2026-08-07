@@ -5,7 +5,7 @@
 #include "error/types.h"
 #include "when/types.h"
 #include "sp.h"
-#include "spn.h"
+#include "spn/core.h"
 #include "toml.h"
 
 void               spn_toml_loader_push_key(spn_toml_loader_t* t, const c8* key);

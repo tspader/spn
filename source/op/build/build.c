@@ -4,7 +4,7 @@
 #include "ctx/types.h"
 #include "error/types.h"
 #include "event/types.h"
-#include "forward/types.h"
+#include "core/types.h"
 #include "unit/types.h"
 
 #include "compiler/driver.h"
@@ -24,7 +24,7 @@ static spn_triple_t get_target_triple(spn_target_unit_t* target) {
   return (spn_triple_t) { profile->arch, profile->os, profile->abi };
 }
 
-sp_str_t spn_target_staged_path(sp_mem_t mem, spn_target_unit_t* target) {
+sp_str_t spn_target_unit_staged_path(sp_mem_t mem, spn_target_unit_t* target) {
   if (target->kind != SPN_CC_OUTPUT_EXE) return sp_zero_s(sp_str_t);
 
   sp_mem_arena_marker_t s = sp_mem_begin_scratch_for(mem);

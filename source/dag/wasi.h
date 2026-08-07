@@ -2,7 +2,7 @@
 #define SPN_DAG_WASI_H
 
 #include "sp.h"
-#include "spn.h"
+#include "spn/core.h"
 #include "dag/types.h"
 #include "wasm_export.h"
 

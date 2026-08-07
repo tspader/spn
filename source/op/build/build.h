@@ -4,6 +4,6 @@
 #include "unit/types.h"
 
 sp_str_t spn_target_output_path(sp_mem_t mem, spn_target_unit_t* unit);
-sp_str_t spn_target_staged_path(sp_mem_t mem, spn_target_unit_t* unit);
+sp_str_t spn_target_unit_staged_path(sp_mem_t mem, spn_target_unit_t* unit);
 
 #endif

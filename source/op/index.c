@@ -6,10 +6,9 @@
 #include "error/error.h"
 #include "error/types.h"
 #include "event/types.h"
-#include "forward/types.h"
+#include "core/types.h"
 #include "index/types.h"
-#include "op/op.h"
-#include "spn.h"
+#include "spn/host.h"
 
 #include "event/event.h"
 #include "external/wasm/wasm.h"

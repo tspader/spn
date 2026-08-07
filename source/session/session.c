@@ -4,10 +4,10 @@
 #include "ctx/types.h"
 #include "error/types.h"
 #include "filter/types.h"
-#include "forward/types.h"
+#include "core/types.h"
 #include "resolve/types.h"
 #include "session/types.h"
-#include "spn.h"
+#include "spn/core.h"
 #include "unit/types.h"
 #include "unit/unit.h"
 
@@ -241,15 +241,3 @@ void spn_session_finalize(spn_session_t* session) {
   }
 }
 
-spn_target_unit_t* spn_session_script_root(spn_session_t* session) {
-  sp_da_for(session->plans, it) {
-    spn_build_plan_t* plan = &session->plans[it];
-    sp_da_for(plan->roots, jt) {
-      spn_target_unit_t* root = spn_session_get_target_unit(session, plan->roots[jt]);
-      if (root->info->kind == SPN_TARGET_SCRIPT) {
-        return root;
-      }
-    }
-  }
-  return SP_NULLPTR;
-}

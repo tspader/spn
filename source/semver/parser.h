@@ -2,7 +2,7 @@
 #define SPN_SEMVER_PARSER_H
 
 #include "sp.h"
-#include "spn.h"
+#include "spn/core.h"
 
 #include "semver/types.h"
 

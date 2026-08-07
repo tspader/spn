@@ -2,7 +2,7 @@
 #define SPN_DAG_DAG_H
 
 #include "sp.h"
-#include "spn.h"
+#include "spn/core.h"
 #include "dag/types.h"
 #include "thread_pool/types.h"
 #include "sha256/sha256.h"

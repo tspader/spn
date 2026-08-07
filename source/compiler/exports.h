@@ -2,7 +2,7 @@
 #define SPN_COMPILER_EXPORTS_H
 
 #include "sp.h"
-#include "spn.h"
+#include "spn/core.h"
 
 void spn_exports_render_version_script(sp_io_writer_t* io, sp_da(sp_str_t) symbols);
 void spn_exports_render_symbol_list(sp_io_writer_t* io, sp_da(sp_str_t) symbols);

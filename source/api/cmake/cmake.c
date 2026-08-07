@@ -4,7 +4,7 @@
 #include "compiler/driver.h"
 
 #include "api/api.h"
-#include "api/core/types.h"
+#include "api/types.h"
 #include "ctx/types.h"
 #include "enum/enum.h"
 #include "session/types.h"

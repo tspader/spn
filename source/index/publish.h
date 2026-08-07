@@ -4,7 +4,7 @@
 #include "sp.h"
 
 #include "error/types.h"
-#include "forward/types.h"
+#include "core/types.h"
 #include "index/types.h"
 #include "intern/types.h"
 

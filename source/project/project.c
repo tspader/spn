@@ -1,3 +1,4 @@
+#include "spn/host.h"
 #include "project/project.h"
 
 #include "intern/intern.h"

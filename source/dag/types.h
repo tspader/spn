@@ -2,7 +2,7 @@
 #define SPN_DAG_TYPES_H
 
 #include "sp.h"
-#include "spn.h"
+#include "spn/core.h"
 
 typedef struct spn_dag_action_t spn_dag_action_t;
 typedef struct spn_dag_t spn_dag_t;

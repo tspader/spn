@@ -7,8 +7,9 @@
 #include "event/event.h"
 #include "event/types.h"
 #include "index/index.h"
+#include "index/json.h"
 #include "index/publish.h"
-#include "op/op.h"
+#include "spn/host.h"
 #include "pkg/id.h"
 #include "project/types.h"
 #include "semver/convert.h"
@@ -16,7 +17,7 @@
 static spn_err_union_t publish_build(spn_ctx_t* ctx, spn_publish_request_t request, spn_index_release_t* release) {
   spn_try_union(spn_ctx_require_project(ctx));
 
-  if (!spn_find_index(request.index)) {
+  if (!spn_find_index(ctx, request.index)) {
     return (spn_err_union_t) { .kind = SPN_ERR_INDEX_UNKNOWN, .index = { .name = request.index } };
   }
 
@@ -32,7 +33,7 @@ static spn_err_union_t publish_build(spn_ctx_t* ctx, spn_publish_request_t reque
 }
 
 static spn_err_union_t publish(spn_ctx_t* ctx, spn_publish_request_t request, spn_index_release_t* release) {
-  spn_index_info_t* index = spn_find_index(request.index);
+  spn_index_info_t* index = spn_find_index(ctx, request.index);
 
   spn_evt_publish_t evt = {
     .name = spn_pkg_name_to_qualified(release->id),
@@ -56,12 +57,15 @@ static spn_err_union_t publish(spn_ctx_t* ctx, spn_publish_request_t request, sp
   return spn_result(SPN_OK);
 }
 
-spn_err_t spn_op_publish_build(spn_ctx_t* ctx, spn_publish_request_t request, spn_index_release_t* release) {
-  return spn_err_emit(ctx, publish_build(ctx, request, release));
+spn_err_t spn_op_publish_dry(spn_ctx_t* ctx, spn_publish_request_t request, sp_mem_t mem, sp_str_t* json) {
+  spn_index_release_t release = sp_zero;
+  spn_try(spn_err_emit(ctx, publish_build(ctx, request, &release)));
+  *json = spn_index_release_to_json(mem, &release);
+  return SPN_OK;
 }
 
 spn_err_t spn_op_publish(spn_ctx_t* ctx, spn_publish_request_t request) {
   spn_index_release_t release = sp_zero;
-  spn_try(spn_op_publish_build(ctx, request, &release));
+  spn_try(spn_err_emit(ctx, publish_build(ctx, request, &release)));
   return spn_err_emit(ctx, publish(ctx, request, &release));
 }

@@ -2,7 +2,7 @@
 #define SPN_INDEX_TYPES_H
 
 #include "sp.h"
-#include "spn.h"
+#include "spn/core.h"
 
 #include "sp/sp_om.h"
 #include "pkg/types.h"

@@ -2,7 +2,7 @@
 #define spn_compiler_types_h
 
 #include "sp.h"
-#include "spn.h"
+#include "spn/core.h"
 
 #include "profile/types.h"
 #include "toolchain/types.h"

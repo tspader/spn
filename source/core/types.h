@@ -1,7 +1,8 @@
-#ifndef SPN_FORWARD_H
-#define SPN_FORWARD_H
+#ifndef SPN_CORE_TYPES_H
+#define SPN_CORE_TYPES_H
 
 #include "sp.h"
+#include "spn/core.h"
 
 typedef struct spn spn_t;
 typedef struct spn_project_t spn_project_t;
@@ -30,7 +31,5 @@ typedef struct sp_intern_t sp_intern_t;
 typedef sp_hash_t spn_build_id_t;
 
 typedef struct toml_table_t toml_table_t;
-
-typedef s32  (*spn_node_fn_t)(spn_t*, spn_node_ctx_t*);
 
 #endif

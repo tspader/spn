@@ -2,8 +2,8 @@
 #define SPN_PROFILE_TYPES_H
 
 #include "sp.h"
-#include "spn.h"
-#include "forward/types.h"
+#include "spn/core.h"
+#include "core/types.h"
 #include "when/types.h"
 
 struct spn_profile_info {

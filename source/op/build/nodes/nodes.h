@@ -5,7 +5,7 @@
 #include "dag/types.h"
 #include "error/types.h"
 #include "external/cc.h"
-#include "forward/types.h"
+#include "core/types.h"
 #include "unit/types.h"
 
 spn_err_union_t spn_build_link_invocation(sp_mem_t mem, spn_target_unit_t* target, const spn_cc_link_files_t* files, spn_invocation_t* invocation);

@@ -13,15 +13,9 @@ sp_cli_result_t spn_cli_add(sp_cli_t* cli) {
     return spn_cli_error(cli, "expected a package name");
   }
 
-  spn_semver_range_t range = spn_semver_any();
-  if (!sp_str_empty(spec.second) && spn_semver_parse_range(spec.second, &range)) {
-    return spn_cli_error(cli, "invalid version {.red}", sp_fmt_str(spec.second));
-  }
-
   spn_err_t err = spn_op_add(&spn, (spn_add_request_t) {
     .key = spec.first,
     .requested = spec.second,
-    .range = range,
     .dep = cmd->test ? SPN_ADD_DEP_TEST : cmd->build ? SPN_ADD_DEP_BUILD : SPN_ADD_DEP_PACKAGE,
   });
   return err ? SP_CLI_ERR : SP_CLI_OK;

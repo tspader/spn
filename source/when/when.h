@@ -2,7 +2,7 @@
 #define SPN_WHEN_WHEN_H
 
 #include "sp.h"
-#include "spn.h"
+#include "spn/core.h"
 #include "when/types.h"
 
 spn_option_value_t spn_option_value_none(void);

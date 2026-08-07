@@ -1,6 +1,6 @@
 #include "spn_test.h"
 
-#include "spn.h"
+#include "spn/core.h"
 #include "triple/triple.h"
 
 

@@ -2,7 +2,7 @@
 #define SPN_OP_BUILD_DAG_H
 
 #include "dag/dag.h"
-#include "forward/types.h"
+#include "core/types.h"
 #include "thread_pool/types.h"
 #include "unit/types.h"
 

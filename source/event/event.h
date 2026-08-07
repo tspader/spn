@@ -3,16 +3,6 @@
 
 #include "event/types.h"
 
-typedef struct {
-  const c8* name;
-  const c8* display;
-  spn_verbosity_t verbosity;
-  spn_log_level_t level;
-  bool error;
-  bool terminal;
-  u16 payload;
-} spn_event_info_t;
-
 extern const spn_event_info_t spn_event_info[SPN_EVENT_COUNT];
 
 // The union arm carrying an event's payload, per the SPN_EVENT_LIST row;

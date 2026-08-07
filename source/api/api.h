@@ -2,10 +2,10 @@
 #define SPN_API_H
 
 #include "sp.h"
-#include "spn.h"
+#include "spn/core.h"
 
 #include "compiler/types.h"
-#include "forward/types.h"
+#include "core/types.h"
 #include "profile/types.h"
 #include "toolchain/types.h"
 
@@ -13,6 +13,7 @@
 spn_pkg_unit_t* spn_api_unit(const void* opaque);
 sp_str_t        spn_api_dir(spn_pkg_unit_t* unit, spn_dir_t dir);
 s32             spn_api_copy(sp_str_t from, sp_str_t to);
+s32             spn_api_copy_rooted(spn_pkg_unit_t* unit, spn_dir_t from_dir, sp_str_t from_path, spn_dir_t to_dir, sp_str_t to_path);
 sp_ps_output_t  spn_api_subprocess(sp_mem_t mem, spn_pkg_unit_t* unit, sp_ps_config_t config);
 void            spn_api_add_profile_flags_env(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, sp_env_t* env);
 

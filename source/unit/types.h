@@ -1,9 +1,9 @@
 #ifndef SPN_UNIT_TYPES_H
 #define SPN_UNIT_TYPES_H
 
-#include "forward/types.h"
+#include "core/types.h"
 #include "sp.h"
-#include "spn.h"
+#include "spn/core.h"
 
 #include "compiler/types.h"
 #include "error/types.h"

@@ -4,7 +4,7 @@
 #include "sp.h"
 
 #include "error/types.h"
-#include "forward/types.h"
+#include "core/types.h"
 #include "pkg/types.h"
 #include "unit/types.h"
 
@@ -78,6 +78,16 @@ typedef enum {
   SPN_EVENT_COUNT,
 } spn_build_event_kind_t;
 #undef SPN_EVENT_ENUM
+
+typedef struct {
+  const c8* name;
+  const c8* display;
+  spn_verbosity_t verbosity;
+  spn_log_level_t level;
+  bool error;
+  bool terminal;
+  u16 payload;
+} spn_event_info_t;
 
 typedef struct { spn_user_node_t* info; } spn_evt_node_t;
 

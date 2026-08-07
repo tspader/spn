@@ -2,6 +2,7 @@
 #define SPN_CLI_CLI_H
 
 #include "cli/types.h"
+#include "ctx/types.h"
 #include "error/types.h"
 #include "session/types.h"
 

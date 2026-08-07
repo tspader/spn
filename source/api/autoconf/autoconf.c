@@ -1,7 +1,7 @@
 #include "api/autoconf/autoconf.h"
 
 #include "api/api.h"
-#include "api/core/types.h"
+#include "api/types.h"
 #include "ctx/types.h"
 #include "session/types.h"
 #include "unit/types.h"

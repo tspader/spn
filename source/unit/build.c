@@ -3,7 +3,7 @@
 #include "ctx/types.h"
 #include "profile/profile.h"
 #include "sp/str.h"
-#include "spn.h"
+#include "spn/core.h"
 #include "toolchain/select.h"
 #include "toolchain/toolchain.h"
 #include "triple/triple.h"

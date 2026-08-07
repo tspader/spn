@@ -2,7 +2,7 @@
 #define SPN_PROFILE_PROFILE_H
 
 #include "error/types.h"
-#include "forward/types.h"
+#include "core/types.h"
 #include "profile/types.h"
 
 void            spn_profile_populate(spn_profile_table_t* profiles, spn_pkg_info_t* pkg);

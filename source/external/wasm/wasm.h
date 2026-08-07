@@ -1,10 +1,8 @@
 #ifndef SPN_WASM_H
 #define SPN_WASM_H
 
-#include "forward/types.h"
-#include "spn.h"
+#include "core/types.h"
 
-#include "external/wasm/abi.h"
 #include "external/wasm/types.h"
 
 spn_err_t spn_wasm_init();

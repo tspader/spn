@@ -2,23 +2,16 @@
 #define SPN_CTX_TYPES_H
 
 #include "sp.h"
-#include "spn.h"
+#include "spn/core.h"
 
 #include "event/types.h"
-#include "forward/types.h"
+#include "core/types.h"
 #include "git/types.h"
 #include "index/types.h"
 #include "intern/types.h"
 #include "paths/types.h"
 #include "session/types.h"
 #include "toolchain/types.h"
-
-typedef struct {
-  u32 total;
-  u32 completed;
-  u32 hits;
-  u32 misses;
-} spn_progress_t;
 
 struct spn_ctx_t {
   spn_project_t* project;

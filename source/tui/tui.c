@@ -5,6 +5,16 @@
 #include "sp/macro.h"
 #include "sp/sp_prompt.h"
 #include "sp/str.h"
+
+#include "ctx/types.h"
+
+#include "enum/enum.h"
+#include "event/event.h"
+#include "event/flush.h"
+#include "event/log.h"
+#include "semver/convert.h"
+#include "toml/issue.h"
+#include "toolchain/select.h"
 #include "tui/tui.h"
 
 
@@ -759,6 +769,14 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
             "version {.yellow} of {.cyan} already exists in the index",
             sp_fmt_str(event->err.version_exists.version),
             sp_fmt_str(event->err.version_exists.name)
+          );
+          break;
+        }
+        case SPN_ERR_VERSION_INVALID: {
+          sp_fmt_io(
+            &w.base,
+            "invalid version {.red}",
+            sp_fmt_str(event->err.version_invalid.requested)
           );
           break;
         }

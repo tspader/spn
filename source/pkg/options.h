@@ -1,7 +1,7 @@
 #ifndef SPN_PKG_OPTIONS_H
 #define SPN_PKG_OPTIONS_H
 
-#include "forward/types.h"
+#include "core/types.h"
 #include "pkg/types.h"
 #include "profile/types.h"
 #include "when/types.h"

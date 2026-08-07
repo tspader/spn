@@ -1,10 +1,10 @@
-#ifndef SPN_API_CORE_TYPES_H
-#define SPN_API_CORE_TYPES_H
+#ifndef SPN_API_TYPES_H
+#define SPN_API_TYPES_H
 
 #include "sp.h"
 #include "spn.h"
 
-#include "forward/types.h"
+#include "core/types.h"
 
 struct spn_target {
   spn_t* spn;

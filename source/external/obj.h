@@ -6,7 +6,7 @@
 #include "sp/sp_elf.h"
 #include "sp/macho.h"
 #include "error/types.h"
-#include "spn.h"
+#include "spn/core.h"
 
 typedef enum {
   SPN_OBJ_COFF,

@@ -5,7 +5,7 @@
 
 #include "compiler/types.h"
 #include "error/types.h"
-#include "forward/types.h"
+#include "core/types.h"
 #include "unit/types.h"
 
 typedef struct {

@@ -15,14 +15,15 @@ static spn_publish_request_t publish_request() {
 }
 
 static sp_cli_result_t publish_dry() {
-  spn_index_release_t release = sp_zero;
-  if (spn_op_publish_build(&spn, publish_request(), &release)) {
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_str_t json = sp_zero;
+  if (spn_op_publish_dry(&spn, publish_request(), scratch.mem, &json)) {
+    sp_mem_end_scratch(scratch);
     return SP_CLI_ERR;
   }
 
   spn_tui_handoff(&tui);
-  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  spn_print("{}", sp_fmt_str(spn_index_release_to_json(scratch.mem, &release)));
+  spn_print("{}", sp_fmt_str(json));
   sp_mem_end_scratch(scratch);
   spn_print_err("{.cyan}: dry run, nothing published", sp_fmt_cstr("note"));
   return SP_CLI_OK;

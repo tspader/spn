@@ -3,7 +3,7 @@
 
 #include "sp.h"
 
-#include "forward/types.h"
+#include "core/types.h"
 #include "git/types.h"
 #include "intern/types.h"
 #include "sp/macro.h"

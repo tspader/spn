@@ -2,7 +2,7 @@
 #define SPN_LOCK_TYPES_H
 
 #include "sp.h"
-#include "spn.h"
+#include "spn/core.h"
 
 #include "pkg/types.h"
 #include "semver/types.h"

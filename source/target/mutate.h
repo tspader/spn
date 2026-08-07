@@ -1,7 +1,7 @@
 #ifndef SPN_TARGET_MUTATE_H
 #define SPN_TARGET_MUTATE_H
 
-#include "forward/types.h"
+#include "core/types.h"
 #include "target/types.h"
 
 static inline void spn_target_info_init(sp_mem_t mem, spn_target_info_t* target) {

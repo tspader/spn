@@ -1,3 +1,4 @@
+#include "spn/host.h"
 #include "error/error.h"
 
 const c8* spn_err_to_str(spn_err_t err) {
@@ -99,6 +100,7 @@ const c8* spn_err_to_str(spn_err_t err) {
     case SPN_ERR_INIT_NAME:                    return "init_name";
     case SPN_ERR_TEST_MISSING:                 return "test_missing";
     case SPN_ERR_TEST_FAILED:                  return "test_failed";
+    case SPN_ERR_VERSION_INVALID:              return "version_invalid";
     case SPN_ERR_COUNT:                        break;
   }
   return "unknown";

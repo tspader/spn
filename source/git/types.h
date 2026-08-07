@@ -5,7 +5,7 @@
 #include "sp/sp_om.h"
 
 #include "intern/types.h"
-#include "spn.h"
+#include "spn/core.h"
 
 typedef struct {
   sp_str_t url;

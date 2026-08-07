@@ -2,9 +2,9 @@
 #define SPN_TARGET_TYPES_H
 
 #include "sp.h"
-#include "spn.h"
+#include "spn/core.h"
 
-#include "forward/types.h"
+#include "core/types.h"
 #include "compiler/types.h"
 #include "when/types.h"
 
@@ -49,15 +49,6 @@ typedef struct {
 } spn_link_lib_t;
 
 
-
-typedef enum {
-  SPN_TARGET_LIB,
-  SPN_TARGET_EXE,
-  SPN_TARGET_SCRIPT,
-  SPN_TARGET_TEST,
-  SPN_TARGET_CONFIGURE_METAPROGRAM,
-  SPN_TARGET_BUILD_METAPROGRAM,
-} spn_target_kind_t;
 
 typedef struct {
   bool source;

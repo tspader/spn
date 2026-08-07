@@ -16,7 +16,7 @@
 #include "resolve/dump.h"
 #include "resolve/resolve.h"
 #include "resolve/types.h"
-#include "spn.h"
+#include "spn/core.h"
 #include "toml/loader.h"
 
 static sp_mem_arena_t* arena;
