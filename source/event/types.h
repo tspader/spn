@@ -5,6 +5,7 @@
 
 #include "error/types.h"
 #include "core/types.h"
+#include "log/lazy/types.h"
 #include "pkg/types.h"
 #include "unit/types.h"
 
@@ -259,6 +260,7 @@ struct spn_event_buffer_t {
   sp_rb(spn_build_event_t) buffer;
   sp_mutex_t mutex;
   sp_cv_t condition;
+  spn_lazy_log_t log;
 };
 
 #endif

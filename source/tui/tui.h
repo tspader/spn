@@ -6,7 +6,6 @@
 
 void            spn_tui_init(spn_tui_t* tui);
 void            spn_tui_open(spn_tui_t* tui, spn_tui_mode_t mode, spn_verbosity_t verbosity);
-void            spn_tui_open_log(spn_tui_t* tui, sp_str_t dir);
 void            spn_tui_flush(spn_tui_t* tui);
 void            spn_tui_poll(spn_tui_t* tui);
 void            spn_tui_handoff(spn_tui_t* tui);

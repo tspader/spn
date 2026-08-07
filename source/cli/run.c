@@ -24,7 +24,6 @@ sp_cli_result_t spn_cli_run(sp_cli_t* cli) {
   sp_da_push(names, cmd->entry);
   spn_session_config_t config = {
     .selection = {
-      .kind = SPN_TARGET_SELECTION_EXPLICIT,
       .script = {
         .kind = SPN_TARGET_RULE_NAMED,
         .names = names,

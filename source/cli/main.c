@@ -124,12 +124,7 @@ static sp_app_result_t on_init(sp_app_t* sp) {
   app.initted = true;
   sp_os_register_signal_handler(SP_OS_SIGNAL_INTERRUPT, on_signal, SP_NULLPTR);
 
-  if (spn_ctx_mount(host.ctx)) {
-    return SP_APP_ERR;
-  }
-  spn_tui_open_log(&tui, spn_ctx_log_dir(host.ctx));
-
-  if (spn_ctx_load_project(host.ctx, (spn_project_request_t) {
+  if (spn_ctx_open(host.ctx, (spn_open_request_t) {
     .dir = args.project_dir,
     .index_refresh_seconds = args.refresh,
   })) {

@@ -29,13 +29,7 @@ typedef struct {
   spn_target_names_t names;
 } spn_target_rule_t;
 
-typedef enum {
-  SPN_TARGET_SELECTION_DEFAULT,
-  SPN_TARGET_SELECTION_EXPLICIT,
-} spn_target_selection_kind_t;
-
 typedef struct {
-  spn_target_selection_kind_t kind;
   spn_target_rule_t bin;
   spn_target_rule_t lib;
   spn_target_rule_t test;

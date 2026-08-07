@@ -1,4 +1,5 @@
 #include "event/event.h"
+#include "event/log.h"
 
 #include <stddef.h>
 
@@ -65,6 +66,9 @@ void spn_event_buffer_push(spn_event_buffer_t* events, spn_build_event_t event) 
 
   sp_mutex_lock(&events->mutex);
   sp_rb_push(events->buffer, event);
+  if (events->log.writer.write) {
+    spn_event_log_jsonl(&events->log.writer, &event);
+  }
   sp_mutex_unlock(&events->mutex);
 }
 

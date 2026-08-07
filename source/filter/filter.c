@@ -23,8 +23,16 @@ static bool spn_target_rule_pass(const spn_target_rule_t* rule, const spn_target
   sp_unreachable_return(false);
 }
 
+static bool is_default(const spn_target_selection_t* selection) {
+  return
+    selection->bin.kind == SPN_TARGET_RULE_NONE &&
+    selection->lib.kind == SPN_TARGET_RULE_NONE &&
+    selection->test.kind == SPN_TARGET_RULE_NONE &&
+    selection->script.kind == SPN_TARGET_RULE_NONE;
+}
+
 bool spn_target_selection_pass(const spn_target_selection_t* selection, const spn_target_info_t* target) {
-  if (selection->kind == SPN_TARGET_SELECTION_DEFAULT) {
+  if (is_default(selection)) {
     switch (target->kind) {
       case SPN_TARGET_KIND_BUILD_METAPROGRAM:
       case SPN_TARGET_KIND_CONFIGURE_METAPROGRAM:

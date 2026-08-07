@@ -208,7 +208,6 @@ struct spn_toolchain_unit_t {
   sp_str_t root;
   spn_cc_toolchain_t cc;
   sp_hash_t identity;
-  spn_build_io_t logs;
 };
 
 static inline spn_user_node_t* spn_find_user_node(spn_node_t* node) {

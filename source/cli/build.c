@@ -21,7 +21,6 @@ sp_cli_result_t spn_cli_build(sp_cli_t* cli) {
 
   bool specific = cmd->only.bin || cmd->only.lib || cmd->only.test || cmd->only.script;
   if (specific || !sp_da_empty(names)) {
-    config.selection.kind = SPN_TARGET_SELECTION_EXPLICIT;
     bool all_kinds = !specific;
     set_rule(&config.selection.bin, all_kinds || cmd->only.bin, names);
     set_rule(&config.selection.lib, all_kinds || cmd->only.lib, names);

@@ -55,6 +55,7 @@ const c8* spn_err_to_str(spn_err_t err) {
     case SPN_ERR_FS_REMOVE:                    return "fs_remove";
     case SPN_ERR_FS_READ:                      return "fs_read";
     case SPN_ERR_FS_WRITE:                     return "fs_write";
+    case SPN_ERR_FS_CREATE_DIR:                return "fs_create_dir";
     case SPN_ERR_INDEX_UNKNOWN:                return "index_unknown";
     case SPN_ERR_INDEX_SYNC:                   return "index_sync";
     case SPN_ERR_INDEX_CORRUPT:                return "index_corrupt";

@@ -708,6 +708,14 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
           );
           break;
         }
+        case SPN_ERR_FS_CREATE_DIR: {
+          sp_fmt_io(
+            &w.base,
+            "failed to create directory {.cyan}",
+            sp_fmt_str(get_contextual_path(mem, event->err.fs.path))
+          );
+          break;
+        }
         case SPN_ERR_FS_WRITE: {
           sp_fmt_io(
             &w.base,
@@ -1565,14 +1573,6 @@ void spn_tui_open(spn_tui_t* tui, spn_tui_mode_t mode, spn_verbosity_t verbosity
   tui->logger.verbosity = verbosity;
 }
 
-void spn_tui_open_log(spn_tui_t* tui, sp_str_t dir) {
-  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  sp_str_t path = sp_fs_join_path(scratch.mem, dir, sp_str_lit("build.jsonl"));
-  sp_fs_create_file(path);
-  sp_io_file_writer_from_path(&tui->logger.jsonl, path);
-  sp_mem_end_scratch(scratch);
-}
-
 static u32 get_short_tid(spn_tui_t* tui, u64 thread_id) {
   static u32 next_thread_id = 0;
   if (!sp_ht_key_exists(tui->thread_ids, thread_id)) {
@@ -1583,11 +1583,6 @@ static u32 get_short_tid(spn_tui_t* tui, u64 thread_id) {
 
 static void emit_event(spn_tui_t* tui, spn_build_event_t* event) {
   event->thread_id = get_short_tid(tui, event->thread_id);
-
-  if (tui->logger.jsonl.fd) {
-    spn_event_log_jsonl(&tui->logger.jsonl.base, event);
-  }
-
   spn_tui_log_event(tui, event);
 }
 
