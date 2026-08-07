@@ -16,7 +16,10 @@ typedef enum {
   SPN_INDEX_PROTOCOL_DIR,
 } spn_index_protocol_t;
 
-typedef sp_da(sp_str_t) spn_target_names_t;
+typedef struct {
+  sp_str_t* items;
+  u32 count;
+} spn_str_arr_t;
 
 typedef enum {
   SPN_TARGET_RULE_NONE,
@@ -26,7 +29,7 @@ typedef enum {
 
 typedef struct {
   spn_target_rule_kind_t kind;
-  spn_target_names_t names;
+  spn_str_arr_t names;
 } spn_target_rule_t;
 
 typedef struct {

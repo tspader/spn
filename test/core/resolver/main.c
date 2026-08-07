@@ -37,7 +37,7 @@ typedef struct {
 static resolve_result_t execute_fixture(const fx_config_t* config, const spn_pkg_info_t* root, sp_str_t dir, sp_intern_t* intern) {
   sp_mem_t mem = sp_mem_arena_as_allocator(arena);
 
-  spn_index_arr_t indexes = sp_da_new(mem, spn_index_info_t);
+  sp_da(spn_index_info_t) indexes = sp_da_new(mem, spn_index_info_t);
 
   sp_str_t dir_index_location = sp_fs_join_path(mem, dir, sp_str_lit("index"));
   if (sp_fs_is_dir(dir_index_location)) {

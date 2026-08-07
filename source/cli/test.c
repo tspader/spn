@@ -6,15 +6,12 @@ sp_cli_result_t spn_cli_test(sp_cli_t* cli) {
     return opened;
   }
 
-  spn_target_names_t names = sp_da_new(host.mem, sp_str_t);
-  for (const c8** it = cli->rest; *it; it++) {
-    sp_da_push(names, sp_cstr_as_str(*it));
-  }
+  spn_str_arr_t names = spn_cli_rest_names(cli);
 
   spn_session_config_t config = {
     .selection = {
       .test = {
-        .kind = sp_da_empty(names) ? SPN_TARGET_RULE_ALL : SPN_TARGET_RULE_NAMED,
+        .kind = names.count ? SPN_TARGET_RULE_NAMED : SPN_TARGET_RULE_ALL,
         .names = names,
       },
     },

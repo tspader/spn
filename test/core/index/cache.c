@@ -81,7 +81,7 @@ sp_test_each(index_cache, get_package, cache_test_t, tests, .setup = spn_test_ct
   u32 slots = 0;
   sp_carr_detect_len(it->indexes, slots, it->indexes[slots].protocol || it->indexes[slots].fixture);
 
-  spn_index_arr_t indexes = sp_da_new(mem, spn_index_info_t);
+  sp_da(spn_index_info_t) indexes = sp_da_new(mem, spn_index_info_t);
   sp_for(slot, slots) {
     sp_str_t location = sp_zero;
     if (it->indexes[slot].fixture) {

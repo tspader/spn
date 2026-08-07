@@ -8,13 +8,13 @@ sp_cli_result_t spn_cli_index(sp_cli_t* cli) {
 
 static void index_list() {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  sp_da(spn_index_desc_t) indexes = spn_ctx_indexes(scratch.mem, host.ctx);
+  spn_index_arr_t indexes = spn_ctx_indexes(scratch.mem, host.ctx);
 
   struct { u32 name; u32 kind; u32 protocol; } width = sp_zero;
-  sp_da_for(indexes, it) {
-    width.name = sp_max(width.name, indexes[it].name.len);
-    width.kind = sp_max(width.kind, spn_index_kind_to_str(indexes[it].kind).len);
-    width.protocol = sp_max(width.protocol, spn_index_protocol_to_str(indexes[it].protocol).len);
+  sp_for(it, indexes.count) {
+    width.name = sp_max(width.name, indexes.items[it].name.len);
+    width.kind = sp_max(width.kind, spn_index_kind_to_str(indexes.items[it].kind).len);
+    width.protocol = sp_max(width.protocol, spn_index_protocol_to_str(indexes.items[it].protocol).len);
   }
   const c8* headers [] = { "name", "kind", "protocol", "source" };
   width.name = sp_max(width.name, sp_cstr_len(headers[0]));
@@ -30,8 +30,8 @@ static void index_list() {
     sp_fmt_cstr(headers[2]),
     sp_fmt_cstr(headers[3]));
 
-  sp_da_for(indexes, it) {
-    spn_index_desc_t* index = &indexes[it];
+  sp_for(it, indexes.count) {
+    spn_index_desc_t* index = &indexes.items[it];
     spn_print("{:>$} {:>$} {:>$} {}",
       sp_fmt_uint(width.name),
       sp_fmt_str(index->name),

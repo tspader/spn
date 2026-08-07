@@ -641,8 +641,8 @@ static bool target_rule_requests_name(const spn_target_rule_t* rule, sp_str_t na
   if (rule->kind != SPN_TARGET_RULE_NAMED) {
     return false;
   }
-  sp_da_for(rule->names, it) {
-    if (sp_str_equal(rule->names[it], name)) {
+  sp_for(it, rule->names.count) {
+    if (sp_str_equal(rule->names.items[it], name)) {
       return true;
     }
   }
@@ -669,8 +669,8 @@ static spn_err_union_t validate_target_selection(const spn_target_selection_t* s
     if (rule->kind != SPN_TARGET_RULE_NAMED) {
       continue;
     }
-    sp_da_for(rule->names, it) {
-      sp_str_t name = rule->names[it];
+    sp_for(it, rule->names.count) {
+      sp_str_t name = rule->names.items[it];
       if (target_selection_matches_name(selection, pkg, name)) {
         continue;
       }

@@ -19,9 +19,9 @@ struct spn_ctx_t {
   sp_atomic_s32_t aborted;
   sp_atomic_s32_t error;
   sp_atomic_ptr_t progress;
-  spn_index_arr_t indexes;
+  sp_da(spn_index_info_t) indexes;
   struct {
-    spn_index_arr_t indexes;
+    sp_da(spn_index_info_t) indexes;
   } config;
   spn_event_buffer_t* events;
   sp_intern_t* intern;

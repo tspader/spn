@@ -51,14 +51,17 @@ sp_str_t spn_ctx_cache_dir(spn_ctx_t* ctx) {
   return ctx->paths.caches.dir;
 }
 
-sp_da(spn_index_desc_t) spn_ctx_indexes(sp_mem_t mem, spn_ctx_t* ctx) {
-  sp_da(spn_index_desc_t) indexes = sp_da_new(mem, spn_index_desc_t);
+spn_index_arr_t spn_ctx_indexes(sp_mem_t mem, spn_ctx_t* ctx) {
+  spn_index_arr_t indexes = {
+    .items = sp_alloc_n(mem, spn_index_desc_t, sp_da_size(ctx->indexes)),
+    .count = (u32)sp_da_size(ctx->indexes),
+  };
   sp_da_for(ctx->indexes, it) {
     spn_index_desc_t desc = describe_index(&ctx->indexes[it]);
     desc.name = sp_str_copy(mem, desc.name);
     desc.source = sp_str_copy(mem, desc.source);
     desc.location = sp_str_copy(mem, desc.location);
-    sp_da_push(indexes, desc);
+    indexes.items[it] = desc;
   }
   return indexes;
 }
