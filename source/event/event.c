@@ -41,7 +41,7 @@ static u64 current_thread_id() {
   return (u64)pthread_self();
 #elif defined(SP_MACOS)
   u64 tid;
-  pthread_threadid_np(NULL, &tid);
+  pthread_threadid_np(SP_NULLPTR, &tid);
   return tid;
 #else
   return (u64)pthread_self();

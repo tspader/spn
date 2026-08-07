@@ -127,6 +127,8 @@ static spn_err_union_t extract_runtime(spn_ctx_t* ctx) {
 }
 
 static spn_err_union_t open_ctx(spn_ctx_t* ctx, spn_open_request_t request) {
+  sp_assert(!ctx->config.indexes);
+
   // Make sure any per-machine directories we need exist
   sp_str_t dirs [] = {
     ctx->paths.log,
@@ -185,9 +187,10 @@ static spn_err_union_t open_ctx(spn_ctx_t* ctx, spn_open_request_t request) {
     spn_toml_loader_t loader = sp_zero;
     spn_toml_loader_init(&loader, ctx->mem, ctx->intern);
     spn_err_t loaded = spn_codegen_load_config(&loader, ctx->paths.config.toml, &config);
+    sp_da(spn_index_info_t) indexes = sp_da_new(ctx->heap, spn_index_info_t);
     if (!loaded) {
       sp_da_for(config.index, it) {
-        sp_da_push(ctx->config.indexes, spn_index_lower(&loader, it, SPN_INDEX_KIND_USER, &config.index[it]));
+        sp_da_push(indexes, spn_index_lower(&loader, it, SPN_INDEX_KIND_USER, &config.index[it]));
       }
     }
     if (loaded || !sp_da_empty(loader.issues)) {
@@ -196,6 +199,7 @@ static spn_err_union_t open_ctx(spn_ctx_t* ctx, spn_open_request_t request) {
         .manifest = { .path = ctx->paths.config.toml, .issues = loader.issues },
       };
     }
+    ctx->config.indexes = indexes;
   }
 
   spn_try_union(spn_project_load(ctx->heap, ctx->intern, ctx->events, ctx->paths.project, &ctx->project));

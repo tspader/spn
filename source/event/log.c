@@ -18,11 +18,10 @@ static const c8* level_name(s32 level) {
   }
 }
 
-static sp_bind_t* schemas[SPN_EVENT_COUNT] = {0};
-static sp_bind_t* err_schemas[SPN_ERR_COUNT] = {0};
+static sp_bind_t* schemas[SPN_EVENT_COUNT] = sp_zero;
+static sp_bind_t* err_schemas[SPN_ERR_COUNT] = sp_zero;
 
 static void build_err_schemas(sp_mem_t mem) {
-  // SPN_ERR_MANIFEST_ISSUES
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -32,7 +31,6 @@ static void build_err_schemas(sp_mem_t mem) {
     err_schemas[SPN_ERR_MANIFEST_ISSUES] = sp_bind_builder_end(&b);
   }
 
-  // SPN_ERR_PKG_MISMATCH
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -43,7 +41,6 @@ static void build_err_schemas(sp_mem_t mem) {
     err_schemas[SPN_ERR_PKG_MISMATCH] = sp_bind_builder_end(&b);
   }
 
-  // SPN_ERR_DEP_CYCLE
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -55,7 +52,6 @@ static void build_err_schemas(sp_mem_t mem) {
     err_schemas[SPN_ERR_DEP_CYCLE] = sp_bind_builder_end(&b);
   }
 
-  // SPN_ERR_PKG_UNKNOWN
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -66,7 +62,6 @@ static void build_err_schemas(sp_mem_t mem) {
     err_schemas[SPN_ERR_PKG_UNKNOWN] = sp_bind_builder_end(&b);
   }
 
-  // SPN_ERR_UNIT_CYCLE
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -83,7 +78,6 @@ static void build_err_schemas(sp_mem_t mem) {
     err_schemas[SPN_ERR_UNIT_CYCLE] = sp_bind_builder_end(&b);
   }
 
-  // SPN_ERR_DYNAMIC_DUPLICATE
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -105,7 +99,6 @@ static void build_err_schemas(sp_mem_t mem) {
     err_schemas[SPN_ERR_DYNAMIC_DUPLICATE] = sp_bind_builder_end(&b);
   }
 
-  // SPN_ERR_RESOLVE_TOO_COMPLEX
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -117,7 +110,6 @@ static void build_err_schemas(sp_mem_t mem) {
     err_schemas[SPN_ERR_RESOLVE_TOO_COMPLEX] = sp_bind_builder_end(&b);
   }
 
-  // SPN_ERR_PKG_NO_MATCH
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -137,7 +129,6 @@ static void build_err_schemas(sp_mem_t mem) {
 }
 
 static void build_schemas(sp_mem_t mem) {
-  // SPN_EVENT_SYNC
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -147,7 +138,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_SYNC] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_BUILD_SCRIPT_PACKAGE
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -156,7 +146,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_BUILD_SCRIPT_PACKAGE] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_ADDED
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -166,7 +155,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_ADDED] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_UPDATE_INCOMPATIBLE
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -177,7 +165,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_UPDATE_INCOMPATIBLE] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_PUBLISH, SPN_EVENT_PUBLISH_END
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -191,7 +178,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_PUBLISH_END] = schema;
   }
 
-  // SPN_EVENT_BUILD_SCRIPT_CRASHED
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -201,7 +187,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_BUILD_SCRIPT_CRASHED] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_BUILD_SCRIPT_COMPILE
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -213,7 +198,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_BUILD_SCRIPT_COMPILE] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -223,7 +207,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_TARGET_BUILD_PASSED
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -234,7 +217,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_TARGET_BUILD_PASSED] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_TARGET_BUILD_FAILED
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -248,7 +230,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_TARGET_BUILD_FAILED] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_NODE_FAILED
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -258,7 +239,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_NODE_FAILED] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_TARGET_RUN
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -268,7 +248,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_TARGET_RUN] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_TEST_PASSED
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -278,7 +257,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_TEST_PASSED] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_TEST_FAILED
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -291,7 +269,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_TEST_FAILED] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_TEST_SUMMARY
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -302,7 +279,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_TEST_SUMMARY] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_INIT_BUILD_GRAPH
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -314,7 +290,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_INIT_BUILD_GRAPH] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_PREPARE_BUILD_GRAPH_FAILED
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -326,7 +301,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_PREPARE_BUILD_GRAPH_FAILED] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_LINK_PASSED
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -336,7 +310,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_LINK_PASSED] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_LINK_FAILED
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -347,7 +320,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_LINK_FAILED] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_BUILD_SCRIPT_CONFIGURE_OK
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -356,7 +328,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_BUILD_SCRIPT_CONFIGURE_OK] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_RESOLVE_PACKAGE
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -367,7 +338,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_RESOLVE_PACKAGE] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_ERR_OPTION
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -382,7 +352,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_ERR_OPTION] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_RESOLVE_END
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -392,7 +361,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_RESOLVE_END] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_API_CALL
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -402,7 +370,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_API_CALL] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_USER_LOG
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -411,7 +378,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_USER_LOG] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_SYNC_START
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -422,7 +388,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_SYNC_START] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_SYNC_PACKAGE
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -435,7 +400,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_SYNC_PACKAGE] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_SYNC_FAILED
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -446,7 +410,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_SYNC_FAILED] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_SYNC_STALE
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -456,7 +419,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_SYNC_STALE] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_SYNC_PATCH
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -466,7 +428,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_SYNC_PATCH] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_ERR_PATCH
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -476,8 +437,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_ERR_PATCH] = sp_bind_builder_end(&b);
   }
 
-
-  // SPN_EVENT_SYNC_END
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -487,13 +446,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_SYNC_END] = sp_bind_builder_end(&b);
   }
 
-
-
-
-
-
-
-  // SPN_EVENT_EMBED_START
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -502,7 +454,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_EMBED_START] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_EMBED_PASSED
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -513,7 +464,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_EMBED_PASSED] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_EMBED_FAILED
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -523,7 +473,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_EMBED_FAILED] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_BUILD_FAILED
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -535,7 +484,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_BUILD_FAILED] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_BUILD_SUMMARY
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -549,7 +497,6 @@ static void build_schemas(sp_mem_t mem) {
     schemas[SPN_EVENT_BUILD_SUMMARY] = sp_bind_builder_end(&b);
   }
 
-  // SPN_EVENT_BUILD_SCRIPT_PACKAGE_OK
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
@@ -569,14 +516,10 @@ static void build_schemas(sp_mem_t mem) {
 
 }
 
-// ============================================================================
-// JSON serializer — walks a bind schema + data pointer
-// ============================================================================
-
 void spn_json_write_str(sp_io_writer_t* out, sp_str_t str) {
   sp_io_write_c8(out, '"');
-  for (u32 i = 0; i < str.len; i++) {
-    c8 c = str.data[i];
+  sp_for(it, str.len) {
+    c8 c = str.data[it];
     switch (c) {
       case '"':  sp_io_write_cstr(out, "\\\"", SP_NULLPTR); break;
       case '\\': sp_io_write_cstr(out, "\\\\", SP_NULLPTR); break;
@@ -603,10 +546,12 @@ static void json_write_value(sp_io_writer_t* out, sp_bind_field_t* field, void* 
 
 static void json_write_object(sp_io_writer_t* out, sp_bind_t* schema, void* data) {
   sp_io_write_c8(out, '{');
-  sp_da_for(schema->as.object.fields, i) {
-    sp_bind_field_t* f = &schema->as.object.fields[i];
-    if (i > 0) sp_io_write_cstr(out, ", ", SP_NULLPTR);
-    spn_json_write_str(out, sp_str_view(f->key));
+  sp_da_for(schema->as.object.fields, it) {
+    sp_bind_field_t* f = &schema->as.object.fields[it];
+    if (it > 0) {
+      sp_io_write_cstr(out, ", ", SP_NULLPTR);
+    }
+    spn_json_write_str(out, sp_cstr_as_str(f->key));
     sp_io_write_cstr(out, ": ", SP_NULLPTR);
     json_write_value(out, f, data);
   }
@@ -657,10 +602,6 @@ static void json_write_value(sp_io_writer_t* out, sp_bind_field_t* field, void* 
     }
   }
 }
-
-// ============================================================================
-// Public API
-// ============================================================================
 
 void spn_event_log_init(sp_mem_t mem) {
   static sp_atomic_s32_t initted;
