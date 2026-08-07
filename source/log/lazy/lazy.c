@@ -13,7 +13,7 @@ static sp_err_t lazy_write(sp_io_writer_t* w, const void* ptr, u64 size, u64* by
       return SP_ERR_IO;
     }
   }
-  sp_err_t err = sp_io_write(&log->file.base, ptr, size, bytes_written);
+  sp_err_t err = sp_io_write_all(&log->file.base, ptr, size, bytes_written);
   if (err != SP_OK) {
     log->failed = true;
   }
