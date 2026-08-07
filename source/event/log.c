@@ -663,6 +663,10 @@ static void json_write_value(sp_io_writer_t* out, sp_bind_field_t* field, void* 
 // ============================================================================
 
 void spn_event_log_init(sp_mem_t mem) {
+  static sp_atomic_s32_t initted;
+  if (sp_atomic_s32_exchange(&initted, 1, SP_ATOMIC_SEQ_CST)) {
+    return;
+  }
   build_schemas(mem);
   build_err_schemas(mem);
 }
