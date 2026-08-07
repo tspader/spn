@@ -161,16 +161,6 @@ sp_test(script, stamp_input) {
   });
 }
 
-sp_test(script, user_data) {
-  return run_test(t, (test_t) {
-    .project = "test/integration/fixtures/script/user_data",
-    .actions = {
-      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_RUN_BIN, .bin.name = "user_data" },
-    },
-  });
-}
-
 sp_test(script, configure_table) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/script/configure_table",

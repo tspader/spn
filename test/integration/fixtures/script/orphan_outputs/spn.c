@@ -1,7 +1,7 @@
 #include "spn.h"
 
 SPN_EXPORT
-s32 gen_orphan(spn_t* spn, spn_node_ctx_t* ctx) {
+s32 gen_orphan(spn_t* spn) {
   spn_log(spn, "generating orphan_header.h (no consumers)...");
   spn_io_write("/work/orphan_header.h",
     "#ifndef ORPHAN_H\n"
@@ -13,7 +13,7 @@ s32 gen_orphan(spn_t* spn, spn_node_ctx_t* ctx) {
 }
 
 SPN_EXPORT
-s32 gen_consumed(spn_t* spn, spn_node_ctx_t* ctx) {
+s32 gen_consumed(spn_t* spn) {
   spn_log(spn, "generating consumed_header.h...");
   spn_io_write("/work/consumed_header.h",
     "#ifndef CONSUMED_H\n"
@@ -25,7 +25,7 @@ s32 gen_consumed(spn_t* spn, spn_node_ctx_t* ctx) {
 }
 
 SPN_EXPORT
-s32 consumer_fn(spn_t* spn, spn_node_ctx_t* ctx) {
+s32 consumer_fn(spn_t* spn) {
   spn_log(spn, "consumer: reading consumed_header.h...");
   return 0;
 }

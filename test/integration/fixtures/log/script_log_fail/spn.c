@@ -1,7 +1,7 @@
 #include "spn.h"
 
 SPN_EXPORT
-s32 fail_node(spn_t* spn, spn_node_ctx_t* ctx) {
+s32 fail_node(spn_t* spn) {
   return 1;
 }
 

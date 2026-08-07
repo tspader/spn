@@ -1,7 +1,7 @@
 #include "spn.h"
 
 SPN_EXPORT
-s32 gen_header(spn_t* spn, spn_node_ctx_t* ctx) {
+s32 gen_header(spn_t* spn) {
   spn_profile_t* profile = spn_get_profile(spn);
   const c8* content = spn_profile_get_mode(profile) == SPN_BUILD_MODE_DEBUG
     ? "#ifdef NDEBUG\n#error \"expected debug profile\"\n#endif\n#define GEN_VALUE 1\n"

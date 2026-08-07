@@ -3,7 +3,7 @@
 #include <stdio.h>
 
 SPN_EXPORT
-s32 package(spn_t* spn, spn_node_ctx_t* ctx) {
+s32 package(spn_t* spn) {
   spn_fs_create_dir("/store/misc/data");
   spn_fs_copy_glob("/source/data/*.txt", "/store/misc/data");
 

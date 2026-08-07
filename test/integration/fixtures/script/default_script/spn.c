@@ -1,7 +1,7 @@
 #include "spn.h"
 
 SPN_EXPORT
-s32 gen_version(spn_t* spn, spn_node_ctx_t* ctx) {
+s32 gen_version(spn_t* spn) {
   spn_io_write("/work/version.h", "#define DEFAULT_SCRIPT_VERSION 42\n");
   return 0;
 }
@@ -18,7 +18,7 @@ spn_err_t configure(spn_t* spn, spn_config_t* config) {
 }
 
 SPN_EXPORT
-s32 package(spn_t* spn, spn_node_ctx_t* ctx) {
+s32 package(spn_t* spn) {
   spn_fs_copy("/work/version.h", "/store/include/version.h");
   return 0;
 }

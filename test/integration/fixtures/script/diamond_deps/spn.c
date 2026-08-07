@@ -1,7 +1,7 @@
 #include "spn.h"
 
 SPN_EXPORT
-s32 gen_base(spn_t* spn, spn_node_ctx_t* ctx) {
+s32 gen_base(spn_t* spn) {
   spn_log(spn, "gen_base: creating base.h");
   spn_io_write("/work/base.h",
     "#ifndef BASE_H\n"
@@ -13,7 +13,7 @@ s32 gen_base(spn_t* spn, spn_node_ctx_t* ctx) {
 }
 
 SPN_EXPORT
-s32 gen_left(spn_t* spn, spn_node_ctx_t* ctx) {
+s32 gen_left(spn_t* spn) {
   spn_log(spn, "gen_left: creating left.h");
   spn_io_write("/work/left.h",
     "#ifndef LEFT_H\n"
@@ -26,7 +26,7 @@ s32 gen_left(spn_t* spn, spn_node_ctx_t* ctx) {
 }
 
 SPN_EXPORT
-s32 gen_right(spn_t* spn, spn_node_ctx_t* ctx) {
+s32 gen_right(spn_t* spn) {
   spn_log(spn, "gen_right: creating right.h");
   spn_io_write("/work/right.h",
     "#ifndef RIGHT_H\n"
@@ -39,7 +39,7 @@ s32 gen_right(spn_t* spn, spn_node_ctx_t* ctx) {
 }
 
 SPN_EXPORT
-s32 gen_final(spn_t* spn, spn_node_ctx_t* ctx) {
+s32 gen_final(spn_t* spn) {
   spn_log(spn, "gen_final: creating final.h");
   spn_io_write("/work/final.h",
     "#ifndef FINAL_H\n"

@@ -82,15 +82,10 @@ struct spn_node_t {
   u32 index;
 };
 
-struct spn_node_ctx_t {
-  void* user_data;
-};
-
 struct spn_user_node_t {
   spn_pkg_unit_t* pkg;
   sp_str_t tag;
   sp_str_t fn;
-  void* user_data;
   sp_da(sp_str_t) inputs;
   sp_da(sp_str_t) outputs;
   sp_da(spn_node_t*) deps;

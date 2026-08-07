@@ -189,15 +189,22 @@ bool spn_wasm_script_exports(spn_wasm_script_t* script, sp_str_t name) {
 }
 
 static spn_err_t script_call_invoke(spn_wasm_script_t* script, spn_pkg_unit_t* unit, wasm_function_inst_t fn, spn_abi_kind_t kind, void* arg) {
-  u32 token = spn_wasm_add_handle(script->handles, arg, kind);
-
   wasm_val_t args [2] = {
     { .kind = WASM_I32, .of.i32 = (s32)script->ctx },
-    { .kind = WASM_I32, .of.i32 = (s32)token },
   };
+  u32 num_args = 1;
+  u32 token = 0;
+  if (kind != SPN_ABI_KIND_NONE) {
+    token = spn_wasm_add_handle(script->handles, arg, kind);
+    args[1] = (wasm_val_t) { .kind = WASM_I32, .of.i32 = (s32)token };
+    num_args = 2;
+  }
+
   wasm_val_t results [1] = sp_zero;
-  bool called = wasm_runtime_call_wasm_a(script->env, fn, 1, results, sp_carr_len(args), args);
-  spn_wasm_remove_handle(script->handles, token);
+  bool called = wasm_runtime_call_wasm_a(script->env, fn, 1, results, num_args, args);
+  if (token) {
+    spn_wasm_remove_handle(script->handles, token);
+  }
 
   if (!called) {
     return script_fail(unit, SPN_ERR_WASM_MODULE_CALL_FAILED, (spn_err_wasm_t) {

@@ -1,7 +1,7 @@
 #include "spn.h"
 
 SPN_EXPORT
-s32 generate_header(spn_t* spn, spn_node_ctx_t* ctx) {
+s32 generate_header(spn_t* spn) {
   spn_log(spn, "generating version.h...");
   spn_io_write("/work/version.h",
     "#ifndef VERSION_H\n"
@@ -26,7 +26,7 @@ spn_err_t configure(spn_t* spn, spn_config_t* config) {
 }
 
 SPN_EXPORT
-s32 package(spn_t* spn, spn_node_ctx_t* ctx) {
+s32 package(spn_t* spn) {
   spn_fs_copy("/work/version.h", "/store/include");
   return 0;
 }

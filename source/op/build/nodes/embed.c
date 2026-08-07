@@ -58,14 +58,6 @@ s32 spn_embed_write(spn_target_unit_t* unit, sp_str_t obj, sp_str_t hdr, sp_mem_
     }
 
     switch (embed.kind) {
-      case SPN_EMBED_MEM: {
-        data = (sp_mem_buffer_t) {
-          .data = (u8*)embed.memory.buffer,
-          .len = embed.memory.size,
-          .capacity = embed.memory.size,
-        };
-        break;
-      }
       case SPN_EMBED_FILE: {
         embed_obs_file(obs_mem, obs, embed.file.path);
         sp_str_t content = sp_zero;

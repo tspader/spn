@@ -14,7 +14,6 @@
 #include "unit/types.h"
 
 #include "event/event.h"
-#include "compiler/driver.h"
 #include "intern/intern.h"
 #include "pkg/id.h"
 #include "pkg/mutate.h"
@@ -43,81 +42,6 @@ sp_str_t spn_api_dir(spn_pkg_unit_t* unit, spn_dir_t dir) {
   }
 
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
-}
-
-void spn_api_add_profile_flags_env(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, sp_env_t* env) {
-  spn_cc_flags_t flags = sp_zero;
-  spn_err_union_t err = spn_cc_render_flags(mem, toolchain, profile, &flags);
-  sp_assert(!err.kind);
-  sp_str_t compile = sp_str_join_n(mem, flags.compile, sp_da_size(flags.compile), sp_str_lit(" "));
-  sp_str_t link = sp_str_join_n(mem, flags.link, sp_da_size(flags.link), sp_str_lit(" "));
-
-  sp_env_insert(env, sp_str_lit("CFLAGS"), compile);
-  sp_env_insert(env, sp_str_lit("CXXFLAGS"), compile);
-  if (!sp_str_empty(link)) {
-    sp_env_insert(env, sp_str_lit("LDFLAGS"), link);
-  }
-}
-
-sp_ps_output_t spn_api_subprocess(sp_mem_t mem, spn_pkg_unit_t* unit, sp_ps_config_t config) {
-  SPN_API_LOG(unit, "spn_api_subprocess", "{}", SP_FMT_STR(config.command));
-
-  if (sp_str_empty(config.cwd)) {
-    config.cwd = unit->paths.work;
-  }
-
-  config.io = (sp_ps_io_config_t) {
-    .in =  { .mode = SP_PS_IO_MODE_NULL },
-    .out = { .mode = SP_PS_IO_MODE_CREATE },
-    .err = { .mode = SP_PS_IO_MODE_REDIRECT },
-  };
-
-  // Inherit the process env, then layer the caller's vars and the session's
-  // overrides (e.g. the toolchain's CC/AR/LD) on top
-  spn_session_t* session = unit->session;
-  sp_env_t env = sp_env_capture(mem);
-  if (config.env.env.vars) {
-    sp_ht_for_kv(config.env.env.vars, it) {
-      sp_env_insert(&env, *it.key, *it.val);
-    }
-  }
-  sp_ht_for_kv(session->env.vars, it) {
-    if (sp_str_empty(*it.val)) continue;
-    sp_env_insert(&env, *it.key, *it.val);
-  }
-  config.env.env = env;
-  config.env.mode = SP_PS_ENV_EXISTING;
-
-  sp_ps_output_t result = sp_ps_run(mem, config);
-  if (!sp_str_empty(result.out)) {
-    sp_io_write_str(&unit->logs.io.build.writer, result.out, SP_NULLPTR);
-  }
-  return result;
-}
-
-static s32 run_argv(spn_pkg_unit_t* unit, spn_toolchain_launcher_t* launcher, const c8** args) {
-  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  sp_ps_config_t config = sp_zero;
-
-  if (launcher) {
-    config.command = launcher->program;
-    sp_da_for(launcher->args, it) {
-      sp_ps_config_add_arg(scratch.mem, &config, launcher->args[it]);
-    }
-  }
-  else {
-    config.command = sp_str_view(args[0]);
-    args++;
-  }
-
-  for (const c8** arg = args; *arg; arg++) {
-    sp_ps_config_add_arg(scratch.mem, &config, sp_str_view(*arg));
-  }
-
-  sp_ps_output_t result = spn_api_subprocess(scratch.mem, unit, config);
-  s32 exit_code = result.status.exit_code;
-  sp_mem_end_scratch(scratch);
-  return exit_code;
 }
 
 static spn_target_t* wrap_target(const void* opaque, spn_target_info_t* info) {
@@ -297,14 +221,6 @@ spn_libc_kind_t spn_profile_get_libc(spn_profile_t* profile) {
   }
 }
 
-spn_linkage_t spn_profile_get_linkage(spn_profile_t* profile) {
-  return ((spn_profile_info_t*)profile)->linkage;
-}
-
-spn_c_standard_t spn_profile_get_standard(spn_profile_t* profile) {
-  return ((spn_profile_info_t*)profile)->standard;
-}
-
 spn_build_mode_t spn_profile_get_mode(spn_profile_t* profile) {
   return ((spn_profile_info_t*)profile)->mode;
 }
@@ -333,10 +249,6 @@ void spn_target_add_flag(spn_target_t* target, const c8* flag) {
   sp_da_push(target->info->flags, spn_intern_cstr(flag));
 }
 
-void spn_target_set_linked(spn_target_t* target, s32 linked) {
-  target->info->no_link = !linked;
-}
-
 // Channel a little bit of Arthur himself to get these wrappers to fit on one line on my editor
 #define view(_str) sp_str_view(_str)
 #define DATA_T SP_EMBED_DEFAULT_DATA_T_S
@@ -349,19 +261,6 @@ void spn_target_embed_file_ex(spn_target_t* t, const c8* f, const c8* s, const c
   spn_target_embed_file_ex_s(t->info, view(f), view(s), view(d_t), view(s_t));
 }
 
-void spn_target_embed_mem(spn_target_t* t, const c8* s, const u8* b, u64 z) {
-  spn_target_embed_mem_ex_s(t->info, view(s), b, z, DATA_T, SIZE_T);
-}
-
-void spn_target_embed_mem_ex(spn_target_t* t, const c8* s, const u8* b, u64 z, const c8* d_t, const c8* s_t) {
-  spn_target_embed_mem_ex_s(t->info, view(s), b, z, view(d_t), view(s_t));
-}
-
-void spn_target_embed_dir(spn_target_t* t, const c8* d) {
-  spn_target_embed_dir_ex_s(t->info, view(d), sp_str_lit(""), DATA_T, SIZE_T);
-}
-
 void spn_target_embed_dir_ex(spn_target_t* t, const c8* d, const c8* dest, const c8* d_t, const c8* s_t) {
   spn_target_embed_dir_ex_s(t->info, view(d), view(dest), view(d_t), view(s_t));
-
 }

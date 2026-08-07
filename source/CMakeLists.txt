@@ -1,9 +1,6 @@
 set(SPN_SOURCES
   api/api.c
-  api/autoconf/autoconf.c
-  api/cmake/cmake.c
   api/core.c
-  api/make/make.c
   api/node/node.c
   project/project.c
   host/host.c

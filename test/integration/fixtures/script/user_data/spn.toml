@@ -1,7 +1,0 @@
-[package]
-name = "user_data"
-version = "0.0.1"
-
-[[bin]]
-name = "user_data"
-source = ["main.c"]
