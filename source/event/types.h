@@ -263,7 +263,6 @@ struct spn_build_event_t {
 struct spn_event_buffer_t {
   sp_rb(spn_build_event_t) buffer;
   sp_mutex_t mutex;
-  sp_cv_t condition;
   spn_lazy_log_t log;
 };
 
