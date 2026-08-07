@@ -63,6 +63,7 @@ void spn_event_buffer_push_ex(spn_event_buffer_t* events, spn_pkg_info_t* pkg, s
 
 void spn_event_buffer_push(spn_event_buffer_t* events, spn_build_event_t event) {
   event.thread_id = current_thread_id();
+  event.epoch = sp_tm_now_epoch();
 
   sp_mutex_lock(&events->mutex);
   sp_rb_push(events->buffer, event);
