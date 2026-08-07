@@ -664,8 +664,6 @@ void spn_event_log_jsonl(sp_io_writer_t* out, spn_build_event_t* event) {
     schema = err_schemas[event->err.kind];
   }
 
-  sp_tm_epoch_t now = sp_tm_now_epoch();
-
   const spn_event_info_t* info = &spn_event_info[event->kind];
   sp_io_write_cstr(out, "{\"event\": \"", SP_NULLPTR);
   sp_io_write_cstr(out, info->name, SP_NULLPTR);
@@ -677,7 +675,7 @@ void spn_event_log_jsonl(sp_io_writer_t* out, spn_build_event_t* event) {
   sp_io_write_cstr(out, level_name(level), SP_NULLPTR);
   sp_io_write_cstr(out, "\"", SP_NULLPTR);
 
-  sp_fmt_io(out, ", \"ts_s\": {}, \"ts_ns\": {}", sp_fmt_uint(now.s), sp_fmt_uint(now.ns));
+  sp_fmt_io(out, ", \"ts_s\": {}, \"ts_ns\": {}", sp_fmt_uint(event->epoch.s), sp_fmt_uint(event->epoch.ns));
 
   sp_fmt_io(out, ", \"tid\": {}", sp_fmt_uint(event->thread_id));
 

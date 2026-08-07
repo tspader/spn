@@ -204,6 +204,7 @@ struct spn_build_event_t {
   spn_pkg_info_t* pkg;
   spn_build_io_t* io;
   u64 thread_id;
+  sp_tm_epoch_t epoch;
 
   union {
     spn_err_union_t err;
