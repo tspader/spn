@@ -63,15 +63,15 @@ static spn_target_rule_t* target_rule(spn_target_selection_t* selection, spn_tar
 }
 
 sp_test_each(filter, target_selection, test_t, tests) {
-  sp_mem_t mem = sp_test_arena(t);
   spn_target_selection_t selection = sp_zero;
+  sp_str_t requested = sp_zero;
 
   if (it->selected_rule != SPN_TARGET_RULE_NONE) {
     spn_target_rule_t* rule = target_rule(&selection, it->selected_kind);
     rule->kind = it->selected_rule;
     if (it->requested_name) {
-      rule->names = sp_da_new(mem, sp_str_t);
-      sp_da_push(rule->names, sp_cstr_as_str(it->requested_name));
+      requested = sp_cstr_as_str(it->requested_name);
+      rule->names = (spn_str_arr_t) { .items = &requested, .count = 1 };
     }
   }
 

@@ -447,6 +447,19 @@ sp_cli_cmd_t* spn_cli() {
   return &cmd_root;
 }
 
+spn_str_arr_t spn_cli_rest_names(sp_cli_t* cli) {
+  u32 count = 0;
+  for (const c8** it = cli->rest; *it; it++) {
+    count++;
+  }
+
+  spn_str_arr_t names = { .items = sp_alloc_n(host.mem, sp_str_t, count), .count = count };
+  sp_for(it, count) {
+    names.items[it] = sp_cstr_as_str(cli->rest[it]);
+  }
+  return names;
+}
+
 sp_cli_result_t spn_cli_open(bool project_optional) {
   spn_err_t err = spn_ctx_open(host.ctx, (spn_open_request_t) {
     .dir = args.project_dir,

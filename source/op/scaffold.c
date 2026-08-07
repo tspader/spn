@@ -56,7 +56,8 @@ static bool is_name_valid(sp_str_t name) {
   return true;
 }
 
-static spn_err_union_t scaffold(spn_ctx_t* ctx, spn_scaffold_request_t request, sp_mem_t mem, sp_da(sp_str_t)* files) {
+static spn_err_union_t scaffold(spn_ctx_t* ctx, spn_scaffold_request_t request, sp_mem_t mem, spn_str_arr_t* files) {
+  *files = sp_zero_s(spn_str_arr_t);
   if (!is_name_valid(request.name)) {
     return (spn_err_union_t) { .kind = SPN_ERR_INIT_NAME, .pkg = { .name = sp_str_copy(ctx->heap, request.name) } };
   }
@@ -64,7 +65,7 @@ static spn_err_union_t scaffold(spn_ctx_t* ctx, spn_scaffold_request_t request, 
     return (spn_err_union_t) { .kind = SPN_ERR_FS_WRITE, .fs = { .path = sp_str_copy(ctx->heap, request.dir) } };
   }
 
-  *files = sp_da_new(mem, sp_str_t);
+  sp_da(sp_str_t) created = sp_da_new(mem, sp_str_t);
 
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
   spn_err_union_t err = spn_result(SPN_OK);
@@ -86,9 +87,10 @@ static spn_err_union_t scaffold(spn_ctx_t* ctx, spn_scaffold_request_t request, 
       break;
     }
 
-    sp_da_push(*files, sp_str_copy(mem, it.rel));
+    sp_da_push(created, sp_str_copy(mem, it.rel));
   }
 
+  *files = (spn_str_arr_t) { .items = created, .count = (u32)sp_da_size(created) };
   sp_mem_end_scratch(s);
   return err;
 }
@@ -109,7 +111,7 @@ static spn_err_union_t check(spn_ctx_t* ctx, spn_scaffold_request_t request) {
   return err;
 }
 
-spn_err_t spn_op_scaffold(spn_ctx_t* ctx, spn_scaffold_request_t request, sp_mem_t mem, sp_da(sp_str_t)* files) {
+spn_err_t spn_op_scaffold(spn_ctx_t* ctx, spn_scaffold_request_t request, sp_mem_t mem, spn_str_arr_t* files) {
   return spn_err_emit(ctx, scaffold(ctx, request, mem, files));
 }
 

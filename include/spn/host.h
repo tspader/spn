@@ -60,6 +60,11 @@ typedef struct {
   sp_str_t location;
 } spn_index_desc_t;
 
+typedef struct {
+  spn_index_desc_t* items;
+  u32 count;
+} spn_index_arr_t;
+
 spn_ctx_t* spn_ctx_new();
 spn_err_t spn_ctx_open(spn_ctx_t* ctx, spn_open_request_t request);
 spn_err_t spn_ctx_open_session(spn_ctx_t* ctx, const spn_session_config_t* config, spn_session_t** session);
@@ -71,12 +76,12 @@ bool spn_ctx_find_target(spn_ctx_t* ctx, sp_str_t name, spn_target_kind_t* kind)
 sp_str_t spn_ctx_project_dir(spn_ctx_t* ctx);
 sp_str_t spn_ctx_cache_dir(spn_ctx_t* ctx);
 bool spn_ctx_find_index(spn_ctx_t* ctx, sp_str_t name, spn_index_desc_t* index);
-sp_da(spn_index_desc_t) spn_ctx_indexes(sp_mem_t mem, spn_ctx_t* ctx);
+spn_index_arr_t spn_ctx_indexes(sp_mem_t mem, spn_ctx_t* ctx);
 spn_err_t spn_op_add(spn_ctx_t* ctx, spn_add_request_t request);
 spn_err_t spn_op_publish(spn_ctx_t* ctx, spn_publish_request_t request);
 spn_err_t spn_op_publish_dry(spn_ctx_t* ctx, spn_publish_request_t request, sp_mem_t mem, sp_str_t* json);
 spn_err_t spn_op_sync_indexes(spn_ctx_t* ctx, spn_sync_request_t request);
-spn_err_t spn_op_scaffold(spn_ctx_t* ctx, spn_scaffold_request_t request, sp_mem_t mem, sp_da(sp_str_t)* files);
+spn_err_t spn_op_scaffold(spn_ctx_t* ctx, spn_scaffold_request_t request, sp_mem_t mem, spn_str_arr_t* files);
 spn_err_t spn_op_scaffold_check(spn_ctx_t* ctx, spn_scaffold_request_t request);
 spn_err_t spn_op_build(spn_session_t* session);
 spn_err_t spn_op_test(spn_session_t* session);

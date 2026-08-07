@@ -12,8 +12,8 @@ static bool spn_target_rule_pass(const spn_target_rule_t* rule, const spn_target
       return true;
     }
     case SPN_TARGET_RULE_NAMED: {
-      sp_da_for(rule->names, it) {
-        if (sp_str_equal(rule->names[it], target->name)) {
+      sp_for(it, rule->names.count) {
+        if (sp_str_equal(rule->names.items[it], target->name)) {
           return true;
         }
       }

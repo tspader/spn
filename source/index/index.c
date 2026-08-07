@@ -314,7 +314,7 @@ sp_str_t spn_index_location(spn_index_info_t* index, sp_mem_t mem, sp_str_t root
   sp_unreachable_return(sp_str_lit(""));
 }
 
-static spn_index_info_t* find_index(spn_index_arr_t* indexes, sp_str_t name) {
+static spn_index_info_t* find_index(sp_da(spn_index_info_t)* indexes, sp_str_t name) {
   sp_da_for(*indexes, it) {
     if (sp_str_equal((*indexes)[it].name, name)) {
       return &(*indexes)[it];
@@ -323,7 +323,7 @@ static spn_index_info_t* find_index(spn_index_arr_t* indexes, sp_str_t name) {
   return SP_NULLPTR;
 }
 
-void spn_index_assemble(sp_mem_t mem, spn_index_map_t* workspace, spn_index_arr_t user, spn_index_arr_t* indexes) {
+void spn_index_assemble(sp_mem_t mem, spn_index_map_t* workspace, sp_da(spn_index_info_t) user, sp_da(spn_index_info_t)* indexes) {
   *indexes = sp_da_new(mem, spn_index_info_t);
 
   if (workspace) {

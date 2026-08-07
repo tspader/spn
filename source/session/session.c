@@ -49,9 +49,12 @@ static sp_str_t resolve_macos_sdk(sp_mem_t mem, sp_env_t* env) {
 static spn_target_rule_t copy_rule(sp_mem_t mem, spn_target_rule_t rule) {
   spn_target_rule_t result = { .kind = rule.kind };
   if (rule.kind == SPN_TARGET_RULE_NAMED) {
-    result.names = sp_da_new(mem, sp_str_t);
-    sp_da_for(rule.names, it) {
-      sp_da_push(result.names, sp_str_copy(mem, rule.names[it]));
+    result.names = (spn_str_arr_t) {
+      .items = sp_alloc_n(mem, sp_str_t, rule.names.count),
+      .count = rule.names.count,
+    };
+    sp_for(it, rule.names.count) {
+      result.names.items[it] = sp_str_copy(mem, rule.names.items[it]);
     }
   }
   return result;

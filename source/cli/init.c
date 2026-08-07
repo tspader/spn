@@ -26,16 +26,16 @@ static void on_submit_prompt(sp_prompt_ctx_t* ctx, sp_prompt_event_t event) {
 }
 
 static void on_render_prompt(sp_prompt_ctx_t* ctx) {
-  sp_da(sp_str_t) files = *(sp_da(sp_str_t)*)sp_prompt_get_user_data(ctx);
+  spn_str_arr_t files = *(spn_str_arr_t*)sp_prompt_get_user_data(ctx);
   sp_prompt_style_t green = {
     .tag = SP_PROMPT_STYLE_ANSI,
     .ansi = SP_ANSI_FG_GREEN_U8,
   };
 
-  sp_da_for(files, it) {
+  sp_for(it, files.count) {
     sp_prompt_render_line(ctx, sp_str_lit("│  "), sp_zero_s(sp_prompt_style_t));
     sp_prompt_render_line(ctx, sp_str_lit("+ "), green);
-    sp_prompt_line(ctx, files[it]);
+    sp_prompt_line(ctx, files.items[it]);
   }
 }
 
@@ -58,7 +58,7 @@ static spn_err_t run_prompt(sp_mem_t mem, spn_cli_init_t* command, sp_str_t dir,
     name = response;
   }
 
-  sp_da(sp_str_t) files = sp_zero;
+  spn_str_arr_t files = sp_zero;
   err = spn_op_scaffold(host.ctx, (spn_scaffold_request_t) {
     .dir = dir,
     .name = name,
@@ -85,15 +85,15 @@ cleanup:
 }
 
 static spn_err_t run_unattended(sp_mem_t mem, spn_cli_init_t* command, sp_str_t dir, sp_str_t name) {
-  sp_da(sp_str_t) files = sp_zero;
+  spn_str_arr_t files = sp_zero;
   spn_try(spn_op_scaffold(host.ctx, (spn_scaffold_request_t) {
     .dir = dir,
     .name = name,
     .bare = command->bare,
   }, mem, &files));
 
-  sp_da_for(files, it) {
-    spn_print("- {}", sp_fmt_str(files[it]));
+  sp_for(it, files.count) {
+    spn_print("- {}", sp_fmt_str(files.items[it]));
   }
   spn_print("");
   spn_print("To build your program:\n\n  spn build {}", sp_fmt_str(name));

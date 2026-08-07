@@ -21,13 +21,11 @@ sp_cli_result_t spn_cli_run(sp_cli_t* cli) {
     return spn_cli_error(cli, "script target {.yellow} is not defined", sp_fmt_str(cmd->entry));
   }
 
-  spn_target_names_t names = sp_da_new(host.mem, sp_str_t);
-  sp_da_push(names, cmd->entry);
   spn_session_config_t config = {
     .selection = {
       .script = {
         .kind = SPN_TARGET_RULE_NAMED,
-        .names = names,
+        .names = { .items = &cmd->entry, .count = 1 },
       },
     },
   };

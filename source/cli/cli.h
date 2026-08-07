@@ -5,6 +5,7 @@
 
 sp_cli_result_t spn_cli_error(sp_cli_t* cli, const c8* fmt, ...);
 sp_cli_result_t spn_cli_parse_profile(sp_cli_t* cli, spn_profile_override_t* profile);
+spn_str_arr_t spn_cli_rest_names(sp_cli_t* cli);
 sp_cli_result_t spn_cli_open(bool project_optional);
 sp_cli_result_t spn_cli_session(sp_cli_t* cli, spn_session_config_t config);
 
