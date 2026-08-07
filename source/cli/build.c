@@ -11,6 +11,11 @@ static void set_rule(spn_target_rule_t* rule, bool selected, spn_target_names_t 
 }
 
 sp_cli_result_t spn_cli_build(sp_cli_t* cli) {
+  sp_cli_result_t opened = spn_cli_open(false);
+  if (opened != SP_CLI_OK) {
+    return opened;
+  }
+
   spn_cli_build_t* cmd = &args.build;
 
   spn_session_config_t config = { .force = cmd->force };

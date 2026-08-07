@@ -1,6 +1,11 @@
 #include "cli/cli.h"
 
 sp_cli_result_t spn_cli_add(sp_cli_t* cli) {
+  sp_cli_result_t opened = spn_cli_open(false);
+  if (opened != SP_CLI_OK) {
+    return opened;
+  }
+
   spn_cli_add_t* cmd = &args.add;
   if (cmd->test && cmd->build) {
     return spn_cli_error(cli, "pass at most one of {.cyan} and {.cyan}", sp_fmt_cstr("--test"), sp_fmt_cstr("--build"));

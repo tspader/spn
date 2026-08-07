@@ -124,14 +124,6 @@ static sp_app_result_t on_init(sp_app_t* sp) {
   app.initted = true;
   sp_os_register_signal_handler(SP_OS_SIGNAL_INTERRUPT, on_signal, SP_NULLPTR);
 
-  if (spn_ctx_open(host.ctx, (spn_open_request_t) {
-    .dir = args.project_dir,
-    .index_refresh_seconds = args.refresh,
-  })) {
-    return SP_APP_ERR;
-  }
-  spn_tui_flush(&tui);
-
   sp_thread_init(&app.thread.handle, on_thread, SP_NULLPTR);
 
   return SP_APP_CONTINUE;

@@ -3,6 +3,11 @@
 #include "tui/tui.h"
 
 sp_cli_result_t spn_cli_run(sp_cli_t* cli) {
+  sp_cli_result_t opened = spn_cli_open(false);
+  if (opened != SP_CLI_OK) {
+    return opened;
+  }
+
   spn_cli_run_t* cmd = &args.run;
 
   spn_target_kind_t kind = sp_zero;
@@ -10,10 +15,6 @@ sp_cli_result_t spn_cli_run(sp_cli_t* cli) {
 
   if (!script && sp_str_equal(sp_fs_get_ext(cmd->entry), sp_str_lit("c"))) {
     return spn_cli_error(cli, "{.yellow} cannot run native sources; build scripts are wasm", sp_fmt_str(cmd->entry));
-  }
-
-  if (!spn_ctx_has_project(host.ctx)) {
-    return spn_cli_error(cli, "no manifest found in {.cyan}", sp_fmt_str(spn_ctx_project_dir(host.ctx)));
   }
 
   if (!script) {
