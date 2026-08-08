@@ -13,6 +13,8 @@
 #include "session/types.h"
 #include "toolchain/types.h"
 
+typedef struct spn_op_t spn_op_t;
+
 struct spn_ctx_t {
   spn_project_t* project;
   spn_session_t* session;
@@ -35,6 +37,19 @@ struct spn_ctx_t {
     spn_git_cache_t git;
     spn_toolchain_store_t toolchains;
   } caches;
+
+  struct {
+    sp_thread_t thread;
+    sp_mutex_t mutex;
+    struct {
+      sp_cv_t submitted;
+      sp_cv_t completed;
+    } signal;
+    sp_da(spn_op_t*) queue;
+    u32 next;
+    bool started;
+    bool shutdown;
+  } ops;
 };
 
 extern spn_ctx_t spn;

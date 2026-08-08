@@ -51,7 +51,6 @@ static u64 current_thread_id() {
 spn_event_buffer_t* spn_event_buffer_new(sp_mem_t mem) {
   spn_event_buffer_t* events = sp_alloc_type(mem, spn_event_buffer_t);
   sp_rb_init(mem, events->buffer);
-  sp_mutex_init(&events->mutex, SP_MUTEX_PLAIN);
   return events;
 }
 

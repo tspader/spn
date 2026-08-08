@@ -46,11 +46,6 @@ static struct {
   const c8** args;
   bool initted;
   sp_cli_t cli;
-  struct {
-    sp_thread_t handle;
-    sp_atomic_s32_t done;
-    sp_cli_result_t status;
-  } thread;
 } app;
 
 static void on_signal(sp_os_signal_t signal, void* userdata) {
@@ -70,12 +65,6 @@ static void print_error(sp_cli_err_t err) {
   sp_fmt_io(&tui.logger.err.base, "{.red}: ", sp_fmt_cstr("error"));
   sp_cli_err_print(&tui.logger.err.base, err);
   sp_fmt_io(&tui.logger.err.base, "\n");
-}
-
-static s32 on_thread(void* userdata) {
-  app.thread.status = sp_cli_dispatch(&app.cli);
-  sp_atomic_s32_store(&app.thread.done, 1, SP_ATOMIC_SEQ_CST);
-  return 0;
 }
 
 static sp_app_result_t on_init(sp_app_t* sp) {
@@ -102,10 +91,6 @@ static sp_app_result_t on_init(sp_app_t* sp) {
     }
   }
 
-  if (args.ci) {
-    sp->fps = 100000;
-  }
-
   spn_verbosity_t verbosity = SPN_VERBOSITY_NORMAL;
   if (args.quiet) {
     verbosity = SPN_VERBOSITY_QUIET;
@@ -124,27 +109,16 @@ static sp_app_result_t on_init(sp_app_t* sp) {
   app.initted = true;
   sp_os_register_signal_handler(SP_OS_SIGNAL_INTERRUPT, on_signal, SP_NULLPTR);
 
-  sp_thread_init(&app.thread.handle, on_thread, SP_NULLPTR);
-
-  return SP_APP_CONTINUE;
-}
-
-static sp_app_result_t on_poll(sp_app_t* sp) {
-  spn_tui_poll(&tui);
   return SP_APP_CONTINUE;
 }
 
 static sp_app_result_t on_update(sp_app_t* sp) {
-  if (!sp_atomic_s32_load(&app.thread.done, SP_ATOMIC_SEQ_CST)) {
-    return SP_APP_CONTINUE;
-  }
+  sp_cli_result_t status = sp_cli_dispatch(&app.cli);
 
-  sp_thread_join(&app.thread.handle);
-
-  spn_prompt_stop(&tui, app.thread.status != SP_CLI_ERR);
+  spn_prompt_stop(&tui, status != SP_CLI_ERR);
   spn_tui_flush(&tui);
 
-  switch (app.thread.status) {
+  switch (status) {
     case SP_CLI_HELP: {
       sp_cli_write_help(&tui.logger.out.base, &app.cli);
       return SP_APP_QUIT;
@@ -182,7 +156,6 @@ sp_app_config_t spn_main(s32 num_args, const c8** args) {
 
   return (sp_app_config_t) {
     .on_init = on_init,
-    .on_poll = on_poll,
     .on_update = on_update,
     .on_deinit = on_deinit,
     .fps = 144,

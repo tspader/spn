@@ -58,9 +58,7 @@ typedef struct {
   } prompt;
 
   struct {
-    sp_atomic_s32_t requested;
     bool granted;
-    sp_semaphore_t ready;
   } handoff;
 } spn_tui_t;
 

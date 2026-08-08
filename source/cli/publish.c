@@ -15,7 +15,7 @@ static spn_publish_request_t publish_request() {
 
 static sp_cli_result_t publish_dry() {
   spn_op_t* op = spn_publish(host.ctx, publish_request());
-  if (spn_op_wait(op)) {
+  if (spn_cli_wait(op)) {
     spn_op_free(op);
     return SP_CLI_ERR;
   }

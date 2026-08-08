@@ -108,9 +108,6 @@ void spn_thread_pool_init(spn_thread_pool_t* pool, sp_mem_t mem, spn_thread_pool
   };
 
   sp_mem_t a = sp_mem_arena_as_allocator(pool->arena);
-  sp_mutex_init(&pool->mutex, SP_MUTEX_PLAIN);
-  sp_cv_init(&pool->signal.submitted);
-  sp_cv_init(&pool->signal.completed);
   sp_da_init(a, pool->queue);
   sp_da_init(a, pool->done);
   sp_da_init(a, pool->workers);

@@ -17,7 +17,6 @@ void spn_git_cache_init(spn_git_cache_t* cache, sp_mem_t mem, sp_intern_t* inter
 
   sp_str_ht_init(mem, cache->db.entries);
   sp_str_om_init(cache->checkouts.entries);
-  sp_mutex_init(&cache->mutex, SP_MUTEX_PLAIN);
 
   sp_fs_create_dir(cache->db.dir);
   sp_fs_create_dir(cache->checkouts.dir);
@@ -33,7 +32,6 @@ static spn_git_db_t* spn_git_cache_db_entry(spn_git_cache_t* cache, sp_str_t url
     db = sp_alloc_type(cache->mem, spn_git_db_t);
     db->url = url;
     db->path = sp_fs_join_path(cache->mem, cache->db.dir, key);
-    sp_mutex_init(&db->mutex, SP_MUTEX_PLAIN);
     sp_str_ht_insert(cache->db.entries, key, db);
   }
 
@@ -229,7 +227,6 @@ spn_err_t spn_git_cache_ensure_checkout(spn_git_cache_t* cache, spn_git_checkout
     entry = sp_alloc_type(cache->mem, spn_git_checkout_t);
     entry->id = id;
     entry->path = sp_fs_join_path(cache->mem, cache->checkouts.dir, owned);
-    sp_mutex_init(&entry->mutex, SP_MUTEX_PLAIN);
     sp_str_om_insert(cache->checkouts.entries, owned, entry);
   }
 
