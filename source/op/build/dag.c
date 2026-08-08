@@ -605,7 +605,7 @@ static spn_err_t dag_add_user_nodes(spn_dag_build_t* b, spn_pkg_unit_t* unit, sp
       spn_dag_action_add_input(g, action, spn_dag_add_file(g, node->inputs[jt]));
     }
     sp_da_for(node->deps, jt) {
-      spn_user_node_t* dep = spn_find_user_node(node->deps[jt]);
+      spn_user_node_t* dep = spn_node_deref(node->deps[jt]);
       sp_da_for(dep->outputs, ot) {
         spn_dag_action_add_input(g, action, spn_dag_add_file(g, dep->outputs[ot]));
       }

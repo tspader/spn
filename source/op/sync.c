@@ -405,7 +405,7 @@ static spn_err_t check_unused_patches(spn_session_t* session) {
   return err;
 }
 
-spn_err_union_t spn_op_sync(spn_session_t* session, bool* reresolve) {
+spn_err_union_t spn_stage_sync(spn_session_t* session, bool* reresolve) {
   sp_da(pkg_job_t*) packages = sp_da_new(session->mem, pkg_job_t*);
   sp_da(toolchain_job_t*) toolchains = sp_da_new(session->mem, toolchain_job_t*);
 

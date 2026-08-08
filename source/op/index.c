@@ -13,6 +13,8 @@
 #include "event/event.h"
 #include "external/wasm/wasm.h"
 #include "index/index.h"
+#include "op/op.h"
+#include "op/stage.h"
 #include "thread_pool/thread_pool.h"
 
 typedef struct {
@@ -30,7 +32,7 @@ static void sync_index_node(void* data) {
   job->err = spn_index_sync(job->index, job->force);
 }
 
-static spn_err_union_t sync_indexes(spn_ctx_t* ctx, spn_sync_request_t request) {
+spn_err_union_t spn_stage_sync_indexes(spn_ctx_t* ctx, spn_sync_request_t request) {
   if (!sp_str_empty(request.only) && !spn_find_index(ctx, request.only)) {
     return (spn_err_union_t) {
       .kind = SPN_ERR_INDEX_UNKNOWN,
@@ -109,6 +111,16 @@ static spn_err_union_t sync_indexes(spn_ctx_t* ctx, spn_sync_request_t request) 
   return spn_result(SPN_OK);
 }
 
-spn_err_t spn_op_sync_indexes(spn_ctx_t* ctx, spn_sync_request_t request) {
-  return spn_err_emit(ctx, sync_indexes(ctx, request));
+spn_err_t spn_op_sync_indexes(spn_op_t* op) {
+  return spn_err_emit(op->ctx, spn_stage_sync_indexes(op->ctx, op->request.indexes));
+}
+
+spn_op_t* spn_sync_indexes(spn_ctx_t* ctx, spn_sync_request_t request) {
+  spn_op_t* op = spn_op_new(ctx, SP_NULLPTR, SPN_OP_SYNC_INDEXES);
+  op->request.indexes = (spn_sync_request_t) {
+    .force = request.force,
+    .only = sp_str_copy(ctx->heap, request.only),
+  };
+  spn_op_submit(op);
+  return op;
 }

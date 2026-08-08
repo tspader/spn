@@ -477,6 +477,12 @@ sp_cli_result_t spn_cli_session(sp_cli_t* cli, spn_session_config_t config) {
   return spn_ctx_open_session(host.ctx, &config, &host.session) ? SP_CLI_ERR : SP_CLI_OK;
 }
 
+sp_cli_result_t spn_cli_op(spn_op_t* op) {
+  spn_err_t err = spn_op_wait(op);
+  spn_op_free(op);
+  return err ? SP_CLI_ERR : SP_CLI_OK;
+}
+
 sp_cli_result_t spn_cli_error(sp_cli_t* cli, const c8* fmt, ...) {
   va_list args;
   va_start(args, fmt);

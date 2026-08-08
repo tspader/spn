@@ -33,7 +33,7 @@ sp_cli_result_t spn_cli_run(sp_cli_t* cli) {
   if (session != SP_CLI_OK) {
     return session;
   }
-  if (spn_op_build(host.session)) {
+  if (spn_cli_op(spn_build(host.session)) != SP_CLI_OK) {
     return SP_CLI_ERR;
   }
 
@@ -42,5 +42,5 @@ sp_cli_result_t spn_cli_run(sp_cli_t* cli) {
 
   spn_tui_handoff(&tui);
   spn_tui_run_banner(&tui, spn_target_name(target), spn_target_path(host.mem, target));
-  return spn_op_run_target(host.session, target) ? SP_CLI_ERR : SP_CLI_OK;
+  return spn_cli_op(spn_run_target(host.session, target));
 }

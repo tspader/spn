@@ -1,11 +1,10 @@
 #ifndef SPN_PROFILE_PROFILE_H
 #define SPN_PROFILE_PROFILE_H
 
-#include "spn/session.h"
-
-#include "error/types.h"
 #include "core/types.h"
+#include "error/types.h"
 #include "profile/types.h"
+#include "spn/types.h"
 
 void            spn_profile_populate(spn_profile_table_t* profiles, spn_pkg_info_t* pkg);
 spn_err_union_t spn_profile_resolve(spn_profile_table_t profiles, const spn_profile_override_t* override, spn_triple_t host, bool shared_demand, spn_profile_info_t* result);

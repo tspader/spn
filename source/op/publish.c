@@ -9,6 +9,7 @@
 #include "index/index.h"
 #include "index/json.h"
 #include "index/publish.h"
+#include "op/op.h"
 #include "spn/host.h"
 #include "pkg/id.h"
 #include "project/types.h"
@@ -57,15 +58,25 @@ static spn_err_union_t publish(spn_ctx_t* ctx, spn_publish_request_t request, sp
   return spn_result(SPN_OK);
 }
 
-spn_err_t spn_op_publish_dry(spn_ctx_t* ctx, spn_publish_request_t request, sp_mem_t mem, sp_str_t* json) {
+spn_err_t spn_op_publish(spn_op_t* op) {
   spn_index_release_t release = sp_zero;
-  spn_try(spn_err_emit(ctx, publish_build(ctx, request, &release)));
-  *json = spn_index_release_to_json(mem, &release);
-  return SPN_OK;
+  spn_try(spn_err_emit(op->ctx, publish_build(op->ctx, op->request.publish, &release)));
+  if (op->request.publish.dry) {
+    op->result.publish.json = spn_index_release_to_json(op->mem, &release);
+    return SPN_OK;
+  }
+  return spn_err_emit(op->ctx, publish(op->ctx, op->request.publish, &release));
 }
 
-spn_err_t spn_op_publish(spn_ctx_t* ctx, spn_publish_request_t request) {
-  spn_index_release_t release = sp_zero;
-  spn_try(spn_err_emit(ctx, publish_build(ctx, request, &release)));
-  return spn_err_emit(ctx, publish(ctx, request, &release));
+spn_op_t* spn_publish(spn_ctx_t* ctx, spn_publish_request_t request) {
+  spn_op_t* op = spn_op_new(ctx, SP_NULLPTR, SPN_OP_PUBLISH);
+  op->request.publish = (spn_publish_request_t) {
+    .index = sp_str_copy(ctx->heap, request.index),
+    .url = sp_str_copy(ctx->heap, request.url),
+    .revision = sp_str_copy(ctx->heap, request.revision),
+    .allow_dirty = request.allow_dirty,
+    .dry = request.dry,
+  };
+  spn_op_submit(op);
+  return op;
 }

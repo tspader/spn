@@ -20,8 +20,8 @@ sp_cli_result_t spn_cli_test(sp_cli_t* cli) {
   if (session != SP_CLI_OK) {
     return session;
   }
-  if (spn_op_build(host.session)) {
+  if (spn_cli_op(spn_build(host.session)) != SP_CLI_OK) {
     return SP_CLI_ERR;
   }
-  return spn_op_test(host.session) ? SP_CLI_ERR : SP_CLI_OK;
+  return spn_cli_op(spn_run_tests(host.session));
 }

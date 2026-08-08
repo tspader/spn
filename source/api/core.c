@@ -1,11 +1,10 @@
-#include "core/types.h"
-#include "sp/macro.h"
 #include "sp.h"
-#include "spn.h"
+#include "sp/macro.h"
 #include "sp/sp_glob.h"
+#include "spn.h"
 
 #include "api/api.h"
-#include "api/types.h"
+#include "core/types.h"
 #include "ctx/types.h"
 #include "event/types.h"
 #include "pkg/types.h"
@@ -44,33 +43,30 @@ sp_str_t spn_api_dir(spn_pkg_unit_t* unit, spn_dir_t dir) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
-static spn_target_t* wrap_target(const void* opaque, spn_target_info_t* info) {
-  if (!info) return SP_NULLPTR;
+static spn_target_info_t* unwrap(spn_target_t* target) {
+  return sp_ptr_cast(spn_target_info_t*, target);
+}
 
-  spn_target_t* target = sp_alloc_type(spn.mem, spn_target_t);
-  *target = (spn_target_t) {
-    .spn = (spn_t*)opaque,
-    .info = info,
-  };
-  return target;
+static spn_target_t* wrap(spn_target_info_t* info) {
+  return sp_ptr_cast(spn_target_t*, info);
 }
 
 spn_target_t* spn_get_target(spn_t* spn, const c8* name) {
-  return wrap_target(spn, spn_pkg_get_target(spn_api_unit(spn)->info, name));
+  return wrap(spn_pkg_get_target(spn_api_unit(spn)->info, name));
 }
 
 spn_target_t* spn_add_exe(spn_config_t* config, const c8* name) {
-  return wrap_target(config, spn_pkg_add_exe(spn_api_unit(config)->info, name));
+  return wrap(spn_pkg_add_exe(spn_api_unit(config)->info, name));
 }
 
 spn_target_t* spn_add_lib(spn_config_t* config, const c8* name, spn_linkage_t kind) {
   spn_linkage_set_t linkages = sp_zero;
   spn_linkage_set_add(&linkages, kind);
-  return wrap_target(config, spn_pkg_add_lib_ex(spn_api_unit(config)->info, spn_intern_cstr(name), linkages));
+  return wrap(spn_pkg_add_lib_ex(spn_api_unit(config)->info, spn_intern_cstr(name), linkages));
 }
 
 spn_target_t* spn_add_test(spn_config_t* config, const c8* name) {
-  return wrap_target(config, spn_pkg_add_test(spn_api_unit(config)->info, name));
+  return wrap(spn_pkg_add_test(spn_api_unit(config)->info, name));
 }
 
 void spn_add_include(spn_config_t* config, const c8* path) {
@@ -234,19 +230,19 @@ spn_sanitizer_set_t spn_profile_get_sanitizers(spn_profile_t* profile) {
 }
 
 void spn_target_add_source(spn_target_t* target, const c8* source) {
-  sp_da_push(target->info->source, spn_intern_cstr(source));
+  sp_da_push(unwrap(target)->source, spn_intern_cstr(source));
 }
 
 void spn_target_add_include(spn_target_t* target, const c8* include) {
-  sp_da_push(target->info->include, spn_intern_cstr(include));
+  sp_da_push(unwrap(target)->include, spn_intern_cstr(include));
 }
 
 void spn_target_add_define(spn_target_t* target, const c8* define) {
-  sp_da_push(target->info->define, spn_intern_cstr(define));
+  sp_da_push(unwrap(target)->define, spn_intern_cstr(define));
 }
 
 void spn_target_add_flag(spn_target_t* target, const c8* flag) {
-  sp_da_push(target->info->flags, spn_intern_cstr(flag));
+  sp_da_push(unwrap(target)->flags, spn_intern_cstr(flag));
 }
 
 // Channel a little bit of Arthur himself to get these wrappers to fit on one line on my editor
@@ -254,13 +250,13 @@ void spn_target_add_flag(spn_target_t* target, const c8* flag) {
 #define DATA_T SP_EMBED_DEFAULT_DATA_T_S
 #define SIZE_T SP_EMBED_DEFAULT_SIZE_T_S
 void spn_target_embed_file(spn_target_t* t, const c8* file) {
-  spn_target_embed_file_ex_s(t->info, view(file), SP_EMBED_DEFAULT_SYMBOL_S, DATA_T, SIZE_T);
+  spn_target_embed_file_ex_s(unwrap(t), view(file), SP_EMBED_DEFAULT_SYMBOL_S, DATA_T, SIZE_T);
 }
 
 void spn_target_embed_file_ex(spn_target_t* t, const c8* f, const c8* s, const c8* d_t, const c8* s_t) {
-  spn_target_embed_file_ex_s(t->info, view(f), view(s), view(d_t), view(s_t));
+  spn_target_embed_file_ex_s(unwrap(t), view(f), view(s), view(d_t), view(s_t));
 }
 
 void spn_target_embed_dir_ex(spn_target_t* t, const c8* d, const c8* dest, const c8* d_t, const c8* s_t) {
-  spn_target_embed_dir_ex_s(t->info, view(d), view(dest), view(d_t), view(s_t));
+  spn_target_embed_dir_ex_s(unwrap(t), view(d), view(dest), view(d_t), view(s_t));
 }

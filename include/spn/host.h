@@ -7,63 +7,14 @@
 
 #include "sp.h"
 #include "core.h"
-#include "session.h"
+#include "types.h"
 
 SP_BEGIN_EXTERN_C()
 
 typedef struct spn_ctx_t spn_ctx_t;
 typedef struct spn_session_t spn_session_t;
-typedef struct spn_target spn_target_t;
-
-typedef struct {
-  u32 total;
-  u32 completed;
-  u32 hits;
-  u32 misses;
-} spn_progress_t;
-
-typedef struct {
-  sp_str_t name;
-  sp_str_t version;
-  spn_dep_kind_t kind;
-} spn_add_request_t;
-
-typedef struct {
-  bool force;
-  sp_str_t only;
-} spn_sync_request_t;
-
-typedef struct {
-  sp_str_t index;
-  sp_str_t url;
-  sp_str_t revision;
-  bool allow_dirty;
-} spn_publish_request_t;
-
-typedef struct {
-  sp_str_t dir;
-  sp_str_t name;
-  bool bare;
-} spn_scaffold_request_t;
-
-typedef struct {
-  sp_str_t dir;
-  u32 index_refresh_seconds;
-  bool project_optional;
-} spn_open_request_t;
-
-typedef struct {
-  sp_str_t name;
-  spn_index_kind_t kind;
-  spn_index_protocol_t protocol;
-  sp_str_t source;
-  sp_str_t location;
-} spn_index_desc_t;
-
-typedef struct {
-  spn_index_desc_t* items;
-  u32 count;
-} spn_index_arr_t;
+typedef struct spn_target_unit spn_target_t;
+typedef struct spn_op_t spn_op_t;
 
 spn_ctx_t* spn_ctx_new();
 spn_err_t spn_ctx_open(spn_ctx_t* ctx, spn_open_request_t request);
@@ -75,19 +26,23 @@ bool spn_ctx_progress(spn_ctx_t* ctx, spn_progress_t* progress);
 bool spn_ctx_find_target(spn_ctx_t* ctx, sp_str_t name, spn_target_kind_t* kind);
 sp_str_t spn_ctx_project_dir(spn_ctx_t* ctx);
 sp_str_t spn_ctx_cache_dir(spn_ctx_t* ctx);
-bool spn_ctx_find_index(spn_ctx_t* ctx, sp_str_t name, spn_index_desc_t* index);
-spn_index_arr_t spn_ctx_indexes(sp_mem_t mem, spn_ctx_t* ctx);
-spn_err_t spn_op_add(spn_ctx_t* ctx, spn_add_request_t request);
-spn_err_t spn_op_publish(spn_ctx_t* ctx, spn_publish_request_t request);
-spn_err_t spn_op_publish_dry(spn_ctx_t* ctx, spn_publish_request_t request, sp_mem_t mem, sp_str_t* json);
-spn_err_t spn_op_sync_indexes(spn_ctx_t* ctx, spn_sync_request_t request);
-spn_err_t spn_op_scaffold(spn_ctx_t* ctx, spn_scaffold_request_t request, sp_mem_t mem, spn_str_arr_t* files);
-spn_err_t spn_op_scaffold_check(spn_ctx_t* ctx, spn_scaffold_request_t request);
-spn_err_t spn_op_build(spn_session_t* session);
-spn_err_t spn_op_test(spn_session_t* session);
-spn_err_t spn_op_run_target(spn_session_t* session, spn_target_t* target);
-spn_err_t spn_op_clean(spn_ctx_t* ctx);
-spn_err_t spn_op_clean_profile(spn_session_t* session);
+bool spn_get_index(spn_ctx_t* ctx, sp_str_t name, spn_index_desc_t* index);
+spn_index_arr_t spn_get_indexes(sp_mem_t mem, spn_ctx_t* ctx);
+spn_op_t* spn_add_dependency(spn_ctx_t* ctx, spn_add_request_t request);
+spn_op_t* spn_publish(spn_ctx_t* ctx, spn_publish_request_t request);
+spn_op_t* spn_sync_indexes(spn_ctx_t* ctx, spn_sync_request_t request);
+spn_op_t* spn_scaffold_project(spn_ctx_t* ctx, spn_scaffold_request_t request);
+spn_op_t* spn_build(spn_session_t* session);
+spn_op_t* spn_run_tests(spn_session_t* session);
+spn_op_t* spn_run_target(spn_session_t* session, spn_target_t* target);
+spn_op_t* spn_clean(spn_ctx_t* ctx);
+spn_op_t* spn_clean_profile(spn_session_t* session);
+spn_op_t* spn_op_new(spn_ctx_t* ctx, spn_session_t* session, spn_op_kind_t kind);
+void spn_op_submit(spn_op_t* op);
+spn_err_t spn_op_wait(spn_op_t* op);
+spn_op_result_t spn_op_result(spn_op_t* op);
+void spn_op_free(spn_op_t* op);
+spn_err_t spn_scaffold_check(spn_ctx_t* ctx, spn_scaffold_request_t request);
 spn_target_t* spn_session_find_target(spn_session_t* session, sp_str_t name);
 sp_str_t spn_target_name(spn_target_t* target);
 sp_str_t spn_target_path(sp_mem_t mem, spn_target_t* target);

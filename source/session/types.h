@@ -3,7 +3,8 @@
 
 #include "sp.h"
 
-#include "spn/session.h"
+#include "spn/core.h"
+#include "spn/types.h"
 
 #include "compiler/types.h"
 #include "core/types.h"

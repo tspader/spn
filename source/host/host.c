@@ -13,14 +13,6 @@
 #include "target/types.h"
 #include "unit/types.h"
 
-static spn_target_unit_t* unwrap(spn_target_t* target) {
-  return sp_ptr_cast(spn_target_unit_t*, target);
-}
-
-static spn_target_t* wrap(spn_target_unit_t* unit) {
-  return sp_ptr_cast(spn_target_t*, unit);
-}
-
 static spn_index_desc_t describe_index(spn_index_info_t* index) {
   return (spn_index_desc_t) {
     .name = index->name,
@@ -51,7 +43,7 @@ sp_str_t spn_ctx_cache_dir(spn_ctx_t* ctx) {
   return ctx->paths.caches.dir;
 }
 
-spn_index_arr_t spn_ctx_indexes(sp_mem_t mem, spn_ctx_t* ctx) {
+spn_index_arr_t spn_get_indexes(sp_mem_t mem, spn_ctx_t* ctx) {
   spn_index_arr_t indexes = {
     .items = sp_alloc_n(mem, spn_index_desc_t, sp_da_size(ctx->indexes)),
     .count = (u32)sp_da_size(ctx->indexes),
@@ -66,7 +58,7 @@ spn_index_arr_t spn_ctx_indexes(sp_mem_t mem, spn_ctx_t* ctx) {
   return indexes;
 }
 
-bool spn_ctx_find_index(spn_ctx_t* ctx, sp_str_t name, spn_index_desc_t* index) {
+bool spn_get_index(spn_ctx_t* ctx, sp_str_t name, spn_index_desc_t* index) {
   spn_index_info_t* info = spn_find_index(ctx, name);
   if (!info) {
     return false;
@@ -78,14 +70,13 @@ bool spn_ctx_find_index(spn_ctx_t* ctx, sp_str_t name, spn_index_desc_t* index) 
 spn_target_t* spn_session_find_target(spn_session_t* session, sp_str_t name) {
   spn_pkg_unit_t* root = spn_session_find_pkg_unit(session, session->units.target, spn_session_root_pkg(session));
   sp_assert(root);
-  spn_target_unit_t* unit = spn_session_find_target_in_pkg(session, root, name);
-  return unit ? wrap(unit) : SP_NULLPTR;
+  return spn_session_find_target_in_pkg(session, root, name);
 }
 
 sp_str_t spn_target_name(spn_target_t* target) {
-  return unwrap(target)->info->name;
+  return target->info->name;
 }
 
 sp_str_t spn_target_path(sp_mem_t mem, spn_target_t* target) {
-  return spn_target_unit_staged_path(mem, unwrap(target));
+  return spn_target_unit_staged_path(mem, target);
 }

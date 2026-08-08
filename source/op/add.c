@@ -5,6 +5,8 @@
 #include "event/event.h"
 #include "index/cache.h"
 #include "index/types.h"
+#include "op/op.h"
+#include "op/stage.h"
 #include "spn/host.h"
 #include "pkg/id.h"
 #include "pkg/types.h"
@@ -138,15 +140,29 @@ cleanup:
   return result;
 }
 
-spn_err_t spn_op_add(spn_ctx_t* ctx, spn_add_request_t request) {
+spn_err_t spn_op_add(spn_op_t* op) {
+  spn_ctx_t* ctx = op->ctx;
+  spn_add_request_t request = op->request.add;
+
   spn_semver_range_t range = spn_semver_any();
   if (!sp_str_empty(request.version) && spn_semver_parse_range(request.version, &range)) {
     return spn_err_emit(ctx, (spn_err_union_t) {
       .kind = SPN_ERR_VERSION_INVALID,
-      .version_invalid = { .requested = sp_str_copy(ctx->heap, request.version) },
+      .version_invalid = { .requested = request.version },
     });
   }
 
-  spn_try(spn_op_sync_indexes(ctx, (spn_sync_request_t) sp_zero));
+  spn_try(spn_err_emit(ctx, spn_stage_sync_indexes(ctx, (spn_sync_request_t) sp_zero)));
   return spn_err_emit(ctx, add(ctx, request, range));
+}
+
+spn_op_t* spn_add_dependency(spn_ctx_t* ctx, spn_add_request_t request) {
+  spn_op_t* op = spn_op_new(ctx, SP_NULLPTR, SPN_OP_ADD);
+  op->request.add = (spn_add_request_t) {
+    .name = sp_str_copy(ctx->heap, request.name),
+    .version = sp_str_copy(ctx->heap, request.version),
+    .kind = request.kind,
+  };
+  spn_op_submit(op);
+  return op;
 }
