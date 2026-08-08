@@ -83,7 +83,6 @@ void sp_intern_init_ex(sp_intern_t* intern, sp_mem_t mem, sp_intern_hash_fn_t ha
   intern->hash = hash;
   intern->next_id = SP_INTERN_INVALID_ID + 1;
   intern->data = sp_mem_arena_new_ex(mem, 4096, 1);
-  sp_mutex_init(&intern->mutex, SP_MUTEX_PLAIN);
 
   intern->index = (sp_intern_index_t) {
     .mem = mem,

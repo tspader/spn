@@ -57,7 +57,6 @@ void spn_wasm_script_init(spn_wasm_script_t* script, sp_str_t module) {
     .state = SPN_WASM_SCRIPT_CLOSED,
     .path = module,
   };
-  sp_mutex_init(&script->mutex, SP_MUTEX_PLAIN);
 }
 
 static spn_err_t script_fail(spn_pkg_unit_t* unit, spn_err_t err, spn_err_wasm_t wasm) {

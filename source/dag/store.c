@@ -516,7 +516,6 @@ void spn_dag_store_init(spn_dag_store_t* store, spn_dag_store_config_t config) {
   store->kind = config.kind;
   store->arena = sp_mem_arena_new(config.mem);
   store->mem = sp_mem_arena_as_allocator(store->arena);
-  sp_mutex_init(&store->mutex, SP_MUTEX_PLAIN);
 
   switch (store->kind) {
     case SPN_DAG_STORE_MEM: {
