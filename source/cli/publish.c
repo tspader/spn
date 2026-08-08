@@ -9,20 +9,20 @@ static spn_publish_request_t publish_request() {
     .url = cmd->source_url,
     .revision = cmd->source_rev,
     .allow_dirty = cmd->allow_dirty,
+    .dry = cmd->dry,
   };
 }
 
 static sp_cli_result_t publish_dry() {
-  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  sp_str_t json = sp_zero;
-  if (spn_op_publish_dry(host.ctx, publish_request(), scratch.mem, &json)) {
-    sp_mem_end_scratch(scratch);
+  spn_op_t* op = spn_publish(host.ctx, publish_request());
+  if (spn_op_wait(op)) {
+    spn_op_free(op);
     return SP_CLI_ERR;
   }
 
   spn_tui_handoff(&tui);
-  spn_print("{}", sp_fmt_str(json));
-  sp_mem_end_scratch(scratch);
+  spn_print("{}", sp_fmt_str(spn_op_result(op).publish.json));
+  spn_op_free(op);
   spn_print_err("{.cyan}: dry run, nothing published", sp_fmt_cstr("note"));
   return SP_CLI_OK;
 }
@@ -37,5 +37,5 @@ sp_cli_result_t spn_cli_publish(sp_cli_t* cli) {
     return publish_dry();
   }
 
-  return spn_op_publish(host.ctx, publish_request()) ? SP_CLI_ERR : SP_CLI_OK;
+  return spn_cli_op(spn_publish(host.ctx, publish_request()));
 }

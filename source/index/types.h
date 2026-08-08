@@ -1,9 +1,8 @@
 #ifndef SPN_INDEX_TYPES_H
 #define SPN_INDEX_TYPES_H
 
-#include "sp.h"
-#include "spn/session.h"
-
+#include "core/types.h"
+#include "spn/types.h"
 #include "sp/sp_om.h"
 #include "pkg/types.h"
 #include "semver/types.h"

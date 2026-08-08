@@ -3,13 +3,10 @@
 
 #include "sp.h"
 #include "spn.h"
+#include "unit/types.h"
 
-#include "core/types.h"
-
-struct spn_target {
-  spn_t* spn;
-  spn_target_info_t* info;
+struct spn_node {
+  spn_node_ref_t ref;
 };
 
 #endif
-

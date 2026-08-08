@@ -4,6 +4,7 @@
 #include "codegen/codegen.h"
 #include "error/types.h"
 #include "index/types.h"
+#include "spn/types.h"
 #include "manifest.gen.h"
 #include "pkg/types.h"
 

@@ -58,17 +58,18 @@ static spn_err_t run_prompt(sp_mem_t mem, spn_cli_init_t* command, sp_str_t dir,
     name = response;
   }
 
-  spn_str_arr_t files = sp_zero;
-  err = spn_op_scaffold(host.ctx, (spn_scaffold_request_t) {
+  spn_op_t* op = spn_scaffold_project(host.ctx, (spn_scaffold_request_t) {
     .dir = dir,
     .name = name,
     .bare = command->bare,
-  }, mem, &files);
+  });
+  err = spn_op_wait(op);
 
   if (err) {
     sp_prompt_cancel(prompt, "failed");
   }
   else {
+    spn_str_arr_t files = spn_op_result(op).scaffold.files;
     sp_prompt_run(prompt, (sp_prompt_widget_t) {
       .user_data = &files,
       .on_event = on_submit_prompt,
@@ -77,6 +78,7 @@ static spn_err_t run_prompt(sp_mem_t mem, spn_cli_init_t* command, sp_str_t dir,
     sp_str_t hint = sp_fmt(s.mem, "To build your program:\n\n  spn build {}", sp_fmt_str(name)).value;
     sp_prompt_note(prompt, sp_str_to_cstr(s.mem, hint), "Done");
   }
+  spn_op_free(op);
 
 cleanup:
   sp_prompt_end(prompt);
@@ -84,17 +86,24 @@ cleanup:
   return err;
 }
 
-static spn_err_t run_unattended(sp_mem_t mem, spn_cli_init_t* command, sp_str_t dir, sp_str_t name) {
-  spn_str_arr_t files = sp_zero;
-  spn_try(spn_op_scaffold(host.ctx, (spn_scaffold_request_t) {
+static spn_err_t run_unattended(spn_cli_init_t* command, sp_str_t dir, sp_str_t name) {
+  spn_op_t* op = spn_scaffold_project(host.ctx, (spn_scaffold_request_t) {
     .dir = dir,
     .name = name,
     .bare = command->bare,
-  }, mem, &files));
+  });
+  spn_err_t err = spn_op_wait(op);
+  if (err) {
+    spn_op_free(op);
+    return err;
+  }
 
+  spn_str_arr_t files = spn_op_result(op).scaffold.files;
   sp_for(it, files.count) {
     spn_print("- {}", sp_fmt_str(files.items[it]));
   }
+  spn_op_free(op);
+
   spn_print("");
   spn_print("To build your program:\n\n  spn build {}", sp_fmt_str(name));
 
@@ -103,7 +112,7 @@ static spn_err_t run_unattended(sp_mem_t mem, spn_cli_init_t* command, sp_str_t 
 
 static spn_err_t run(sp_mem_t mem, spn_cli_init_t* command, sp_str_t project) {
   sp_str_t dir = get_dir(mem, command, project);
-  spn_try(spn_op_scaffold_check(host.ctx, (spn_scaffold_request_t) {
+  spn_try(spn_scaffold_check(host.ctx, (spn_scaffold_request_t) {
     .dir = dir,
     .bare = command->bare,
   }));
@@ -113,7 +122,7 @@ static spn_err_t run(sp_mem_t mem, spn_cli_init_t* command, sp_str_t project) {
     return run_prompt(mem, command, dir, name);
   }
 
-  return run_unattended(mem, command, dir, name);
+  return run_unattended(command, dir, name);
 }
 
 sp_cli_result_t spn_cli_init(sp_cli_t* cli) {

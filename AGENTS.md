@@ -18,17 +18,25 @@ spn build
 ```
 
 # references
+- include/
+  - spn/host.h -> (host, public)
+  - spn/types.h -> (host, public), (host, private)
+  - spn/core.h - (host, public), (host, private), (guest)
+  - spn.h -> (guest)
+- source/
+  - cli/
 - `source/`
   - `cli/` and `tui/` are the CLI: a consumer of the spn library like any other. `cli/main.c` is the entry point. `cli/*.c` files only include `spn/host.h` for library functions; `tui/` additionally renders the internal event protocol, per the transitional exception below.
   - `op/` is the library operations: the build pipeline (resolve, sync, configure, build), plus action verbs (add, clean, publish, index sync, run)
     - `build/` is all the code that sets up and runs inside the build graph
 - `include/`
-  - `spn/core.h` is the shared vocabulary (enums, `spn_triple_t`, `spn_err_t`) included by everything: guest scripts, host consumers, and library internals. Internal code includes `spn/core.h`, never `spn.h`.
-  - `spn.h` is the guest API included by build scripts in downstream packages. Inside the library, only the guest ABI implementation (`source/api/`, `source/external/wasm/abi.h`, `wasm.c`, `codegen/gen/abi.gen.h`) may include it.
-  - `spn/host.h` is the single public header for host consumers embedding spn as a library. It is self-contained: it includes only `sp.h`, `spn/core.h`, and `spn/session.h`, never internal headers, and its signatures use only public types, opaque handles (`spn_ctx_t`, `spn_session_t`, `spn_target_t`), and request structs it defines itself. Handles are pure forward declarations; the library casts them to internal types at the boundary (`source/host/host.c`, the op verbs), the same way the guest ABI puns `spn_t` to `spn_pkg_unit_t`. If the CLI needs a library capability expressible in public types, that is an API gap to fix in `spn/host.h`, never a reason to widen its includes.
-  - `spn/session.h` is the public session vocabulary (`spn_session_config_t`, target selection, profile overrides). It needs `sp.h`, so it cannot live in `spn/core.h`; it is also the in-memory representation the library uses, so internal `types.h` headers include it directly. Host consumers get it through `spn/host.h`. It declares no opaque handles and carries no `#error` guard, so it is safe in guest-ABI TUs.
+  - `spn/core.h` is the sp-free shared vocabulary (enums, `spn_triple_t`, `spn_err_t`) included by everything: guest scripts, host consumers, and library internals. Internal code includes `spn/core.h`, never `spn.h`.
+  - `spn/types.h` is the sp-dependent shared vocabulary: the value types that describe work and results (`spn_session_config_t`, target selection, profile overrides, op requests and results, index descriptors). It declares no handles, no functions, and carries no `#error` guard, so it is safe in any TU; internal `types.h` headers include it directly, and `spn/host.h` re-exports it. If a type has identity (a handle) or behavior (a function), it is surface, not vocabulary, and does not belong here.
+  - `spn.h` is the guest API included by build scripts in downstream packages. Inside the library, only the guest boundary (`source/api/`, `source/external/wasm/abi.h`, `wasm.c`, `guest.c`, `codegen/gen/abi.gen.*`) may include it; those TUs also include internal headers, and `spn.h` gives the compiler the public prototypes to check the implementations against.
+  - `spn/host.h` is the host embedding API: opaque handles plus functions, nothing else. Every handle aliases the real internal tag (`spn_ctx_t`, `spn_session_t`, `spn_op_t`, and `spn_target_t` is `struct spn_target_unit`), so host-boundary TUs (`source/host/host.c`, the op verbs, `ctx/`, `triple/`, `enum/`, `error/str.c`) see the complete type and use handles with no casts, while embedders see pure forward declarations. If the CLI needs a library capability expressible in public types, that is an API gap to fix in `spn/host.h`, never a reason to widen its includes.
+  - Tag ownership: typedef names belong to a world -- guest `spn_target_t` and host `spn_target_t` are different types on purpose -- and a struct tag belongs to whoever defines it. Guest handle tags (`struct spn`, `struct spn_config`, `struct spn_target`, `struct spn_profile`) are defined nowhere; the guest boundary puns them to internal types (`spn_t` to `spn_pkg_unit_t`, `spn_target_t` to `spn_target_info_t`). `struct spn_node` is the one guest handle with its own state; `source/api/types.h` defines it. Internal headers never mention guest names.
   - One transitional exception is sanctioned until its publicization lands: the event/error protocol (`spn_build_event_t`, `spn_err_union_t`, their renderers) is not yet public, so `tui/` — the CLI's renderer of that protocol — includes internal library headers (`event/`, `ctx/`, `enum/`, `semver/`, `toml/`, `toolchain/`) and reaches the `spn` ctx global. This is a gap being closed by the event publicization work, not the pattern. The CLI command layer (`cli/*.c`) has no such exception: it consumes only `spn/host.h` plus its own `cli/` and `tui/` headers.
-  - `spn.h` and `spn/host.h` cannot be included in the same translation unit (both enforce this with `#error`): each declares its own opaque `spn_target_t`, so guest-side and host-side code must stay in separate TUs.
+  - `spn.h` and `spn/host.h` cannot share a translation unit (both enforce this with `#error`). Because every internal header is reachable from both boundaries, this mechanically forbids internal headers from including either surface header: leaking `spn/host.h` into an internal header breaks every guest-boundary TU, and leaking `spn.h` breaks every host-boundary TU.
 - `spn.toml` is the package for spn itself; it's example of how a real downstream project would use spn
 - `test/integration/fixtures/` contains small, hermetic spn projects used in integration tests.
   - `script/build_script` is an excellent example
@@ -70,7 +78,7 @@ Reporting is the event stream. `spn_err_emit(ctx, err)` is the single gate betwe
 
 The rules:
 - Library internals construct unions and propagate them unreported with `spn_try_union()`.
-- Ops (`spn_op_*`) and context lifecycle (`spn_ctx_*`) return `spn_err_t`. Every union crosses `spn_err_emit()` exactly once at that boundary, so a nonzero code in hand always means "already reported"; frontends only map it to an exit status.
+- Ops are data: `spn_op_*` verbs return an `spn_op_t*` handle, and `spn_op_wait()` returns the op's `spn_err_t`. An op's exec function is the boundary: every union crosses `spn_err_emit()` exactly once inside it, so the code `spn_op_wait()` hands back always means "already reported"; frontends only map it to an exit status. Context lifecycle (`spn_ctx_*`) and public queries return `spn_err_t` under the same contract.
 - Concurrent and streaming code (build workers, sync jobs) reports at the point of occurrence -- `spn_err_emit()`, or a specialized error event like `SPN_EVENT_LINK_FAILED` -- and propagates `spn_err_reported(kind)` so the boundary skips it.
 - The reporting layer (`tui.c`, `spn_tui_render_event_detail`) is the only place messages are built:
 

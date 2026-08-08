@@ -16,10 +16,9 @@ sp_cli_result_t spn_cli_add(sp_cli_t* cli) {
     return spn_cli_error(cli, "expected a package name");
   }
 
-  spn_err_t err = spn_op_add(host.ctx, (spn_add_request_t) {
+  return spn_cli_op(spn_add_dependency(host.ctx, (spn_add_request_t) {
     .name = spec.first,
     .version = spec.second,
     .kind = cmd->test ? SPN_DEP_KIND_TEST : cmd->build ? SPN_DEP_KIND_BUILD : SPN_DEP_KIND_PACKAGE,
-  });
-  return err ? SP_CLI_ERR : SP_CLI_OK;
+  }));
 }

@@ -1,8 +1,9 @@
-#include "sp/macro.h"
 #include "sp.h"
+#include "sp/macro.h"
 #include "spn.h"
 
 #include "api/api.h"
+#include "api/types.h"
 #include "ctx/types.h"
 #include "event/types.h"
 #include "session/types.h"
@@ -28,33 +29,35 @@ spn_node_t* spn_add_node(spn_config_t* config, const c8* tag) {
 
   spn_node_t* out = sp_alloc_type(mem, spn_node_t);
   *out = (spn_node_t) {
-    .ctx = unit,
-    .index = index,
+    .ref = {
+      .pkg = unit,
+      .index = index,
+    },
   };
 
   return out;
 }
 
 void spn_node_add_input(spn_node_t* node, const c8* input) {
-  spn_user_node_t* info = spn_find_user_node(node);
-  SPN_API_LOG(node->ctx, "spn_node_add_input", "{}, {}", SP_FMT_STR(info->tag), SP_FMT_CSTR(input));
+  spn_user_node_t* info = spn_node_deref(node->ref);
+  SPN_API_LOG(node->ref.pkg, "spn_node_add_input", "{}, {}", SP_FMT_STR(info->tag), SP_FMT_CSTR(input));
   sp_da_push(info->inputs, spn_intern_cstr(input));
 }
 
 void spn_node_add_output(spn_node_t* node, const c8* output) {
-  spn_user_node_t* info = spn_find_user_node(node);
-  SPN_API_LOG(node->ctx, "spn_node_add_output", "{}, {}", SP_FMT_STR(info->tag), SP_FMT_CSTR(output));
+  spn_user_node_t* info = spn_node_deref(node->ref);
+  SPN_API_LOG(node->ref.pkg, "spn_node_add_output", "{}, {}", SP_FMT_STR(info->tag), SP_FMT_CSTR(output));
   sp_da_push(info->outputs, spn_intern_cstr(output));
 }
 
 void spn_node_link(spn_node_t* from, spn_node_t* to) {
-  spn_user_node_t* info = spn_find_user_node(to);
-  SPN_API_LOG(to->ctx, "spn_node_link", "{} -> {}", SP_FMT_STR(spn_find_user_node(from)->tag), SP_FMT_STR(info->tag));
-  sp_da_push(info->deps, from);
+  spn_user_node_t* info = spn_node_deref(to->ref);
+  SPN_API_LOG(to->ref.pkg, "spn_node_link", "{} -> {}", SP_FMT_STR(spn_node_deref(from->ref)->tag), SP_FMT_STR(info->tag));
+  sp_da_push(info->deps, from->ref);
 }
 
 void spn_node_set_fn(spn_node_t* node, const c8* fn) {
-  spn_user_node_t* info = spn_find_user_node(node);
-  SPN_API_LOG(node->ctx, "spn_node_set_fn", "{}, {}", SP_FMT_STR(info->tag), SP_FMT_CSTR(fn));
+  spn_user_node_t* info = spn_node_deref(node->ref);
+  SPN_API_LOG(node->ref.pkg, "spn_node_set_fn", "{}, {}", SP_FMT_STR(info->tag), SP_FMT_CSTR(fn));
   info->fn = spn_intern_cstr(fn);
 }

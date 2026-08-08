@@ -3,6 +3,7 @@
 
 #include "sp.h"
 #include "spn/core.h"
+#include "spn/types.h"
 #include "event/types.h"
 #include "index/types.h"
 #include "resolve/types.h"

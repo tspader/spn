@@ -2,12 +2,10 @@
 #define SPN_UNIT_TYPES_H
 
 #include "core/types.h"
-#include "sp.h"
-#include "spn/core.h"
-
 #include "compiler/types.h"
 #include "error/types.h"
-#include "spn/session.h"
+#include "spn/core.h"
+#include "spn/types.h"
 #include "intern/types.h"
 #include "pkg/types.h"
 #include "sp/macro.h"
@@ -77,10 +75,10 @@ typedef struct {
   bool private;
 } spn_pkg_dep_t;
 
-struct spn_node_t {
-  spn_pkg_unit_t* ctx;
+typedef struct {
+  spn_pkg_unit_t* pkg;
   u32 index;
-};
+} spn_node_ref_t;
 
 struct spn_user_node_t {
   spn_pkg_unit_t* pkg;
@@ -88,7 +86,7 @@ struct spn_user_node_t {
   sp_str_t fn;
   sp_da(sp_str_t) inputs;
   sp_da(sp_str_t) outputs;
-  sp_da(spn_node_t*) deps;
+  sp_da(spn_node_ref_t) deps;
 };
 
 typedef struct {
@@ -205,9 +203,9 @@ struct spn_toolchain_unit_t {
   sp_hash_t identity;
 };
 
-static inline spn_user_node_t* spn_find_user_node(spn_node_t* node) {
-  SP_ASSERT(node->index < sp_da_size(node->ctx->user_nodes));
-  return &node->ctx->user_nodes[node->index];
+static inline spn_user_node_t* spn_node_deref(spn_node_ref_t ref) {
+  SP_ASSERT(ref.index < sp_da_size(ref.pkg->user_nodes));
+  return &ref.pkg->user_nodes[ref.index];
 }
 
 #endif

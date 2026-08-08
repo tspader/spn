@@ -1,9 +1,11 @@
-#include "error/error.h"
 #include "spn/host.h"
 
+#include "core/types.h"
 #include "ctx/types.h"
+#include "error/error.h"
 #include "event/event.h"
 #include "op/build/build.h"
+#include "op/op.h"
 #include "session/session.h"
 #include "session/types.h"
 #include "unit/types.h"
@@ -38,8 +40,16 @@ static spn_err_union_t run_target(spn_session_t* session, spn_target_unit_t* uni
   return spn_result(SPN_OK);
 }
 
-spn_err_t spn_op_run_target(spn_session_t* session, spn_target_t* target) {
-  return spn_err_emit(session->ctx, run_target(session, sp_ptr_cast(spn_target_unit_t*, target)));
+spn_err_t spn_op_run_target(spn_op_t* op) {
+  spn_session_t* session = op->session;
+  return spn_err_emit(session->ctx, run_target(session, op->request.target));
+}
+
+spn_op_t* spn_run_target(spn_session_t* session, spn_target_t* target) {
+  spn_op_t* op = spn_op_new(session->ctx, session, SPN_OP_RUN_TARGET);
+  op->request.target = target;
+  spn_op_submit(op);
+  return op;
 }
 
 static spn_err_union_t run_test(spn_session_t* session, spn_target_unit_t* unit, bool* passed) {
@@ -100,12 +110,12 @@ static spn_err_union_t run_test(spn_session_t* session, spn_target_unit_t* unit,
   return spn_result(SPN_OK);
 }
 
-spn_err_t spn_op_test(spn_session_t* session) {
+spn_err_t spn_op_test(spn_op_t* op) {
+  spn_session_t* session = op->session;
   spn_ctx_t* ctx = session->ctx;
   sp_tm_timer_t timer = sp_tm_start_timer();
 
-  u32 passed = 0;
-  u32 failed = 0;
+  spn_test_result_t* result = &op->result.test;
 
   sp_da_for(session->plans, it) {
     spn_build_plan_t* plan = &session->plans[it];
@@ -117,10 +127,10 @@ spn_err_t spn_op_test(spn_session_t* session) {
       bool test_passed = sp_zero;
       spn_try(spn_err_emit(ctx, run_test(session, unit, &test_passed)));
       if (test_passed) {
-        passed++;
+        result->passed++;
       }
       else {
-        failed++;
+        result->failed++;
       }
     }
   }
@@ -128,14 +138,20 @@ spn_err_t spn_op_test(spn_session_t* session) {
   spn_event_buffer_push(ctx->events, (spn_build_event_t) {
     .kind = SPN_EVENT_TEST_SUMMARY,
     .test_summary = {
-      .passed = passed,
-      .failed = failed,
+      .passed = result->passed,
+      .failed = result->failed,
       .time = sp_tm_read_timer(&timer),
     },
   });
 
-  if (failed) {
+  if (result->failed) {
     return spn_err_emit(ctx, spn_err_reported(SPN_ERR_TEST_FAILED));
   }
   return SPN_OK;
+}
+
+spn_op_t* spn_run_tests(spn_session_t* session) {
+  spn_op_t* op = spn_op_new(session->ctx, session, SPN_OP_TEST);
+  spn_op_submit(op);
+  return op;
 }

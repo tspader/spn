@@ -19,7 +19,7 @@ typedef struct spn              spn_t;
 typedef struct spn_config       spn_config_t;
 typedef struct spn_target       spn_target_t;
 typedef struct spn_profile      spn_profile_t;
-typedef struct spn_node_t       spn_node_t;
+typedef struct spn_node         spn_node_t;
 
 typedef spn_err_t (*spn_configure_fn_t) (spn_t*, spn_config_t*);
 typedef s32       (*spn_node_fn_t)      (spn_t*);

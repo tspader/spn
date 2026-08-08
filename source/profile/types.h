@@ -1,8 +1,6 @@
 #ifndef SPN_PROFILE_TYPES_H
 #define SPN_PROFILE_TYPES_H
 
-#include "sp.h"
-#include "spn/core.h"
 #include "core/types.h"
 #include "when/types.h"
 

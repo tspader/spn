@@ -4,10 +4,7 @@
 #include "sp.h"
 #include "spn/core.h"
 
-#include "compiler/types.h"
 #include "core/types.h"
-#include "profile/types.h"
-#include "toolchain/types.h"
 
 // Build scripts get opaque pointers; spn_t and spn_config_t are both the package unit
 spn_pkg_unit_t* spn_api_unit(const void* opaque);

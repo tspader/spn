@@ -1,11 +1,8 @@
 #ifndef SPN_ERR_H
 #define SPN_ERR_H
 
-#include "sp.h"
-#include "spn/core.h"
-
-#include "compiler/types.h"
 #include "core/types.h"
+#include "compiler/types.h"
 #include "pkg/types.h"
 #include "semver/types.h"
 

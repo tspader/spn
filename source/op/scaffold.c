@@ -2,6 +2,7 @@
 
 #include "ctx/types.h"
 #include "error/error.h"
+#include "op/op.h"
 #include "sp/sp_template.h"
 #include "spn.embed.h"
 
@@ -111,10 +112,21 @@ static spn_err_union_t check(spn_ctx_t* ctx, spn_scaffold_request_t request) {
   return err;
 }
 
-spn_err_t spn_op_scaffold(spn_ctx_t* ctx, spn_scaffold_request_t request, sp_mem_t mem, spn_str_arr_t* files) {
-  return spn_err_emit(ctx, scaffold(ctx, request, mem, files));
+spn_err_t spn_op_scaffold(spn_op_t* op) {
+  return spn_err_emit(op->ctx, scaffold(op->ctx, op->request.scaffold, op->mem, &op->result.scaffold.files));
 }
 
-spn_err_t spn_op_scaffold_check(spn_ctx_t* ctx, spn_scaffold_request_t request) {
+spn_op_t* spn_scaffold_project(spn_ctx_t* ctx, spn_scaffold_request_t request) {
+  spn_op_t* op = spn_op_new(ctx, SP_NULLPTR, SPN_OP_SCAFFOLD);
+  op->request.scaffold = (spn_scaffold_request_t) {
+    .dir = sp_str_copy(ctx->heap, request.dir),
+    .name = sp_str_copy(ctx->heap, request.name),
+    .bare = request.bare,
+  };
+  spn_op_submit(op);
+  return op;
+}
+
+spn_err_t spn_scaffold_check(spn_ctx_t* ctx, spn_scaffold_request_t request) {
   return spn_err_emit(ctx, check(ctx, request));
 }
