@@ -19,7 +19,7 @@
 #include "session/invocation.h"
 #include "session/session.h"
 #include "target/select.h"
-#include "op/build/build.h"
+#include "graph/build.h"
 #include "toolchain/toolchain.h"
 #include "triple/triple.h"
 

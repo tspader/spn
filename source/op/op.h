@@ -6,6 +6,9 @@
 void spn_op_thread_start(spn_ctx_t* ctx);
 void spn_op_thread_stop(spn_ctx_t* ctx);
 
+void spn_op_cancel(spn_op_t* op);
+bool spn_op_cancelled(spn_op_t* op);
+
 spn_err_t spn_op_add(spn_op_t* op);
 spn_err_t spn_op_publish(spn_op_t* op);
 spn_err_t spn_op_sync_indexes(spn_op_t* op);

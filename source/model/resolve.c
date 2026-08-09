@@ -8,7 +8,7 @@
 #include "error/error.h"
 #include "event/event.h"
 #include "index/cache.h"
-#include "op/stage.h"
+#include "op/types.h"
 #include "intern/intern.h"
 #include "pkg/id.h"
 #include "pkg/load.h"
@@ -90,7 +90,8 @@ static void emit_resolved(sp_mem_t mem, spn_resolve_query_t* query) {
   });
 }
 
-spn_err_union_t spn_stage_resolve(spn_session_t* session) {
+spn_err_union_t resolve(spn_op_t* op) {
+  spn_session_t* session = op->session;
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_RESOLVE_START,
     .pkg = session->pkg,

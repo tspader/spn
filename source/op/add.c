@@ -6,7 +6,6 @@
 #include "index/cache.h"
 #include "index/types.h"
 #include "op/op.h"
-#include "op/stage.h"
 #include "spn/host.h"
 #include "pkg/id.h"
 #include "pkg/types.h"
@@ -152,7 +151,6 @@ spn_err_t spn_op_add(spn_op_t* op) {
     });
   }
 
-  spn_try(spn_err_emit(ctx, spn_stage_sync_indexes(ctx, (spn_sync_request_t) sp_zero)));
   return spn_err_emit(ctx, add(ctx, request, range));
 }
 

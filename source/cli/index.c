@@ -46,10 +46,7 @@ static void index_list() {
 }
 
 sp_cli_result_t spn_cli_index_list(sp_cli_t* cli) {
-  sp_cli_result_t opened = spn_cli_open(true);
-  if (opened != SP_CLI_OK) {
-    return opened;
-  }
+  try(spn_cli_open(true));
 
   spn_tui_handoff(&tui);
   index_list();
@@ -57,10 +54,7 @@ sp_cli_result_t spn_cli_index_list(sp_cli_t* cli) {
 }
 
 sp_cli_result_t spn_cli_index_path(sp_cli_t* cli) {
-  sp_cli_result_t opened = spn_cli_open(true);
-  if (opened != SP_CLI_OK) {
-    return opened;
-  }
+  try(spn_cli_open(true));
 
   spn_index_desc_t index = sp_zero;
   if (!spn_get_index(host.ctx, args.index.name, &index)) {
@@ -73,10 +67,7 @@ sp_cli_result_t spn_cli_index_path(sp_cli_t* cli) {
 }
 
 sp_cli_result_t spn_cli_index_sync(sp_cli_t* cli) {
-  sp_cli_result_t opened = spn_cli_open(true);
-  if (opened != SP_CLI_OK) {
-    return opened;
-  }
+  try(spn_cli_open(true));
 
   return spn_cli_op(spn_sync_indexes(host.ctx, (spn_sync_request_t) {
     .force = true,

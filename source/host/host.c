@@ -4,7 +4,7 @@
 #include "ctx/types.h"
 #include "index/index.h"
 #include "index/types.h"
-#include "op/build/build.h"
+#include "graph/build.h"
 #include "pkg/pkg.h"
 #include "pkg/types.h"
 #include "project/types.h"

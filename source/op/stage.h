@@ -6,9 +6,9 @@
 #include "error/types.h"
 #include "core/types.h"
 
-spn_err_union_t spn_stage_resolve(spn_session_t* session);
-spn_err_union_t spn_stage_sync(spn_session_t* session, bool* reresolve);
-spn_err_union_t spn_stage_configure(spn_session_t* session);
-spn_err_union_t spn_stage_sync_indexes(spn_ctx_t* ctx, spn_sync_request_t request);
+spn_err_union_t resolve(spn_op_t* op);
+spn_err_union_t sync(spn_op_t* op, bool* reresolve);
+spn_err_union_t configure(spn_op_t* op);
+spn_err_union_t spn_stage_sync_indexes(spn_op_t* op, spn_sync_request_t request);
 
 #endif

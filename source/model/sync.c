@@ -11,7 +11,6 @@
 #include "intern/intern.h"
 #include "log/lazy/lazy.h"
 #include "op/op.h"
-#include "op/stage.h"
 #include "pkg/id.h"
 #include "pkg/load.h"
 #include "pkg/patch.h"

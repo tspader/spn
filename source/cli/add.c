@@ -1,10 +1,7 @@
 #include "cli/cli.h"
 
 sp_cli_result_t spn_cli_add(sp_cli_t* cli) {
-  sp_cli_result_t opened = spn_cli_open(false);
-  if (opened != SP_CLI_OK) {
-    return opened;
-  }
+  try(spn_cli_open(false));
 
   spn_cli_add_t* cmd = &args.add;
   if (cmd->test && cmd->build) {
@@ -15,6 +12,8 @@ sp_cli_result_t spn_cli_add(sp_cli_t* cli) {
   if (sp_str_empty(spec.first)) {
     return spn_cli_error(cli, "expected a package name");
   }
+
+  try(spn_cli_refresh_indexes());
 
   return spn_cli_op(spn_add_dependency(host.ctx, (spn_add_request_t) {
     .name = spec.first,

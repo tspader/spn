@@ -140,8 +140,8 @@ add_executable(core
   ${SRC}/intern/intern.c
   ${SRC}/lock/lock.c
   ${SRC}/log/lazy/lazy.c
-  ${SRC}/op/build/build.c
-  ${SRC}/op/build/identity.c
+  ${SRC}/graph/build.c
+  ${SRC}/graph/identity.c
   ${SRC}/pkg/id.c
   ${SRC}/pkg/mutate.c
   ${SRC}/pkg/options.c

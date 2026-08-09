@@ -1,5 +1,5 @@
-#ifndef SPN_OP_BUILD_DAG_H
-#define SPN_OP_BUILD_DAG_H
+#ifndef SPN_GRAPH_DAG_H
+#define SPN_GRAPH_DAG_H
 
 #include "dag/dag.h"
 #include "core/types.h"
@@ -57,8 +57,8 @@ struct spn_dag_build_t {
   sp_tm_timer_t timer;
 };
 
-spn_err_union_t  spn_dag_build_session(spn_session_t* session);
-spn_dag_build_t* spn_dag_build_new(spn_session_t* session);
+spn_err_union_t  spn_dag_build_session(spn_op_t* op);
+spn_dag_build_t* spn_dag_build_new(spn_op_t* op);
 spn_err_union_t  spn_dag_build_run(spn_dag_build_t* b, u32 workers);
 spn_err_union_t  spn_dag_build_add_target(spn_dag_build_t* b, spn_target_unit_t* target);
 spn_err_t        spn_build_publish_copies(spn_pkg_unit_t* unit, sp_str_t root, bool strict, sp_da(spn_dag_obs_t)* obs);
