@@ -418,12 +418,6 @@ static sp_cli_cmd_t cmd_root = {
       .kind = SP_CLI_OPT_BOOLEAN,
       .ptr = &args.quiet,
     },
-    {
-      .name = "ci",
-      .summary = "Run the main loop unthrottled; use when no human is watching",
-      .kind = SP_CLI_OPT_BOOLEAN,
-      .ptr = &args.ci,
-    },
   },
   .env = {
     {
@@ -481,13 +475,20 @@ sp_cli_result_t spn_cli_refresh_indexes() {
 }
 
 spn_err_t spn_cli_wait(spn_op_t* op) {
+  sp_atomic_ptr_store(&host.active, op, SP_ATOMIC_SEQ_CST);
   while (!spn_op_done(op)) {
-    spn_tui_poll(&tui);
-    if (!args.ci) {
-      sp_os_sleep_ms(7);
+    if (sp_atomic_s32_load(&host.interrupted, SP_ATOMIC_SEQ_CST)) {
+      spn_op_cancel(op);
+    }
+    spn_tui_poll(&tui, op);
+    if (!spn_op_done(op)) {
+      sp_semaphore_wait_for(&host.wake, 10);
     }
   }
-  return spn_op_wait(op);
+  sp_atomic_ptr_store(&host.active, SP_NULLPTR, SP_ATOMIC_RELEASE);
+
+  spn_tui_op_done(&tui, op);
+  return spn_op_result(op).err;
 }
 
 sp_cli_result_t spn_cli_op(spn_op_t* op) {

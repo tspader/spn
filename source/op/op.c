@@ -24,7 +24,7 @@ void spn_op_cancel(spn_op_t* op) {
 }
 
 bool spn_op_cancelled(spn_op_t* op) {
-  return sp_atomic_s32_load(&op->cancelled, SP_ATOMIC_SEQ_CST) != 0 || spn_ctx_cancelled(op->ctx);
+  return sp_atomic_s32_load(&op->cancelled, SP_ATOMIC_SEQ_CST) != 0;
 }
 
 static void exec(spn_op_t* op) {
@@ -46,7 +46,11 @@ static void exec(spn_op_t* op) {
   }
 
   sp_atomic_u32_store(&op->done, 1, SP_ATOMIC_RELEASE);
-  sp_sys_futex_wake_all(&op->done);
+
+  spn_ctx_t* ctx = op->ctx;
+  if (ctx->wake.fn) {
+    ctx->wake.fn(ctx->wake.data);
+  }
 }
 
 static s32 op_thread(void* data) {
@@ -84,13 +88,6 @@ void spn_op_submit(spn_op_t* op) {
 
 bool spn_op_done(spn_op_t* op) {
   return sp_atomic_u32_load(&op->done, SP_ATOMIC_ACQUIRE) != 0;
-}
-
-spn_err_t spn_op_wait(spn_op_t* op) {
-  while (!sp_atomic_u32_load(&op->done, SP_ATOMIC_ACQUIRE)) {
-    sp_sys_futex_wait(&op->done, 0, SP_NULLPTR);
-  }
-  return op->result.err;
 }
 
 spn_op_result_t spn_op_result(spn_op_t* op) {

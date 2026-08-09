@@ -63,7 +63,7 @@ static spn_err_t run_prompt(sp_mem_t mem, spn_cli_init_t* command, sp_str_t dir,
     .name = name,
     .bare = command->bare,
   });
-  err = spn_op_wait(op);
+  err = spn_cli_wait(op);
 
   if (err) {
     sp_prompt_cancel(prompt, "failed");
@@ -92,7 +92,7 @@ static spn_err_t run_unattended(spn_cli_init_t* command, sp_str_t dir, sp_str_t 
     .name = name,
     .bare = command->bare,
   });
-  spn_err_t err = spn_op_wait(op);
+  spn_err_t err = spn_cli_wait(op);
   if (err) {
     spn_op_free(op);
     return err;

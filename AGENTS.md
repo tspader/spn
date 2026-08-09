@@ -79,7 +79,7 @@ Reporting is the event stream. `spn_err_emit(ctx, err)` is the single gate betwe
 
 The rules:
 - Library internals construct unions and propagate them unreported with `spn_try_union()`.
-- Ops are data: `spn_op_*` verbs return an `spn_op_t*` handle, and `spn_op_wait()` returns the op's `spn_err_t`. An op's exec function is the boundary: every union crosses `spn_err_emit()` exactly once inside it, so the code `spn_op_wait()` hands back always means "already reported"; frontends only map it to an exit status. Context lifecycle (`spn_ctx_*`) and public queries return `spn_err_t` under the same contract.
+- Ops are data: verbs return an `spn_op_t*` handle; completion is state (`spn_op_done()`, `spn_op_result()`), signaled through the host's wake callback (registered at `spn_ctx_new`), and cancellation is per-op (`spn_op_cancel()`). An op's exec function is the boundary: every union crosses `spn_err_emit()` exactly once inside it, so the `err` in `spn_op_result()` always means "already reported"; frontends only map it to an exit status. Context lifecycle (`spn_ctx_*`) and public queries return `spn_err_t` under the same contract.
 - Concurrent and streaming code (build workers, sync jobs) reports at the point of occurrence -- `spn_err_emit()`, or a specialized error event like `SPN_EVENT_LINK_FAILED` -- and propagates `spn_err_reported(kind)` so the boundary skips it.
 - The reporting layer (`tui.c`, `spn_tui_render_event_detail`) is the only place messages are built:
 

@@ -221,10 +221,12 @@ static spn_err_union_t open_ctx(spn_ctx_t* ctx, spn_open_request_t request) {
   return spn_result(SPN_OK);
 }
 
-spn_ctx_t* spn_ctx_new() {
+spn_ctx_t* spn_ctx_new(spn_wake_fn_t wake, void* wake_data) {
   sp_assert(!spn.arena);
   spn_ctx_t* ctx = &spn;
   *ctx = sp_zero_s(spn_ctx_t);
+  ctx->wake.fn = wake;
+  ctx->wake.data = wake_data;
   ctx->mem = sp_mem_os_new();
   ctx->arena = sp_mem_arena_new(ctx->mem);
   ctx->heap = sp_mem_arena_as_allocator(ctx->arena);

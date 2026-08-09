@@ -45,14 +45,21 @@
 static struct {
   s32 num_args;
   const c8** args;
-  bool initted;
   sp_cli_t cli;
 } app;
+
+static void on_wake(void* user_data) {
+  sp_semaphore_signal(&host.wake);
+}
 
 static void on_signal(sp_os_signal_t signal, void* userdata) {
   switch (signal) {
     case SP_OS_SIGNAL_INTERRUPT: {
-      spn_ctx_cancel(host.ctx);
+      sp_atomic_s32_store(&host.interrupted, 1, SP_ATOMIC_SEQ_CST);
+      spn_op_t* op = (spn_op_t*)sp_atomic_ptr_load(&host.active, SP_ATOMIC_ACQUIRE);
+      if (op) {
+        spn_op_cancel(op);
+      }
       break;
     }
     case SP_OS_SIGNAL_ABORT:
@@ -68,7 +75,10 @@ static void print_error(sp_cli_err_t err) {
   sp_fmt_io(&tui.logger.err.base, "\n");
 }
 
-static sp_app_result_t on_init(sp_app_t* sp) {
+s32 spn_main(s32 num_args, const c8** argv) {
+  app.args = argv;
+  app.num_args = num_args;
+
   spn_tui_init(&tui);
 
   sp_cli_parse((sp_cli_desc_t) {
@@ -80,11 +90,11 @@ static sp_app_result_t on_init(sp_app_t* sp) {
   switch (app.cli.status) {
     case SP_CLI_HELP: {
       sp_cli_write_help(&tui.logger.out.base, &app.cli);
-      return SP_APP_QUIT;
+      return 0;
     }
     case SP_CLI_ERR: {
       print_error(app.cli.err);
-      return SP_APP_ERR;
+      return 1;
     }
     case SP_CLI_OK:
     case SP_CLI_CONTINUE: {
@@ -106,29 +116,22 @@ static sp_app_result_t on_init(sp_app_t* sp) {
   spn_tui_open(&tui, mode, verbosity);
 
   host.mem = sp_mem_arena_as_allocator(sp_mem_arena_new(sp_mem_os_new()));
-  host.ctx = spn_ctx_new();
-  app.initted = true;
+  sp_semaphore_init(&host.wake);
+  host.ctx = spn_ctx_new(on_wake, SP_NULLPTR);
   sp_os_register_signal_handler(SP_OS_SIGNAL_INTERRUPT, on_signal, SP_NULLPTR);
 
-  return SP_APP_CONTINUE;
-}
-
-static sp_app_result_t on_update(sp_app_t* sp) {
   sp_cli_result_t status = sp_cli_dispatch(&app.cli);
-
-  spn_prompt_stop(&tui, status != SP_CLI_ERR);
-  spn_tui_flush(&tui);
 
   switch (status) {
     case SP_CLI_HELP: {
       sp_cli_write_help(&tui.logger.out.base, &app.cli);
-      return SP_APP_QUIT;
+      break;
     }
     case SP_CLI_ERR: {
       if (app.cli.err.kind) {
         print_error(app.cli.err);
       }
-      return SP_APP_ERR;
+      break;
     }
     case SP_CLI_OK:
     case SP_CLI_CONTINUE: {
@@ -136,30 +139,12 @@ static sp_app_result_t on_update(sp_app_t* sp) {
     }
   }
 
-  return SP_APP_QUIT;
+  bool ok = status != SP_CLI_ERR;
+  spn_prompt_stop(&tui, ok ? SP_PROMPT_STATE_SUBMIT : SP_PROMPT_STATE_ERROR);
+  spn_ctx_close(host.ctx, ok);
+  spn_tui_flush(&tui);
+  sp_io_flush(&tui.logger.err.base);
+
+  return ok ? 0 : 1;
 }
-
-static void on_deinit(sp_app_t* sp) {
-  if (tui.mode == SPN_OUTPUT_MODE_INTERACTIVE) {
-    spn_prompt_stop(&tui, true);
-    sp_io_flush(&tui.logger.err.base);
-  }
-
-  if (app.initted) {
-    spn_ctx_close(host.ctx, sp->result != SP_APP_ERR);
-    spn_tui_flush(&tui);
-  }
-}
-
-sp_app_config_t spn_main(s32 num_args, const c8** args) {
-  app.args = args;
-  app.num_args = num_args;
-
-  return (sp_app_config_t) {
-    .on_init = on_init,
-    .on_update = on_update,
-    .on_deinit = on_deinit,
-    .fps = 144,
-  };
-}
-SP_APP_MAIN(spn_main)
+SP_MAIN(spn_main)

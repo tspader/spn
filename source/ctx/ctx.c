@@ -10,14 +10,6 @@ sp_intern_t* spn_ctx_get_intern() {
   return spn.intern;
 }
 
-void spn_ctx_cancel(spn_ctx_t* ctx) {
-  sp_atomic_s32_store(&ctx->cancelled, 1, SP_ATOMIC_SEQ_CST);
-}
-
-bool spn_ctx_cancelled(spn_ctx_t* ctx) {
-  return sp_atomic_s32_load(&ctx->cancelled, SP_ATOMIC_SEQ_CST) != 0;
-}
-
 bool spn_ctx_progress(spn_ctx_t* ctx, spn_progress_t* progress) {
   spn_dag_progress_t* dag = (spn_dag_progress_t*)sp_atomic_ptr_load(&ctx->progress, SP_ATOMIC_SEQ_CST);
   if (!dag) {
