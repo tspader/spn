@@ -3,6 +3,9 @@
 
 #include "op/types.h"
 
+void spn_op_thread_start(spn_ctx_t* ctx);
+void spn_op_thread_stop(spn_ctx_t* ctx);
+
 spn_err_t spn_op_add(spn_op_t* op);
 spn_err_t spn_op_publish(spn_op_t* op);
 spn_err_t spn_op_sync_indexes(spn_op_t* op);
