@@ -76,6 +76,8 @@ add_executable(core
   pkg/pkg.c
   profile/profile.c
   publish/publish.c
+  queue/ops.c
+  queue/smoke.c
   schema/schema.c
   thread_pool/ops.c
   thread_pool/smoke.c
