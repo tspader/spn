@@ -25,6 +25,7 @@
 #define SP_IMPLEMENTATION
 #include "sp.h"
 #include "sp/atomic_file.h"
+#include "sp/queue.h"
 #include "sp/sp_prompt.h"
 #include "sp/sp_cli.h"
 #include "sp/sp_template.h"

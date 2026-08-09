@@ -31,60 +31,57 @@ static void exec(spn_op_t* op) {
     case SPN_OP_CLEAN:         op->result.err = spn_op_clean(op); break;
     case SPN_OP_CLEAN_PROFILE: op->result.err = spn_op_clean_profile(op); break;
   }
+
+  sp_atomic_u32_store(&op->done, 1, SP_ATOMIC_RELEASE);
+  sp_sys_futex_wake_all(&op->done);
 }
 
 static s32 op_thread(void* data) {
   spn_ctx_t* ctx = (spn_ctx_t*)data;
 
-  while (true) {
-    sp_mutex_lock(&ctx->ops.mutex);
-    while (!ctx->ops.shutdown && ctx->ops.next == sp_da_size(ctx->ops.queue)) {
-      sp_cv_wait(&ctx->ops.signal.submitted, &ctx->ops.mutex);
+  while (sp_atomic_u32_load(&ctx->ops.running, SP_ATOMIC_ACQUIRE)) {
+    sp_queue_node_t* node = sp_queue_wait(&ctx->ops.queue);
+    if (node) {
+      exec((spn_op_t*)node);
     }
-    if (ctx->ops.next == sp_da_size(ctx->ops.queue)) {
-      sp_mutex_unlock(&ctx->ops.mutex);
-      spn_wasm_thread_exit();
-      return 0;
-    }
-    spn_op_t* op = ctx->ops.queue[ctx->ops.next++];
-    if (ctx->ops.next == sp_da_size(ctx->ops.queue)) {
-      sp_da_clear(ctx->ops.queue);
-      ctx->ops.next = 0;
-    }
-    sp_mutex_unlock(&ctx->ops.mutex);
-
-    exec(op);
-
-    sp_mutex_lock(&ctx->ops.mutex);
-    sp_atomic_s32_store(&op->done, 1, SP_ATOMIC_SEQ_CST);
-    sp_mutex_unlock(&ctx->ops.mutex);
-    sp_cv_notify_all(&ctx->ops.signal.completed);
   }
+
+  while (true) {
+    sp_queue_node_t* node = sp_queue_pop(&ctx->ops.queue);
+    if (!node) {
+      break;
+    }
+    exec((spn_op_t*)node);
+  }
+
+  spn_wasm_thread_exit();
+  return 0;
+}
+
+void spn_op_thread_start(spn_ctx_t* ctx) {
+  sp_queue_init(&ctx->ops.queue);
+  sp_atomic_u32_store(&ctx->ops.running, 1, SP_ATOMIC_RELEASE);
+  sp_thread_init(&ctx->ops.thread, op_thread, ctx);
+}
+
+void spn_op_thread_stop(spn_ctx_t* ctx) {
+  sp_atomic_u32_store(&ctx->ops.running, 0, SP_ATOMIC_RELEASE);
+  sp_queue_wake(&ctx->ops.queue);
+  sp_thread_join(&ctx->ops.thread);
 }
 
 void spn_op_submit(spn_op_t* op) {
-  spn_ctx_t* ctx = op->ctx;
-  sp_mutex_lock(&ctx->ops.mutex);
-  if (!ctx->ops.started) {
-    ctx->ops.started = true;
-    sp_thread_init(&ctx->ops.thread, op_thread, ctx);
-  }
-  sp_da_push(ctx->ops.queue, op);
-  sp_mutex_unlock(&ctx->ops.mutex);
-  sp_cv_notify_one(&ctx->ops.signal.submitted);
+  sp_queue_push(&op->ctx->ops.queue, &op->node);
 }
 
 bool spn_op_done(spn_op_t* op) {
-  return sp_atomic_s32_load(&op->done, SP_ATOMIC_SEQ_CST) != 0;
+  return sp_atomic_u32_load(&op->done, SP_ATOMIC_ACQUIRE) != 0;
 }
 
 spn_err_t spn_op_wait(spn_op_t* op) {
-  spn_ctx_t* ctx = op->ctx;
-  sp_mutex_lock(&ctx->ops.mutex);
-  while (!sp_atomic_s32_load(&op->done, SP_ATOMIC_SEQ_CST)) {
-    sp_cv_wait(&ctx->ops.signal.completed, &ctx->ops.mutex);
+  while (!sp_atomic_u32_load(&op->done, SP_ATOMIC_ACQUIRE)) {
+    sp_sys_futex_wait(&op->done, 0, SP_NULLPTR);
   }
-  sp_mutex_unlock(&ctx->ops.mutex);
   return op->result.err;
 }
 

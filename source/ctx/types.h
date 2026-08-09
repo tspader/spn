@@ -2,6 +2,7 @@
 #define SPN_CTX_TYPES_H
 
 #include "sp.h"
+#include "sp/queue.h"
 #include "spn/core.h"
 
 #include "event/types.h"
@@ -40,15 +41,8 @@ struct spn_ctx_t {
 
   struct {
     sp_thread_t thread;
-    sp_mutex_t mutex;
-    struct {
-      sp_cv_t submitted;
-      sp_cv_t completed;
-    } signal;
-    sp_da(spn_op_t*) queue;
-    u32 next;
-    bool started;
-    bool shutdown;
+    sp_queue_t queue;
+    sp_atomic_u32_t running;
   } ops;
 };
 

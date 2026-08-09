@@ -2,11 +2,13 @@
 #define SPN_OP_TYPES_H
 
 #include "sp.h"
+#include "sp/queue.h"
 #include "spn/types.h"
 
 #include "core/types.h"
 
 struct spn_op_t {
+  sp_queue_node_t node;
   spn_ctx_t* ctx;
   spn_session_t* session;
   sp_mem_t mem;
@@ -20,7 +22,7 @@ struct spn_op_t {
   } request;
 
   spn_op_result_t result;
-  sp_atomic_s32_t done;
+  sp_atomic_u32_t done;
 };
 
 #endif

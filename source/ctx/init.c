@@ -10,6 +10,7 @@
 #include "index/index.h"
 #include "intern/intern.h"
 #include "log/lazy/lazy.h"
+#include "op/op.h"
 #include "project/project.h"
 #include "project/types.h"
 #include "session/session.h"
@@ -232,8 +233,6 @@ spn_ctx_t* spn_ctx_new() {
   *ctx->env = sp_env_capture(ctx->heap);
   ctx->events = spn_event_buffer_new(ctx->mem);
 
-  sp_da_init(ctx->mem, ctx->ops.queue);
-
   ctx->paths.cwd = sp_fs_get_cwd(ctx->heap);
   ctx->paths.patches = sp_env_get(ctx->env, sp_str_lit("SPN_PATCH_DIR"));
   ctx->paths.config.dir = join_path(ctx, env_or(ctx, "SPN_CONFIG_DIR", sp_fs_get_config_path(ctx->heap)), "spn");
@@ -253,6 +252,8 @@ spn_ctx_t* spn_ctx_new() {
 
   spn_event_log_init(ctx->heap);
   spn_lazy_log_init(&ctx->events->log, sp_fs_join_path(ctx->heap, ctx->paths.log, sp_str_lit("build.jsonl")));
+
+  spn_op_thread_start(ctx);
   return ctx;
 }
 
@@ -274,13 +275,7 @@ spn_err_t spn_ctx_open_session(spn_ctx_t* ctx, const spn_session_config_t* confi
 }
 
 void spn_ctx_close(spn_ctx_t* ctx, bool ok) {
-  if (ctx->ops.started) {
-    sp_mutex_lock(&ctx->ops.mutex);
-    ctx->ops.shutdown = true;
-    sp_mutex_unlock(&ctx->ops.mutex);
-    sp_cv_notify_all(&ctx->ops.signal.submitted);
-    sp_thread_join(&ctx->ops.thread);
-  }
+  spn_op_thread_stop(ctx);
 
   spn_err_t result = SPN_OK;
   if (!ok) {
