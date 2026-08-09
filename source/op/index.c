@@ -14,11 +14,10 @@
 #include "external/wasm/wasm.h"
 #include "index/index.h"
 #include "op/op.h"
-#include "op/stage.h"
 #include "thread_pool/thread_pool.h"
 
 typedef struct {
-  spn_ctx_t* ctx;
+  spn_op_t* op;
   spn_index_info_t* index;
   bool force;
   spn_err_t err;
@@ -26,13 +25,15 @@ typedef struct {
 
 static void sync_index_node(void* data) {
   job_t* job = (job_t*)data;
-  if (spn_ctx_cancelled(job->ctx)) {
+  if (spn_op_cancelled(job->op)) {
     return;
   }
   job->err = spn_index_sync(job->index, job->force);
 }
 
-spn_err_union_t spn_stage_sync_indexes(spn_ctx_t* ctx, spn_sync_request_t request) {
+static spn_err_union_t sync_indexes(spn_op_t* op) {
+  spn_ctx_t* ctx = op->ctx;
+  spn_sync_request_t request = op->request.indexes;
   if (!sp_str_empty(request.only) && !spn_find_index(ctx, request.only)) {
     return (spn_err_union_t) {
       .kind = SPN_ERR_INDEX_UNKNOWN,
@@ -60,7 +61,7 @@ spn_err_union_t spn_stage_sync_indexes(spn_ctx_t* ctx, spn_sync_request_t reques
 
     job_t* job = sp_alloc_type(ctx->mem, job_t);
     *job = (job_t) {
-      .ctx = ctx,
+      .op = op,
       .index = index,
       .force = request.force,
     };
@@ -80,8 +81,8 @@ spn_err_union_t spn_stage_sync_indexes(spn_ctx_t* ctx, spn_sync_request_t reques
   spn_thread_pool_wait(&pool);
   spn_thread_pool_deinit(&pool);
 
-  if (spn_ctx_cancelled(ctx)) {
-    return spn_err_reported(SPN_ERROR);
+  if (spn_op_cancelled(op)) {
+    return spn_err_reported(SPN_ERR_CANCELLED);
   }
 
   sp_da_for(jobs, it) {
@@ -112,7 +113,7 @@ spn_err_union_t spn_stage_sync_indexes(spn_ctx_t* ctx, spn_sync_request_t reques
 }
 
 spn_err_t spn_op_sync_indexes(spn_op_t* op) {
-  return spn_err_emit(op->ctx, spn_stage_sync_indexes(op->ctx, op->request.indexes));
+  return spn_err_emit(op->ctx, sync_indexes(op));
 }
 
 spn_op_t* spn_sync_indexes(spn_ctx_t* ctx, spn_sync_request_t request) {

@@ -14,8 +14,8 @@
 #include "session/invocation.h"
 #include "sp/io.h"
 #include "sp/os.h"
-#include "op/build/build.h"
-#include "op/build/nodes/nodes.h"
+#include "graph/build.h"
+#include "graph/nodes/nodes.h"
 #include "unit/package.h"
 
 spn_err_union_t spn_build_link_invocation(sp_mem_t mem, spn_target_unit_t* target, const spn_cc_link_files_t* files, spn_invocation_t* invocation) {

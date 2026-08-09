@@ -39,6 +39,8 @@ spn_op_t* spn_clean(spn_ctx_t* ctx);
 spn_op_t* spn_clean_profile(spn_session_t* session);
 spn_op_t* spn_op_new(spn_ctx_t* ctx, spn_session_t* session, spn_op_kind_t kind);
 void spn_op_submit(spn_op_t* op);
+void spn_op_cancel(spn_op_t* op);
+bool spn_op_cancelled(spn_op_t* op);
 bool spn_op_done(spn_op_t* op);
 spn_err_t spn_op_wait(spn_op_t* op);
 spn_op_result_t spn_op_result(spn_op_t* op);

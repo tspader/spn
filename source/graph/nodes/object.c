@@ -7,8 +7,8 @@
 #include "compiler/driver.h"
 #include "session/invocation.h"
 #include "session/session.h"
-#include "op/build/build.h"
-#include "op/build/nodes/nodes.h"
+#include "graph/build.h"
+#include "graph/nodes/nodes.h"
 #include "unit/package.h"
 
 s32 spn_compile_object_run(spn_compile_unit_t* unit, sp_str_t object, sp_str_t depfile) {

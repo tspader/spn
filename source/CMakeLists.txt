@@ -62,23 +62,24 @@ set(SPN_SOURCES
   intern/intern.c
   lock/lock.c
   log/lazy/lazy.c
+  graph/build.c
+  graph/dag.c
+  graph/identity.c
+  graph/nodes/embed.c
+  graph/nodes/link.c
+  graph/nodes/object.c
+  model/configure.c
+  model/model.c
+  model/resolve.c
+  model/sync.c
   op/add.c
   op/build.c
-  op/build/build.c
-  op/build/dag.c
-  op/build/identity.c
-  op/build/nodes/embed.c
-  op/build/nodes/link.c
-  op/build/nodes/object.c
   op/clean.c
-  op/configure.c
   op/index.c
   op/op.c
   op/run.c
   op/scaffold.c
   op/publish.c
-  op/resolve.c
-  op/sync.c
   pkg/id.c
   pkg/mutate.c
   pkg/patch.c

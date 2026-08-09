@@ -9,9 +9,8 @@
 #include "unit/types.h"
 
 #include "external/wasm/wasm.h"
-#include "op/build/build.h"
-#include "op/build/dag.h"
-#include "op/stage.h"
+#include "graph/build.h"
+#include "graph/dag.h"
 #include "op/types.h"
 #include "session/session.h"
 #include "unit/package.h"

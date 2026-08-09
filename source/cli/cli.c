@@ -472,11 +472,12 @@ sp_cli_result_t spn_cli_open(bool project_optional) {
 }
 
 sp_cli_result_t spn_cli_session(sp_cli_t* cli, spn_session_config_t config) {
-  sp_cli_result_t profile = spn_cli_parse_profile(cli, &config.profile);
-  if (profile != SP_CLI_OK) {
-    return profile;
-  }
+  try(spn_cli_parse_profile(cli, &config.profile));
   return spn_ctx_open_session(host.ctx, &config, &host.session) ? SP_CLI_ERR : SP_CLI_OK;
+}
+
+sp_cli_result_t spn_cli_refresh_indexes() {
+  return spn_cli_op(spn_sync_indexes(host.ctx, (spn_sync_request_t) sp_zero));
 }
 
 spn_err_t spn_cli_wait(spn_op_t* op) {

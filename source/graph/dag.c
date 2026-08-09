@@ -14,13 +14,14 @@
 #include "enum/enum.h"
 #include "event/event.h"
 #include "external/wasm/wasm.h"
+#include "op/op.h"
 #include "session/session.h"
 #include "thread_pool/thread_pool.h"
 #include "unit/unit.h"
-#include "op/build/build.h"
-#include "op/build/dag.h"
-#include "op/build/identity.h"
-#include "op/build/nodes/nodes.h"
+#include "graph/build.h"
+#include "graph/dag.h"
+#include "graph/identity.h"
+#include "graph/nodes/nodes.h"
 #include "triple/triple.h"
 #include "unit/package.h"
 
@@ -1278,7 +1279,12 @@ static sp_str_t dag_root_dir(sp_mem_t mem, sp_str_t path) {
   return sp_str_empty(canonical) ? sp_fs_normalize_path(mem, path) : canonical;
 }
 
-spn_dag_build_t* spn_dag_build_new(spn_session_t* session) {
+static bool dag_cancelled(void* data) {
+  return spn_op_cancelled((spn_op_t*)data);
+}
+
+spn_dag_build_t* spn_dag_build_new(spn_op_t* op) {
+  spn_session_t* session = op->session;
   spn_dag_build_t* b = sp_alloc_type(session->mem, spn_dag_build_t);
   sp_mem_zero(b, sizeof(spn_dag_build_t));
   b->session = session;
@@ -1317,7 +1323,8 @@ spn_dag_build_t* spn_dag_build_new(spn_session_t* session) {
     .memos = &b->memos,
     .roots = &b->roots,
     .progress = &b->progress,
-    .cancel = &session->ctx->aborted,
+    .cancel = dag_cancelled,
+    .cancel_data = op,
     .scratch = tmp,
   };
 
@@ -1336,10 +1343,11 @@ spn_err_union_t spn_dag_build_run(spn_dag_build_t* b, u32 workers) {
   return dag_result(b);
 }
 
-spn_err_union_t spn_dag_build_session(spn_session_t* session) {
+spn_err_union_t spn_dag_build_session(spn_op_t* op) {
+  spn_session_t* session = op->session;
   spn_project_t* project = session->project;
 
-  spn_dag_build_t* b = spn_dag_build_new(session);
+  spn_dag_build_t* b = spn_dag_build_new(op);
   session->dag.build = b;
 
   spn_try_union(prepare_graph(b));

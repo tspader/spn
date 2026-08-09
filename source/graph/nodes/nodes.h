@@ -1,5 +1,5 @@
-#ifndef SPN_OP_BUILD_NODES_H
-#define SPN_OP_BUILD_NODES_H
+#ifndef SPN_GRAPH_NODES_H
+#define SPN_GRAPH_NODES_H
 
 #include "compiler/types.h"
 #include "dag/types.h"

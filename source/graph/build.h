@@ -1,5 +1,5 @@
-#ifndef SPN_OP_BUILD_BUILD_H
-#define SPN_OP_BUILD_BUILD_H
+#ifndef SPN_GRAPH_BUILD_H
+#define SPN_GRAPH_BUILD_H
 
 #include "unit/types.h"
 

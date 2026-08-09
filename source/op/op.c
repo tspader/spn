@@ -19,17 +19,30 @@ spn_op_t* spn_op_new(spn_ctx_t* ctx, spn_session_t* session, spn_op_kind_t kind)
   return op;
 }
 
+void spn_op_cancel(spn_op_t* op) {
+  sp_atomic_s32_store(&op->cancelled, 1, SP_ATOMIC_SEQ_CST);
+}
+
+bool spn_op_cancelled(spn_op_t* op) {
+  return sp_atomic_s32_load(&op->cancelled, SP_ATOMIC_SEQ_CST) != 0 || spn_ctx_cancelled(op->ctx);
+}
+
 static void exec(spn_op_t* op) {
-  switch (op->result.kind) {
-    case SPN_OP_ADD:           op->result.err = spn_op_add(op); break;
-    case SPN_OP_PUBLISH:       op->result.err = spn_op_publish(op); break;
-    case SPN_OP_SYNC_INDEXES:  op->result.err = spn_op_sync_indexes(op); break;
-    case SPN_OP_SCAFFOLD:      op->result.err = spn_op_scaffold(op); break;
-    case SPN_OP_BUILD:         op->result.err = spn_op_build(op); break;
-    case SPN_OP_TEST:          op->result.err = spn_op_test(op); break;
-    case SPN_OP_RUN_TARGET:    op->result.err = spn_op_run_target(op); break;
-    case SPN_OP_CLEAN:         op->result.err = spn_op_clean(op); break;
-    case SPN_OP_CLEAN_PROFILE: op->result.err = spn_op_clean_profile(op); break;
+  if (spn_op_cancelled(op)) {
+    op->result.err = SPN_ERR_CANCELLED;
+  }
+  else {
+    switch (op->result.kind) {
+      case SPN_OP_ADD:           op->result.err = spn_op_add(op); break;
+      case SPN_OP_PUBLISH:       op->result.err = spn_op_publish(op); break;
+      case SPN_OP_SYNC_INDEXES:  op->result.err = spn_op_sync_indexes(op); break;
+      case SPN_OP_SCAFFOLD:      op->result.err = spn_op_scaffold(op); break;
+      case SPN_OP_BUILD:         op->result.err = spn_op_build(op); break;
+      case SPN_OP_TEST:          op->result.err = spn_op_test(op); break;
+      case SPN_OP_RUN_TARGET:    op->result.err = spn_op_run_target(op); break;
+      case SPN_OP_CLEAN:         op->result.err = spn_op_clean(op); break;
+      case SPN_OP_CLEAN_PROFILE: op->result.err = spn_op_clean_profile(op); break;
+    }
   }
 
   sp_atomic_u32_store(&op->done, 1, SP_ATOMIC_RELEASE);
@@ -39,19 +52,14 @@ static void exec(spn_op_t* op) {
 static s32 op_thread(void* data) {
   spn_ctx_t* ctx = (spn_ctx_t*)data;
 
-  while (sp_atomic_u32_load(&ctx->ops.running, SP_ATOMIC_ACQUIRE)) {
+  while (true) {
     sp_queue_node_t* node = sp_queue_wait(&ctx->ops.queue);
     if (node) {
       exec((spn_op_t*)node);
     }
-  }
-
-  while (true) {
-    sp_queue_node_t* node = sp_queue_pop(&ctx->ops.queue);
-    if (!node) {
+    else if (!sp_atomic_u32_load(&ctx->ops.running, SP_ATOMIC_ACQUIRE)) {
       break;
     }
-    exec((spn_op_t*)node);
   }
 
   spn_wasm_thread_exit();

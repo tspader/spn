@@ -28,10 +28,7 @@ static sp_cli_result_t publish_dry() {
 }
 
 sp_cli_result_t spn_cli_publish(sp_cli_t* cli) {
-  sp_cli_result_t opened = spn_cli_open(false);
-  if (opened != SP_CLI_OK) {
-    return opened;
-  }
+  try(spn_cli_open(false));
 
   if (args.publish.dry) {
     return publish_dry();

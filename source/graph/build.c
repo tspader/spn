@@ -15,7 +15,7 @@
 #include "session/invocation.h"
 #include "session/session.h"
 #include "unit/unit.h"
-#include "op/build/build.h"
+#include "graph/build.h"
 #include "triple/triple.h"
 
 

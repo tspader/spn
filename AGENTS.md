@@ -27,8 +27,9 @@ spn build
   - cli/
 - `source/`
   - `cli/` and `tui/` are the CLI: a consumer of the spn library like any other. `cli/main.c` is the entry point. `cli/*.c` files only include `spn/host.h` for library functions; `tui/` additionally renders the internal event protocol, per the transitional exception below.
-  - `op/` is the library operations: the build pipeline (resolve, sync, configure, build), plus action verbs (add, clean, publish, index sync, run)
-    - `build/` is all the code that sets up and runs inside the build graph
+  - `op/` is the op layer: the worker thread and queue (`op.c`), plus the op bodies (build, add, clean, publish, index sync, run, scaffold)
+  - `model/` establishes the session's model: the resolve/sync/configure stages plus the driver that runs them to a fixpoint. `model.h` declares its one entry point (`spn_model_establish`); `stage.h` is module-internal
+  - `graph/` is all the code that sets up and runs inside the build graph; it serves both `model/` (the configure graph) and the build op (the target graph)
 - `include/`
   - `spn/core.h` is the sp-free shared vocabulary (enums, `spn_triple_t`, `spn_err_t`) included by everything: guest scripts, host consumers, and library internals. Internal code includes `spn/core.h`, never `spn.h`.
   - `spn/types.h` is the sp-dependent shared vocabulary: the value types that describe work and results (`spn_session_config_t`, target selection, profile overrides, op requests and results, index descriptors). It declares no handles, no functions, and carries no `#error` guard, so it is safe in any TU; internal `types.h` headers include it directly, and `spn/host.h` re-exports it. If a type has identity (a handle) or behavior (a function), it is surface, not vocabulary, and does not belong here.

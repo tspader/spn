@@ -7,7 +7,7 @@
 #include "external/cc.h"
 #include "event/event.h"
 #include "intern/intern.h"
-#include "op/build/build.h"
+#include "graph/build.h"
 #include "unit/package.h"
 
 static void embed_obs_file(sp_mem_t mem, sp_da(spn_dag_obs_t)* obs, sp_str_t path) {
