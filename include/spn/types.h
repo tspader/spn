@@ -9,6 +9,8 @@ typedef struct {
   u32 count;
 } spn_str_arr_t;
 
+SP_TYPEDEF_FN(void, spn_wake_fn_t, void*);
+
 typedef enum {
   SPN_INDEX_KIND_WORKSPACE,
   SPN_INDEX_KIND_BUILTIN,

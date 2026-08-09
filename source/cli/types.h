@@ -63,7 +63,6 @@ struct spn_cli {
   sp_str_t output;
   bool verbose;
   bool quiet;
-  bool ci;
   u32 refresh;
 
   spn_cli_profile_t profile;
@@ -80,6 +79,9 @@ typedef struct {
   spn_ctx_t* ctx;
   spn_session_t* session;
   sp_mem_t mem;
+  sp_semaphore_t wake;
+  sp_atomic_ptr_t active;
+  sp_atomic_s32_t interrupted;
 } spn_cli_host_t;
 
 extern spn_cli_t args;

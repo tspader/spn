@@ -202,7 +202,6 @@ typedef struct {
 } spn_dag_trace_event_t;
 
 SP_TYPEDEF_FN(void, spn_dag_trace_fn_t, const spn_dag_trace_event_t*, void*);
-SP_TYPEDEF_FN(bool, spn_dag_cancel_fn_t, void*);
 
 typedef struct {
   spn_err_t err;
@@ -218,8 +217,7 @@ typedef struct {
   spn_dag_obs_table_t* memos;
   const spn_dag_roots_t* roots;
   spn_dag_progress_t* progress;
-  spn_dag_cancel_fn_t cancel;
-  void* cancel_data;
+  sp_atomic_s32_t* cancel;
   spn_dag_trace_fn_t trace;
   void* trace_data;
   sp_str_t scratch;

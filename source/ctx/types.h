@@ -19,7 +19,6 @@ typedef struct spn_op_t spn_op_t;
 struct spn_ctx_t {
   spn_project_t* project;
   spn_session_t* session;
-  sp_atomic_s32_t cancelled;
   sp_atomic_s32_t error;
   sp_atomic_ptr_t progress;
   sp_da(spn_index_info_t) indexes;
@@ -44,6 +43,11 @@ struct spn_ctx_t {
     sp_queue_t queue;
     sp_atomic_u32_t running;
   } ops;
+
+  struct {
+    spn_wake_fn_t fn;
+    void* data;
+  } wake;
 };
 
 extern spn_ctx_t spn;

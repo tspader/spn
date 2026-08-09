@@ -104,7 +104,6 @@ sp_test(offline, shared_store) {
       },
     },
   };
-  sp_ps_config_add_arg(mem, &config, sp_str_lit("--ci"));
   sp_ps_config_add_arg(mem, &config, sp_str_lit("build"));
 
   sp_ps_output_t output = sp_ps_run(mem, config);

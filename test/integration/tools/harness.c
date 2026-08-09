@@ -227,7 +227,6 @@ static sp_err_t fixture_publish(sp_test_t* t, fixture_t* fixture, sp_str_t repo,
       },
     },
   };
-  sp_ps_config_add_arg(mem, &config, sp_str_lit("--ci"));
   sp_ps_config_add_arg(mem, &config, sp_str_lit("publish"));
   sp_ps_config_add_arg(mem, &config, sp_str_lit("--source-url"));
   sp_ps_config_add_arg(mem, &config, sp_str_replace_c8(mem, url, '\\', '/'));
@@ -760,7 +759,6 @@ static sp_ps_output_t run_spn_command(sp_test_t* t, fixture_t* fixture, const c8
       },
     },
   };
-  sp_ps_config_add_arg(mem, &config, sp_str_lit("--ci"));
 
   u32 env_slot = 0;
   while (env_slot < sp_carr_len(config.env.extra) && !sp_str_empty(config.env.extra[env_slot].key)) {

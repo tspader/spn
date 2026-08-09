@@ -17,9 +17,6 @@
 #include "tui/tui.h"
 
 
-sp_app_result_t sp_prompt_app_on_poll(sp_app_t* app);
-sp_app_result_t sp_prompt_app_on_init(sp_app_t* app);
-void sp_prompt_app_on_deinit(sp_app_t* app);
 sp_prompt_widget_t sp_prompt_progress_widget(sp_prompt_ctx_t* ctx, sp_prompt_progress_t config);
 
 #ifdef SP_WIN32
@@ -1597,11 +1594,12 @@ void spn_tui_flush(spn_tui_t* tui) {
 
     switch (event->kind) {
       case SPN_EVENT_BUILD_PASSED: {
-        spn_prompt_stop(tui, true);
+        spn_prompt_stop(tui, SP_PROMPT_STATE_SUBMIT);
         break;
       }
       case SPN_EVENT_BUILD_FAILED: {
-        spn_prompt_stop(tui, false);
+        bool cancelled = tui->prompt.op && spn_op_cancelled(tui->prompt.op);
+        spn_prompt_stop(tui, cancelled ? SP_PROMPT_STATE_CANCEL : SP_PROMPT_STATE_ERROR);
         break;
       }
       default: {
@@ -1650,7 +1648,9 @@ static spn_tui_t* prompt_tui;
 static void on_prompt_event(sp_prompt_ctx_t* ctx, sp_prompt_event_t event) {
   switch (event.kind) {
     case SP_PROMPT_EVENT_CTRL_C: {
-      spn_ctx_cancel(&spn);
+      if (prompt_tui->prompt.op) {
+        spn_op_cancel(prompt_tui->prompt.op);
+      }
       break;
     }
     case SP_PROMPT_EVENT_ESCAPE: {
@@ -1688,39 +1688,26 @@ static void prompt_start(spn_tui_t* tui) {
   });
   sp_prompt_widget_t widget = tui->prompt.widget;
   widget.on_event = on_prompt_event;
-  sp_prompt_app(tui->prompt.ctx, widget);
-  tui->prompt.app = (sp_app_t) { .user_data = tui->prompt.ctx };
-  sp_prompt_app_on_init(&tui->prompt.app);
+  tui->prompt.app = sp_app_new(tui->mem, sp_prompt_app(tui->prompt.ctx, widget));
   tui->prompt.on = true;
   attach_prompt(tui, tui->prompt.ctx);
 }
 
-// @spader
-// What does this even mean? What does it mean to "submit" the main
-// TUI? Also, this can get called from:
-// - poll(), when we see the shutdown signal
-// - update(), if a step returns an error
-// - deinit(), unconditionally in interactive mode?
-void spn_prompt_stop(spn_tui_t* tui, bool ok) {
+void spn_prompt_stop(spn_tui_t* tui, sp_prompt_state_t state) {
   if (!tui->prompt.on) {
     return;
   }
 
-  sp_prompt_state_t state = ok ? SP_PROMPT_STATE_SUBMIT : SP_PROMPT_STATE_ERROR;
-  if (spn_ctx_cancelled(&spn)) {
-    state = SP_PROMPT_STATE_CANCEL;
-  }
-
   sp_prompt_set_state(tui->prompt.ctx, state);
-  sp_prompt_app_on_poll(&tui->prompt.app);
+  sp_app_tick(tui->prompt.app);
   sp_prompt_end(tui->prompt.ctx);
   tui->prompt.on = false;
   detach_prompt(tui);
 }
 
 static void prompt_pump(spn_tui_t* tui) {
-  if (spn_ctx_cancelled(&spn)) {
-    spn_prompt_stop(tui, false);
+  if (spn_op_cancelled(tui->prompt.op)) {
+    spn_prompt_stop(tui, SP_PROMPT_STATE_CANCEL);
     return;
   }
 
@@ -1743,20 +1730,40 @@ static void prompt_pump(spn_tui_t* tui) {
   sp_mem_end_scratch(s);
 
   sp_prompt_send_progress_f32(tui->prompt.ctx, value);
-  sp_prompt_app_on_poll(&tui->prompt.app);
+  sp_app_tick(tui->prompt.app);
 }
 
-void spn_tui_poll(spn_tui_t* tui) {
+void spn_tui_poll(spn_tui_t* tui, spn_op_t* op) {
   if (tui->handoff.granted) {
     return;
   }
 
+  tui->prompt.op = op;
   spn_tui_flush(tui);
   prompt_pump(tui);
 }
 
+void spn_tui_op_done(spn_tui_t* tui, spn_op_t* op) {
+  if (tui->handoff.granted) {
+    tui->prompt.op = SP_NULLPTR;
+    return;
+  }
+
+  tui->prompt.op = op;
+  spn_tui_flush(tui);
+
+  sp_prompt_state_t state = SP_PROMPT_STATE_SUBMIT;
+  if (spn_op_cancelled(op)) {
+    state = SP_PROMPT_STATE_CANCEL;
+  } else if (spn_op_result(op).err) {
+    state = SP_PROMPT_STATE_ERROR;
+  }
+  spn_prompt_stop(tui, state);
+  tui->prompt.op = SP_NULLPTR;
+}
+
 void spn_tui_handoff(spn_tui_t* tui) {
-  spn_prompt_stop(tui, true);
+  spn_prompt_stop(tui, SP_PROMPT_STATE_SUBMIT);
   spn_tui_flush(tui);
   tui->handoff.granted = true;
 }

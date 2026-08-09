@@ -1279,10 +1279,6 @@ static sp_str_t dag_root_dir(sp_mem_t mem, sp_str_t path) {
   return sp_str_empty(canonical) ? sp_fs_normalize_path(mem, path) : canonical;
 }
 
-static bool dag_cancelled(void* data) {
-  return spn_op_cancelled((spn_op_t*)data);
-}
-
 spn_dag_build_t* spn_dag_build_new(spn_op_t* op) {
   spn_session_t* session = op->session;
   spn_dag_build_t* b = sp_alloc_type(session->mem, spn_dag_build_t);
@@ -1323,8 +1319,7 @@ spn_dag_build_t* spn_dag_build_new(spn_op_t* op) {
     .memos = &b->memos,
     .roots = &b->roots,
     .progress = &b->progress,
-    .cancel = dag_cancelled,
-    .cancel_data = op,
+    .cancel = &op->cancelled,
     .scratch = tmp,
   };
 

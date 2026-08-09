@@ -1089,7 +1089,7 @@ spn_err_t spn_dag_run_executor(spn_dag_t* g, spn_dag_env_t* env, spn_thread_pool
       turns++;
       sp_assert(turns <= turns_max);
 
-      if (!run.err && env->cancel && env->cancel(env->cancel_data)) {
+      if (!run.err && env->cancel && sp_atomic_s32_load(env->cancel, SP_ATOMIC_SEQ_CST)) {
         run.err = SPN_ERR_DAG_CANCELLED;
       }
 
