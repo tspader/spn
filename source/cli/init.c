@@ -1,6 +1,6 @@
 #include "cli/cli.h"
 
-#include "sp/sp_prompt.h"
+#include "sp/prompt.h"
 #include "tui/tui.h"
 
 static sp_str_t get_dir(sp_mem_t mem, spn_cli_init_t* command, sp_str_t project) {

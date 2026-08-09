@@ -5,7 +5,7 @@
 
 #include "sp.h"
 #include "sp/sp_math.h"
-#include "sp/sp_prompt.h"
+#include "sp/prompt.h"
 #include "event/types.h"
 #include "core/types.h"
 
@@ -44,6 +44,10 @@ typedef struct {
   sp_mem_t mem;
   spn_logger_t logger;
   spn_tui_line_writer_t writer;
+  struct {
+    sp_sys_fd_t read;
+    sp_sys_fd_t write;
+  } wake;
   sp_str_ht(bool) seen_url;
   sp_da(spn_tui_buffered_log_t) buffered_logs;
   u32 num_downloads;
@@ -54,6 +58,7 @@ typedef struct {
     sp_app_t* app;
     sp_prompt_widget_t widget;
     spn_op_t* op;
+    spn_progress_t last;
     bool started;
     bool on;
   } prompt;

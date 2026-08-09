@@ -1,3 +1,4 @@
+#include "core/core.h"
 #include "spn/host.h"
 
 #include "ctx/types.h"
@@ -48,6 +49,7 @@ static void exec(spn_op_t* op) {
   sp_atomic_u32_store(&op->done, 1, SP_ATOMIC_RELEASE);
 
   spn_ctx_t* ctx = op->ctx;
+  // spn_wake_ring(&ctx->wake);
   if (ctx->wake.fn) {
     ctx->wake.fn(ctx->wake.data);
   }

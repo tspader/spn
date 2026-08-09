@@ -1,4 +1,5 @@
 add_executable(fuzz_dag
+  ${SRC}/core/core.c
   ${SRC}/dag/dag.c
   ${SRC}/dag/store.c
   ${SRC}/dag/run.c

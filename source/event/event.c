@@ -2,6 +2,8 @@
 #include "event/build.h"
 #include "event/log.h"
 
+#include "core/core.h"
+
 #include <stddef.h>
 
 #if defined(SP_POSIX)
@@ -93,6 +95,10 @@ void spn_event_buffer_push(spn_event_buffer_t* events, spn_build_event_t event) 
   }
 
   sp_mutex_unlock(&events->mutex);
+
+  if (events->wake) {
+    spn_wake_ring(events->wake);
+  }
 }
 
 sp_da(spn_build_event_t) spn_event_buffer_drain(sp_mem_t mem, spn_event_buffer_t* events) {

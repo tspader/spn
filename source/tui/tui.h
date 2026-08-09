@@ -5,9 +5,10 @@
 #include "event/types.h"
 
 void            spn_tui_init(spn_tui_t* tui);
-void            spn_tui_open(spn_tui_t* tui, spn_tui_mode_t mode, spn_verbosity_t verbosity);
+void            spn_tui_open(spn_tui_t* tui, spn_tui_mode_t mode, spn_verbosity_t verbosity, sp_sys_fd_t wake_read, sp_sys_fd_t wake_write);
 void            spn_tui_flush(spn_tui_t* tui);
 void            spn_tui_poll(spn_tui_t* tui, spn_op_t* op);
+bool            spn_tui_wants_input(spn_tui_t* tui);
 void            spn_tui_op_done(spn_tui_t* tui, spn_op_t* op);
 void            spn_tui_handoff(spn_tui_t* tui);
 void            spn_tui_log_event(spn_tui_t* tui, spn_build_event_t* event);

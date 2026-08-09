@@ -2,6 +2,7 @@ add_executable(core
   main.c
   fs.c
   filter.c
+  wake.c
   identity.c
   intern.c
   lazy.c
@@ -112,6 +113,7 @@ add_executable(core
   ${SRC}/compiler/gnu.c
   ${SRC}/compiler/msvc.c
   ${SRC}/compiler/toc.c
+  ${SRC}/core/core.c
   ${SRC}/ctx/ctx.c
   ${SRC}/dag/dag.c
   ${SRC}/dag/glob.c

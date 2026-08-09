@@ -1,5 +1,6 @@
 #include "dag/dag.h"
 #include "dag/types.h"
+#include "core/core.h"
 #include "thread_pool/thread_pool.h"
 #include "sha256/sha256.h"
 #include "error/types.h"
@@ -146,6 +147,9 @@ static void trace_resolve(spn_dag_env_t* env, spn_dag_id_t action, bool hit, boo
 static void progress_total(spn_dag_env_t* env, u64 total) {
   if (env->progress) {
     sp_atomic_s32_store(&env->progress->total, (s32)total, SP_ATOMIC_SEQ_CST);
+    if (env->wake) {
+      spn_wake_ring(env->wake);
+    }
   }
 }
 
@@ -158,6 +162,9 @@ static void progress_count(spn_dag_env_t* env, const spn_dag_action_t* action, b
     sp_atomic_s32_add(hit ? &env->progress->hits : &env->progress->misses, 1, SP_ATOMIC_SEQ_CST);
   }
   sp_atomic_s32_add(&env->progress->completed, 1, SP_ATOMIC_SEQ_CST);
+  if (env->wake) {
+    spn_wake_ring(env->wake);
+  }
 }
 
 static bool is_file_settled(spn_dag_file_cache_t* files, sp_str_t path, spn_dag_digest_t digest) {

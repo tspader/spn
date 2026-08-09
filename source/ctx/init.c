@@ -234,6 +234,7 @@ spn_ctx_t* spn_ctx_new(spn_wake_fn_t wake, void* wake_data) {
   ctx->env = sp_alloc_type(ctx->heap, sp_env_t);
   *ctx->env = sp_env_capture(ctx->heap);
   ctx->events = spn_event_buffer_new(ctx->mem);
+  ctx->events->wake = &ctx->wake;
 
   ctx->paths.cwd = sp_fs_get_cwd(ctx->heap);
   ctx->paths.patches = sp_env_get(ctx->env, sp_str_lit("SPN_PATCH_DIR"));
