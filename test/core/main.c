@@ -1,6 +1,7 @@
 #define SP_IMPLEMENTATION
 #include "sp.h"
 #include "sp/atomic_file.h"
+#include "sp/queue.h"
 
 #include "spn_test.h"
 #include "sp_sim.h"

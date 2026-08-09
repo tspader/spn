@@ -94,6 +94,7 @@ source = [
   "test/core/pkg/pkg.c",
   "test/core/profile/profile.c",
   "test/core/publish/publish.c",
+  "test/core/queue/*.c",
   "test/core/schema/schema.c",
   "test/core/toml/*.c",
   "test/core/thread_pool/*.c",
