@@ -44,10 +44,7 @@ struct spn_ctx_t {
     sp_atomic_u32_t running;
   } ops;
 
-  struct {
-    spn_wake_fn_t fn;
-    void* data;
-  } wake;
+  spn_wake_t wake;
 };
 
 extern spn_ctx_t spn;

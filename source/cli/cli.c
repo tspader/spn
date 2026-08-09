@@ -475,17 +475,26 @@ sp_cli_result_t spn_cli_refresh_indexes() {
 }
 
 spn_err_t spn_cli_wait(spn_op_t* op) {
-  sp_atomic_ptr_store(&host.active, op, SP_ATOMIC_SEQ_CST);
-  while (!spn_op_done(op)) {
+  while (true) {
+    u8 drain [16];
+    u64 drained = 0;
+    while (sp_sys_read(host.doorbell.read, drain, sizeof(drain), &drained) == SP_OK && drained) {}
+
     if (sp_atomic_s32_load(&host.interrupted, SP_ATOMIC_SEQ_CST)) {
       spn_op_cancel(op);
     }
+
     spn_tui_poll(&tui, op);
-    if (!spn_op_done(op)) {
-      sp_semaphore_wait_for(&host.wake, 10);
+    if (spn_op_done(op)) {
+      break;
+    }
+
+    if (!spn_tui_wants_input(&tui)) {
+      sp_sys_fd_t fds [1] = { host.doorbell.read };
+      u8 ready [1] = sp_zero;
+      sp_sys_fds_wait(fds, ready, 1);
     }
   }
-  sp_atomic_ptr_store(&host.active, SP_NULLPTR, SP_ATOMIC_RELEASE);
 
   spn_tui_op_done(&tui, op);
   return spn_op_result(op).err;

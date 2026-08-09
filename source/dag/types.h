@@ -3,6 +3,7 @@
 
 #include "sp.h"
 #include "spn/core.h"
+#include "core/types.h"
 
 typedef struct spn_dag_action_t spn_dag_action_t;
 typedef struct spn_dag_t spn_dag_t;
@@ -217,6 +218,7 @@ typedef struct {
   spn_dag_obs_table_t* memos;
   const spn_dag_roots_t* roots;
   spn_dag_progress_t* progress;
+  spn_wake_t* wake;
   sp_atomic_s32_t* cancel;
   spn_dag_trace_fn_t trace;
   void* trace_data;

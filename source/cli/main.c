@@ -26,7 +26,7 @@
 #include "sp.h"
 #include "sp/atomic_file.h"
 #include "sp/queue.h"
-#include "sp/sp_prompt.h"
+#include "sp/prompt.h"
 #include "sp/sp_cli.h"
 #include "sp/sp_template.h"
 #include "sp/coff.h"
@@ -49,17 +49,15 @@ static struct {
 } app;
 
 static void on_wake(void* user_data) {
-  sp_semaphore_signal(&host.wake);
+  u8 byte = 0;
+  sp_sys_write(host.doorbell.write, &byte, 1, SP_NULLPTR);
 }
 
 static void on_signal(sp_os_signal_t signal, void* userdata) {
   switch (signal) {
     case SP_OS_SIGNAL_INTERRUPT: {
       sp_atomic_s32_store(&host.interrupted, 1, SP_ATOMIC_SEQ_CST);
-      spn_op_t* op = (spn_op_t*)sp_atomic_ptr_load(&host.active, SP_ATOMIC_ACQUIRE);
-      if (op) {
-        spn_op_cancel(op);
-      }
+      on_wake(SP_NULLPTR);
       break;
     }
     case SP_OS_SIGNAL_ABORT:
@@ -113,10 +111,9 @@ s32 spn_main(s32 num_args, const c8** argv) {
   if (!sp_str_empty(args.output)) {
     mode = spn_output_mode_from_str(args.output);
   }
-  spn_tui_open(&tui, mode, verbosity);
-
   host.mem = sp_mem_arena_as_allocator(sp_mem_arena_new(sp_mem_os_new()));
-  sp_semaphore_init(&host.wake);
+  sp_sys_pipe(&host.doorbell.read, &host.doorbell.write);
+  spn_tui_open(&tui, mode, verbosity, host.doorbell.read, host.doorbell.write);
   host.ctx = spn_ctx_new(on_wake, SP_NULLPTR);
   sp_os_register_signal_handler(SP_OS_SIGNAL_INTERRUPT, on_signal, SP_NULLPTR);
 

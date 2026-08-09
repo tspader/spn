@@ -1,4 +1,5 @@
 add_executable(fuzz_resolver
+  ${SRC}/core/core.c
   ${SRC}/ctx/ctx.c
   ${SRC}/intern/context.c
   ${SRC}/intern/intern.c

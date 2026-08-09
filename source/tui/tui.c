@@ -3,7 +3,7 @@
 #include "sp/color.h"
 #include "sp/io.h"
 #include "sp/macro.h"
-#include "sp/sp_prompt.h"
+#include "sp/prompt.h"
 #include "sp/str.h"
 
 #include "ctx/types.h"
@@ -1563,9 +1563,11 @@ void spn_tui_init(spn_tui_t* tui) {
   sp_ht_init(tui->mem, tui->thread_ids);
 }
 
-void spn_tui_open(spn_tui_t* tui, spn_tui_mode_t mode, spn_verbosity_t verbosity) {
+void spn_tui_open(spn_tui_t* tui, spn_tui_mode_t mode, spn_verbosity_t verbosity, sp_sys_fd_t wake_read, sp_sys_fd_t wake_write) {
   tui->mode = mode;
   tui->logger.verbosity = verbosity;
+  tui->wake.read = wake_read;
+  tui->wake.write = wake_write;
 }
 
 static u32 get_short_tid(spn_tui_t* tui, u64 thread_id) {
@@ -1680,6 +1682,7 @@ static void prompt_start(spn_tui_t* tui) {
   if (!tui->prompt.ctx) {
     return;
   }
+  sp_prompt_use_wake(tui->prompt.ctx, tui->wake.read, tui->wake.write);
 
   prompt_tui = tui;
   tui->prompt.widget = sp_prompt_progress_widget(tui->prompt.ctx, (sp_prompt_progress_t) {
@@ -1689,6 +1692,7 @@ static void prompt_start(spn_tui_t* tui) {
   sp_prompt_widget_t widget = tui->prompt.widget;
   widget.on_event = on_prompt_event;
   tui->prompt.app = sp_app_new(tui->mem, sp_prompt_app(tui->prompt.ctx, widget));
+  tui->prompt.last = sp_zero_s(spn_progress_t);
   tui->prompt.on = true;
   attach_prompt(tui, tui->prompt.ctx);
 }
@@ -1705,31 +1709,30 @@ void spn_prompt_stop(spn_tui_t* tui, sp_prompt_state_t state) {
   detach_prompt(tui);
 }
 
-static void prompt_pump(spn_tui_t* tui) {
+static void prompt_pump(spn_tui_t* tui, bool building, spn_progress_t progress) {
   if (spn_op_cancelled(tui->prompt.op)) {
     spn_prompt_stop(tui, SP_PROMPT_STATE_CANCEL);
     return;
   }
 
-  spn_progress_t progress = sp_zero;
-  if (!spn_ctx_progress(&spn, &progress)) {
-    return;
-  }
-
   if (!tui->prompt.on) {
-    if (!progress.misses) return;
+    if (!building || !progress.misses) return;
     prompt_start(tui);
     if (!tui->prompt.on) return;
   }
 
-  f32 value = progress.total ? (f32)progress.completed / (f32)progress.total : 0.f;
+  if (building && (progress.completed != tui->prompt.last.completed || progress.total != tui->prompt.last.total)) {
+    tui->prompt.last = progress;
 
-  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-  sp_prompt_send_status_str(tui->prompt.ctx, sp_fmt(s.mem,
-    "{}/{} units", sp_fmt_uint(progress.completed), sp_fmt_uint(progress.total)).value);
-  sp_mem_end_scratch(s);
+    sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+    sp_prompt_send_status_str(tui->prompt.ctx, sp_fmt(s.mem,
+      "{}/{} units", sp_fmt_uint(progress.completed), sp_fmt_uint(progress.total)).value);
+    sp_mem_end_scratch(s);
 
-  sp_prompt_send_progress_f32(tui->prompt.ctx, value);
+    f32 value = progress.total ? (f32)progress.completed / (f32)progress.total : 0.f;
+    sp_prompt_send_progress_f32(tui->prompt.ctx, value);
+  }
+
   sp_app_tick(tui->prompt.app);
 }
 
@@ -1739,8 +1742,14 @@ void spn_tui_poll(spn_tui_t* tui, spn_op_t* op) {
   }
 
   tui->prompt.op = op;
+  spn_progress_t progress = sp_zero;
+  bool building = spn_ctx_progress(&spn, &progress);
   spn_tui_flush(tui);
-  prompt_pump(tui);
+  prompt_pump(tui, building, progress);
+}
+
+bool spn_tui_wants_input(spn_tui_t* tui) {
+  return tui->prompt.on;
 }
 
 void spn_tui_op_done(spn_tui_t* tui, spn_op_t* op) {

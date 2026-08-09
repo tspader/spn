@@ -264,6 +264,7 @@ struct spn_event_buffer_t {
   sp_rb(spn_build_event_t) buffer;
   sp_mutex_t mutex;
   spn_lazy_log_t log;
+  spn_wake_t* wake;
 };
 
 #endif

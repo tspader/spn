@@ -1,5 +1,6 @@
 #include "spn/host.h"
 
+#include "core/core.h"
 #include "ctx/ctx.h"
 #include "dag/types.h"
 #include "intern/intern.h"
@@ -11,6 +12,7 @@ sp_intern_t* spn_ctx_get_intern() {
 }
 
 bool spn_ctx_progress(spn_ctx_t* ctx, spn_progress_t* progress) {
+  spn_wake_rearm(&ctx->wake);
   spn_dag_progress_t* dag = (spn_dag_progress_t*)sp_atomic_ptr_load(&ctx->progress, SP_ATOMIC_SEQ_CST);
   if (!dag) {
     return false;

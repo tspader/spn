@@ -3,6 +3,7 @@
 
 #include "sp.h"
 #include "spn/core.h"
+#include "spn/types.h"
 
 typedef struct spn_project_t spn_project_t;
 typedef struct spn_ctx_t spn_ctx_t;
@@ -24,6 +25,12 @@ typedef struct spn_dag_build_t spn_dag_build_t;
 typedef struct sp_intern_t sp_intern_t;
 
 typedef sp_hash_t spn_build_id_t;
+
+typedef struct {
+  spn_wake_fn_t fn;
+  void* data;
+  sp_atomic_u32_t signaled;
+} spn_wake_t;
 
 typedef struct toml_table_t toml_table_t;
 

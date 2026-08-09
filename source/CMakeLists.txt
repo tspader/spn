@@ -1,6 +1,7 @@
 set(SPN_SOURCES
   api/api.c
   api/core.c
+  core/core.c
   api/node/node.c
   project/project.c
   host/host.c

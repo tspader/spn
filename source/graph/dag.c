@@ -1319,6 +1319,7 @@ spn_dag_build_t* spn_dag_build_new(spn_op_t* op) {
     .memos = &b->memos,
     .roots = &b->roots,
     .progress = &b->progress,
+    .wake = &op->ctx->wake,
     .cancel = &op->cancelled,
     .scratch = tmp,
   };

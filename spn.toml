@@ -116,6 +116,7 @@ source = [
   "source/compiler/gnu.c",
   "source/compiler/msvc.c",
   "source/compiler/toc.c",
+  "source/core/core.c",
   "source/ctx/ctx.c",
   "source/dag/dag.c",
   "source/dag/glob.c",
@@ -196,6 +197,7 @@ flags = [
 [[test]]
 name = "resolver"
 source = [
+  "source/core/core.c",
   "source/ctx/ctx.c",
   "source/intern/context.c",
   "source/intern/intern.c",
@@ -275,6 +277,7 @@ flags = []
 [[test]]
 name = "fuzz_dag"
 source = [
+  "source/core/core.c",
   "source/dag/dag.c",
   "source/dag/store.c",
   "source/dag/run.c",
@@ -306,6 +309,7 @@ flags = []
 [[test]]
 name = "fuzz_resolver"
 source = [
+  "source/core/core.c",
   "source/ctx/ctx.c",
   "source/intern/context.c",
   "source/intern/intern.c",
