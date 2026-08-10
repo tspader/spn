@@ -20,3 +20,7 @@ deps = ["spum"]
 [[script]]
 name = "script"
 source = ["script.c"]
+
+[[example]]
+name = "x"
+source = ["x.c"]

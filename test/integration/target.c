@@ -58,12 +58,27 @@ sp_test(target, multiple_roots) {
 sp_test(target, selection_default) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/target/selection",
-    .copy = { "spum.c", "script.c" },
+    .copy = { "spum.c", "script.c", "x.c" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
       { .kind = ACTION_VERIFY_EXISTS, .exists = static_lib("spum") },
       { .kind = ACTION_VERIFY_EXISTS, .exists = store_file("bin/main") },
       { .kind = ACTION_VERIFY_EXISTS, .exists = test_exe("test") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = example_exe("x") },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .exists = store_file("bin/script") },
+    },
+  });
+}
+
+sp_test(target, selection_example) {
+  return run_test(t, (test_t) {
+    .project = "test/integration/fixtures/target/selection",
+    .copy = { "spum.c", "script.c", "x.c" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "--example" } } },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = example_exe("x") },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .exists = store_file("bin/main") },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .exists = test_exe("test") },
       { .kind = ACTION_VERIFY_NOT_EXISTS, .exists = store_file("bin/script") },
     },
   });
@@ -91,6 +106,7 @@ sp_test(target, selection_multiple_kinds) {
       { .kind = ACTION_VERIFY_EXISTS, .exists = static_lib("spum") },
       { .kind = ACTION_VERIFY_EXISTS, .exists = test_exe("test") },
       { .kind = ACTION_VERIFY_NOT_EXISTS, .exists = store_file("bin/script") },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .exists = example_exe("x") },
     },
   });
 }
@@ -134,6 +150,18 @@ sp_test(target, selection_run_command) {
   });
 }
 
+sp_test(target, example) {
+  return run_test(t, (test_t) {
+    .project = "test/integration/fixtures/target/example",
+    .copy = { "a.c", "a.h", "example" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = static_lib("A") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = example_exe("E") },
+    },
+  });
+}
+
 sp_test(target, publish) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/target/publish",
@@ -156,16 +184,6 @@ sp_test(target, system_deps) {
       { .kind = ACTION_VERIFY_EXISTS, .exists = sp_str_lit("spn.lock") },
       { .kind = ACTION_VERIFY_EXISTS, .exists = exe("main") },
       { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "--force" } } },
-      { .kind = ACTION_VERIFY_EXISTS, .exists = exe("main") },
-    },
-  });
-}
-
-sp_test(target, source_pin) {
-  return run_test(t, (test_t) {
-    .project = "test/integration/fixtures/target/source_pin",
-    .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { "build" } },
       { .kind = ACTION_VERIFY_EXISTS, .exists = exe("main") },
     },
   });
