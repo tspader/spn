@@ -2,8 +2,10 @@
 name = "fullpkg"
 version = "2.3.4"
 namespace = "core"
-url = "https://example.com/fullpkg"
 repo = "https://github.com/acme/fullpkg"
 author = "Ada Lovelace"
 maintainer = "Grace Hopper"
+
+[package.upstream]
+url = "https://example.com/fullpkg"
 commit = "abc123def456"

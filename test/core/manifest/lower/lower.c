@@ -18,6 +18,7 @@
 typedef struct {
   const c8* value;
   const c8* when;
+  spn_tree_t tree;
 } gated_t;
 
 typedef struct {
@@ -395,14 +396,33 @@ static const test_t tests [] = {
     .name = "validate_upstream_url_only",
     .manifest = "validate_upstream_url_only",
     .issues = {
-      { SPN_ERR_CODEGEN_MISSING_KEY, "package.commit" }
+      { SPN_ERR_CODEGEN_MISSING_KEY, "package.upstream.commit" }
     }
   },
   {
     .name = "validate_upstream_commit_only",
     .manifest = "validate_upstream_commit_only",
     .issues = {
-      { SPN_ERR_CODEGEN_MISSING_KEY, "package.url" }
+      { SPN_ERR_CODEGEN_MISSING_KEY, "package.upstream.url" }
+    }
+  },
+  {
+    .name = "target_tree",
+    .manifest = "target_tree",
+    .libs = {
+      {
+        .name = "t",
+        .linkages = { .static_lib = true },
+        .source = { { "a.c" }, { "b.c", .tree = SPN_TREE_MANIFEST }, { "c.c", .tree = SPN_TREE_SOURCE } },
+        .include = { { "inc", .tree = SPN_TREE_MANIFEST } },
+      }
+    }
+  },
+  {
+    .name = "validate_tree_invalid",
+    .manifest = "validate_tree_invalid",
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "lib[0].source[0].tree" }
     }
   },
   {
@@ -835,10 +855,26 @@ static sp_err_t check_gated_list(sp_test_t* t, spn_gated_list_t actual, const ga
   return SP_OK;
 }
 
+static sp_err_t check_gated_path_list(sp_test_t* t, spn_gated_path_list_t actual, const gated_t* expected, u32 n) {
+  sp_must_eq(t, n, (u32)sp_da_size(actual));
+  sp_for(i, n) {
+    sp_expect_str_eq_c(t, actual[i].path, expected[i].value);
+    sp_expect_eq(t, (u32)(expected[i].tree ? expected[i].tree : SPN_TREE_SOURCE), (u32)actual[i].tree);
+    sp_expect_str_eq_c(t, spn_when_to_str(sp_test_arena(t), &actual[i].when), expected[i].when ? expected[i].when : "always");
+  }
+  return SP_OK;
+}
+
 #define check_gated(t, actual, expected) do { \
   u32 num_gated = 0; \
   sp_carr_detect_len(expected, num_gated, (expected)[num_gated].value); \
   sp_try(check_gated_list(t, actual, expected, num_gated)); \
+} while (0)
+
+#define check_gated_paths(t, actual, expected) do { \
+  u32 num_gated = 0; \
+  sp_carr_detect_len(expected, num_gated, (expected)[num_gated].value); \
+  sp_try(check_gated_path_list(t, actual, expected, num_gated)); \
 } while (0)
 
 static sp_err_t check_targets(sp_test_t* t, spn_target_map_t om, const target_t* arr, u32 n, spn_target_kind_t kind) {
@@ -858,9 +894,9 @@ static sp_err_t check_targets(sp_test_t* t, spn_target_map_t om, const target_t*
     sp_expect_eq(t, (u32)0, (u32)sp_da_size(info->flags));
     sp_expect_eq(t, (u32)0, (u32)sp_da_size(info->system_deps));
     sp_expect_eq(t, (u32)0, (u32)sp_da_size(info->deps));
-    check_gated(t, info->gated.source, arr[i].source);
+    check_gated_paths(t, info->gated.source, arr[i].source);
     sp_must_strs_eq(t, info->headers, sp_da_size(info->headers), arr[i].headers);
-    check_gated(t, info->gated.include, arr[i].include);
+    check_gated_paths(t, info->gated.include, arr[i].include);
     check_gated(t, info->gated.define, arr[i].define);
     check_gated(t, info->gated.flags, arr[i].flags);
     check_gated(t, info->gated.system_deps, arr[i].system_deps);

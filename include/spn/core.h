@@ -103,6 +103,12 @@ typedef enum {
 } spn_win_subsystem_t;
 
 typedef enum {
+  SPN_TREE_NONE,
+  SPN_TREE_SOURCE,
+  SPN_TREE_MANIFEST,
+} spn_tree_t;
+
+typedef enum {
   SPN_LIBC_GNU = 0,
   SPN_LIBC_MUSL = 1,
   SPN_LIBC_COSMOPOLITAN = 2,

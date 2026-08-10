@@ -400,6 +400,7 @@ static spn_err_union_t resolve_local_package(spn_resolver_t* resolver, spn_resol
         .kind = SPN_PKG_ROOT_LOCAL,
         .local = sp_fs_parent_path(pkg->manifest)
       },
+      .source = spn_pkg_upstream(pkg->info),
       .paths = {
         .manifest = sp_fs_get_name(pkg->manifest),
         .script = sp_str_lit("spn.c")
@@ -407,10 +408,6 @@ static spn_err_union_t resolve_local_package(spn_resolver_t* resolver, spn_resol
       .info = pkg->info,
     },
   };
-
-  if (pkg->source == SPN_PKG_SOURCE_FILE) {
-    node.origin.source = spn_pkg_upstream(pkg->info);
-  }
 
   sp_da_init(resolver->mem, node.deps);
 

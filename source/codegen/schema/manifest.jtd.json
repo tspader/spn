@@ -25,6 +25,7 @@
     "opt_level": { "enum": ["0", "1", "2", "3", "s", "z"] },
     "sanitizer": { "enum": ["address", "thread", "undefined", "memory", "leak"] },
     "win_subsystem": { "enum": ["console", "windows"] },
+    "tree": { "enum": ["manifest", "source"] },
 
     "platform_macos": {
       "optionalProperties": {
@@ -57,7 +58,15 @@
         "path": { "type": "string" }
       },
       "optionalProperties": {
+        "tree": { "ref": "tree" },
         "when": { "metadata": { "extern": "when", "include": "when/types.h" } }
+      }
+    },
+
+    "upstream": {
+      "properties": {
+        "url": { "type": "string" },
+        "commit": { "type": "string" }
       }
     },
 
@@ -108,11 +117,10 @@
       },
       "optionalProperties": {
         "namespace": { "type": "string" },
-        "url": { "type": "string" },
         "repo": { "type": "string" },
         "author": { "type": "string" },
         "maintainer": { "type": "string" },
-        "commit": { "type": "string" },
+        "upstream": { "ref": "upstream" },
         "include": { "elements": { "type": "string" } },
         "define": { "elements": { "type": "string" } },
         "system_deps": { "elements": { "ref": "system_dep_entry" }, "metadata": { "shorthand": "lib" } },

@@ -114,6 +114,32 @@ static void make_list(
   }
 }
 
+static void make_path_list(
+  sp_mem_t mem,
+  apply_list_t test,
+  sp_da(sp_str_t)* plain,
+  spn_gated_path_list_t* gated
+) {
+  *plain = sp_da_new(mem, sp_str_t);
+  *gated = sp_da_new(mem, spn_gated_path_t);
+
+  sp_carr_for(test.values, it) {
+    apply_value_t* value = &test.values[it];
+    if (!value->value) {
+      break;
+    }
+    if (value->plain) {
+      sp_da_push(*plain, sp_cstr_as_str(value->value));
+      continue;
+    }
+    sp_da_push(*gated, ((spn_gated_path_t) {
+      .path = sp_cstr_as_str(value->value),
+      .tree = SPN_TREE_SOURCE,
+      .when = make_apply_when(mem, value->when, SP_CARR_LEN(value->when)),
+    }));
+  }
+}
+
 static sp_err_t expect_list(sp_test_t* t, sp_da(sp_str_t) actual, const c8** expected) {
   sp_for(et, 4) {
     if (!expected[et]) {
@@ -294,20 +320,30 @@ sp_test_each(options_apply, lists, apply_test_t, list_tests) {
   struct {
     apply_list_t test;
     sp_da(sp_str_t)* plain;
-    spn_gated_list_t* gated;
+    spn_gated_path_list_t* gated;
     const c8** expected;
-  } lists [] = {
+  } path_lists [] = {
     { it->lib_source, &lib->source, &lib->gated.source, it->expect.lib_source },
     { it->source, &exe->source, &exe->gated.source, it->expect.source },
     { it->script_source, &script->source, &script->gated.source, it->expect.script_source },
     { it->test_source, &unit_test->source, &unit_test->gated.source, it->expect.test_source },
     { it->include, &exe->include, &exe->gated.include, it->expect.include },
+  };
+  struct {
+    apply_list_t test;
+    sp_da(sp_str_t)* plain;
+    spn_gated_list_t* gated;
+    const c8** expected;
+  } lists [] = {
     { it->define, &exe->define, &exe->gated.define, it->expect.define },
     { it->flags, &exe->flags, &exe->gated.flags, it->expect.flags },
     { it->sys_target, &exe->system_deps, &exe->gated.system_deps, it->expect.sys_target, },
     { it->deps, &exe->deps, &exe->gated.deps, it->expect.deps },
     { it->sys, &info.system_deps, &info.gated.system_deps, it->expect.sys, },
   };
+  sp_carr_for(path_lists, lt) {
+    make_path_list(mem, path_lists[lt].test, path_lists[lt].plain, path_lists[lt].gated);
+  }
   sp_carr_for(lists, lt) {
     make_list(mem, lists[lt].test, lists[lt].plain, lists[lt].gated);
   }
@@ -324,6 +360,10 @@ sp_test_each(options_apply, lists, apply_test_t, list_tests) {
   }
 
   sp_expect(t, info.applied);
+  sp_carr_for(path_lists, lt) {
+    sp_err_t err = expect_list(t, *path_lists[lt].plain, path_lists[lt].expected);
+    if (err) return err;
+  }
   sp_carr_for(lists, lt) {
     sp_err_t err = expect_list(t, *lists[lt].plain, lists[lt].expected);
     if (err) return err;
