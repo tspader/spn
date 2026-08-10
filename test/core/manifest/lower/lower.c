@@ -137,6 +137,7 @@ typedef struct {
   target_t exes [8];
   target_t scripts [8];
   target_t tests [8];
+  target_t examples [8];
   dep_t deps [8];
   toolchain_t toolchains [4];
   profile_t profiles [4];
@@ -221,6 +222,13 @@ static const test_t tests [] = {
     .name = "test",
     .manifest = "target_test",
     .tests = {
+      { .name = "t" }
+    }
+  },
+  {
+    .name = "example",
+    .manifest = "target_example",
+    .examples = {
       { .name = "t" }
     }
   },
@@ -927,10 +935,11 @@ sp_test_each(lower, cases, test_t, tests) {
   }
 
   // Targets
-  sp_try(check_targets(t, pkg.libs,    it->libs,    SP_CARR_LEN(it->libs),    SPN_TARGET_KIND_LIB));
-  sp_try(check_targets(t, pkg.exes,    it->exes,    SP_CARR_LEN(it->exes),    SPN_TARGET_KIND_EXE));
-  sp_try(check_targets(t, pkg.scripts, it->scripts, SP_CARR_LEN(it->scripts), SPN_TARGET_KIND_SCRIPT));
-  sp_try(check_targets(t, pkg.tests,   it->tests,   SP_CARR_LEN(it->tests),   SPN_TARGET_KIND_TEST));
+  sp_try(check_targets(t, pkg.libs,     it->libs,     SP_CARR_LEN(it->libs),     SPN_TARGET_KIND_LIB));
+  sp_try(check_targets(t, pkg.exes,     it->exes,     SP_CARR_LEN(it->exes),     SPN_TARGET_KIND_EXE));
+  sp_try(check_targets(t, pkg.scripts,  it->scripts,  SP_CARR_LEN(it->scripts),  SPN_TARGET_KIND_SCRIPT));
+  sp_try(check_targets(t, pkg.tests,    it->tests,    SP_CARR_LEN(it->tests),    SPN_TARGET_KIND_TEST));
+  sp_try(check_targets(t, pkg.examples, it->examples, SP_CARR_LEN(it->examples), SPN_TARGET_KIND_EXAMPLE));
 
   // Deps
   sp_carr_for(it->deps, d) {

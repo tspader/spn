@@ -38,6 +38,7 @@ typedef struct {
     bool bin;
     bool lib;
     bool script;
+    bool example;
   } only;
 } spn_cli_build_t;
 

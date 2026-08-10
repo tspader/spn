@@ -42,6 +42,11 @@ sp_str_t spn_target_unit_staged_path(sp_mem_t mem, spn_target_unit_t* target) {
       path = sp_fs_join_path(mem, dir, file_name);
       break;
     }
+    case SPN_TARGET_KIND_EXAMPLE: {
+      sp_str_t dir = sp_fs_join_path(s.mem, target->pkg->build->paths.root, SP_LIT("example"));
+      path = sp_fs_join_path(mem, dir, file_name);
+      break;
+    }
     case SPN_TARGET_KIND_LIB:
     case SPN_TARGET_KIND_CONFIGURE_METAPROGRAM:
     case SPN_TARGET_KIND_BUILD_METAPROGRAM: {

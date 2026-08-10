@@ -134,6 +134,7 @@ struct spn_pkg_info {
   spn_target_map_t exes;
   spn_target_map_t scripts;
   spn_target_map_t tests;
+  spn_target_map_t examples;
   spn_profile_map_t profiles;
   spn_index_map_t indexes;
   sp_da(spn_requested_dep_t) deps;

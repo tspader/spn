@@ -17,3 +17,7 @@ source = ["gen.sh"]
 [[test]]
 name = "unit"
 source = ["test.c"]
+
+[[example]]
+name = "demo"
+source = ["demo.c"]

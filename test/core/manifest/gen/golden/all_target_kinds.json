@@ -34,5 +34,13 @@
         "test.c"
       ]
     }
+  },
+  "example": {
+    "demo": {
+      "name": "demo",
+      "source": [
+        "demo.c"
+      ]
+    }
   }
 }

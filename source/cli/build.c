@@ -18,13 +18,14 @@ sp_cli_result_t spn_cli_build(sp_cli_t* cli) {
   spn_session_config_t config = { .force = cmd->force };
   spn_str_arr_t names = spn_cli_rest_names(cli);
 
-  bool specific = cmd->only.bin || cmd->only.lib || cmd->only.test || cmd->only.script;
+  bool specific = cmd->only.bin || cmd->only.lib || cmd->only.test || cmd->only.script || cmd->only.example;
   if (specific || names.count) {
     bool all_kinds = !specific;
     set_rule(&config.selection.bin, all_kinds || cmd->only.bin, names);
     set_rule(&config.selection.lib, all_kinds || cmd->only.lib, names);
     set_rule(&config.selection.test, all_kinds || cmd->only.test, names);
     set_rule(&config.selection.script, all_kinds || cmd->only.script, names);
+    set_rule(&config.selection.example, all_kinds || cmd->only.example, names);
   }
 
   try(spn_cli_refresh_indexes());

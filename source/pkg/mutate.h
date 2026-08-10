@@ -29,6 +29,8 @@ spn_target_info_t*  spn_pkg_add_script(spn_pkg_info_t* pkg, const c8* name);
 spn_target_info_t*  spn_pkg_add_script_ex(spn_pkg_info_t* pkg, sp_str_t name);
 spn_target_info_t*  spn_pkg_add_test(spn_pkg_info_t* pkg, const c8* name);
 spn_target_info_t*  spn_pkg_add_test_ex(spn_pkg_info_t* pkg, sp_str_t name);
+spn_target_info_t*  spn_pkg_add_example(spn_pkg_info_t* pkg, const c8* name);
+spn_target_info_t*  spn_pkg_add_example_ex(spn_pkg_info_t* pkg, sp_str_t name);
 spn_target_info_t*  spn_pkg_add_lib_ex(spn_pkg_info_t* pkg, sp_str_t name, spn_linkage_set_t linkage);
 
 #endif

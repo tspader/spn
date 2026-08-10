@@ -116,6 +116,12 @@ static sp_cli_cmd_t cmd_build = {
       .ptr = &args.build.only.script,
     },
     {
+      .name = "example",
+      .summary = "Build only example targets",
+      .kind = SP_CLI_OPT_BOOLEAN,
+      .ptr = &args.build.only.example,
+    },
+    {
       .name = "toolchain",
       .kind = SP_CLI_OPT_STR,
       .summary = "Override toolchain",

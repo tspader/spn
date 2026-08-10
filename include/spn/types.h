@@ -52,6 +52,7 @@ typedef struct {
   spn_target_rule_t lib;
   spn_target_rule_t test;
   spn_target_rule_t script;
+  spn_target_rule_t example;
 } spn_target_selection_t;
 
 typedef struct {

@@ -55,6 +55,7 @@ static spn_pkg_info_t* clone_pkg_info(spn_session_t* s, spn_pkg_id_t id, spn_bui
   clone_target_map(&info->exes, source->exes, mem);
   clone_target_map(&info->scripts, source->scripts, mem);
   clone_target_map(&info->tests, source->tests, mem);
+  clone_target_map(&info->examples, source->examples, mem);
   info->include = clone_str_list(mem, source->include);
   info->define = clone_str_list(mem, source->define);
   info->public_define = clone_str_list(mem, source->public_define);
