@@ -187,7 +187,7 @@ static spn_target_info_t target_info(sp_mem_t mem, const plan_target_t* spec) {
   info.name = sp_str_lit("app");
   info.kind = spec->kind;
   info.linkages = spec->linkages;
-  info.source = test_str_list(mem, spec->source, UNIT_TEST_MAX_STRS);
+  info.source = test_tree_path_list(mem, spec->source, UNIT_TEST_MAX_STRS);
   info.deps = test_str_list(mem, spec->deps, UNIT_TEST_MAX_STRS);
   info.macos.frameworks = test_str_list(mem, spec->frameworks, UNIT_TEST_MAX_STRS);
   info.macos.min_os = spec->min_os;

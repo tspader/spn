@@ -1,0 +1,76 @@
+{
+  "package": {
+    "name": "t",
+    "version": "1.0.0",
+    "include": [
+      "inc",
+      {
+        "path": "minc",
+        "tree": "manifest"
+      }
+    ],
+    "build": {
+      "source": [
+        "b.c",
+        {
+          "path": "mb.c",
+          "tree": "manifest"
+        },
+        {
+          "path": "lb.c",
+          "when": {
+            "os": "linux"
+          }
+        }
+      ],
+      "include": [
+        {
+          "path": "binc",
+          "tree": "manifest"
+        }
+      ]
+    },
+    "configure": {
+      "source": [
+        {
+          "path": "mc.c",
+          "tree": "manifest"
+        }
+      ]
+    }
+  },
+  "lib": {
+    "t": {
+      "name": "t",
+      "source": [
+        {
+          "path": "s.c",
+          "tree": "source"
+        },
+        {
+          "path": "m.c",
+          "tree": "manifest"
+        }
+      ],
+      "headers": [
+        "a.h",
+        {
+          "path": "m.h",
+          "tree": "manifest"
+        },
+        {
+          "path": "w.h",
+          "when": {
+            "os": "linux"
+          }
+        }
+      ],
+      "include": [
+        {
+          "path": "minc",
+          "tree": "manifest"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,4 @@
+[package]
+name = "p"
+version = "1.0.0"
+include = [{ path = "inc", tree = "manifest" }, "src", { path = "gen", when = { os = "linux" } }]

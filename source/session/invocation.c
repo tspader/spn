@@ -10,11 +10,12 @@
 #include "unit/unit.h"
 #include "graph/build.h"
 
-static sp_str_t resolve_pkg_path(sp_mem_t mem, spn_pkg_unit_t* pkg, sp_str_t path) {
-  if (sp_fs_is_absolute(path)) {
-    return path;
+static sp_str_t resolve_pkg_path(sp_mem_t mem, spn_pkg_unit_t* pkg, spn_tree_path_t entry) {
+  if (sp_fs_is_absolute(entry.path)) {
+    return entry.path;
   }
-  return sp_fs_join_path(mem, pkg->paths.source, path);
+  sp_str_t root = entry.tree == SPN_TREE_MANIFEST ? pkg->paths.recipe : pkg->paths.source;
+  return sp_fs_join_path(mem, root, entry.path);
 }
 
 static spn_cc_compile_t spn_build_compile_desc(sp_mem_t mem, spn_compile_unit_t* unit) {

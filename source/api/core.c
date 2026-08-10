@@ -230,11 +230,11 @@ spn_sanitizer_set_t spn_profile_get_sanitizers(spn_profile_t* profile) {
 }
 
 void spn_target_add_source(spn_target_t* target, const c8* source) {
-  sp_da_push(unwrap(target)->source, spn_intern_cstr(source));
+  sp_da_push(unwrap(target)->source, ((spn_tree_path_t) { .path = spn_intern_cstr(source), .tree = SPN_TREE_SOURCE }));
 }
 
 void spn_target_add_include(spn_target_t* target, const c8* include) {
-  sp_da_push(unwrap(target)->include, spn_intern_cstr(include));
+  sp_da_push(unwrap(target)->include, ((spn_tree_path_t) { .path = spn_intern_cstr(include), .tree = SPN_TREE_SOURCE }));
 }
 
 void spn_target_add_define(spn_target_t* target, const c8* define) {

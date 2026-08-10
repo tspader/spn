@@ -21,11 +21,19 @@ static sp_da(spn_embed_t) clone_embed_list(sp_mem_t mem, sp_da(spn_embed_t) sour
   return result;
 }
 
+static sp_da(spn_tree_path_t) clone_tree_path_list(sp_mem_t mem, sp_da(spn_tree_path_t) source) {
+  sp_da(spn_tree_path_t) result = sp_da_new(mem, spn_tree_path_t);
+  sp_da_for(source, it) {
+    sp_da_push(result, source[it]);
+  }
+  return result;
+}
+
 static spn_target_info_t clone_target_info(sp_mem_t mem, spn_target_info_t* source) {
   spn_target_info_t target = *source;
-  target.source = clone_str_list(mem, source->source);
-  target.headers = clone_str_list(mem, source->headers);
-  target.include = clone_str_list(mem, source->include);
+  target.source = clone_tree_path_list(mem, source->source);
+  target.headers = clone_tree_path_list(mem, source->headers);
+  target.include = clone_tree_path_list(mem, source->include);
   target.define = clone_str_list(mem, source->define);
   target.flags = clone_str_list(mem, source->flags);
   target.system_deps = clone_str_list(mem, source->system_deps);
@@ -56,7 +64,7 @@ static spn_pkg_info_t* clone_pkg_info(spn_session_t* s, spn_pkg_id_t id, spn_bui
   clone_target_map(&info->scripts, source->scripts, mem);
   clone_target_map(&info->tests, source->tests, mem);
   clone_target_map(&info->examples, source->examples, mem);
-  info->include = clone_str_list(mem, source->include);
+  info->include = clone_tree_path_list(mem, source->include);
   info->define = clone_str_list(mem, source->define);
   info->public_define = clone_str_list(mem, source->public_define);
   info->system_deps = clone_str_list(mem, source->system_deps);

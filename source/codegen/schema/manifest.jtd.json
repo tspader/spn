@@ -121,7 +121,7 @@
         "author": { "type": "string" },
         "maintainer": { "type": "string" },
         "upstream": { "ref": "upstream" },
-        "include": { "elements": { "type": "string" } },
+        "include": { "elements": { "ref": "source_entry" }, "metadata": { "shorthand": "path" } },
         "define": { "elements": { "type": "string" } },
         "system_deps": { "elements": { "ref": "system_dep_entry" }, "metadata": { "shorthand": "lib" } },
         "macos": { "ref": "platform_macos" },
@@ -132,8 +132,8 @@
 
     "build_script": {
       "optionalProperties": {
-        "source": { "elements": { "type": "string" } },
-        "include": { "elements": { "type": "string" } },
+        "source": { "elements": { "ref": "source_entry" }, "metadata": { "shorthand": "path" } },
+        "include": { "elements": { "ref": "source_entry" }, "metadata": { "shorthand": "path" } },
         "define": { "elements": { "type": "string" } },
         "flags": { "elements": { "type": "string" } }
       }
@@ -146,7 +146,7 @@
       "optionalProperties": {
         "kinds": { "elements": { "type": "string" } },
         "source": { "elements": { "ref": "source_entry" }, "metadata": { "shorthand": "path" } },
-        "headers": { "elements": { "type": "string" } },
+        "headers": { "elements": { "ref": "source_entry" }, "metadata": { "shorthand": "path" } },
         "include": { "elements": { "ref": "source_entry" }, "metadata": { "shorthand": "path" } },
         "define": { "elements": { "ref": "value_entry" }, "metadata": { "shorthand": "value" } },
         "flags": { "elements": { "ref": "value_entry" }, "metadata": { "shorthand": "value" } },

@@ -23,24 +23,52 @@ void spn_pkg_unit_create_layout(spn_pkg_unit_t* unit) {
   sp_fs_create_dir(unit->paths.vendor);
 }
 
-static spn_err_t publish_target_headers(spn_pkg_unit_t* unit, spn_target_map_t targets, bool strict) {
+typedef sp_str_ht(sp_str_t) staged_header_set_t;
+
+sp_str_t spn_pkg_unit_header_source(sp_mem_t mem, spn_pkg_unit_t* unit, spn_tree_path_t header) {
+  if (sp_fs_is_absolute(header.path)) {
+    return header.path;
+  }
+  sp_str_t root = header.tree == SPN_TREE_MANIFEST ? unit->paths.recipe : unit->paths.source;
+  return sp_fs_join_path(mem, root, header.path);
+}
+
+static spn_err_t header_collision(spn_pkg_unit_t* unit, sp_str_t path) {
+  spn_event_buffer_push(spn.events, (spn_build_event_t) {
+    .kind = SPN_EVENT_NODE_FAILED,
+    .pkg = unit->info,
+    .io = &unit->logs.io,
+    .node_failed = {
+      .path = path,
+      .message = sp_str_lit("is published from both trees; the destination would collide"),
+    },
+  });
+  return SPN_ERROR;
+}
+
+static spn_err_t publish_target_headers(spn_pkg_unit_t* unit, spn_target_map_t targets, bool strict, sp_mem_t mem, staged_header_set_t* staged) {
   sp_om_for(targets, it) {
     spn_target_info_t* target = sp_str_om_at(targets, it);
 
     sp_da_for(target->headers, h) {
-      sp_str_t header = target->headers[h];
+      spn_tree_path_t header = target->headers[h];
 
-      sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-      sp_str_t from = sp_fs_join_path(scratch.mem, unit->paths.source, header);
-      sp_str_t to = sp_fs_join_path(scratch.mem, unit->paths.include, header);
+      sp_str_t from = spn_pkg_unit_header_source(mem, unit, header);
+      sp_str_t to = sp_fs_join_path(mem, unit->paths.include, header.path);
 
-      spn_err_t err = SPN_OK;
+      sp_str_t* seen = sp_str_ht_get(*staged, to);
+      if (seen) {
+        if (!sp_str_equal(*seen, from)) {
+          return header_collision(unit, header.path);
+        }
+        continue;
+      }
+      sp_str_ht_insert(*staged, to, from);
+
       if (strict || sp_fs_exists(from)) {
         sp_fs_create_dir(sp_fs_parent_path(to));
-        err = sp_fs_copy(from, to) ? SPN_ERROR : SPN_OK;
+        spn_try(sp_fs_copy(from, to) ? SPN_ERROR : SPN_OK);
       }
-      sp_mem_end_scratch(scratch);
-      spn_try(err);
     }
   }
 
@@ -48,13 +76,23 @@ static spn_err_t publish_target_headers(spn_pkg_unit_t* unit, spn_target_map_t t
 }
 
 spn_err_t spn_pkg_unit_publish_headers(spn_pkg_unit_t* unit, bool strict) {
-  spn_try(publish_target_headers(unit, unit->info->libs, strict));
-  if (unit->source == SPN_PKG_SOURCE_ROOT) {
-    spn_try(publish_target_headers(unit, unit->info->exes, strict));
-    spn_try(publish_target_headers(unit, unit->info->scripts, strict));
-    spn_try(publish_target_headers(unit, unit->info->tests, strict));
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  staged_header_set_t staged;
+  sp_str_ht_init(scratch.mem, staged);
+
+  spn_err_t err = publish_target_headers(unit, unit->info->libs, strict, scratch.mem, &staged);
+  if (!err && unit->source == SPN_PKG_SOURCE_ROOT) {
+    spn_target_map_t maps [] = { unit->info->exes, unit->info->scripts, unit->info->tests };
+    sp_carr_for(maps, it) {
+      err = publish_target_headers(unit, maps[it], strict, scratch.mem, &staged);
+      if (err) {
+        break;
+      }
+    }
   }
-  return SPN_OK;
+
+  sp_mem_end_scratch(scratch);
+  return err;
 }
 
 void spn_pkg_unit_write_stamp(spn_pkg_unit_t* unit, sp_str_t path) {

@@ -236,17 +236,18 @@ static void apply_gated(sp_da(sp_str_t)* plain, spn_gated_list_t gated, spn_when
   }
 }
 
-static void apply_gated_paths(sp_da(sp_str_t)* plain, spn_gated_path_list_t gated, spn_when_env_t* env) {
+static void apply_gated_paths(sp_da(spn_tree_path_t)* plain, spn_gated_path_list_t gated, spn_when_env_t* env) {
   sp_da_for(gated, it) {
     if (!spn_when_eval(&gated[it].when, env)) {
       continue;
     }
-    sp_da_push(*plain, gated[it].path);
+    sp_da_push(*plain, ((spn_tree_path_t) { .path = gated[it].path, .tree = gated[it].tree }));
   }
 }
 
 static void apply_target(spn_target_info_t* target, spn_when_env_t* env) {
   apply_gated_paths(&target->source, target->gated.source, env);
+  apply_gated_paths(&target->headers, target->gated.headers, env);
   apply_gated_paths(&target->include, target->gated.include, env);
   apply_gated(&target->define, target->gated.define, env);
   apply_gated(&target->flags, target->gated.flags, env);
@@ -267,6 +268,7 @@ void spn_pkg_apply_options(spn_pkg_info_t* info, spn_when_env_t* env) {
   sp_str_om_for(info->examples, it) apply_target(sp_str_om_at(info->examples, it), env);
 
   apply_gated(&info->system_deps, info->gated.system_deps, env);
+  apply_gated_paths(&info->include, info->gated.include, env);
 
   sp_str_om_for(info->options, it) {
     spn_option_info_t* option = sp_str_om_at(info->options, it);

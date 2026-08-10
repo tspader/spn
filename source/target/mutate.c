@@ -63,18 +63,17 @@ spn_linkage_t spn_linkage_set_default(spn_linkage_set_t set) {
 
 void spn_target_add_source_ex(spn_target_info_t* target, sp_str_t source) {
   sp_require(target);
-  source = spn_intern(source);
-  sp_da_push(target->source, source);
+  sp_da_push(target->source, ((spn_tree_path_t) { .path = spn_intern(source), .tree = SPN_TREE_SOURCE }));
 }
 
 void spn_target_add_header_ex(spn_target_info_t* target, sp_str_t header) {
   sp_require(target);
-  sp_da_push(target->headers, spn_intern(header));
+  sp_da_push(target->headers, ((spn_tree_path_t) { .path = spn_intern(header), .tree = SPN_TREE_SOURCE }));
 }
 
 void spn_target_add_include_ex(spn_target_info_t* target, sp_str_t include) {
   sp_require(target);
-  sp_da_push(target->include, spn_intern(include));
+  sp_da_push(target->include, ((spn_tree_path_t) { .path = spn_intern(include), .tree = SPN_TREE_SOURCE }));
 }
 
 void spn_target_add_define_ex(spn_target_info_t* target, sp_str_t define) {

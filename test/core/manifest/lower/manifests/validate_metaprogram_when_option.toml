@@ -1,0 +1,9 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[package.build]
+source = [{ path = "b.c", when = { tls = true } }]
+
+[options.tls]
+type = "bool"

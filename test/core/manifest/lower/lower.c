@@ -19,6 +19,7 @@ typedef struct {
   const c8* value;
   const c8* when;
   spn_tree_t tree;
+  bool tree_none;
 } gated_t;
 
 typedef struct {
@@ -26,7 +27,7 @@ typedef struct {
   spn_linkage_set_t linkages;
   bool no_link;
   gated_t source [4];
-  const c8* headers [4];
+  gated_t headers [4];
   gated_t include [4];
   gated_t define [4];
   gated_t flags [4];
@@ -130,7 +131,9 @@ typedef struct {
   const c8* maintainer;
   spn_semver_t version;
   const c8* commit;
-  const c8* include_resolved;
+  gated_t include [4];
+  gated_t build_source [4];
+  gated_t build_include [4];
   const c8* define [8];
   gated_t system_deps [8];
   issue_t issues [7];
@@ -197,7 +200,7 @@ static const test_t tests [] = {
         .name = "t",
         .linkages = { .static_lib = true },
         .source = { { "main.c" } },
-        .headers = { "header.h" },
+        .headers = { { "header.h" } },
         .include = { { "include/dir" } },
         .define = { { "SPUM" } },
         .flags = { { "-flag" } },
@@ -324,6 +327,7 @@ static const test_t tests [] = {
   {
     .name = "validate_cxx_source_on_build_script",
     .manifest = "validate_cxx_source_on_build_script",
+    .build_source = { { "tools/build.cpp" } },
     .issues = {
       { SPN_ERR_CODEGEN_INVALID, "package.build.source" }
     }
@@ -414,6 +418,7 @@ static const test_t tests [] = {
         .name = "t",
         .linkages = { .static_lib = true },
         .source = { { "a.c" }, { "b.c", .tree = SPN_TREE_MANIFEST }, { "c.c", .tree = SPN_TREE_SOURCE } },
+        .headers = { { "a.h" }, { "b.h", .tree = SPN_TREE_MANIFEST } },
         .include = { { "inc", .tree = SPN_TREE_MANIFEST } },
       }
     }
@@ -421,8 +426,34 @@ static const test_t tests [] = {
   {
     .name = "validate_tree_invalid",
     .manifest = "validate_tree_invalid",
+    .include = { { "inc", .tree_none = true } },
+    .build_source = { { "b.c", .tree_none = true } },
     .issues = {
-      { SPN_ERR_CODEGEN_INVALID, "lib[0].source[0].tree" }
+      { SPN_ERR_CODEGEN_INVALID, "lib[0].source[0].tree" },
+      { SPN_ERR_CODEGEN_INVALID, "lib[0].headers[0].tree" },
+      { SPN_ERR_CODEGEN_INVALID, "package.include[0].tree" },
+      { SPN_ERR_CODEGEN_INVALID, "package.build.source[0].tree" },
+      { SPN_ERR_CODEGEN_INVALID, "package.configure.include[0].tree" },
+    }
+  },
+  {
+    .name = "script_tree",
+    .manifest = "script_tree",
+    .build_source = { { "b.c", .tree = SPN_TREE_MANIFEST }, { "c.c", .when = "os = \"linux\"" } },
+    .build_include = { { "inc", .tree = SPN_TREE_MANIFEST } },
+  },
+  {
+    .name = "validate_metaprogram_when_option",
+    .manifest = "validate_metaprogram_when_option",
+    .build_source = { { "b.c", .when = "tls = true" } },
+    .options = {
+      {
+        .name = "tls",
+        .type = SPN_OPTION_TYPE_BOOL,
+      },
+    },
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "package.build.source[0].when.tls" },
     }
   },
   {
@@ -437,16 +468,14 @@ static const test_t tests [] = {
     .maintainer = "m",
     .version = spn_semver_lit(1, 2, 3),
     .commit = "abc",
-    .include_resolved = "/inc",
+    .include = { { "inc" } },
     .define = { "SPUM" },
     .system_deps = { { "z" } },
   },
   {
-    .name = "package_include_resolved",
-    .manifest = "package",
-    .include_resolved = "/inc",
-    .define = { "SPUM" },
-    .system_deps = { { "z" } },
+    .name = "package_include_tree",
+    .manifest = "package_include_tree",
+    .include = { { "inc", .tree = SPN_TREE_MANIFEST }, { "src" }, { "gen", .when = "os = \"linux\"" } },
   },
   {
     .name = "qualified_default_namespace",
@@ -858,8 +887,9 @@ static sp_err_t check_gated_list(sp_test_t* t, spn_gated_list_t actual, const ga
 static sp_err_t check_gated_path_list(sp_test_t* t, spn_gated_path_list_t actual, const gated_t* expected, u32 n) {
   sp_must_eq(t, n, (u32)sp_da_size(actual));
   sp_for(i, n) {
+    spn_tree_t tree = expected[i].tree_none ? SPN_TREE_NONE : expected[i].tree ? expected[i].tree : SPN_TREE_SOURCE;
     sp_expect_str_eq_c(t, actual[i].path, expected[i].value);
-    sp_expect_eq(t, (u32)(expected[i].tree ? expected[i].tree : SPN_TREE_SOURCE), (u32)actual[i].tree);
+    sp_expect_eq(t, (u32)tree, (u32)actual[i].tree);
     sp_expect_str_eq_c(t, spn_when_to_str(sp_test_arena(t), &actual[i].when), expected[i].when ? expected[i].when : "always");
   }
   return SP_OK;
@@ -895,7 +925,8 @@ static sp_err_t check_targets(sp_test_t* t, spn_target_map_t om, const target_t*
     sp_expect_eq(t, (u32)0, (u32)sp_da_size(info->system_deps));
     sp_expect_eq(t, (u32)0, (u32)sp_da_size(info->deps));
     check_gated_paths(t, info->gated.source, arr[i].source);
-    sp_must_strs_eq(t, info->headers, sp_da_size(info->headers), arr[i].headers);
+    sp_expect_eq(t, (u32)0, (u32)sp_da_size(info->headers));
+    check_gated_paths(t, info->gated.headers, arr[i].headers);
     check_gated_paths(t, info->gated.include, arr[i].include);
     check_gated(t, info->gated.define, arr[i].define);
     check_gated(t, info->gated.flags, arr[i].flags);
@@ -964,11 +995,10 @@ sp_test_each(lower, cases, test_t, tests) {
   // Package arrays
   sp_must_strs_eq(t, pkg.define, sp_da_size(pkg.define), it->define);
   check_gated(t, pkg.gated.system_deps, it->system_deps);
-
-  if (it->include_resolved) {
-    sp_must_eq(t, (u32)1, (u32)sp_da_size(pkg.include));
-    sp_expect(t, sp_str_ends_with(pkg.include[0], sp_str_view(it->include_resolved)));
-  }
+  sp_expect_eq(t, (u32)0, (u32)sp_da_size(pkg.include));
+  check_gated_paths(t, pkg.gated.include, it->include);
+  check_gated_paths(t, pkg.build.gated.source, it->build_source);
+  check_gated_paths(t, pkg.build.gated.include, it->build_include);
 
   // Targets
   sp_try(check_targets(t, pkg.libs,     it->libs,     SP_CARR_LEN(it->libs),     SPN_TARGET_KIND_LIB));

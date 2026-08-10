@@ -57,7 +57,11 @@ spn_dag_digest_t spn_build_tree_identity(const spn_dag_roots_t* roots, spn_pkg_u
   sp_for(mt, num_maps) {
     sp_om_for(maps[mt], it) {
       spn_target_info_t* target = sp_str_om_at(maps[mt], it);
-      spn_dag_hash_strs(&ctx, target->headers);
+      spn_dag_hash_u64(&ctx, sp_da_size(target->headers));
+      sp_da_for(target->headers, ht) {
+        spn_dag_hash_u8(&ctx, (u8)target->headers[ht].tree);
+        spn_dag_hash_str(&ctx, target->headers[ht].path);
+      }
     }
   }
 

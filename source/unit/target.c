@@ -141,13 +141,24 @@ static spn_err_union_t ensure_target(spn_session_t* s, spn_pkg_unit_t* pkg, spn_
   return spn_result(SPN_OK);
 }
 
-static bool has_source_file(sp_da(sp_str_t) source, sp_str_t path) {
+static bool tree_path_equal(spn_tree_path_t a, spn_tree_path_t b) {
+  if (!sp_str_equal(a.path, b.path)) {
+    return false;
+  }
+  return sp_fs_is_absolute(a.path) || a.tree == b.tree;
+}
+
+static bool has_source_file(sp_da(spn_tree_path_t) source, spn_tree_path_t entry) {
   sp_da_for(source, it) {
-    if (sp_str_equal(source[it], path)) {
+    if (tree_path_equal(source[it], entry)) {
       return true;
     }
   }
   return false;
+}
+
+static sp_str_t tree_path_root(spn_pkg_unit_t* pkg, spn_tree_t tree) {
+  return tree == SPN_TREE_MANIFEST ? pkg->paths.recipe : pkg->paths.source;
 }
 
 static sp_str_t glob_literal_dir(sp_str_t pattern) {
@@ -160,13 +171,13 @@ static sp_str_t glob_literal_dir(sp_str_t pattern) {
   return sp_str_sub(pattern, 0, cut);
 }
 
-static void collect_source_glob(sp_mem_t mem, sp_str_t root, sp_str_t pattern, sp_da(sp_str_t)* source) {
-  sp_glob_t* glob = sp_glob_new_str(mem, pattern);
+static void collect_source_glob(sp_mem_t mem, sp_str_t root, spn_tree_path_t pattern, sp_da(spn_tree_path_t)* source) {
+  sp_glob_t* glob = sp_glob_new_str(mem, pattern.path);
   if (!glob) {
     return;
   }
 
-  sp_str_t sub = glob_literal_dir(pattern);
+  sp_str_t sub = glob_literal_dir(pattern.path);
   sp_str_t scan = sp_str_empty(sub) ? root : sp_fs_join_path(mem, root, sub);
   sp_da(sp_fs_entry_t) entries = sp_fs_collect_recursive(mem, scan);
   sp_da(sp_str_t) matches = sp_da_new(mem, sp_str_t);
@@ -182,7 +193,15 @@ static void collect_source_glob(sp_mem_t mem, sp_str_t root, sp_str_t pattern, s
     if (!sp_glob_match(glob, relative)) {
       continue;
     }
-    if (has_source_file(matches, relative)) {
+
+    bool seen = false;
+    sp_da_for(matches, jt) {
+      if (sp_str_equal(matches[jt], relative)) {
+        seen = true;
+        break;
+      }
+    }
+    if (seen) {
       continue;
     }
 
@@ -192,26 +211,27 @@ static void collect_source_glob(sp_mem_t mem, sp_str_t root, sp_str_t pattern, s
   sp_da_sort(matches, sp_str_sort_kernel_alphabetical);
 
   sp_da_for(matches, it) {
-    if (has_source_file(*source, matches[it])) {
+    spn_tree_path_t match = { .path = matches[it], .tree = pattern.tree };
+    if (has_source_file(*source, match)) {
       continue;
     }
-    sp_da_push(*source, matches[it]);
+    sp_da_push(*source, match);
   }
 }
 
-static sp_da(sp_str_t) collect_target_source(sp_mem_t mem, spn_pkg_unit_t* pkg, spn_target_unit_t* target) {
-  sp_da(sp_str_t) source = sp_da_new(mem, sp_str_t);
+static sp_da(spn_tree_path_t) collect_target_source(sp_mem_t mem, spn_pkg_unit_t* pkg, spn_target_unit_t* target) {
+  sp_da(spn_tree_path_t) source = sp_da_new(mem, spn_tree_path_t);
 
   sp_da_for(target->info->source, it) {
-    sp_str_t path = target->info->source[it];
-    if (sp_fs_is_glob(path)) {
-      collect_source_glob(mem, pkg->paths.source, path, &source);
+    spn_tree_path_t entry = target->info->source[it];
+    if (sp_fs_is_glob(entry.path)) {
+      collect_source_glob(mem, tree_path_root(pkg, entry.tree), entry, &source);
       continue;
     }
-    if (has_source_file(source, path)) {
+    if (has_source_file(source, entry)) {
       continue;
     }
-    sp_da_push(source, path);
+    sp_da_push(source, entry);
   }
 
   return source;
@@ -221,17 +241,23 @@ static void create_target_objects(spn_session_t* s, spn_target_unit_t* target) {
   spn_pkg_unit_t* pkg = target->pkg;
 
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  sp_da(sp_str_t) source = collect_target_source(scratch.mem, pkg, target);
+  sp_da(spn_tree_path_t) source = collect_target_source(scratch.mem, pkg, target);
 
   sp_da_for(source, j) {
-    sp_str_t relative = source[j];
+    spn_tree_path_t entry = source[j];
+    sp_str_t relative = entry.path;
     sp_str_t file = relative;
+    bool manifest_tree = false;
     if (sp_fs_is_absolute(relative)) {
-      relative = sp_str_strip_left(relative, pkg->paths.recipe);
-      relative = sp_str_strip_left(relative, sp_str_lit("/"));
+      sp_str_t stripped = sp_str_strip_left(relative, pkg->paths.recipe);
+      if (stripped.len == relative.len) {
+        stripped = sp_str_strip_left(relative, pkg->paths.source);
+      }
+      relative = sp_str_strip_left(stripped, sp_str_lit("/"));
     }
     else {
-      file = sp_fs_join_path(s->mem, pkg->paths.source, relative);
+      manifest_tree = entry.tree == SPN_TREE_MANIFEST;
+      file = sp_fs_join_path(s->mem, tree_path_root(pkg, entry.tree), relative);
     }
 
     spn_lang_t lang = spn_lang_from_path(relative);
@@ -242,6 +268,9 @@ static void create_target_objects(spn_session_t* s, spn_target_unit_t* target) {
     sp_str_t object_dir = target->lib_kind == SPN_LIB_KIND_OBJECT ?
       pkg->paths.lib :
       sp_fs_join_path(s->mem, pkg->paths.object, target->info->name);
+    if (manifest_tree) {
+      object_dir = sp_fs_join_path(s->mem, object_dir, sp_str_lit("manifest"));
+    }
     sp_str_t object_path = sp_fs_join_path(s->mem, object_dir, sp_fmt(scratch.mem, "{}.o", SP_FMT_STR(relative)).value);
     spn_compile_unit_id_t id = {
       .target = target->id,

@@ -6,4 +6,5 @@ version = "1.0.0"
 name = "t"
 kinds = ["static"]
 source = ["a.c", { path = "b.c", tree = "manifest" }, { path = "c.c", tree = "source" }]
+headers = ["a.h", { path = "b.h", tree = "manifest" }]
 include = [{ path = "inc", tree = "manifest" }]

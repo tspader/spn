@@ -53,6 +53,7 @@ static const test_t tests [] = {
   { "toolchain_launcher_args" },
   { "toolchain_scalars" },
   { "toolchain_triples" },
+  { "tree_entries" },
   { "triple_subset" },
   { "when_dep" },
   { "when_empty" },

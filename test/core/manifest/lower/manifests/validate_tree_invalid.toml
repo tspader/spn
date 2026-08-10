@@ -1,8 +1,16 @@
 [package]
 name = "p"
 version = "1.0.0"
+include = [{ path = "inc", tree = "spum" }]
+
+[package.build]
+source = [{ path = "b.c", tree = "spum" }]
+
+[package.configure]
+include = [{ path = "inc", tree = "spum" }]
 
 [[lib]]
 name = "t"
 kinds = ["static"]
 source = [{ path = "a.c", tree = "spum" }]
+headers = [{ path = "a.h", tree = "spum" }]
