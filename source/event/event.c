@@ -1,8 +1,11 @@
+#include "spn/host.h"
+
 #include "event/event.h"
 #include "event/build.h"
 #include "event/log.h"
 
 #include "core/core.h"
+#include "ctx/types.h"
 
 #include <stddef.h>
 
@@ -99,6 +102,24 @@ void spn_event_buffer_push(spn_event_buffer_t* events, spn_build_event_t event) 
   if (events->wake) {
     spn_wake_ring(events->wake);
   }
+}
+
+spn_build_event_t* spn_ctx_drain(spn_ctx_t* ctx) {
+  spn_event_buffer_t* events = ctx->events;
+
+  sp_mutex_lock(&events->mutex);
+  if (sp_rb_empty(events->buffer)) {
+    if (events->wake) {
+      spn_wake_rearm(events->wake);
+    }
+    sp_mutex_unlock(&events->mutex);
+    return SP_NULLPTR;
+  }
+
+  events->current = sp_rb_at(events->buffer, 0);
+  sp_rb_pop(events->buffer);
+  sp_mutex_unlock(&events->mutex);
+  return &events->current;
 }
 
 sp_da(spn_build_event_t) spn_event_buffer_drain(sp_mem_t mem, spn_event_buffer_t* events) {

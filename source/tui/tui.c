@@ -1588,11 +1588,11 @@ void spn_tui_flush(spn_tui_t* tui) {
     return;
   }
 
-  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-  sp_da(spn_build_event_t) events = spn_event_buffer_drain(s.mem, spn.events);
-
-  sp_da_for(events, it) {
-    spn_build_event_t* event = &events[it];
+  while (true) {
+    spn_build_event_t* event = spn_ctx_drain(&spn);
+    if (!event) {
+      break;
+    }
 
     switch (event->kind) {
       case SPN_EVENT_BUILD_PASSED: {
@@ -1611,8 +1611,6 @@ void spn_tui_flush(spn_tui_t* tui) {
 
     emit_event(tui, event);
   }
-
-  sp_mem_end_scratch(s);
 }
 
 void spn_tui_run_banner(spn_tui_t* tui, sp_str_t name, sp_str_t command) {
@@ -1742,9 +1740,9 @@ void spn_tui_poll(spn_tui_t* tui, spn_op_t* op) {
   }
 
   tui->prompt.op = op;
+  spn_tui_flush(tui);
   spn_progress_t progress = sp_zero;
   bool building = spn_ctx_progress(&spn, &progress);
-  spn_tui_flush(tui);
   prompt_pump(tui, building, progress);
 }
 

@@ -1,5 +1,6 @@
 add_executable(core
   main.c
+  drain.c
   fs.c
   filter.c
   wake.c

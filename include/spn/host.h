@@ -15,12 +15,14 @@ typedef struct spn_ctx_t spn_ctx_t;
 typedef struct spn_session_t spn_session_t;
 typedef struct spn_target_unit spn_target_t;
 typedef struct spn_op_t spn_op_t;
+typedef struct spn_build_event_t spn_build_event_t;
 
 spn_ctx_t* spn_ctx_new(spn_wake_fn_t wake, void* wake_data);
 spn_err_t spn_ctx_open(spn_ctx_t* ctx, spn_open_request_t request);
 spn_err_t spn_ctx_open_session(spn_ctx_t* ctx, const spn_session_config_t* config, spn_session_t** session);
 void spn_ctx_close(spn_ctx_t* ctx, bool ok);
 bool spn_ctx_progress(spn_ctx_t* ctx, spn_progress_t* progress);
+spn_build_event_t* spn_ctx_drain(spn_ctx_t* ctx);
 bool spn_ctx_find_target(spn_ctx_t* ctx, sp_str_t name, spn_target_kind_t* kind);
 sp_str_t spn_ctx_project_dir(spn_ctx_t* ctx);
 sp_str_t spn_ctx_cache_dir(spn_ctx_t* ctx);
