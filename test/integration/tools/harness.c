@@ -101,6 +101,11 @@ sp_str_t test_exe(const c8* name) {
   return layout_path(SP_NULLPTR, "debug", layout_sub("test", sp_str_to_cstr(harness_mem(), file)));
 }
 
+sp_str_t example_exe(const c8* name) {
+  sp_str_t file = exe_file_name(name, SP_NULLPTR);
+  return layout_path(SP_NULLPTR, "debug", layout_sub("example", sp_str_to_cstr(harness_mem(), file)));
+}
+
 sp_str_t target_exe(const c8* name, const c8* triple) {
   return layout_path(triple, "debug", exe_file_name(name, triple));
 }

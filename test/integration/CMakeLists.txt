@@ -29,6 +29,7 @@ add_executable(integration
   script.c
   target.c
   units.c
+  upstream.c
   worlds.c
   tools/caps.c
   tools/harness.c

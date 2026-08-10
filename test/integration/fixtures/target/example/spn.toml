@@ -1,0 +1,14 @@
+[package]
+name = "A"
+version = "0.1.0"
+
+[[lib]]
+name = "A"
+kinds = ["static"]
+source = ["a.c"]
+headers = ["a.h"]
+
+[[example]]
+name = "E"
+source = ["example/e.c"]
+deps = ["A"]
