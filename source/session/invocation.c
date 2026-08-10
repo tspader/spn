@@ -54,6 +54,10 @@ static spn_cc_compile_t spn_build_compile_desc(sp_mem_t mem, spn_compile_unit_t*
     sp_da_push(compile.args, unit->target->info->flags[it]);
   }
 
+  if (unit->target->info->kind == SPN_TARGET_KIND_EXAMPLE) {
+    sp_da_push(compile.include, pkg->paths.include);
+  }
+
   sp_da_for(pkg->deps, it) {
     if (!spn_dep_kind_applies(pkg->deps[it].kind, unit->target->info->kind)) {
       continue;

@@ -22,6 +22,7 @@ void spn_pkg_init(sp_mem_t mem, spn_pkg_info_t* pkg, sp_str_t name) {
   sp_str_om_init(pkg->exes);
   sp_str_om_init(pkg->scripts);
   sp_str_om_init(pkg->tests);
+  sp_str_om_init(pkg->examples);
   sp_str_om_init(pkg->profiles);
   sp_str_om_init(pkg->indexes);
   sp_str_om_init(pkg->toolchains);
@@ -152,6 +153,21 @@ spn_target_info_t* spn_pkg_add_test_ex(spn_pkg_info_t* pkg, sp_str_t name) {
   };
   sp_str_om_insert(pkg->tests, test.name, test);
   spn_target_info_t* target = sp_str_om_get(pkg->tests, test.name);
+  spn_target_info_init(spn_pkg_mem(pkg), target);
+  return target;
+}
+
+spn_target_info_t* spn_pkg_add_example(spn_pkg_info_t* pkg, const c8* name) {
+  return spn_pkg_add_example_ex(pkg, spn_intern_cstr(name));
+}
+
+spn_target_info_t* spn_pkg_add_example_ex(spn_pkg_info_t* pkg, sp_str_t name) {
+  spn_target_info_t example = {
+    .name = spn_intern(name),
+    .kind = SPN_TARGET_KIND_EXAMPLE,
+  };
+  sp_str_om_insert(pkg->examples, example.name, example);
+  spn_target_info_t* target = sp_str_om_get(pkg->examples, example.name);
   spn_target_info_init(spn_pkg_mem(pkg), target);
   return target;
 }

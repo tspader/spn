@@ -95,6 +95,9 @@ spn_target_info_t* spn_pkg_get_target_ex(spn_pkg_info_t* pkg, sp_str_t name) {
   if (sp_str_om_has(pkg->tests, name)) {
     return sp_str_om_get(pkg->tests, name);
   }
+  if (sp_str_om_has(pkg->examples, name)) {
+    return sp_str_om_get(pkg->examples, name);
+  }
   if (sp_str_om_has(pkg->libs, name)) {
     return sp_str_om_get(pkg->libs, name);
   }

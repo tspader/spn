@@ -67,6 +67,7 @@ static spn_session_config_t copy_config(sp_mem_t mem, spn_session_config_t confi
       .lib = copy_rule(mem, config.selection.lib),
       .test = copy_rule(mem, config.selection.test),
       .script = copy_rule(mem, config.selection.script),
+      .example = copy_rule(mem, config.selection.example),
     },
     .profile = {
       .name = sp_str_copy(mem, config.profile.name),

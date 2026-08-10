@@ -8,6 +8,7 @@
     "bin": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
     "script": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
     "test": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
+    "example": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
     "toolchain": { "elements": { "ref": "manifest_toolchain" } },
     "index": { "elements": { "ref": "index" } },
     "profile": { "values": { "ref": "profile" } },

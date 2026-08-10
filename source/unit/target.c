@@ -45,7 +45,8 @@ static spn_target_unit_t* add_target(spn_session_t* s, spn_pkg_unit_t* pkg, spn_
     }
     case SPN_TARGET_KIND_EXE:
     case SPN_TARGET_KIND_SCRIPT:
-    case SPN_TARGET_KIND_TEST: {
+    case SPN_TARGET_KIND_TEST:
+    case SPN_TARGET_KIND_EXAMPLE: {
       sp_da_push(pkg->targets, target);
       break;
     }
@@ -75,7 +76,8 @@ static spn_err_union_t set_target_kind(spn_session_t* s, spn_target_unit_t* targ
   switch (info->kind) {
     case SPN_TARGET_KIND_EXE:
     case SPN_TARGET_KIND_SCRIPT:
-    case SPN_TARGET_KIND_TEST: {
+    case SPN_TARGET_KIND_TEST:
+    case SPN_TARGET_KIND_EXAMPLE: {
       target->kind = SPN_CC_OUTPUT_EXE;
       return spn_result(SPN_OK);
     }
@@ -625,7 +627,7 @@ static spn_err_union_t add_metaprogram_targets(spn_session_t* s) {
 }
 
 static bool exe_name_reserved(sp_str_t name) {
-  return sp_str_equal_cstr(name, "store") || sp_str_equal_cstr(name, "work") || sp_str_equal_cstr(name, "test");
+  return sp_str_equal_cstr(name, "store") || sp_str_equal_cstr(name, "work") || sp_str_equal_cstr(name, "test") || sp_str_equal_cstr(name, "example");
 }
 
 static bool is_root_target(spn_session_t* s, spn_build_plan_t* plan, spn_target_unit_t* target) {
@@ -654,7 +656,8 @@ static bool target_selection_matches_name(const spn_target_selection_t* selectio
     (target_rule_requests_name(&selection->lib, name) && sp_str_om_has(pkg->libs, name)) ||
     (target_rule_requests_name(&selection->bin, name) && sp_str_om_has(pkg->exes, name)) ||
     (target_rule_requests_name(&selection->test, name) && sp_str_om_has(pkg->tests, name)) ||
-    (target_rule_requests_name(&selection->script, name) && sp_str_om_has(pkg->scripts, name));
+    (target_rule_requests_name(&selection->script, name) && sp_str_om_has(pkg->scripts, name)) ||
+    (target_rule_requests_name(&selection->example, name) && sp_str_om_has(pkg->examples, name));
 }
 
 static spn_err_union_t validate_target_selection(const spn_target_selection_t* selection, const spn_pkg_info_t* pkg) {
@@ -663,6 +666,7 @@ static spn_err_union_t validate_target_selection(const spn_target_selection_t* s
     &selection->bin,
     &selection->test,
     &selection->script,
+    &selection->example,
   };
   sp_carr_for(rules, rt) {
     const spn_target_rule_t* rule = rules[rt];
@@ -732,6 +736,7 @@ static spn_err_union_t add_plan_root_targets(spn_session_t* s) {
     spn_try_union(add_plan_targets(s, plan, pkg, pkg->info->exes));
     spn_try_union(add_plan_targets(s, plan, pkg, pkg->info->scripts));
     spn_try_union(add_plan_targets(s, plan, pkg, pkg->info->tests));
+    spn_try_union(add_plan_targets(s, plan, pkg, pkg->info->examples));
   }
   return spn_result(SPN_OK);
 }

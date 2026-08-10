@@ -21,6 +21,7 @@ static const test_t tests [] = {
   { "default_selects_lib",     SPN_TARGET_KIND_LIB,                   SPN_TARGET_KIND_LIB, SPN_TARGET_RULE_NONE, "spum", SP_NULLPTR, { true } },
   { "default_selects_exe",     SPN_TARGET_KIND_EXE,                   SPN_TARGET_KIND_LIB, SPN_TARGET_RULE_NONE, "main", SP_NULLPTR, { true } },
   { "default_selects_test",    SPN_TARGET_KIND_TEST,                  SPN_TARGET_KIND_LIB, SPN_TARGET_RULE_NONE, "test", SP_NULLPTR, { true } },
+  { "default_selects_example", SPN_TARGET_KIND_EXAMPLE,               SPN_TARGET_KIND_LIB, SPN_TARGET_RULE_NONE, "demo", SP_NULLPTR, { true } },
   { "default_skips_script",    SPN_TARGET_KIND_SCRIPT,                SPN_TARGET_KIND_LIB, SPN_TARGET_RULE_NONE, "tool", SP_NULLPTR, { false } },
   { "default_skips_configure", SPN_TARGET_KIND_CONFIGURE_METAPROGRAM, SPN_TARGET_KIND_LIB, SPN_TARGET_RULE_NONE, "configure", SP_NULLPTR, { false } },
   { "default_skips_build",     SPN_TARGET_KIND_BUILD_METAPROGRAM,     SPN_TARGET_KIND_LIB, SPN_TARGET_RULE_NONE, "build", SP_NULLPTR, { false } },
@@ -41,10 +42,16 @@ static const test_t tests [] = {
   { "script_named_match",      SPN_TARGET_KIND_SCRIPT, SPN_TARGET_KIND_SCRIPT, SPN_TARGET_RULE_NAMED, "tool", "tool", { true } },
   { "script_named_miss",       SPN_TARGET_KIND_SCRIPT, SPN_TARGET_KIND_SCRIPT, SPN_TARGET_RULE_NAMED, "tool", "other", { false } },
 
+  { "example_rule_all_selects", SPN_TARGET_KIND_EXAMPLE, SPN_TARGET_KIND_EXAMPLE, SPN_TARGET_RULE_ALL,   "demo", SP_NULLPTR, { true } },
+  { "example_named_match",      SPN_TARGET_KIND_EXAMPLE, SPN_TARGET_KIND_EXAMPLE, SPN_TARGET_RULE_NAMED, "demo", "demo", { true } },
+  { "example_named_miss",       SPN_TARGET_KIND_EXAMPLE, SPN_TARGET_KIND_EXAMPLE, SPN_TARGET_RULE_NAMED, "demo", "other", { false } },
+
   { "lib_rule_skips_exe",     SPN_TARGET_KIND_EXE,    SPN_TARGET_KIND_LIB,    SPN_TARGET_RULE_ALL, "main", SP_NULLPTR, { false } },
   { "exe_rule_skips_test",    SPN_TARGET_KIND_TEST,   SPN_TARGET_KIND_EXE,    SPN_TARGET_RULE_ALL, "test", SP_NULLPTR, { false } },
   { "test_rule_skips_script", SPN_TARGET_KIND_SCRIPT, SPN_TARGET_KIND_TEST,   SPN_TARGET_RULE_ALL, "tool", SP_NULLPTR, { false } },
   { "script_rule_skips_lib",  SPN_TARGET_KIND_LIB,    SPN_TARGET_KIND_SCRIPT, SPN_TARGET_RULE_ALL, "spum", SP_NULLPTR, { false } },
+  { "example_rule_skips_exe", SPN_TARGET_KIND_EXE,    SPN_TARGET_KIND_EXAMPLE, SPN_TARGET_RULE_ALL, "main", SP_NULLPTR, { false } },
+  { "bin_rule_skips_example", SPN_TARGET_KIND_EXAMPLE, SPN_TARGET_KIND_EXE,   SPN_TARGET_RULE_ALL, "demo", SP_NULLPTR, { false } },
 
   { "all_rule_skips_configure", SPN_TARGET_KIND_CONFIGURE_METAPROGRAM, SPN_TARGET_KIND_LIB, SPN_TARGET_RULE_ALL, "configure", SP_NULLPTR, { false } },
   { "all_rule_skips_build",     SPN_TARGET_KIND_BUILD_METAPROGRAM,     SPN_TARGET_KIND_LIB, SPN_TARGET_RULE_ALL, "build", SP_NULLPTR, { false } },
@@ -56,6 +63,7 @@ static spn_target_rule_t* target_rule(spn_target_selection_t* selection, spn_tar
     case SPN_TARGET_KIND_EXE: return &selection->bin;
     case SPN_TARGET_KIND_TEST: return &selection->test;
     case SPN_TARGET_KIND_SCRIPT: return &selection->script;
+    case SPN_TARGET_KIND_EXAMPLE: return &selection->example;
     case SPN_TARGET_KIND_CONFIGURE_METAPROGRAM:
     case SPN_TARGET_KIND_BUILD_METAPROGRAM: break;
   }

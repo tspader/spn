@@ -28,7 +28,8 @@ static bool is_default(const spn_target_selection_t* selection) {
     selection->bin.kind == SPN_TARGET_RULE_NONE &&
     selection->lib.kind == SPN_TARGET_RULE_NONE &&
     selection->test.kind == SPN_TARGET_RULE_NONE &&
-    selection->script.kind == SPN_TARGET_RULE_NONE;
+    selection->script.kind == SPN_TARGET_RULE_NONE &&
+    selection->example.kind == SPN_TARGET_RULE_NONE;
 }
 
 bool spn_target_selection_pass(const spn_target_selection_t* selection, const spn_target_info_t* target) {
@@ -41,7 +42,8 @@ bool spn_target_selection_pass(const spn_target_selection_t* selection, const sp
       }
       case SPN_TARGET_KIND_LIB:
       case SPN_TARGET_KIND_TEST:
-      case SPN_TARGET_KIND_EXE: {
+      case SPN_TARGET_KIND_EXE:
+      case SPN_TARGET_KIND_EXAMPLE: {
         return true;
       }
     }
@@ -59,6 +61,9 @@ bool spn_target_selection_pass(const spn_target_selection_t* selection, const sp
     }
     case SPN_TARGET_KIND_SCRIPT: {
       return spn_target_rule_pass(&selection->script, target);
+    }
+    case SPN_TARGET_KIND_EXAMPLE: {
+      return spn_target_rule_pass(&selection->example, target);
     }
     case SPN_TARGET_KIND_CONFIGURE_METAPROGRAM:
     case SPN_TARGET_KIND_BUILD_METAPROGRAM: {

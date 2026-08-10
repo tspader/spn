@@ -175,7 +175,7 @@ static spn_err_t resolve_configure_source(spn_ctx_t* ctx, sp_str_t name, sp_da(s
     sp_str_t entry = declared[it];
     if (!sp_fs_is_glob(entry)) {
       sp_str_t path = absolute_to(entry, root);
-      if (!sp_fs_is_file(path)) {
+      if (!sp_fs_is_target_file(path)) {
         return configure_source_err(ctx, name, entry);
       }
       sp_da_push(resolved, path);
@@ -201,7 +201,7 @@ static sp_da(sp_str_t) detect_configure_source(spn_loaded_pkg_t* loaded) {
     loaded->paths.script,
   };
   sp_carr_for(candidates, it) {
-    if (sp_fs_is_file(candidates[it])) {
+    if (sp_fs_is_target_file(candidates[it])) {
       sp_da_push(source, candidates[it]);
       break;
     }
@@ -327,10 +327,10 @@ static spn_err_t load_package(spn_session_t* session, spn_resolved_pkg_t* pkg, s
 
   if (sp_da_empty(loaded->build.source)) {
     sp_str_t candidate = sp_fs_join_path(spn.mem, loaded->roots.recipe, sp_str_lit("build.c"));
-    if (sp_fs_is_file(candidate)) {
+    if (sp_fs_is_target_file(candidate)) {
       sp_da_push(loaded->build.source, candidate);
     }
-    else if (package_has_build_deps(pkg) && sp_fs_is_file(loaded->paths.script)) {
+    else if (package_has_build_deps(pkg) && sp_fs_is_target_file(loaded->paths.script)) {
       sp_da_push(loaded->build.source, loaded->paths.script);
     }
   }

@@ -252,6 +252,7 @@ static void lower_targets(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, s
   lower_collection(ctx, cg->bin, &out->exes, SPN_TARGET_KIND_EXE);
   lower_collection(ctx, cg->script, &out->scripts, SPN_TARGET_KIND_SCRIPT);
   lower_collection(ctx, cg->test, &out->tests, SPN_TARGET_KIND_TEST);
+  lower_collection(ctx, cg->example, &out->examples, SPN_TARGET_KIND_EXAMPLE);
 }
 
 static void lower_toolchains(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
@@ -739,6 +740,7 @@ static void validate_whens(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, 
   validate_target_whens(ctx, cg->bin, "bin", out);
   validate_target_whens(ctx, cg->script, "script", out);
   validate_target_whens(ctx, cg->test, "test", out);
+  validate_target_whens(ctx, cg->example, "example", out);
   validate_pkg_system_dep_whens(ctx, cg, out);
   validate_option_sets(ctx, cg, out);
 }
@@ -788,6 +790,7 @@ static void validate_links(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg) 
   validate_collection_links(ctx, cg->bin, "bin");
   validate_collection_links(ctx, cg->script, "script");
   validate_collection_links(ctx, cg->test, "test");
+  validate_collection_links(ctx, cg->example, "example");
 }
 
 static void validate_c_only_sources(spn_toml_loader_t* ctx, sp_da(sp_str_t) source) {
@@ -827,6 +830,7 @@ static void validate_cxx(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg) {
   validate_collection_cxx(ctx, cg->bin, "bin");
   validate_collection_cxx(ctx, cg->script, "script");
   validate_collection_cxx(ctx, cg->test, "test");
+  validate_collection_cxx(ctx, cg->example, "example");
 }
 
 // Build and configure scripts compile to wasm, where C++ would drag libc++
@@ -865,6 +869,7 @@ static void validate_platform(spn_toml_loader_t* ctx, const spn_cg_manifest_t* c
   validate_collection_platform(ctx, cg->bin, "bin", false);
   validate_collection_platform(ctx, cg->script, "script", false);
   validate_collection_platform(ctx, cg->test, "test", false);
+  validate_collection_platform(ctx, cg->example, "example", false);
 }
 
 static void validate_unique_targets(spn_toml_loader_t* ctx, spn_pkg_info_t* out) {
@@ -879,6 +884,7 @@ static void validate_unique_targets(spn_toml_loader_t* ctx, spn_pkg_info_t* out)
     { "bin", out->exes },
     { "script", out->scripts },
     { "test", out->tests },
+    { "example", out->examples },
   };
 
   sp_for(g, SP_CARR_LEN(groups)) {
