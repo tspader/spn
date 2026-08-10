@@ -622,15 +622,15 @@ spn_pkg_source_t spn_pkg_source_from_str(sp_str_t str) {
   SP_UNREACHABLE_RETURN(SPN_PKG_SOURCE_INDEX);
 }
 
-sp_str_t spn_pkg_tree_kind_to_str(spn_pkg_tree_kind_t kind) {
+sp_str_t spn_pkg_root_kind_to_str(spn_pkg_root_kind_t kind) {
   switch (kind) {
-    case SPN_PKG_TREE_NONE: {
+    case SPN_PKG_ROOT_NONE: {
       return sp_str_lit("none");
     }
-    case SPN_PKG_TREE_LOCAL: {
+    case SPN_PKG_ROOT_LOCAL: {
       return sp_str_lit("local");
     }
-    case SPN_PKG_TREE_GIT: {
+    case SPN_PKG_ROOT_GIT: {
       return sp_str_lit("git");
     }
   }
@@ -638,18 +638,18 @@ sp_str_t spn_pkg_tree_kind_to_str(spn_pkg_tree_kind_t kind) {
   sp_unreachable_return(sp_str_lit(""));
 }
 
-spn_pkg_tree_kind_t spn_pkg_tree_kind_from_str(sp_str_t str) {
+spn_pkg_root_kind_t spn_pkg_root_kind_from_str(sp_str_t str) {
   if (sp_str_equal_cstr(str, "none")) {
-    return SPN_PKG_TREE_NONE;
+    return SPN_PKG_ROOT_NONE;
   }
   if (sp_str_equal_cstr(str, "local")) {
-    return SPN_PKG_TREE_LOCAL;
+    return SPN_PKG_ROOT_LOCAL;
   }
   if (sp_str_equal_cstr(str, "git")) {
-    return SPN_PKG_TREE_GIT;
+    return SPN_PKG_ROOT_GIT;
   }
 
-  sp_unreachable_return(SPN_PKG_TREE_NONE);
+  sp_unreachable_return(SPN_PKG_ROOT_NONE);
 }
 
 sp_str_t spn_dep_kind_to_str(spn_dep_kind_t kind) {

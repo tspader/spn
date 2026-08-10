@@ -222,15 +222,15 @@ sp_test_each(index_dir, get_package, dir_test_t, tests, .setup = spn_test_ctx_se
     sp_expect_str_eq_c(t, release->paths.manifest, "spn.toml");
     sp_expect_str_eq_c(t, release->paths.script, "spn.c");
 
-    sp_must_eq(t, SPN_PKG_TREE_LOCAL, release->manifest.kind);
+    sp_must_eq(t, SPN_PKG_ROOT_LOCAL, release->manifest.kind);
     sp_expect_str_eq(t, release->manifest.local, package);
 
     if (it->expect.source.url) {
-      sp_must_eq(t, SPN_PKG_TREE_GIT, release->source.kind);
+      sp_must_eq(t, SPN_PKG_ROOT_GIT, release->source.kind);
       sp_expect_str_eq_c(t, release->source.git.url, it->expect.source.url);
       sp_expect_str_eq_c(t, release->source.git.rev, it->expect.source.rev);
     } else {
-      sp_expect_eq(t, SPN_PKG_TREE_NONE, release->source.kind);
+      sp_expect_eq(t, SPN_PKG_ROOT_NONE, release->source.kind);
     }
 
     u32 deps = 0;

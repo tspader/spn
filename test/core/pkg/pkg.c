@@ -95,17 +95,17 @@ typedef struct {
   const c8* name;
   const c8* patches [2];
   const c8* qualified;
-  spn_pkg_tree_kind_t tree;
+  spn_pkg_root_kind_t tree;
   stamp_expect_t expect;
 } stamp_test_t;
 
 static const stamp_test_t stamp_tests [] = {
-  { .name = "stamp_matching_patch",  .patches = { "core/a" }, .qualified = "core/a", .tree = SPN_PKG_TREE_GIT,   .expect = { SPN_PKG_PATCH_STAMP_APPLIED, 1 } },
-  { .name = "skip_unmatched_patch",  .patches = { "core/a" }, .qualified = "core/b", .tree = SPN_PKG_TREE_GIT,   .expect = { SPN_PKG_PATCH_STAMP_NONE } },
-  { .name = "stamp_second_patch",    .patches = { "core/a", "core/b" }, .qualified = "core/b", .tree = SPN_PKG_TREE_GIT, .expect = { SPN_PKG_PATCH_STAMP_APPLIED, 2 } },
-  { .name = "reject_tree_none",      .patches = { "core/a" }, .qualified = "core/a", .tree = SPN_PKG_TREE_NONE,  .expect = { SPN_PKG_PATCH_STAMP_NOT_GIT } },
-  { .name = "reject_tree_local",     .patches = { "core/a" }, .qualified = "core/a", .tree = SPN_PKG_TREE_LOCAL, .expect = { SPN_PKG_PATCH_STAMP_NOT_GIT } },
-  { .name = "skip_empty_patches",    .qualified = "core/a",   .tree = SPN_PKG_TREE_NONE, .expect = { SPN_PKG_PATCH_STAMP_NONE } },
+  { .name = "stamp_matching_patch",  .patches = { "core/a" }, .qualified = "core/a", .tree = SPN_PKG_ROOT_GIT,   .expect = { SPN_PKG_PATCH_STAMP_APPLIED, 1 } },
+  { .name = "skip_unmatched_patch",  .patches = { "core/a" }, .qualified = "core/b", .tree = SPN_PKG_ROOT_GIT,   .expect = { SPN_PKG_PATCH_STAMP_NONE } },
+  { .name = "stamp_second_patch",    .patches = { "core/a", "core/b" }, .qualified = "core/b", .tree = SPN_PKG_ROOT_GIT, .expect = { SPN_PKG_PATCH_STAMP_APPLIED, 2 } },
+  { .name = "reject_tree_none",      .patches = { "core/a" }, .qualified = "core/a", .tree = SPN_PKG_ROOT_NONE,  .expect = { SPN_PKG_PATCH_STAMP_NOT_GIT } },
+  { .name = "reject_tree_local",     .patches = { "core/a" }, .qualified = "core/a", .tree = SPN_PKG_ROOT_LOCAL, .expect = { SPN_PKG_PATCH_STAMP_NOT_GIT } },
+  { .name = "skip_empty_patches",    .qualified = "core/a",   .tree = SPN_PKG_ROOT_NONE, .expect = { SPN_PKG_PATCH_STAMP_NONE } },
 };
 
 sp_test_each(pkg, patch_stamp, stamp_test_t, stamp_tests) {
@@ -120,11 +120,11 @@ sp_test_each(pkg, patch_stamp, stamp_test_t, stamp_tests) {
     }));
   }
 
-  spn_pkg_tree_t source = { .kind = it->tree };
+  spn_pkg_root_t source = { .kind = it->tree };
   spn_pkg_patch_stamp_result_t result = spn_pkg_patch_stamp(patches, sp_str_view(it->qualified), &source);
 
   sp_expect_eq(t, (u32)it->expect.result, (u32)result);
-  if (it->tree == SPN_PKG_TREE_GIT) {
+  if (it->tree == SPN_PKG_ROOT_GIT) {
     sp_expect_eq(t, it->expect.hash, source.git.patches.hash);
   }
 

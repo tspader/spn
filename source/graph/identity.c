@@ -17,7 +17,7 @@ spn_build_source_pin_t spn_build_source_pin(spn_pkg_unit_t* unit) {
     return pin;
   }
   spn_resolved_pkg_t* resolved = sp_ht_getp(unit->session->resolve, unit->id.pkg);
-  if (!resolved || resolved->origin.source.kind != SPN_PKG_TREE_GIT) {
+  if (!resolved || resolved->origin.source.kind != SPN_PKG_ROOT_GIT) {
     return pin;
   }
   pin.kind = resolved->origin.source.kind;

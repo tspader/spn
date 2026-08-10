@@ -267,8 +267,8 @@ static spn_index_release_t release_build(sp_mem_t mem, const release_rel_t* rel)
   };
 
   if (rel->source.url) {
-    built.source = (spn_pkg_tree_t) {
-      .kind = SPN_PKG_TREE_GIT,
+    built.source = (spn_pkg_root_t) {
+      .kind = SPN_PKG_ROOT_GIT,
       .git = {
         .url = sp_cstr_as_str(rel->source.url),
         .rev = sp_cstr_as_str(rel->source.rev ? rel->source.rev : ""),
@@ -277,8 +277,8 @@ static spn_index_release_t release_build(sp_mem_t mem, const release_rel_t* rel)
     };
   }
   if (rel->manifest.url) {
-    built.manifest = (spn_pkg_tree_t) {
-      .kind = SPN_PKG_TREE_GIT,
+    built.manifest = (spn_pkg_root_t) {
+      .kind = SPN_PKG_ROOT_GIT,
       .git = {
         .url = sp_cstr_as_str(rel->manifest.url),
         .rev = sp_cstr_as_str(rel->manifest.rev ? rel->manifest.rev : ""),
@@ -327,20 +327,20 @@ static sp_err_t release_check(sp_test_t* t, sp_mem_t mem, const release_rel_t* e
   sp_expect_eq(t, expected->yanked, rel->yanked);
 
   if (expected->source.url) {
-    sp_must_eq(t, SPN_PKG_TREE_GIT, rel->source.kind);
+    sp_must_eq(t, SPN_PKG_ROOT_GIT, rel->source.kind);
     sp_expect_str_eq_c(t, rel->source.git.url, expected->source.url);
     if (expected->source.rev) { sp_expect_str_eq_c(t, rel->source.git.rev, expected->source.rev); }
     if (expected->source.dir) { sp_expect_str_eq_c(t, rel->source.git.dir, expected->source.dir); }
   } else {
-    sp_expect_eq(t, SPN_PKG_TREE_NONE, rel->source.kind);
+    sp_expect_eq(t, SPN_PKG_ROOT_NONE, rel->source.kind);
   }
   if (expected->manifest.url) {
-    sp_must_eq(t, SPN_PKG_TREE_GIT, rel->manifest.kind);
+    sp_must_eq(t, SPN_PKG_ROOT_GIT, rel->manifest.kind);
     sp_expect_str_eq_c(t, rel->manifest.git.url, expected->manifest.url);
     if (expected->manifest.rev) { sp_expect_str_eq_c(t, rel->manifest.git.rev, expected->manifest.rev); }
     if (expected->manifest.dir) { sp_expect_str_eq_c(t, rel->manifest.git.dir, expected->manifest.dir); }
   } else {
-    sp_expect_eq(t, SPN_PKG_TREE_NONE, rel->manifest.kind);
+    sp_expect_eq(t, SPN_PKG_ROOT_NONE, rel->manifest.kind);
   }
   if (expected->paths.manifest) { sp_expect_str_eq_c(t, rel->paths.manifest, expected->paths.manifest); }
   if (expected->paths.script) { sp_expect_str_eq_c(t, rel->paths.script, expected->paths.script); }

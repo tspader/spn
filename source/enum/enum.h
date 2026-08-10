@@ -55,8 +55,8 @@ spn_lang_t spn_lang_from_path(sp_str_t path);
 sp_str_t spn_pkg_source_to_str(spn_pkg_source_t kind);
 spn_pkg_source_t spn_pkg_source_from_str(sp_str_t str);
 
-sp_str_t spn_pkg_tree_kind_to_str(spn_pkg_tree_kind_t kind);
-spn_pkg_tree_kind_t spn_pkg_tree_kind_from_str(sp_str_t str);
+sp_str_t spn_pkg_root_kind_to_str(spn_pkg_root_kind_t kind);
+spn_pkg_root_kind_t spn_pkg_root_kind_from_str(sp_str_t str);
 
 sp_str_t spn_dep_kind_to_str(spn_dep_kind_t kind);
 spn_dep_kind_t spn_dep_kind_from_str(sp_str_t str);

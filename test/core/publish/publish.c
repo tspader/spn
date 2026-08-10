@@ -386,7 +386,7 @@ sp_test_each(cmd_publish, publish, case_t, cases, .setup = spn_test_ctx_setup) {
     sp_expect_eq(t, c.expect.version.minor, rel->version.minor);
     sp_expect_eq(t, c.expect.version.patch, rel->version.patch);
 
-    sp_must_eq(t, SPN_PKG_TREE_GIT, rel->source.kind);
+    sp_must_eq(t, SPN_PKG_ROOT_GIT, rel->source.kind);
     if (source_repo.path.len) {
       sp_expect_str_eq(t, rel->source.git.url, source_repo.path);
     } else {
@@ -404,7 +404,7 @@ sp_test_each(cmd_publish, publish, case_t, cases, .setup = spn_test_ctx_setup) {
     }
 
     if (c.expect.manifest_url) {
-      sp_must_eq(t, SPN_PKG_TREE_GIT, rel->manifest.kind);
+      sp_must_eq(t, SPN_PKG_ROOT_GIT, rel->manifest.kind);
       sp_expect_str_eq(t, rel->manifest.git.url, repo.path);
 
       if (c.expect.manifest_commit) {
@@ -416,7 +416,7 @@ sp_test_each(cmd_publish, publish, case_t, cases, .setup = spn_test_ctx_setup) {
         sp_expect_str_eq_c(t, rel->manifest.git.dir, c.expect.manifest_dir);
       }
     } else {
-      sp_expect_eq(t, SPN_PKG_TREE_NONE, rel->manifest.kind);
+      sp_expect_eq(t, SPN_PKG_ROOT_NONE, rel->manifest.kind);
     }
 
     u32 expected_targets = 0;

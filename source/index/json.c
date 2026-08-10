@@ -26,14 +26,14 @@ static spn_err_t spn_index_parse_rel(sp_mem_t mem, spn_pkg_name_t id, sp_str_t j
   release->id.name = rel.name;
   release->yanked = rel.yanked;
   if (!sp_str_empty(rel.source.url)) {
-    release->source = (spn_pkg_tree_t) {
-      .kind = SPN_PKG_TREE_GIT,
+    release->source = (spn_pkg_root_t) {
+      .kind = SPN_PKG_ROOT_GIT,
       .git = { .url = rel.source.url, .rev = rel.source.rev, .dir = rel.source.dir },
     };
   }
   if (!sp_str_empty(rel.manifest.url)) {
-    release->manifest = (spn_pkg_tree_t) {
-      .kind = SPN_PKG_TREE_GIT,
+    release->manifest = (spn_pkg_root_t) {
+      .kind = SPN_PKG_ROOT_GIT,
       .git = { .url = rel.manifest.url, .rev = rel.manifest.rev, .dir = rel.manifest.dir },
     };
   }
@@ -100,10 +100,10 @@ sp_str_t spn_index_release_to_json(sp_mem_t mem, spn_index_release_t* rel) {
     .options = sp_da_new(mem, spn_cg_release_options_entry_t),
   };
 
-  if (rel->source.kind == SPN_PKG_TREE_GIT) {
+  if (rel->source.kind == SPN_PKG_ROOT_GIT) {
     release.source = (spn_cg_release_source_t) { .url = rel->source.git.url, .rev = rel->source.git.rev, .dir = rel->source.git.dir };
   }
-  if (rel->manifest.kind == SPN_PKG_TREE_GIT) {
+  if (rel->manifest.kind == SPN_PKG_ROOT_GIT) {
     release.manifest = (spn_cg_release_source_t) { .url = rel->manifest.git.url, .rev = rel->manifest.git.rev, .dir = rel->manifest.git.dir };
   }
 
