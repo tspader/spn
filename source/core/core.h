@@ -4,6 +4,7 @@
 #include "core/types.h"
 
 void spn_wake_ring(spn_wake_t* wake);
+void spn_wake_pulse(spn_wake_t* wake);
 void spn_wake_rearm(spn_wake_t* wake);
 
 #endif

@@ -7,6 +7,7 @@
 typedef enum {
   WAKE_OP_NONE,
   WAKE_OP_RING,
+  WAKE_OP_PULSE,
   WAKE_OP_REARM,
 } wake_op_kind_t;
 
@@ -47,10 +48,28 @@ static const wake_test_t wake_tests [] = {
     },
   },
   {
+    .name = "pulse_always_fires",
+    .ops = {
+      { .kind = WAKE_OP_RING, .fired = 1 },
+      { .kind = WAKE_OP_PULSE, .fired = 2 },
+      { .kind = WAKE_OP_PULSE, .fired = 3 },
+    },
+  },
+  {
+    .name = "pulse_suppresses_ring",
+    .ops = {
+      { .kind = WAKE_OP_PULSE, .fired = 1 },
+      { .kind = WAKE_OP_RING, .fired = 1 },
+      { .kind = WAKE_OP_REARM, .fired = 1 },
+      { .kind = WAKE_OP_RING, .fired = 2 },
+    },
+  },
+  {
     .name = "no_fn_never_fires",
     .no_fn = true,
     .ops = {
       { .kind = WAKE_OP_RING },
+      { .kind = WAKE_OP_PULSE },
       { .kind = WAKE_OP_REARM },
       { .kind = WAKE_OP_RING },
     },
@@ -78,6 +97,11 @@ sp_test_each(core, wake, wake_test_t, wake_tests) {
       }
       case WAKE_OP_RING: {
         spn_wake_ring(&wake);
+        sp_expect_eq(t, op->fired, fired);
+        break;
+      }
+      case WAKE_OP_PULSE: {
+        spn_wake_pulse(&wake);
         sp_expect_eq(t, op->fired, fired);
         break;
       }
