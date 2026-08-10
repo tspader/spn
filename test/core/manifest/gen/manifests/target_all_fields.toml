@@ -5,9 +5,9 @@ version = "1.0.0"
 [[lib]]
 name = "rich"
 kinds = ["executable"]
-source = ["a.c", "b.c"]
+source = ["a.c", "b.c", { path = "c.c", tree = "manifest" }, { path = "d.c", tree = "source" }]
 headers = ["a.h"]
-include = ["inc"]
+include = ["inc", { path = "minc", tree = "manifest" }]
 define = ["X=1"]
 flags = ["-O2"]
 deps = ["libfoo"]

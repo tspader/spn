@@ -14,6 +14,7 @@
   X(cxx_standard,   "manifest.jtd.json") \
   X(build_mode,     "manifest.jtd.json") \
   X(option_type,    "manifest.jtd.json") \
+  X(tree,           "manifest.jtd.json") \
   X(index_protocol, "manifest.jtd.json") \
   X(index_dep_kind, "release.jtd.json")
 

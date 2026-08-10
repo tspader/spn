@@ -84,10 +84,14 @@ static spn_cxx_options_t lower_cxx_options(const spn_cg_cxx_options_t* cg) {
   };
 }
 
-static spn_gated_list_t lower_gated_sources(spn_toml_loader_t* ctx, sp_da(spn_cg_source_entry_t) entries) {
-  spn_gated_list_t values = sp_da_new(ctx->mem, spn_gated_str_t);
+static spn_gated_path_list_t lower_gated_sources(spn_toml_loader_t* ctx, sp_da(spn_cg_source_entry_t) entries) {
+  spn_gated_path_list_t values = sp_da_new(ctx->mem, spn_gated_path_t);
   sp_da_for(entries, it) {
-    sp_da_push(values, ((spn_gated_str_t) { .value = entries[it].path, .when = entries[it].when }));
+    sp_da_push(values, ((spn_gated_path_t) {
+      .path = entries[it].path,
+      .tree = sp_opt_is_null(entries[it].tree) ? SPN_TREE_SOURCE : sp_opt_get(entries[it].tree),
+      .when = entries[it].when,
+    }));
   }
   return values;
 }
@@ -192,8 +196,8 @@ static void lower_package(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, s
   info->name = p->name;
   info->namespace = p->namespace;
   info->repo = p->repo;
-  info->upstream.url = p->url;
-  info->upstream.commit = p->commit;
+  info->upstream.url = p->upstream.url;
+  info->upstream.commit = p->upstream.commit;
   info->author = p->author;
   info->maintainer = p->maintainer;
   info->qualified = lower_qualify(ctx, p->namespace, p->name);
@@ -816,13 +820,36 @@ static void validate_collection_cxx(spn_toml_loader_t* ctx, spn_cg_target_om_t c
   spn_toml_loader_pop(ctx);
 }
 
-static void validate_upstream(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg) {
-  const spn_cg_package_t* p = &cg->package;
-  if (sp_str_empty(p->url) != sp_str_empty(p->commit)) {
-    spn_toml_loader_push_key(ctx, "package");
-    spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, sp_str_empty(p->commit) ? "commit" : "url");
+static void validate_entry_trees(spn_toml_loader_t* ctx, sp_da(spn_cg_source_entry_t) entries, const c8* key) {
+  spn_toml_loader_push_key(ctx, key);
+  sp_da_for(entries, it) {
+    if (!sp_opt_is_null(entries[it].tree) && sp_opt_get(entries[it].tree) == SPN_TREE_NONE) {
+      spn_toml_loader_push_index(ctx, it);
+      spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "tree");
+      spn_toml_loader_pop(ctx);
+    }
+  }
+  spn_toml_loader_pop(ctx);
+}
+
+static void validate_collection_trees(spn_toml_loader_t* ctx, spn_cg_target_om_t cg, const c8* key) {
+  spn_toml_loader_push_key(ctx, key);
+  sp_om_for(cg, it) {
+    const spn_cg_target_t* target = sp_str_om_at(cg, it);
+    spn_toml_loader_push_index(ctx, it);
+    validate_entry_trees(ctx, target->source, "source");
+    validate_entry_trees(ctx, target->include, "include");
     spn_toml_loader_pop(ctx);
   }
+  spn_toml_loader_pop(ctx);
+}
+
+static void validate_trees(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg) {
+  validate_collection_trees(ctx, cg->lib, "lib");
+  validate_collection_trees(ctx, cg->bin, "bin");
+  validate_collection_trees(ctx, cg->script, "script");
+  validate_collection_trees(ctx, cg->test, "test");
+  validate_collection_trees(ctx, cg->example, "example");
 }
 
 static void validate_cxx(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg) {
@@ -942,7 +969,7 @@ spn_err_t spn_pkg_lower(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, spn
 
   validate_profiles(ctx, cg);
   validate_lib_linkages(ctx, out);
-  validate_upstream(ctx, cg);
+  validate_trees(ctx, cg);
   validate_cxx(ctx, cg);
   validate_links(ctx, cg);
   validate_c_only_scripts(ctx, cg);

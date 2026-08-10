@@ -71,4 +71,12 @@ typedef struct {
 
 typedef sp_da(spn_gated_str_t) spn_gated_list_t;
 
+typedef struct {
+  sp_str_t path;
+  spn_tree_t tree;
+  spn_when_t when;
+} spn_gated_path_t;
+
+typedef sp_da(spn_gated_path_t) spn_gated_path_list_t;
+
 #endif

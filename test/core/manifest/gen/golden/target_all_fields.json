@@ -11,13 +11,25 @@
       ],
       "source": [
         "a.c",
-        "b.c"
+        "b.c",
+        {
+          "path": "c.c",
+          "tree": "manifest"
+        },
+        {
+          "path": "d.c",
+          "tree": "source"
+        }
       ],
       "headers": [
         "a.h"
       ],
       "include": [
-        "inc"
+        "inc",
+        {
+          "path": "minc",
+          "tree": "manifest"
+        }
       ],
       "define": [
         "X=1"

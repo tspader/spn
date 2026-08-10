@@ -319,6 +319,7 @@ sp_test_each(cmd_publish, publish, case_t, cases, .setup = spn_test_ctx_setup) {
       ts(package)
       "name = \"{}\"\n"
       "version = \"{}\"\n"
+      "[package.upstream]\n"
       "url = \"{}\"\n"
       "commit = \"{}\"\n",
       sp_fmt_cstr(c.expect.name),

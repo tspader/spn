@@ -1,0 +1,9 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[[lib]]
+name = "t"
+kinds = ["static"]
+source = ["a.c", { path = "b.c", tree = "manifest" }, { path = "c.c", tree = "source" }]
+include = [{ path = "inc", tree = "manifest" }]

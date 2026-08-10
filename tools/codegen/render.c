@@ -53,7 +53,7 @@ static sp_str_t present_expr(gen_t* g, field_t* field, sp_str_t recv) {
   if (field_named(field)) {
     return sp_fmt(g->mem, "sp_om_size({}{}) > 0", sp_fmt_str(recv), sp_fmt_str(field->name)).value;
   }
-  if (field->required) {
+  if (field->required && field->kind != FIELD_STR) {
     return sp_str_lit("true");
   }
   if (field->card == CARD_ARRAY || field->card == CARD_MAP) {

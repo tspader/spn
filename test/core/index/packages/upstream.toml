@@ -1,5 +1,7 @@
 [package]
 name = "A"
 version = "1.0.0"
+
+[package.upstream]
 url = "https://spn.dev/A.git"
 commit = "deadbeef"
