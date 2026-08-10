@@ -397,7 +397,7 @@ static spn_err_union_t resolve_local_package(spn_resolver_t* resolver, spn_resol
     .source = pkg->source,
     .origin = {
       .recipe = {
-        .kind = SPN_PKG_TREE_LOCAL,
+        .kind = SPN_PKG_ROOT_LOCAL,
         .local = sp_fs_parent_path(pkg->manifest)
       },
       .paths = {

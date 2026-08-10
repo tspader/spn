@@ -54,7 +54,7 @@ static spn_err_t apply_patch_overrides(spn_session_t* session, spn_resolve_query
       continue;
     }
 
-    pkg->origin.recipe = (spn_pkg_tree_t) { .kind = SPN_PKG_TREE_LOCAL, .local = patch };
+    pkg->origin.recipe = (spn_pkg_root_t) { .kind = SPN_PKG_ROOT_LOCAL, .local = patch };
     pkg->origin.source = spn_pkg_upstream(info);
     pkg->origin.info = info;
     pkg->name = info->name;

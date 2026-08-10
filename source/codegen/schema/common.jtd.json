@@ -8,7 +8,7 @@
     "index_protocol": { "enum": ["git", "http", "dir"], "metadata": { "include": "index/types.h" } },
     "option_type": { "enum": ["bool", "enum"], "metadata": { "include": "when/types.h" } },
     "pkg_source": { "enum": ["root", "file", "index"], "metadata": { "include": "pkg/types.h" } },
-    "pkg_tree_kind": { "enum": ["none", "local", "git"], "metadata": { "include": "pkg/types.h" } },
+    "pkg_root_kind": { "enum": ["none", "local", "git"], "metadata": { "include": "pkg/types.h" } },
 
     "triple": {
       "optionalProperties": {

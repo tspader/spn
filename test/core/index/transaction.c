@@ -237,7 +237,7 @@ sp_test_each(index_transaction, publish, txn_test_t, tests, .setup = spn_test_ct
           },
           .version = action.publish.version,
           .source = {
-            .kind = SPN_PKG_TREE_GIT,
+            .kind = SPN_PKG_ROOT_GIT,
             .git = { .url = sp_str_lit("https://example.com/pkg.git"), .rev = sp_str_lit("abc123") },
           },
         };

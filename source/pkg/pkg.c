@@ -114,12 +114,12 @@ spn_profile_info_t* spn_pkg_get_default_profile(spn_pkg_info_t* pkg) {
 }
 
 
-spn_pkg_tree_t spn_pkg_upstream(spn_pkg_info_t* info) {
+spn_pkg_root_t spn_pkg_upstream(spn_pkg_info_t* info) {
   if (sp_str_empty(info->upstream.url)) {
-    return (spn_pkg_tree_t) { .kind = SPN_PKG_TREE_NONE };
+    return (spn_pkg_root_t) { .kind = SPN_PKG_ROOT_NONE };
   }
-  return (spn_pkg_tree_t) {
-    .kind = SPN_PKG_TREE_GIT,
+  return (spn_pkg_root_t) {
+    .kind = SPN_PKG_ROOT_GIT,
     .git = { .url = info->upstream.url, .rev = info->upstream.commit },
   };
 }

@@ -42,13 +42,13 @@ spn_lock_file_t spn_build_lock_file(sp_mem_t mem, sp_intern_t* intern, spn_resol
 
     if (pkg->source == SPN_PKG_SOURCE_INDEX) {
       spn_index_release_t* release = pkg->origin.release;
-      if (release->source.kind == SPN_PKG_TREE_GIT) {
+      if (release->source.kind == SPN_PKG_ROOT_GIT) {
         entry.commit = release->source.git.rev;
         entry.source.url = release->source.git.url;
         entry.source.rev = release->source.git.rev;
         entry.source.dir = release->source.git.dir;
       }
-      if (release->manifest.kind == SPN_PKG_TREE_GIT) {
+      if (release->manifest.kind == SPN_PKG_ROOT_GIT) {
         entry.manifest.url = release->manifest.git.url;
         entry.manifest.rev = release->manifest.git.rev;
         entry.manifest.dir = release->manifest.git.dir;

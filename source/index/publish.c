@@ -61,11 +61,11 @@ spn_err_union_t spn_publish_build(spn_publish_opts_t* opts, spn_index_release_t*
   spn_index_release_t release = sp_zero;
   spn_try_union(spn_index_release_from_pkg(opts->mem, &info, &release));
 
-  spn_pkg_tree_t published = {
-    .kind = SPN_PKG_TREE_GIT,
+  spn_pkg_root_t published = {
+    .kind = SPN_PKG_ROOT_GIT,
     .git = { .url = url, .rev = revision, .dir = subdir },
   };
-  if (release.source.kind == SPN_PKG_TREE_NONE) {
+  if (release.source.kind == SPN_PKG_ROOT_NONE) {
     release.source = published;
   } else {
     release.manifest = published;

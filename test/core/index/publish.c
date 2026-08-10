@@ -167,8 +167,8 @@ sp_test_each(index_publish, publish, publish_test_t, tests, .setup = spn_test_ct
     .version = it->release.version,
   };
   if (it->release.source.url) {
-    rel.source = (spn_pkg_tree_t) {
-      .kind = SPN_PKG_TREE_GIT,
+    rel.source = (spn_pkg_root_t) {
+      .kind = SPN_PKG_ROOT_GIT,
       .git = {
         .url = sp_cstr_as_str(it->release.source.url),
         .rev = sp_cstr_as_str(it->release.source.rev ? it->release.source.rev : ""),

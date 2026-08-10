@@ -72,7 +72,7 @@ static spn_pkg_unit_t* identity_unit(sp_mem_t mem, const identity_pkg_t* spec) {
 
 static spn_build_source_pin_t identity_pin(const identity_pkg_t* spec) {
   return (spn_build_source_pin_t) {
-    .kind = SPN_PKG_TREE_GIT,
+    .kind = SPN_PKG_ROOT_GIT,
     .rev = sp_str_view(spec->rev),
   };
 }

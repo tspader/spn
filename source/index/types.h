@@ -38,8 +38,8 @@ typedef struct {
 
   bool yanked;
 
-  spn_pkg_tree_t source;
-  spn_pkg_tree_t manifest;
+  spn_pkg_root_t source;
+  spn_pkg_root_t manifest;
   spn_index_rel_paths_t paths;
 
   sp_da(spn_index_dep_t) deps;

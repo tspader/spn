@@ -89,7 +89,7 @@ sp_hash_t spn_unit_fingerprint(spn_session_t* session, spn_build_unit_t* build, 
 
   spn_resolved_pkg_t* resolved = sp_ht_getp(session->resolve, id);
   if (resolved) {
-    if (resolved->origin.source.kind == SPN_PKG_TREE_GIT) {
+    if (resolved->origin.source.kind == SPN_PKG_ROOT_GIT) {
       fingerprint.patches = resolved->origin.source.git.patches.hash;
     }
     if (!sp_da_empty(resolved->edges)) {

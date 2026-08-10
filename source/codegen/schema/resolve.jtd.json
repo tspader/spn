@@ -65,7 +65,7 @@
         "version": { "type": "string" },
         "hash": { "type": "string" },
         "source": { "ref": "pkg_source" },
-        "recipe": { "ref": "pkg_tree_kind" }
+        "recipe": { "ref": "pkg_root_kind" }
       },
       "optionalProperties": {
         "edges": { "elements": { "ref": "resolve_edge" } }

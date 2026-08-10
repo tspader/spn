@@ -6,7 +6,7 @@
 #include "unit/types.h"
 
 typedef struct {
-  spn_pkg_tree_kind_t kind;
+  spn_pkg_root_kind_t kind;
   sp_str_t rev;
   sp_str_t dir;
   sp_hash_t patches;

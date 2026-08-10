@@ -28,18 +28,18 @@ typedef enum {
 // check out. Manifests and source code are each one of these, materialized
 // independently, so "local recipe + remote source" is just LOCAL + GIT.
 typedef enum {
-  SPN_PKG_TREE_NONE,
-  SPN_PKG_TREE_LOCAL,
-  SPN_PKG_TREE_GIT,
-} spn_pkg_tree_kind_t;
+  SPN_PKG_ROOT_NONE,
+  SPN_PKG_ROOT_LOCAL,
+  SPN_PKG_ROOT_GIT,
+} spn_pkg_root_kind_t;
 
 typedef struct {
-  spn_pkg_tree_kind_t kind;
+  spn_pkg_root_kind_t kind;
   union {
     sp_str_t local;
     spn_git_checkout_id_t git;
   };
-} spn_pkg_tree_t;
+} spn_pkg_root_t;
 
 
 typedef struct {

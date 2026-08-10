@@ -36,8 +36,8 @@ struct spn_resolved_pkg {
   sp_da(spn_requested_dep_t) deps;
   sp_da(spn_resolved_dep_t) edges;
   struct {
-    spn_pkg_tree_t recipe;
-    spn_pkg_tree_t source;
+    spn_pkg_root_t recipe;
+    spn_pkg_root_t source;
     spn_index_rel_paths_t paths;
     spn_pkg_info_t* info;
     spn_index_release_t* release;
