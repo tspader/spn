@@ -55,3 +55,4 @@ typedef struct {
 spn_session_t* build_session(sp_mem_t mem, unit_graph_test_t* g);
 spn_pkg_id_t find_pkg_id(spn_session_t* s, unit_graph_test_t* g, const c8* name);
 sp_da(sp_str_t) test_str_list(sp_mem_t mem, const c8* const* items, u32 max);
+sp_da(spn_tree_path_t) test_tree_path_list(sp_mem_t mem, const c8* const* items, u32 max);

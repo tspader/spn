@@ -27,6 +27,11 @@ typedef struct sp_intern_t sp_intern_t;
 typedef sp_hash_t spn_build_id_t;
 
 typedef struct {
+  sp_str_t path;
+  spn_tree_t tree;
+} spn_tree_path_t;
+
+typedef struct {
   spn_wake_fn_t fn;
   void* data;
   sp_atomic_u32_t signaled;

@@ -117,10 +117,10 @@ static void make_list(
 static void make_path_list(
   sp_mem_t mem,
   apply_list_t test,
-  sp_da(sp_str_t)* plain,
+  sp_da(spn_tree_path_t)* plain,
   spn_gated_path_list_t* gated
 ) {
-  *plain = sp_da_new(mem, sp_str_t);
+  *plain = sp_da_new(mem, spn_tree_path_t);
   *gated = sp_da_new(mem, spn_gated_path_t);
 
   sp_carr_for(test.values, it) {
@@ -129,7 +129,7 @@ static void make_path_list(
       break;
     }
     if (value->plain) {
-      sp_da_push(*plain, sp_cstr_as_str(value->value));
+      sp_da_push(*plain, ((spn_tree_path_t) { .path = sp_cstr_as_str(value->value), .tree = SPN_TREE_SOURCE }));
       continue;
     }
     sp_da_push(*gated, ((spn_gated_path_t) {
@@ -149,6 +149,20 @@ static sp_err_t expect_list(sp_test_t* t, sp_da(sp_str_t) actual, const c8** exp
     sp_test_kv_c(t, "value", expected[et]);
     sp_must(t, et < sp_da_size(actual));
     sp_expect_str_eq_c(t, actual[et], expected[et]);
+  }
+  sp_must_eq(t, sp_da_size(actual), 4);
+  return SP_OK;
+}
+
+static sp_err_t expect_path_list(sp_test_t* t, sp_da(spn_tree_path_t) actual, const c8** expected) {
+  sp_for(et, 4) {
+    if (!expected[et]) {
+      sp_must_eq(t, sp_da_size(actual), et);
+      return SP_OK;
+    }
+    sp_test_kv_c(t, "value", expected[et]);
+    sp_must(t, et < sp_da_size(actual));
+    sp_expect_str_eq_c(t, actual[et].path, expected[et]);
   }
   sp_must_eq(t, sp_da_size(actual), 4);
   return SP_OK;
@@ -319,7 +333,7 @@ sp_test_each(options_apply, lists, apply_test_t, list_tests) {
 
   struct {
     apply_list_t test;
-    sp_da(sp_str_t)* plain;
+    sp_da(spn_tree_path_t)* plain;
     spn_gated_path_list_t* gated;
     const c8** expected;
   } path_lists [] = {
@@ -361,7 +375,7 @@ sp_test_each(options_apply, lists, apply_test_t, list_tests) {
 
   sp_expect(t, info.applied);
   sp_carr_for(path_lists, lt) {
-    sp_err_t err = expect_list(t, *path_lists[lt].plain, path_lists[lt].expected);
+    sp_err_t err = expect_path_list(t, *path_lists[lt].plain, path_lists[lt].expected);
     if (err) return err;
   }
   sp_carr_for(lists, lt) {

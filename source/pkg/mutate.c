@@ -34,6 +34,7 @@ void spn_pkg_init(sp_mem_t mem, spn_pkg_info_t* pkg, sp_str_t name) {
   sp_da_init(a, pkg->system_deps);
   sp_da_init(a, pkg->macos.frameworks);
   sp_da_init(a, pkg->gated.system_deps);
+  sp_da_init(a, pkg->gated.include);
   sp_str_om_init(pkg->options);
 }
 
@@ -74,7 +75,7 @@ void spn_pkg_add_include(spn_pkg_info_t* pkg, const c8* include) {
 }
 
 void spn_pkg_add_include_ex(spn_pkg_info_t* pkg, sp_str_t path) {
-  sp_da_push(pkg->include, sp_str_copy(spn_pkg_mem(pkg), path));
+  sp_da_push(pkg->include, ((spn_tree_path_t) { .path = sp_str_copy(spn_pkg_mem(pkg), path), .tree = SPN_TREE_SOURCE }));
 }
 
 void spn_pkg_add_define(spn_pkg_info_t* pkg, const c8* define) {

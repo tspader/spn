@@ -1,0 +1,7 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[package.build]
+source = [{ path = "b.c", tree = "manifest" }, { path = "c.c", when = { os = "linux" } }]
+include = [{ path = "inc", tree = "manifest" }]

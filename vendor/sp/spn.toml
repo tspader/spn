@@ -1,14 +1,16 @@
 [package]
 namespace = "spader"
 name = "sp"
-url = "https://github.com/tspader/sp.git"
 version = "3.5.0"
-commit = "a6c1733125b3d664bc544c29b5887fe19e78af5c"
 author = "tspader"
 maintainer = "tspader"
 system_deps = [
   { lib = "m", when = { os = "linux" } },
 ]
+
+[package.upstream]
+url = "https://github.com/tspader/sp.git"
+commit = "a6c1733125b3d664bc544c29b5887fe19e78af5c"
 
 [[lib]]
 name = "sp"

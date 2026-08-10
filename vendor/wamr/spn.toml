@@ -1,8 +1,6 @@
 [package]
 name = "wamr"
-url = "https://github.com/bytecodealliance/wasm-micro-runtime.git"
 version = "2.4.1"
-commit = "0b9db98aea32f5d634de8268a57b442f41fffc45"
 system_deps = [
   { lib = "m", when = { os = "linux" } },
   { lib = "ws2_32", when = { os = "windows" } },
@@ -11,6 +9,10 @@ system_deps = [
   { lib = "pathcch", when = { abi = "msvc" } },
   { lib = "api-ms-win-core-path-l1-1-0", when = { os = "windows", abi = { not = "msvc" } } },
 ]
+
+[package.upstream]
+url = "https://github.com/bytecodealliance/wasm-micro-runtime.git"
+commit = "0b9db98aea32f5d634de8268a57b442f41fffc45"
 
 # wasm_export.h declares the runtime API __declspec(dllimport) under MSVC
 # unless this macro is empty; vmlib is static, so it must be

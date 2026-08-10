@@ -62,9 +62,9 @@ struct spn_target_info {
   spn_target_kind_t kind;
   spn_linkage_set_t linkages;
   bool no_link; // @spader A hack for libtcc1.a (building an unlinked library)
-  sp_da(sp_str_t) source;
-  sp_da(sp_str_t) headers;
-  sp_da(sp_str_t) include;
+  sp_da(spn_tree_path_t) source;
+  sp_da(spn_tree_path_t) headers;
+  sp_da(spn_tree_path_t) include;
   sp_da(sp_str_t) define;
   sp_da(sp_str_t) flags;
   sp_da(sp_str_t) system_deps;
@@ -80,6 +80,7 @@ struct spn_target_info {
   } windows;
   struct {
     spn_gated_path_list_t source;
+    spn_gated_path_list_t headers;
     spn_gated_path_list_t include;
     spn_gated_list_t define;
     spn_gated_list_t flags;

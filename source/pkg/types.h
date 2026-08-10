@@ -141,7 +141,7 @@ struct spn_pkg_info {
   sp_da(spn_pkg_config_entry_t) config;
   sp_da(spn_pkg_patch_t) patches;
   spn_option_map_t options;
-  sp_da(sp_str_t) include;
+  sp_da(spn_tree_path_t) include;
   sp_da(sp_str_t) define;
   sp_da(sp_str_t) public_define;
   sp_da(sp_str_t) system_deps;
@@ -151,6 +151,7 @@ struct spn_pkg_info {
   } macos;
   struct {
     spn_gated_list_t system_deps;
+    spn_gated_path_list_t include;
   } gated;
   spn_toolchain_map_t toolchains;
   spn_target_info_t build;
