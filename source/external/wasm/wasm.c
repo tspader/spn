@@ -96,6 +96,7 @@ static spn_err_t script_open(spn_wasm_script_t* script, spn_pkg_unit_t* unit) {
   script->preopens = (spn_wasm_preopens_t) {
     .work = preopen("/work", unit->paths.work),
     .source = preopen("/source", unit->paths.roots.source),
+    .manifest = preopen("/manifest", unit->paths.roots.recipe),
     .store = preopen("/store", unit->paths.store),
   };
   wasm_runtime_set_wasi_args(
@@ -132,9 +133,10 @@ static spn_err_t script_open(spn_wasm_script_t* script, spn_pkg_unit_t* unit) {
   wasm_runtime_set_user_data(script->env, script->handles);
 
   spn_dag_wasi_mount_t mounts [] = {
-    { .guest = "/work",   .host = unit->paths.work },
-    { .guest = "/source", .host = unit->paths.roots.source },
-    { .guest = "/store",  .host = unit->paths.store },
+    { .guest = "/work",     .host = unit->paths.work },
+    { .guest = "/source",   .host = unit->paths.roots.source },
+    { .guest = "/manifest", .host = unit->paths.roots.recipe },
+    { .guest = "/store",    .host = unit->paths.store },
   };
   script->wasi = spn_dag_wasi_new(spn.mem, mounts, sp_carr_len(mounts));
   spn_dag_wasi_bind(script->wasi, script->instance);
