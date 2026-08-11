@@ -125,6 +125,7 @@ typedef enum {
   SPN_DIR_SOURCE = 6,
   SPN_DIR_WORK = 7,
   SPN_DIR_PROJECT = 8,
+  SPN_DIR_MANIFEST = 9,
 } spn_dir_t;
 
 typedef enum {

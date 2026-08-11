@@ -38,6 +38,7 @@ sp_str_t spn_api_dir(spn_pkg_unit_t* unit, spn_dir_t dir) {
     case SPN_DIR_SOURCE:  return unit->paths.roots.source;
     case SPN_DIR_WORK:    return unit->paths.work;
     case SPN_DIR_PROJECT: return unit->session->paths.root;
+    case SPN_DIR_MANIFEST: return unit->paths.roots.recipe;
   }
 
   SP_UNREACHABLE_RETURN(sp_str_lit(""));

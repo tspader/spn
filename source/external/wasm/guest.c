@@ -15,9 +15,10 @@ static spn_pkg_unit_t* guest_unit(spn_wasm_ctx_t* abi) {
 
 static sp_str_t guest_path(spn_wasm_ctx_t* abi, sp_mem_t mem, spn_pkg_unit_t* unit, const c8* path) {
   struct { sp_str_t guest; sp_str_t host; } dirs [] = {
-    { sp_str_lit("/work"),   unit->paths.work },
-    { sp_str_lit("/source"), unit->paths.roots.source },
-    { sp_str_lit("/store"),  unit->paths.store },
+    { sp_str_lit("/work"),     unit->paths.work },
+    { sp_str_lit("/source"),   unit->paths.roots.source },
+    { sp_str_lit("/manifest"), unit->paths.roots.recipe },
+    { sp_str_lit("/store"),    unit->paths.store },
   };
 
   sp_str_t str = sp_str_view(path);

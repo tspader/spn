@@ -29,9 +29,10 @@ typedef union {
   struct {
     const c8* work;
     const c8* source;
+    const c8* manifest;
     const c8* store;
   };
-  const c8* array [3];
+  const c8* array [4];
 } spn_wasm_preopens_t;
 
 typedef enum {
