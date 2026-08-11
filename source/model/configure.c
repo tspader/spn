@@ -26,8 +26,8 @@ static s32 on_configure_package(spn_dag_t* g, spn_dag_action_t* action, void* us
       spn_try(spn_wasm_script_call(configure, unit, sp_str_lit("configure"), SPN_ABI_KIND_CONFIG, unit));
     }
   }
-  spn_try(spn_pkg_unit_publish_headers(unit, unit->paths.include, false));
-  spn_try(spn_build_publish_copies(unit, unit->paths.include, false, SP_NULLPTR));
+  spn_try(spn_pkg_unit_publish_headers(unit, unit->paths.include, SPN_PUBLISH_EXISTING));
+  spn_try(spn_build_publish_copies(unit, unit->paths.include, SPN_PUBLISH_EXISTING, SP_NULLPTR));
   spn_pkg_unit_write_stamp(unit, spn_dag_find_artifact(g, action->produces[0])->path);
   return SPN_OK;
 }

@@ -14,6 +14,11 @@
 #include "external/wasm/types.h"
 #include "log/lazy/types.h"
 
+typedef enum {
+  SPN_PUBLISH_EXISTING,
+  SPN_PUBLISH_ALL,
+} spn_publish_t;
+
 typedef struct {
   spn_triple_t host;
   spn_profile_info_t profile;

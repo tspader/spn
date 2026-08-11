@@ -3,6 +3,7 @@
 #include "dag/dag.h"
 #include "session/types.h"
 #include "sha256/sha256.h"
+#include "unit/package.h"
 
 static void identity_hash_pin(spn_sha256_ctx_t* ctx, const spn_build_source_pin_t* pin) {
   spn_dag_hash_u8(ctx, (u8)pin->kind);
@@ -52,11 +53,10 @@ spn_dag_digest_t spn_build_tree_identity(const spn_dag_roots_t* roots, spn_pkg_u
   spn_dag_hash_str(&ctx, unit->info->qualified);
   identity_hash_pin(&ctx, pin);
 
-  spn_target_map_t maps [] = { unit->info->libs, unit->info->exes, unit->info->scripts, unit->info->tests };
-  u32 num_maps = unit->source == SPN_PKG_SOURCE_ROOT ? 4 : 1;
-  sp_for(mt, num_maps) {
-    sp_om_for(maps[mt], it) {
-      spn_target_info_t* target = sp_str_om_at(maps[mt], it);
+  spn_pkg_unit_header_maps_t published = spn_pkg_unit_header_maps(unit);
+  sp_for(mt, published.count) {
+    sp_om_for(published.maps[mt], it) {
+      spn_target_info_t* target = sp_str_om_at(published.maps[mt], it);
       spn_dag_hash_u64(&ctx, sp_da_size(target->headers));
       sp_da_for(target->headers, ht) {
         spn_dag_hash_u8(&ctx, (u8)target->headers[ht].tree);
