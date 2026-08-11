@@ -25,3 +25,7 @@ deps = ["A"]
 [[example]]
 name = "G"
 source = [{ path = "example/g/*.c", tree = "manifest" }]
+
+[[example]]
+name = "X"
+source = ["manifest/example/x/x.c", { path = "example/x/x.c", tree = "manifest" }, { path = "example/x/main.c", tree = "manifest" }]
