@@ -1,0 +1,13 @@
+[package]
+name = "A"
+version = "0.1.0"
+
+[package.upstream]
+url = "@A.url@"
+commit = "@A.commit@"
+
+[[lib]]
+name = "A"
+kinds = ["static"]
+source = ["a.c"]
+headers = ["x.h", { path = "x.h", tree = "manifest" }]

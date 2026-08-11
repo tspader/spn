@@ -2,8 +2,10 @@
 
 #include "dag/dag.h"
 #include "graph/identity.h"
+#include "target/mutate.h"
 
 #define IDENTITY_TEST_MAX_COPIES 2
+#define IDENTITY_TEST_MAX_HEADERS 2
 #define IDENTITY_TEST_MAX_STRS 2
 
 typedef struct {
@@ -12,9 +14,15 @@ typedef struct {
 } identity_copy_t;
 
 typedef struct {
+  const c8* path;
+  spn_tree_t tree;
+} identity_header_t;
+
+typedef struct {
   const c8* qualified;
   const c8* rev;
   identity_copy_t copies [IDENTITY_TEST_MAX_COPIES];
+  identity_header_t headers [IDENTITY_TEST_MAX_HEADERS];
 } identity_pkg_t;
 
 typedef struct {
@@ -62,6 +70,20 @@ static spn_pkg_unit_t* identity_unit(sp_mem_t mem, const identity_pkg_t* spec) {
       .to = sp_str_view(spec->copies[it].to),
     }));
   }
+
+  spn_target_info_t lib = { .name = sp_cstr_as_str("L"), .kind = SPN_TARGET_KIND_LIB };
+  spn_target_info_init(mem, &lib);
+  sp_carr_for(spec->headers, it) {
+    if (!spec->headers[it].path) {
+      break;
+    }
+    sp_da_push(lib.headers, ((spn_tree_path_t) {
+      .path = sp_cstr_as_str(spec->headers[it].path),
+      .tree = spec->headers[it].tree,
+    }));
+  }
+  sp_str_om_init(info->libs);
+  sp_str_om_insert(info->libs, lib.name, lib);
 
   spn_pkg_unit_t* unit = sp_alloc_type(mem, spn_pkg_unit_t);
   unit->info = info;
@@ -126,6 +148,17 @@ static const identity_pkg_test_t tree_tests [] = {
     .name = "distinct_pinned_source",
     .a = { .qualified = "A", .rev = "1", .copies = { { "source/H", "include" } } },
     .b = { .qualified = "A", .rev = "2", .copies = { { "source/H", "include" } } },
+    .expect = { .distinct = true }
+  },
+  {
+    .name = "identical_headers_agree",
+    .a = { .qualified = "A", .rev = "1", .headers = { { "H", SPN_TREE_SOURCE }, { "I", SPN_TREE_MANIFEST } } },
+    .b = { .qualified = "A", .rev = "1", .headers = { { "H", SPN_TREE_SOURCE }, { "I", SPN_TREE_MANIFEST } } },
+  },
+  {
+    .name = "distinct_header_tree",
+    .a = { .qualified = "A", .rev = "1", .headers = { { "H", SPN_TREE_SOURCE } } },
+    .b = { .qualified = "A", .rev = "1", .headers = { { "H", SPN_TREE_MANIFEST } } },
     .expect = { .distinct = true }
   },
 };
