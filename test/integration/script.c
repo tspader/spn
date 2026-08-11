@@ -111,9 +111,9 @@ sp_test(script, object_lib) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
       // object libs publish their objects to lib/, preserving source-relative paths
-      { .kind = ACTION_VERIFY_EXISTS, .exists = store_file("lib/rt/extra.c.o") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = store_file("lib/source/rt/extra.c.o") },
       // ditto for an object lib declared from the build script instead of the manifest
-      { .kind = ACTION_VERIFY_EXISTS, .exists = store_file("lib/rt/extra2.c.o") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = store_file("lib/source/rt/extra2.c.o") },
       // an unlinked archive still builds and installs
       { .kind = ACTION_VERIFY_EXISTS, .exists = static_lib("blob") },
       { .kind = ACTION_RUN_BIN, .bin.name = "object_lib" },
@@ -247,8 +247,8 @@ sp_test(script, build_script) {
           { .args = { "tools/build.c" } },
         },
         .exists = {
-          sp_str_lit("build/wasm32-wasi/work/build_script/spn/object/build/tools/a/main.c.o"),
-          sp_str_lit("build/wasm32-wasi/work/build_script/spn/object/build/tools/b/main.c.o"),
+          sp_str_lit("build/wasm32-wasi/work/build_script/spn/object/build/manifest/tools/a/main.c.o"),
+          sp_str_lit("build/wasm32-wasi/work/build_script/spn/object/build/manifest/tools/b/main.c.o"),
           store_file("include/version.h"),
         },
       },

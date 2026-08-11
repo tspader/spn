@@ -21,7 +21,7 @@ sp_da(spn_tree_path_t) test_tree_path_list(sp_mem_t mem, const c8* const* items,
     if (!items[it]) {
       break;
     }
-    sp_da_push(list, ((spn_tree_path_t) { .path = sp_str_view(items[it]), .tree = SPN_TREE_SOURCE }));
+    sp_da_push(list, ((spn_tree_path_t) { .path = sp_cstr_as_str(items[it]), .tree = SPN_TREE_SOURCE }));
   }
   return list;
 }

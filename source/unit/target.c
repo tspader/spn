@@ -234,41 +234,67 @@ static sp_da(spn_tree_path_t) collect_target_source(sp_mem_t mem, spn_pkg_unit_t
   return source;
 }
 
+typedef struct {
+  sp_str_t prefix;
+  sp_str_t path;
+} object_name_t;
+
+static bool is_path_within(sp_str_t path, sp_str_t dir) {
+  if (path.len <= dir.len + 1 || !sp_str_starts_with(path, dir)) {
+    return false;
+  }
+  return path.data[dir.len] == '/';
+}
+
+static object_name_t object_name(spn_tree_roots_t roots, spn_tree_path_t entry) {
+  if (!sp_fs_is_absolute(entry.path)) {
+    return (object_name_t) {
+      .prefix = entry.tree == SPN_TREE_MANIFEST ? sp_str_lit("manifest") : sp_str_lit("source"),
+      .path = entry.path,
+    };
+  }
+
+  if (is_path_within(entry.path, roots.recipe)) {
+    return (object_name_t) {
+      .prefix = sp_str_lit("manifest"),
+      .path = sp_str_sub(entry.path, (s32)roots.recipe.len + 1, (s32)(entry.path.len - roots.recipe.len - 1)),
+    };
+  }
+
+  if (is_path_within(entry.path, roots.source)) {
+    return (object_name_t) {
+      .prefix = sp_str_lit("source"),
+      .path = sp_str_sub(entry.path, (s32)roots.source.len + 1, (s32)(entry.path.len - roots.source.len - 1)),
+    };
+  }
+
+  return (object_name_t) {
+    .path = sp_str_strip_left(entry.path, sp_str_lit("/")),
+  };
+}
+
 static void create_target_objects(spn_session_t* s, spn_target_unit_t* target) {
   spn_pkg_unit_t* pkg = target->pkg;
 
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   sp_da(spn_tree_path_t) source = collect_target_source(scratch.mem, pkg, target);
 
-  sp_da_for(source, j) {
-    spn_tree_path_t entry = source[j];
-    sp_str_t relative = entry.path;
-    sp_str_t file = relative;
-    bool manifest_tree = false;
-    if (sp_fs_is_absolute(relative)) {
-      sp_str_t stripped = sp_str_strip_left(relative, pkg->paths.roots.recipe);
-      if (stripped.len == relative.len) {
-        stripped = sp_str_strip_left(relative, pkg->paths.roots.source);
-      }
-      relative = sp_str_strip_left(stripped, sp_str_lit("/"));
-    }
-    else {
-      manifest_tree = entry.tree == SPN_TREE_MANIFEST;
-      file = spn_tree_path_resolve(s->mem, pkg->paths.roots, entry);
-    }
+  sp_da_for(source, it) {
+    spn_tree_path_t entry = source[it];
+    object_name_t name = object_name(pkg->paths.roots, entry);
+    sp_str_t file = spn_tree_path_resolve(s->mem, pkg->paths.roots, entry);
 
-    spn_lang_t lang = spn_lang_from_path(relative);
+    spn_lang_t lang = spn_lang_from_path(name.path);
 
     // Object libs publish their objects as artifacts; everyone else keeps
-    // them as intermediates. The object name keeps the full source-relative
-    // path, extension included, so colliding sources stay distinct.
+    // them as intermediates.
     sp_str_t object_dir = target->lib_kind == SPN_LIB_KIND_OBJECT ?
       pkg->paths.lib :
       sp_fs_join_path(s->mem, pkg->paths.object, target->info->name);
-    if (manifest_tree) {
-      object_dir = sp_fs_join_path(s->mem, object_dir, sp_str_lit("manifest"));
+    if (name.prefix.len) {
+      object_dir = sp_fs_join_path(s->mem, object_dir, name.prefix);
     }
-    sp_str_t object_path = sp_fs_join_path(s->mem, object_dir, sp_fmt(scratch.mem, "{}.o", SP_FMT_STR(relative)).value);
+    sp_str_t object_path = sp_fs_join_path(s->mem, object_dir, sp_fmt(scratch.mem, "{}.o", SP_FMT_STR(name.path)).value);
     spn_compile_unit_id_t id = {
       .target = target->id,
       .source = sp_intern_get_or_insert(s->ctx->intern, file),
