@@ -312,7 +312,7 @@ static s32 dag_user_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data
   return 0;
 }
 
-spn_err_t spn_build_publish_copies(spn_pkg_unit_t* unit, sp_str_t root, bool strict, sp_da(spn_dag_obs_t)* obs) {
+spn_err_t spn_build_publish_copies(spn_pkg_unit_t* unit, sp_str_t root, spn_publish_t publish, sp_da(spn_dag_obs_t)* obs) {
   sp_da_for(unit->info->publish.copy, it) {
     spn_publish_copy_t* copy = &unit->info->publish.copy[it];
     sp_str_t rest = sp_zero;
@@ -341,7 +341,7 @@ spn_err_t spn_build_publish_copies(spn_pkg_unit_t* unit, sp_str_t root, bool str
       }
     }
     else if (sp_da_empty(matches)) {
-      err = strict ? 1 : 0;
+      err = publish == SPN_PUBLISH_ALL ? 1 : 0;
     }
     else {
       sp_fs_create_dir(sp_fs_parent_path(dest));
@@ -405,11 +405,11 @@ static s32 dag_tree_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data
 
   sp_str_t root = dag_artifact_path(g, action->produces[0]);
 
-  if (spn_pkg_unit_publish_headers(unit, root, true)) {
+  if (spn_pkg_unit_publish_headers(unit, root, SPN_PUBLISH_ALL)) {
     return 1;
   }
 
-  if (spn_build_publish_copies(unit, root, true, &ctx->obs)) {
+  if (spn_build_publish_copies(unit, root, SPN_PUBLISH_ALL, &ctx->obs)) {
     return 1;
   }
   if (dag_tree_copy_user_outputs(ctx, root)) {
@@ -813,11 +813,10 @@ static spn_err_t dag_add_tree(spn_dag_build_t* b, spn_pkg_unit_t* unit, spn_dag_
   pkg->tree = spn_dag_add_tree(g, unit->paths.include);
   spn_try(spn_dag_action_add_output(g, action, pkg->tree));
 
-  spn_target_map_t maps [] = { unit->info->libs, unit->info->exes, unit->info->scripts, unit->info->tests };
-  u32 num_maps = unit->source == SPN_PKG_SOURCE_ROOT ? 4 : 1;
-  sp_for(mt, num_maps) {
-    sp_om_for(maps[mt], it) {
-      spn_target_info_t* target = sp_str_om_at(maps[mt], it);
+  spn_pkg_unit_header_maps_t published = spn_pkg_unit_header_maps(unit);
+  sp_for(mt, published.count) {
+    sp_om_for(published.maps[mt], it) {
+      spn_target_info_t* target = sp_str_om_at(published.maps[mt], it);
       sp_da_for(target->headers, ht) {
         sp_str_t from = spn_tree_path_resolve(b->mem, unit->paths.roots, target->headers[ht]);
         spn_dag_action_add_input(g, action, spn_dag_add_file(g, from));

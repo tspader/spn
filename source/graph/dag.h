@@ -61,6 +61,6 @@ spn_err_union_t  spn_dag_build_session(spn_op_t* op);
 spn_dag_build_t* spn_dag_build_new(spn_op_t* op);
 spn_err_union_t  spn_dag_build_run(spn_dag_build_t* b, u32 workers);
 spn_err_union_t  spn_dag_build_add_target(spn_dag_build_t* b, spn_target_unit_t* target);
-spn_err_t        spn_build_publish_copies(spn_pkg_unit_t* unit, sp_str_t root, bool strict, sp_da(spn_dag_obs_t)* obs);
+spn_err_t        spn_build_publish_copies(spn_pkg_unit_t* unit, sp_str_t root, spn_publish_t publish, sp_da(spn_dag_obs_t)* obs);
 
 #endif
