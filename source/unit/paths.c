@@ -10,8 +10,7 @@ void spn_unit_paths_init(spn_pkg_unit_t* unit, spn_loaded_pkg_t* loaded) {
 
   unit->paths.manifest = loaded->paths.manifest;
   unit->paths.script = loaded->paths.script;
-  unit->paths.recipe = loaded->roots.recipe;
-  unit->paths.source = loaded->roots.source;
+  unit->paths.roots = loaded->roots;
 
   switch (loaded->source) {
     case SPN_PKG_SOURCE_ROOT:

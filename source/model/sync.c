@@ -6,6 +6,7 @@
 #include "error/error.h"
 #include "error/types.h"
 #include "event/event.h"
+#include "core/core.h"
 #include "core/types.h"
 #include "git/cache.h"
 #include "intern/intern.h"
@@ -150,23 +151,16 @@ static spn_err_t materialize_tree(spn_session_t* session, sp_str_t name, spn_pkg
   sp_unreachable_return(SPN_ERROR);
 }
 
-static sp_str_t absolute_to(sp_str_t path, sp_str_t root) {
-  return sp_fs_is_absolute(path) ? path : sp_fs_join_path(spn.mem, root, path);
-}
-
-static sp_str_t tree_root(spn_loaded_pkg_t* loaded, spn_tree_t tree) {
-  return tree == SPN_TREE_MANIFEST ? loaded->roots.recipe : loaded->roots.source;
-}
-
 static sp_da(spn_tree_path_t) resolve_paths(spn_gated_path_list_t entries, spn_loaded_pkg_t* loaded, spn_when_env_t* env) {
   sp_da(spn_tree_path_t) resolved = sp_da_new(spn.mem, spn_tree_path_t);
   sp_da_for(entries, it) {
     if (!spn_when_eval(&entries[it].when, env)) {
       continue;
     }
+    spn_tree_path_t entry = { .path = entries[it].path, .tree = entries[it].tree };
     sp_da_push(resolved, ((spn_tree_path_t) {
-      .path = absolute_to(entries[it].path, tree_root(loaded, entries[it].tree)),
-      .tree = entries[it].tree,
+      .path = spn_tree_path_resolve(spn.mem, loaded->roots, entry),
+      .tree = entry.tree,
     }));
   }
   return resolved;
@@ -187,23 +181,23 @@ static spn_err_t resolve_configure_source(spn_ctx_t* ctx, sp_str_t name, spn_gat
     if (!spn_when_eval(&declared[it].when, env)) {
       continue;
     }
-    sp_str_t entry = declared[it].path;
-    sp_str_t root = tree_root(loaded, declared[it].tree);
-    if (!sp_fs_is_glob(entry)) {
-      sp_str_t path = absolute_to(entry, root);
+    spn_tree_path_t entry = { .path = declared[it].path, .tree = declared[it].tree };
+    sp_str_t root = spn_tree_root(loaded->roots, entry.tree);
+    if (!sp_fs_is_glob(entry.path)) {
+      sp_str_t path = spn_tree_path_resolve(spn.mem, loaded->roots, entry);
       if (!sp_fs_is_target_file(path)) {
-        return configure_source_err(ctx, name, entry);
+        return configure_source_err(ctx, name, entry.path);
       }
-      sp_da_push(resolved, ((spn_tree_path_t) { .path = path, .tree = declared[it].tree }));
+      sp_da_push(resolved, ((spn_tree_path_t) { .path = path, .tree = entry.tree }));
       continue;
     }
 
     sp_da(spn_dag_match_t) matches = sp_da_new(spn.mem, spn_dag_match_t);
-    if (spn_dag_glob(spn.mem, root, entry, SP_NULLPTR, &matches) || sp_da_empty(matches)) {
-      return configure_source_err(ctx, name, entry);
+    if (spn_dag_glob(spn.mem, root, entry.path, SP_NULLPTR, &matches) || sp_da_empty(matches)) {
+      return configure_source_err(ctx, name, entry.path);
     }
     sp_da_for(matches, jt) {
-      sp_da_push(resolved, ((spn_tree_path_t) { .path = matches[jt].path, .tree = declared[it].tree }));
+      sp_da_push(resolved, ((spn_tree_path_t) { .path = matches[jt].path, .tree = entry.tree }));
     }
   }
   *source = resolved;

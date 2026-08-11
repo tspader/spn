@@ -242,6 +242,16 @@ static void build_schemas(sp_mem_t mem) {
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
+      SP_BIND(&b, spn_evt_header_collision_t, path, "path", SP_BIND_STR);
+      SP_BIND(&b, spn_evt_header_collision_t, first, "first", SP_BIND_STR);
+      SP_BIND(&b, spn_evt_header_collision_t, second, "second", SP_BIND_STR);
+    }
+    schemas[SPN_EVENT_ERR_HEADER_COLLISION] = sp_bind_builder_end(&b);
+  }
+
+  {
+    sp_bind_builder_t b = sp_bind_builder_begin(mem);
+    SP_BIND_SCHEMA(&b) {
       SP_BIND(&b, spn_evt_run_t, name, "name", SP_BIND_STR);
       SP_BIND(&b, spn_evt_run_t, command, "command", SP_BIND_STR);
     }

@@ -35,7 +35,7 @@ sp_str_t spn_api_dir(spn_pkg_unit_t* unit, spn_dir_t dir) {
     case SPN_DIR_INCLUDE: return unit->paths.include;
     case SPN_DIR_VENDOR:  return unit->paths.vendor;
     case SPN_DIR_LIB:     return unit->paths.lib;
-    case SPN_DIR_SOURCE:  return unit->paths.source;
+    case SPN_DIR_SOURCE:  return unit->paths.roots.source;
     case SPN_DIR_WORK:    return unit->paths.work;
     case SPN_DIR_PROJECT: return unit->session->paths.root;
   }

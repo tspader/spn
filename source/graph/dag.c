@@ -10,6 +10,7 @@
 
 #include "api/api.h"
 #include "compiler/driver.h"
+#include "core/core.h"
 #include "dag/occ.h"
 #include "enum/enum.h"
 #include "event/event.h"
@@ -311,53 +312,6 @@ static s32 dag_user_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data
   return 0;
 }
 
-typedef sp_str_ht(sp_str_t) dag_staged_header_set_t;
-
-static s32 dag_tree_copy_headers(spn_dag_tree_ctx_t* ctx, sp_str_t root, spn_target_map_t targets, sp_mem_t mem, dag_staged_header_set_t* staged) {
-  spn_pkg_unit_t* unit = ctx->pkg;
-  sp_om_for(targets, it) {
-    spn_target_info_t* target = sp_str_om_at(targets, it);
-    sp_da_for(target->headers, ht) {
-      spn_tree_path_t header = target->headers[ht];
-      sp_str_t from = spn_pkg_unit_header_source(mem, unit, header);
-      sp_str_t to = sp_fs_join_path(mem, root, header.path);
-
-      sp_str_t* seen = sp_str_ht_get(*staged, to);
-      if (seen) {
-        if (!sp_str_equal(*seen, from)) {
-          spn_event_buffer_push(spn.events, (spn_build_event_t) {
-            .kind = SPN_EVENT_NODE_FAILED,
-            .pkg = unit->info,
-            .io = &unit->logs.io,
-            .node_failed = {
-              .path = header.path,
-              .message = sp_str_lit("is published from both trees; the destination would collide"),
-            },
-          });
-          return 1;
-        }
-        continue;
-      }
-      sp_str_ht_insert(*staged, to, from);
-
-      sp_fs_create_dir(sp_fs_parent_path(to));
-      if (sp_fs_copy(from, to)) {
-        spn_event_buffer_push(spn.events, (spn_build_event_t) {
-          .kind = SPN_EVENT_NODE_FAILED,
-          .pkg = unit->info,
-          .io = &unit->logs.io,
-          .node_failed = {
-            .path = header.path,
-            .message = sp_str_lit("could not be published to the package store"),
-          },
-        });
-        return 1;
-      }
-    }
-  }
-  return 0;
-}
-
 spn_err_t spn_build_publish_copies(spn_pkg_unit_t* unit, sp_str_t root, bool strict, sp_da(spn_dag_obs_t)* obs) {
   sp_da_for(unit->info->publish.copy, it) {
     spn_publish_copy_t* copy = &unit->info->publish.copy[it];
@@ -451,22 +405,7 @@ static s32 dag_tree_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data
 
   sp_str_t root = dag_artifact_path(g, action->produces[0]);
 
-  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  dag_staged_header_set_t staged;
-  sp_str_ht_init(scratch.mem, staged);
-
-  s32 err = dag_tree_copy_headers(ctx, root, unit->info->libs, scratch.mem, &staged);
-  if (!err && unit->source == SPN_PKG_SOURCE_ROOT) {
-    spn_target_map_t maps [] = { unit->info->exes, unit->info->scripts, unit->info->tests };
-    sp_carr_for(maps, it) {
-      err = dag_tree_copy_headers(ctx, root, maps[it], scratch.mem, &staged);
-      if (err) {
-        break;
-      }
-    }
-  }
-  sp_mem_end_scratch(scratch);
-  if (err) {
+  if (spn_pkg_unit_publish_headers(unit, root, true)) {
     return 1;
   }
 
@@ -880,7 +819,7 @@ static spn_err_t dag_add_tree(spn_dag_build_t* b, spn_pkg_unit_t* unit, spn_dag_
     sp_om_for(maps[mt], it) {
       spn_target_info_t* target = sp_str_om_at(maps[mt], it);
       sp_da_for(target->headers, ht) {
-        sp_str_t from = spn_pkg_unit_header_source(b->mem, unit, target->headers[ht]);
+        sp_str_t from = spn_tree_path_resolve(b->mem, unit->paths.roots, target->headers[ht]);
         spn_dag_action_add_input(g, action, spn_dag_add_file(g, from));
       }
     }
