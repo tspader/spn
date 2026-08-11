@@ -886,11 +886,11 @@ static sp_err_t check_gated_list(sp_test_t* t, spn_gated_list_t actual, const ga
 
 static sp_err_t check_gated_path_list(sp_test_t* t, spn_gated_path_list_t actual, const gated_t* expected, u32 n) {
   sp_must_eq(t, n, (u32)sp_da_size(actual));
-  sp_for(i, n) {
-    spn_tree_t tree = expected[i].tree_none ? SPN_TREE_NONE : expected[i].tree ? expected[i].tree : SPN_TREE_SOURCE;
-    sp_expect_str_eq_c(t, actual[i].path, expected[i].value);
-    sp_expect_eq(t, (u32)tree, (u32)actual[i].tree);
-    sp_expect_str_eq_c(t, spn_when_to_str(sp_test_arena(t), &actual[i].when), expected[i].when ? expected[i].when : "always");
+  sp_for(it, n) {
+    spn_tree_t tree = expected[it].tree_none ? SPN_TREE_NONE : expected[it].tree ? expected[it].tree : SPN_TREE_SOURCE;
+    sp_expect_str_eq_c(t, actual[it].path, expected[it].value);
+    sp_expect_eq(t, (u32)tree, (u32)actual[it].tree);
+    sp_expect_str_eq_c(t, spn_when_to_str(sp_test_arena(t), &actual[it].when), expected[it].when ? expected[it].when : "always");
   }
   return SP_OK;
 }
