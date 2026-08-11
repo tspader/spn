@@ -18,10 +18,7 @@
 typedef struct {
   spn_pkg_source_t source;
   spn_pkg_info_t* info;
-  struct {
-    sp_str_t recipe;
-    sp_str_t source;
-  } roots;
+  spn_tree_roots_t roots;
   struct {
     sp_str_t manifest;
     sp_str_t script;

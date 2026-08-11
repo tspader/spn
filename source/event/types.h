@@ -60,6 +60,7 @@ typedef enum {
   X(SPN_EVENT_EMBED_PASSED,                 "embed_passed",               "Embedded",    DEBUG,   INFO,  false, false, SPN_EVT(embed_passed)) \
   X(SPN_EVENT_EMBED_FAILED,                 "embed_failed",               "error",       QUIET,   ERROR, true,  false, SPN_EVT(embed_failed)) \
   X(SPN_EVENT_NODE_FAILED,                  "node_failed",                "error",       QUIET,   ERROR, true,  false, SPN_EVT(node_failed)) \
+  X(SPN_EVENT_ERR_HEADER_COLLISION,         "err_header_collision",       "error",       QUIET,   ERROR, true,  false, SPN_EVT(header_collision)) \
   X(SPN_EVENT_INIT_BUILD_GRAPH,             "init_build_graph",           "Building",    NORMAL,  INFO,  false, false, SPN_EVT(graph_init)) \
   X(SPN_EVENT_PREPARE_BUILD_GRAPH_FAILED,   "prepare_build_graph_failed", "error",       QUIET,   ERROR, true,  true,  SPN_EVT(err.build_graph)) \
   X(SPN_EVENT_BUILD_PASSED,                 "build_passed",               "Finished",    NORMAL,  INFO,  false, false, SPN_EVT(build.passed)) \
@@ -193,6 +194,7 @@ typedef struct { u32 num_files; } spn_evt_embed_start_t;
 typedef struct { sp_str_t object_path; sp_str_t header_path; u64 time; } spn_evt_embed_passed_t;
 typedef struct { sp_str_t path; sp_str_t error; } spn_evt_embed_failed_t;
 typedef struct { sp_str_t path; sp_str_t message; } spn_evt_node_failed_t;
+typedef struct { sp_str_t path; sp_str_t first; sp_str_t second; } spn_evt_header_collision_t;
 typedef struct { sp_str_t profile; u64 time; u32 num_errors; sp_str_t first_error; } spn_evt_build_failed_t;
 typedef struct { bool success; u32 hits; u32 misses; u32 total; u64 time; sp_str_t profile; } spn_evt_build_summary_t;
 typedef struct { u64 time; } spn_evt_package_ok_t;
@@ -252,6 +254,7 @@ struct spn_build_event_t {
     spn_evt_embed_passed_t embed_passed;
     spn_evt_embed_failed_t embed_failed;
     spn_evt_node_failed_t node_failed;
+    spn_evt_header_collision_t header_collision;
     spn_evt_build_failed_t build_failed;
     spn_evt_build_summary_t build_summary;
     spn_evt_package_ok_t package_ok;

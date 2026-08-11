@@ -1,5 +1,16 @@
 #include "core/core.h"
 
+sp_str_t spn_tree_root(spn_tree_roots_t roots, spn_tree_t tree) {
+  return tree == SPN_TREE_MANIFEST ? roots.recipe : roots.source;
+}
+
+sp_str_t spn_tree_path_resolve(sp_mem_t mem, spn_tree_roots_t roots, spn_tree_path_t entry) {
+  if (sp_fs_is_absolute(entry.path)) {
+    return entry.path;
+  }
+  return sp_fs_join_path(mem, spn_tree_root(roots, entry.tree), entry.path);
+}
+
 void spn_wake_ring(spn_wake_t* wake) {
   if (!wake->fn) {
     return;

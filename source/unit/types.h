@@ -160,8 +160,7 @@ struct spn_pkg_unit_t {
 
     sp_str_t manifest;
     sp_str_t script;
-    sp_str_t recipe;
-    sp_str_t source;
+    spn_tree_roots_t roots;
     sp_str_t work;
     sp_str_t generated;
     sp_str_t object;

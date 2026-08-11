@@ -8,6 +8,7 @@
 #include "ctx/types.h"
 
 #include "compiler/driver.h"
+#include "core/core.h"
 #include "enum/enum.h"
 #include "external/wasm/wasm.h"
 #include "filter/filter.h"
@@ -157,10 +158,6 @@ static bool has_source_file(sp_da(spn_tree_path_t) source, spn_tree_path_t entry
   return false;
 }
 
-static sp_str_t tree_path_root(spn_pkg_unit_t* pkg, spn_tree_t tree) {
-  return tree == SPN_TREE_MANIFEST ? pkg->paths.recipe : pkg->paths.source;
-}
-
 static sp_str_t glob_literal_dir(sp_str_t pattern) {
   u32 cut = 0;
   for (u32 i = 0; i < pattern.len; i++) {
@@ -225,7 +222,7 @@ static sp_da(spn_tree_path_t) collect_target_source(sp_mem_t mem, spn_pkg_unit_t
   sp_da_for(target->info->source, it) {
     spn_tree_path_t entry = target->info->source[it];
     if (sp_fs_is_glob(entry.path)) {
-      collect_source_glob(mem, tree_path_root(pkg, entry.tree), entry, &source);
+      collect_source_glob(mem, spn_tree_root(pkg->paths.roots, entry.tree), entry, &source);
       continue;
     }
     if (has_source_file(source, entry)) {
@@ -249,15 +246,15 @@ static void create_target_objects(spn_session_t* s, spn_target_unit_t* target) {
     sp_str_t file = relative;
     bool manifest_tree = false;
     if (sp_fs_is_absolute(relative)) {
-      sp_str_t stripped = sp_str_strip_left(relative, pkg->paths.recipe);
+      sp_str_t stripped = sp_str_strip_left(relative, pkg->paths.roots.recipe);
       if (stripped.len == relative.len) {
-        stripped = sp_str_strip_left(relative, pkg->paths.source);
+        stripped = sp_str_strip_left(relative, pkg->paths.roots.source);
       }
       relative = sp_str_strip_left(stripped, sp_str_lit("/"));
     }
     else {
       manifest_tree = entry.tree == SPN_TREE_MANIFEST;
-      file = sp_fs_join_path(s->mem, tree_path_root(pkg, entry.tree), relative);
+      file = spn_tree_path_resolve(s->mem, pkg->paths.roots, entry);
     }
 
     spn_lang_t lang = spn_lang_from_path(relative);

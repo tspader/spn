@@ -4,19 +4,12 @@
 
 #include "event/log.h"
 #include "compiler/driver.h"
+#include "core/core.h"
 #include "external/cc.h"
 #include "session/invocation.h"
 #include "session/session.h"
 #include "unit/unit.h"
 #include "graph/build.h"
-
-static sp_str_t resolve_pkg_path(sp_mem_t mem, spn_pkg_unit_t* pkg, spn_tree_path_t entry) {
-  if (sp_fs_is_absolute(entry.path)) {
-    return entry.path;
-  }
-  sp_str_t root = entry.tree == SPN_TREE_MANIFEST ? pkg->paths.recipe : pkg->paths.source;
-  return sp_fs_join_path(mem, root, entry.path);
-}
 
 static spn_cc_compile_t spn_build_compile_desc(sp_mem_t mem, spn_compile_unit_t* unit) {
   spn_pkg_unit_t* pkg = unit->target->pkg;
@@ -39,14 +32,14 @@ static spn_cc_compile_t spn_build_compile_desc(sp_mem_t mem, spn_compile_unit_t*
   }
 
   sp_da_for(pkg->info->include, it) {
-    sp_da_push(compile.include, resolve_pkg_path(mem, pkg, pkg->info->include[it]));
+    sp_da_push(compile.include, spn_tree_path_resolve(mem, pkg->paths.roots, pkg->info->include[it]));
   }
   sp_da_for(pkg->info->define, it) {
     sp_da_push(compile.define, pkg->info->define[it]);
   }
 
   sp_da_for(unit->target->info->include, it) {
-    sp_da_push(compile.include, resolve_pkg_path(mem, pkg, unit->target->info->include[it]));
+    sp_da_push(compile.include, spn_tree_path_resolve(mem, pkg->paths.roots, unit->target->info->include[it]));
   }
   sp_da_for(unit->target->info->define, it) {
     sp_da_push(compile.define, unit->target->info->define[it]);

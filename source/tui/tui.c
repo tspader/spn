@@ -485,6 +485,16 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
       }
       break;
     }
+    case SPN_EVENT_ERR_HEADER_COLLISION: {
+      sp_fmt_io(
+        &w.base,
+        "two headers are published to {.cyan}: {.gray} and {.gray}",
+        sp_fmt_str(event->header_collision.path),
+        sp_fmt_str(get_contextual_path(mem, event->header_collision.first)),
+        sp_fmt_str(get_contextual_path(mem, event->header_collision.second))
+      );
+      break;
+    }
     case SPN_EVENT_ERR: {
       switch (event->err.kind) {
         case SPN_ERR_MANIFEST_PARSE: {

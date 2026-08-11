@@ -21,7 +21,7 @@ static spn_err_union_t run_target(spn_session_t* session, spn_target_unit_t* uni
 
   sp_ps_t ps = sp_ps_create(session->mem, (sp_ps_config_t) {
     .command = command,
-    .cwd = unit->pkg->paths.source,
+    .cwd = unit->pkg->paths.roots.source,
     .io = {
       .in =  { .mode = SP_PS_IO_MODE_NULL },
       .out = { .mode = SP_PS_IO_MODE_INHERIT },
@@ -75,7 +75,7 @@ static spn_err_union_t run_test(spn_session_t* session, spn_target_unit_t* unit,
   sp_tm_timer_t timer = sp_tm_start_timer();
   sp_ps_output_t output = sp_ps_run(session->mem, (sp_ps_config_t) {
     .command = command,
-    .cwd = unit->pkg->paths.source,
+    .cwd = unit->pkg->paths.roots.source,
     .io = {
       .in =  { .mode = SP_PS_IO_MODE_NULL },
       .out = { .mode = SP_PS_IO_MODE_CREATE },
