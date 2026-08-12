@@ -1,0 +1,103 @@
+#include "sp.h"
+#include "abi.gen.h"
+#include "external/wasm/abi.h"
+
+{{ for .types }}
+typedef struct {
+{{ for .fields }}
+  {{ .wire_decl }};
+{{ end }}
+} {{ .wire_type }};
+
+{{ end }}
+{{ for .types }}
+typedef c8 spn_abi_assert_wire_{{ .name }} [(sizeof({{ .wire_type }}) == {{ .size }}) ? 1 : -1];
+{{ end }}
+
+{{ for .types }}
+static bool spn_wire_{{ .name }}_read(spn_wasm_ctx_t* abi, const spn_wire_{{ .name }}_t* wire, {{ .type }}* out) {
+{{ for .fields }}
+{{ if .cap }}
+  for (u32 it = 0; it < {{ .cap }}; it++) {
+    if (!spn_wasm_read_str(abi, wire->{{ .key }}[it], &out->{{ .key }}[it])) return false;
+  }
+{{ end }}
+{{ if .f_str }}
+  if (!spn_wasm_read_str(abi, wire->{{ .key }}, &out->{{ .key }})) return false;
+{{ end }}
+{{ if .f_handle }}
+  {
+    void* {{ .key }} = SP_NULLPTR;
+    if (!spn_wasm_read_handle(abi, wire->{{ .key }}, {{ .kind }}, &{{ .key }})) return false;
+    out->{{ .key }} = {{ .key }};
+  }
+{{ end }}
+{{ if .f_object }}
+  if (!spn_wire_{{ .object }}_read(abi, &wire->{{ .key }}, &out->{{ .key }})) return false;
+{{ end }}
+{{ end }}
+  return true;
+}
+
+{{ end }}
+{{ for .functions }}
+static s32 spn_abi_thunk_{{ .name }}(wasm_exec_env_t env, u32 ctx, u32 addr) {
+  spn_wasm_ctx_t abi = {
+    .instance = wasm_runtime_get_module_inst(env),
+    .handles = wasm_runtime_get_user_data(env),
+  };
+
+  spn_t* spn = spn_wasm_resolve_handle(abi.handles, ctx, SPN_ABI_KIND_CTX);
+  if (!spn) return SPN_ERROR;
+
+  const spn_wire_{{ .name }}_t* wire = spn_wasm_resolve_guest_ptr(&abi, addr, sizeof(spn_wire_{{ .name }}_t));
+  if (!wire) return SPN_ERROR;
+
+  {{ .type }} {{ .name }} = sp_zero;
+  if (!spn_wire_{{ .name }}_read(&abi, wire, &{{ .name }})) return SPN_ERROR;
+
+  return spn_{{ .name }}_ex(spn, {{ .name }});
+}
+
+{{ end }}
+{{ for .fns }}
+static {{ .ret_type }} spn_abi_thunk_{{ .short }}(wasm_exec_env_t env{{ for .args }}, {{ .ctype }} a{{ .i }}{{ end }}) {
+  spn_wasm_ctx_t abi = spn_wasm_ctx(env);
+{{ for .args }}
+{{ if .stropt }}
+  const c8* s{{ .i }} = SP_NULLPTR;
+  if (!spn_wasm_read_str(&abi, a{{ .i }}, &s{{ .i }})) {{ .fail }}
+{{ end }}
+{{ if .handle }}
+  void* h{{ .i }} = spn_wasm_resolve_handle(abi.handles, a{{ .i }}, {{ .kind }});
+  if (!h{{ .i }}) {{ .fail }}
+{{ end }}
+{{ end }}
+{{ if .r_void }}
+  {{ .host }}({{ .call }});
+{{ end }}
+{{ if .r_s32 }}
+  return {{ .host }}({{ .call }});
+{{ end }}
+{{ if .r_str }}
+  return spn_wasm_copy_str(&abi, {{ .host }}({{ .call }}));
+{{ end }}
+{{ if .r_handle }}
+  void* result = (void*)({{ .host }}({{ .call }}));
+  if (!result) return 0;
+  return spn_wasm_add_handle(abi.handles, result, {{ .ret_kind }});
+{{ end }}
+}
+
+{{ end }}
+bool spn_wasm_register_api(void) {
+  static NativeSymbol natives [] = {
+{{ for .fns }}
+    { "{{ .name }}", spn_abi_thunk_{{ .short }}, "{{ .sig }}", SP_NULLPTR },
+{{ end }}
+{{ for .functions }}
+    { "spn_{{ .name }}_ex", spn_abi_thunk_{{ .name }}, "(ii)i", SP_NULLPTR },
+{{ end }}
+  };
+  return wasm_runtime_register_natives("env", natives, sp_carr_len(natives));
+}

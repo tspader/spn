@@ -1,9 +1,0 @@
-  {
-    sp_str_t raw = sp_zero;
-    if (spn_toml_loader_raw_optional(ctx, table, "{{ .key }}", &raw)) {
-      sp_opt_set(out->{{ .name }}, {{ .from }}(raw));
-    }
-    else if (spn_toml_loader_field_present(table, "{{ .key }}")) {
-      spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_EXPECTED_STR, "{{ .key }}");
-    }
-  }

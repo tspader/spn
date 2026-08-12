@@ -36,7 +36,7 @@ static void add_codegen(spn_t* spn, spn_config_t* config) {
   spn_node_set_fn(node, "codegen");
 
   add_inputs(spn, mem, node, sp_str_lit("/source/source/codegen/schema"));
-  add_inputs(spn, mem, node, sp_str_lit("/source/tools/templates"));
+  add_inputs(spn, mem, node, sp_str_lit("/source/tools/gen/templates"));
 
   add_output(spn, mem, node, sp_str_lit("common"), ".gen.h");
   add_output(spn, mem, node, sp_str_lit("abi"), ".gen.h");

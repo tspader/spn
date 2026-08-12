@@ -10,13 +10,12 @@ else()
   target_link_libraries(embed PRIVATE m)
   add_dependencies(embed headers)
 
-  add_executable(jtd_gen codegen/main.c codegen/run.c codegen/extract.c codegen/render.c codegen/abi.c jtd.c)
+  add_executable(jtd_gen gen/main.c gen/run.c gen/lower.c gen/bind.c gen/abi.c jtd.c)
   set_target_properties(jtd_gen PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
-  # @spader Rename source/sp/io.h so it doesn't shadow the CRT's io.h
   target_include_directories(jtd_gen PRIVATE
     ${STORE}/include
     ${CMAKE_CURRENT_SOURCE_DIR}
-    ${SRC}
+    ${CMAKE_CURRENT_SOURCE_DIR}/gen
   )
   target_link_libraries(jtd_gen PRIVATE yyjson m)
   add_dependencies(jtd_gen headers)
@@ -79,14 +78,14 @@ set(GEN_FILES
   ${GEN_DIR}/fuzz.gen.c
   ${GEN_DIR}/fuzz.jtd.json)
 file(GLOB JTD_GEN_SCHEMAS CONFIGURE_DEPENDS ${SCHEMA_DIR}/*.json)
-file(GLOB_RECURSE JTD_GEN_TEMPLATES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/templates/*.tmpl)
+file(GLOB_RECURSE JTD_GEN_TEMPLATES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/gen/templates/*.tmpl)
 add_custom_command(
   OUTPUT ${GEN_FILES}
   COMMAND ${CMAKE_COMMAND} -E make_directory ${GEN_DIR}
   COMMAND $<TARGET_FILE:jtd_gen>
     ${SCHEMA_DIR}
     ${GEN_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/templates
+    ${CMAKE_CURRENT_SOURCE_DIR}/gen/templates
   DEPENDS jtd_gen ${JTD_GEN_SCHEMAS} ${JTD_GEN_TEMPLATES}
   COMMENT "codegen: common.gen.h, {config,fuzz,manifest,release,toolchains,abi}.gen.{h,c}"
   VERBATIM)

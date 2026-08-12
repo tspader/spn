@@ -1,0 +1,101 @@
+static void spn_cg_{{ .name }}_write(const {{ .type }}* in, sp_io_writer_t* out) {
+  sp_io_write_c8(out, '{');
+  bool first = true;
+{{ for .fields }}
+{{ if .guarded }}
+  if ({{ .present }}) {
+    spn_codegen_json_key(out, &first, sp_str_lit("{{ .key }}"));
+{{ else }}
+  spn_codegen_json_key(out, &first, sp_str_lit("{{ .key }}"));
+{{ end }}
+{{ if .jwrite }}
+    {{ .jwrite }}(out, {{ .warg }});
+{{ end }}
+{{ if .k_extern }}
+    spn_codegen_write_{{ .extern }}(out, &in->{{ .name }});
+{{ end }}
+{{ if .k_object }}
+    spn_cg_{{ .object }}_write(&in->{{ .name }}, out);
+{{ end }}
+{{ if .k_str_array }}
+    spn_codegen_json_str_array(out, in->{{ .name }});
+{{ end }}
+{{ if .k_enum_array }}
+    sp_io_write_c8(out, '[');
+    sp_da_for(in->{{ .name }}, it) {
+      if (it) {
+        sp_io_write_c8(out, ',');
+      }
+      spn_codegen_json_str(out, {{ .to }}(in->{{ .name }}[it]));
+    }
+    sp_io_write_c8(out, ']');
+{{ end }}
+{{ if .k_object_array }}
+{{ if .shorthand }}
+    sp_io_write_c8(out, '[');
+    sp_da_for(in->{{ .name }}, it) {
+      if (it) {
+        sp_io_write_c8(out, ',');
+      }
+      if ({{ .table_present }}) {
+        spn_cg_{{ .object }}_write(&in->{{ .name }}[it], out);
+      } else {
+        spn_codegen_json_str(out, in->{{ .name }}[it].{{ .shorthand }});
+      }
+    }
+    sp_io_write_c8(out, ']');
+{{ else }}
+    sp_io_write_c8(out, '[');
+    sp_da_for(in->{{ .name }}, it) {
+      if (it) {
+        sp_io_write_c8(out, ',');
+      }
+      spn_cg_{{ .object }}_write(&in->{{ .name }}[it], out);
+    }
+    sp_io_write_c8(out, ']');
+{{ end }}
+{{ end }}
+{{ if .k_keyed }}
+    sp_io_write_c8(out, '{');
+    sp_om_for(in->{{ .name }}, it) {
+      const {{ .type }}* entry = sp_om_at(in->{{ .name }}, it);
+      if (it) {
+        sp_io_write_c8(out, ',');
+      }
+      spn_codegen_json_str(out, entry->{{ .key_field }});
+      sp_io_write_c8(out, ':');
+      spn_cg_{{ .object }}_write(entry, out);
+    }
+    sp_io_write_c8(out, '}');
+{{ end }}
+{{ if .k_map }}
+{{ if .map_object }}
+    sp_io_write_c8(out, '{');
+    sp_da_for(in->{{ .name }}, it) {
+      if (it) {
+        sp_io_write_c8(out, ',');
+      }
+      spn_codegen_json_str(out, in->{{ .name }}[it].key);
+      sp_io_write_c8(out, ':');
+      spn_cg_{{ .object }}_write(&in->{{ .name }}[it].value, out);
+    }
+    sp_io_write_c8(out, '}');
+{{ else }}
+    sp_io_write_c8(out, '{');
+    sp_da_for(in->{{ .name }}, it) {
+      if (it) {
+        sp_io_write_c8(out, ',');
+      }
+      spn_codegen_json_str(out, in->{{ .name }}[it].key);
+      sp_io_write_c8(out, ':');
+      spn_codegen_json_str(out, in->{{ .name }}[it].value);
+    }
+    sp_io_write_c8(out, '}');
+{{ end }}
+{{ end }}
+{{ if .guarded }}
+  }
+{{ end }}
+{{ end }}
+  sp_io_write_c8(out, '}');
+}
