@@ -5,8 +5,7 @@
 #include "resolve/types.h"
 #include "session/types.h"
 
-#include "event/event.h"
-#include "event/types.h"
+#include "error/types.h"
 #include "intern/intern.h"
 #include "pkg/id.h"
 #include "pkg/options.h"
@@ -97,14 +96,13 @@ static spn_err_union_t validate_config_keys(spn_session_t* session) {
     }
 
     if (!known) {
-      spn_event_buffer_push(session->ctx->events, (spn_build_event_t) {
-        .kind = SPN_EVENT_ERR_OPTION,
+      return (spn_err_union_t) {
+        .kind = SPN_ERR_OPTION,
         .option = {
-          .err = SPN_OPTION_ERR_UNKNOWN_PKG,
+          .kind = SPN_OPTION_ERR_UNKNOWN_PKG,
           .pkg = entry->key,
         },
-      });
-      return spn_err_reported(SPN_ERR_OPTION);
+      };
     }
   }
   return spn_result(SPN_OK);
@@ -161,19 +159,14 @@ spn_err_union_t spn_session_apply_options(spn_session_t* session, bool* reresolv
       spn_resolved_pkg_t* node = it.val;
       spn_option_requests_t* asked = sp_ht_getp(requests, node->id);
 
-      spn_resolved_options_t resolved = sp_zero;
-      if (spn_pkg_options_merge(
-        mem,
-        node,
-        &session->profile,
-        session->pkg->config,
-        asked ? *asked : SP_NULLPTR,
-        session->ctx->events,
-        &resolved)) {
-        return spn_err_reported(SPN_ERR_OPTION);
+      spn_option_requests_t node_requests = asked ? *asked : SP_NULLPTR;
+      spn_merged_options_t merged = sp_zero;
+      spn_pkg_options_merge(mem, node, &session->profile, session->pkg->config, node_requests, &merged);
+      if (!sp_da_empty(merged.violations)) {
+        return (spn_err_union_t) { .kind = SPN_ERR_OPTION, .option = merged.violations[0] };
       }
 
-      sp_ht_insert(session->options, node->id, resolved);
+      sp_ht_insert(session->options, node->id, merged.options);
     }
 
     bool pruned = false;
@@ -219,15 +212,14 @@ spn_err_union_t spn_session_apply_options(spn_session_t* session, bool* reresolv
         *reresolve = true;
         return spn_result(SPN_OK);
       }
-      spn_event_buffer_push(session->ctx->events, (spn_build_event_t) {
-        .kind = SPN_EVENT_ERR_OPTION,
+      return (spn_err_union_t) {
+        .kind = SPN_ERR_OPTION,
         .option = {
-          .err = SPN_OPTION_ERR_LATE_GATE,
+          .kind = SPN_OPTION_ERR_LATE_GATE,
           .pkg = missing_pkg,
           .a = { .kind = SPN_OPTION_SETTER_CONSUMER, .name = missing_dep },
         },
-      });
-      return spn_err_reported(SPN_ERR_OPTION);
+      };
     }
     break;
   }

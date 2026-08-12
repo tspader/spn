@@ -15,6 +15,7 @@
 #include "toml/issue.h"
 #include "toolchain/select.h"
 #include "tui/tui.h"
+#include "when/when.h"
 
 
 sp_prompt_widget_t sp_prompt_progress_widget(sp_prompt_ctx_t* ctx, sp_prompt_progress_t config);
@@ -370,81 +371,6 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
       }
       break;
     }
-    case SPN_EVENT_ERR_OPTION: {
-      switch (event->option.err) {
-        case SPN_OPTION_ERR_UNDECLARED: {
-          sp_fmt_io(
-            &w.base,
-            "{} does not declare an option named {.yellow} (set by {.cyan})",
-            sp_fmt_str(get_colored_name(mem, event->option.pkg)),
-            sp_fmt_str(event->option.option),
-            sp_fmt_str(spn_option_setter_to_str(event->option.a))
-          );
-          break;
-        }
-        case SPN_OPTION_ERR_BAD_VALUE: {
-          sp_fmt_io(
-            &w.base,
-            "{.yellow} is not a valid value for {}.{.cyan} (set by {.cyan})",
-            sp_fmt_str(event->option.value),
-            sp_fmt_str(get_colored_name(mem, event->option.pkg)),
-            sp_fmt_str(event->option.option),
-            sp_fmt_str(spn_option_setter_to_str(event->option.a))
-          );
-          break;
-        }
-        case SPN_OPTION_ERR_CONFLICT: {
-          sp_fmt_io(
-            &w.base,
-            "option conflict on {}.{.cyan}: {.cyan} and {.cyan} request different values",
-            sp_fmt_str(get_colored_name(mem, event->option.pkg)),
-            sp_fmt_str(event->option.option),
-            sp_fmt_str(spn_option_setter_to_str(event->option.a)),
-            sp_fmt_str(spn_option_setter_to_str(event->option.b))
-          );
-          break;
-        }
-        case SPN_OPTION_ERR_VETO: {
-          sp_fmt_io(
-            &w.base,
-            "{.cyan} requires {}.{.cyan} != {.yellow}, but {} set it",
-            sp_fmt_str(spn_option_setter_to_str(event->option.a)),
-            sp_fmt_str(get_colored_name(mem, event->option.pkg)),
-            sp_fmt_str(event->option.option),
-            sp_fmt_str(event->option.value),
-            sp_fmt_str(spn_option_setter_to_str(event->option.b))
-          );
-          break;
-        }
-        case SPN_OPTION_ERR_NO_VALUE: {
-          sp_fmt_io(
-            &w.base,
-            "no value for {}.{.cyan}: no default matched and nothing set it",
-            sp_fmt_str(get_colored_name(mem, event->option.pkg)),
-            sp_fmt_str(event->option.option)
-          );
-          break;
-        }
-        case SPN_OPTION_ERR_LATE_GATE: {
-          sp_fmt_io(
-            &w.base,
-            "the dependency gate on {}'s edge to {.cyan} never settled",
-            sp_fmt_str(get_colored_name(mem, event->option.pkg)),
-            sp_fmt_str(spn_option_setter_to_str(event->option.a))
-          );
-          break;
-        }
-        case SPN_OPTION_ERR_UNKNOWN_PKG: {
-          sp_fmt_io(
-            &w.base,
-            "the root manifest configures {.yellow}, which is not a package in this build",
-            sp_fmt_str(event->option.pkg)
-          );
-          break;
-        }
-      }
-      break;
-    }
     case SPN_EVENT_SYNC_FAILED: {
       sp_fmt_io(
         &w.base,
@@ -497,6 +423,81 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
     }
     case SPN_EVENT_ERR: {
       switch (event->err.kind) {
+        case SPN_ERR_OPTION: {
+          switch (event->err.option.kind) {
+            case SPN_OPTION_ERR_UNDECLARED: {
+              sp_fmt_io(
+                &w.base,
+                "{} does not declare an option named {.yellow} (set by {.cyan})",
+                sp_fmt_str(get_colored_name(mem, event->err.option.pkg)),
+                sp_fmt_str(event->err.option.option),
+                sp_fmt_str(spn_option_setter_to_str(event->err.option.a))
+              );
+              break;
+            }
+            case SPN_OPTION_ERR_BAD_VALUE: {
+              sp_fmt_io(
+                &w.base,
+                "{.yellow} is not a valid value for {}.{.cyan} (set by {.cyan})",
+                sp_fmt_str(spn_option_value_to_str(mem, event->err.option.value)),
+                sp_fmt_str(get_colored_name(mem, event->err.option.pkg)),
+                sp_fmt_str(event->err.option.option),
+                sp_fmt_str(spn_option_setter_to_str(event->err.option.a))
+              );
+              break;
+            }
+            case SPN_OPTION_ERR_CONFLICT: {
+              sp_fmt_io(
+                &w.base,
+                "option conflict on {}.{.cyan}: {.cyan} and {.cyan} request different values",
+                sp_fmt_str(get_colored_name(mem, event->err.option.pkg)),
+                sp_fmt_str(event->err.option.option),
+                sp_fmt_str(spn_option_setter_to_str(event->err.option.a)),
+                sp_fmt_str(spn_option_setter_to_str(event->err.option.b))
+              );
+              break;
+            }
+            case SPN_OPTION_ERR_VETO: {
+              sp_fmt_io(
+                &w.base,
+                "{.cyan} requires {}.{.cyan} != {.yellow}, but {} set it",
+                sp_fmt_str(spn_option_setter_to_str(event->err.option.a)),
+                sp_fmt_str(get_colored_name(mem, event->err.option.pkg)),
+                sp_fmt_str(event->err.option.option),
+                sp_fmt_str(spn_option_value_to_str(mem, event->err.option.value)),
+                sp_fmt_str(spn_option_setter_to_str(event->err.option.b))
+              );
+              break;
+            }
+            case SPN_OPTION_ERR_NO_VALUE: {
+              sp_fmt_io(
+                &w.base,
+                "no value for {}.{.cyan}: no default matched and nothing set it",
+                sp_fmt_str(get_colored_name(mem, event->err.option.pkg)),
+                sp_fmt_str(event->err.option.option)
+              );
+              break;
+            }
+            case SPN_OPTION_ERR_LATE_GATE: {
+              sp_fmt_io(
+                &w.base,
+                "the dependency gate on {}'s edge to {.cyan} never settled",
+                sp_fmt_str(get_colored_name(mem, event->err.option.pkg)),
+                sp_fmt_str(spn_option_setter_to_str(event->err.option.a))
+              );
+              break;
+            }
+            case SPN_OPTION_ERR_UNKNOWN_PKG: {
+              sp_fmt_io(
+                &w.base,
+                "the root manifest configures {.yellow}, which is not a package in this build",
+                sp_fmt_str(event->err.option.pkg)
+              );
+              break;
+            }
+          }
+          break;
+        }
         case SPN_ERR_MANIFEST_PARSE: {
           sp_fmt_io(
             &w.base,

@@ -351,20 +351,6 @@ static void build_schemas(sp_mem_t mem) {
   {
     sp_bind_builder_t b = sp_bind_builder_begin(mem);
     SP_BIND_SCHEMA(&b) {
-      SP_BIND(&b, spn_evt_option_t, pkg, "pkg", SP_BIND_STR);
-      SP_BIND(&b, spn_evt_option_t, option, "option", SP_BIND_STR);
-      SP_BIND(&b, spn_evt_option_t, value, "value", SP_BIND_STR);
-      SP_BIND(&b, spn_evt_option_t, a.kind, "a_kind", SP_BIND_S32);
-      SP_BIND(&b, spn_evt_option_t, a.name, "a", SP_BIND_STR);
-      SP_BIND(&b, spn_evt_option_t, b.kind, "b_kind", SP_BIND_S32);
-      SP_BIND(&b, spn_evt_option_t, b.name, "b", SP_BIND_STR);
-    }
-    schemas[SPN_EVENT_ERR_OPTION] = sp_bind_builder_end(&b);
-  }
-
-  {
-    sp_bind_builder_t b = sp_bind_builder_begin(mem);
-    SP_BIND_SCHEMA(&b) {
       SP_BIND(&b, spn_evt_resolve_end_t, num_resolved, "num_resolved", SP_BIND_U32);
       SP_BIND(&b, spn_evt_resolve_end_t, time, "time_ns", SP_BIND_U64);
     }
@@ -667,7 +653,36 @@ void spn_event_log_jsonl(sp_io_writer_t* out, spn_build_event_t* event) {
     sp_io_write_cstr(out, ", \"kind\": \"", SP_NULLPTR);
     sp_io_write_cstr(out, spn_err_to_str(event->err.kind), SP_NULLPTR);
     sp_io_write_cstr(out, "\"", SP_NULLPTR);
-    if (schema) {
+    if (event->err.kind == SPN_ERR_OPTION) {
+      const spn_option_violation_t* option = &event->err.option;
+      sp_io_write_cstr(out, ", \"data\": {\"pkg\": ", SP_NULLPTR);
+      spn_json_write_str(out, option->pkg);
+      sp_io_write_cstr(out, ", \"option\": ", SP_NULLPTR);
+      spn_json_write_str(out, option->option);
+      sp_io_write_cstr(out, ", \"value\": ", SP_NULLPTR);
+      switch (option->value.kind) {
+        case SPN_OPTION_VALUE_NONE: {
+          sp_io_write_cstr(out, "null", SP_NULLPTR);
+          break;
+        }
+        case SPN_OPTION_VALUE_BOOL: {
+          sp_io_write_cstr(out, option->value.b ? "true" : "false", SP_NULLPTR);
+          break;
+        }
+        case SPN_OPTION_VALUE_STR: {
+          spn_json_write_str(out, option->value.str);
+          break;
+        }
+      }
+      sp_fmt_io(out, ", \"a_kind\": {}", sp_fmt_int(option->a.kind));
+      sp_io_write_cstr(out, ", \"a\": ", SP_NULLPTR);
+      spn_json_write_str(out, option->a.name);
+      sp_fmt_io(out, ", \"b_kind\": {}", sp_fmt_int(option->b.kind));
+      sp_io_write_cstr(out, ", \"b\": ", SP_NULLPTR);
+      spn_json_write_str(out, option->b.name);
+      sp_io_write_cstr(out, "}", SP_NULLPTR);
+    }
+    else if (schema) {
       sp_io_write_cstr(out, ", \"data\": ", SP_NULLPTR);
       json_write_object(out, schema, (void*)&event->err.manifest);
     }
