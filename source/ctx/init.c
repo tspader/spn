@@ -5,7 +5,6 @@
 #include "ctx/ctx.h"
 #include "error/error.h"
 #include "event/event.h"
-#include "event/log.h"
 #include "git/cache.h"
 #include "index/index.h"
 #include "intern/intern.h"
@@ -253,7 +252,6 @@ spn_ctx_t* spn_ctx_new(spn_wake_fn_t wake, void* wake_data) {
       ctx->paths.include = join_path(ctx, ctx->paths.runtime, "include");
       ctx->paths.version = join_path(ctx, ctx->paths.runtime, "version.stamp");
 
-  spn_event_log_init(ctx->heap);
   spn_lazy_log_init(&ctx->events->log, sp_fs_join_path(ctx->heap, ctx->paths.log, sp_str_lit("build.jsonl")));
 
   spn_op_thread_start(ctx);

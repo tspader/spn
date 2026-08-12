@@ -2,7 +2,7 @@
 #include "session/types.h"
 #include "unit/types.h"
 
-#include "event/log.h"
+#include "codegen/codegen.h"
 #include "compiler/driver.h"
 #include "core/core.h"
 #include "external/cc.h"
@@ -103,16 +103,16 @@ spn_err_t spn_session_write_compile_commands(spn_session_t* session, sp_str_t pa
       sp_io_write_c8(io, ',');
     }
     sp_io_write_cstr(io, "\n  { \"directory\": ", SP_NULLPTR);
-    spn_json_write_str(io, invocation.cwd);
+    spn_codegen_json_str(io, invocation.cwd);
     sp_io_write_cstr(io, ", \"file\": ", SP_NULLPTR);
-    spn_json_write_str(io, unit->paths.file);
+    spn_codegen_json_str(io, unit->paths.file);
     sp_io_write_cstr(io, ", \"output\": ", SP_NULLPTR);
-    spn_json_write_str(io, unit->paths.object);
+    spn_codegen_json_str(io, unit->paths.object);
     sp_io_write_cstr(io, ", \"arguments\": [", SP_NULLPTR);
-    spn_json_write_str(io, invocation.program);
+    spn_codegen_json_str(io, invocation.program);
     sp_da_for(invocation.args, arg) {
       sp_io_write_cstr(io, ", ", SP_NULLPTR);
-      spn_json_write_str(io, invocation.args[arg]);
+      spn_codegen_json_str(io, invocation.args[arg]);
     }
     sp_io_write_cstr(io, "] }", SP_NULLPTR);
   }
@@ -134,6 +134,19 @@ spn_err_t spn_session_write_compile_commands(spn_session_t* session, sp_str_t pa
 
 sp_str_t spn_session_compile_commands_path(spn_session_t* session) {
   return sp_fs_join_path(session->mem, session->paths.root, sp_str_lit("compile_commands.json"));
+}
+
+sp_str_t spn_invocation_to_str(sp_mem_t mem, const spn_invocation_t* invocation) {
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch_for(mem);
+  sp_da(sp_str_t) parts = sp_da_new(scratch.mem, sp_str_t);
+  sp_da_push(parts, invocation->program);
+  sp_da_for(invocation->args, it) {
+    sp_da_push(parts, invocation->args[it]);
+  }
+
+  sp_str_t command = sp_str_join_n(mem, parts, sp_da_size(parts), sp_str_lit(" "));
+  sp_mem_end_scratch(scratch);
+  return command;
 }
 
 spn_invocation_result_t spn_invocation_run(spn_invocation_t* invocation) {

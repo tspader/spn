@@ -421,7 +421,7 @@ sp_test(script, input_order) {
     .first = {
       .args = { "build" },
       .expect = {
-        .events = { { .event = SPN_EVENT_BUILD_SCRIPT_USER_FN } },
+        .events = { { .event = SPN_EVENT_SCRIPT_USER_FN } },
         .exists = { work_file("input_order/gen.h") },
       },
     },
@@ -432,7 +432,7 @@ sp_test(script, input_order) {
         },
         .command = {
           .args = { "build" },
-          .expect.events = { { .event = SPN_EVENT_BUILD_SCRIPT_USER_FN, .absent = true } },
+          .expect.events = { { .event = SPN_EVENT_SCRIPT_USER_FN, .absent = true } },
         },
       },
     },

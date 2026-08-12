@@ -473,19 +473,31 @@ static jtd_schema_t* jtd_parse_schema_object(jtd_ctx_t* ctx, yyjson_val* v, sp_s
       sp_str_t cpath = jtd_path_seg_cstr_str(ctx->temp, path, "mapping", tag);
       jtd_schema_t* child = jtd_parse_schema(ctx, mv, cpath);
       if (!child) return SP_NULLPTR;
-      if (child->form != JTD_FORM_PROPERTIES || child->nullable) {
+
+      jtd_schema_t* payload = child;
+      sp_for(hop, sp_da_size(ctx->out->definitions)) {
+        if (payload->form != JTD_FORM_REF) {
+          break;
+        }
+        payload = jtd_definition(ctx->out, payload->as.ref.name);
+        if (!payload) {
+          jtd_fail_str(ctx, JTD_ERR_REF_UNRESOLVED, cpath, child->as.ref.name);
+          return SP_NULLPTR;
+        }
+      }
+      if (payload->form != JTD_FORM_PROPERTIES || child->nullable || payload->nullable) {
         jtd_fail(ctx, JTD_ERR_MAPPING_NOT_PROPERTIES, cpath);
         return SP_NULLPTR;
       }
-      sp_da_for(child->as.properties.required, it) {
-        jtd_property_t* p = &child->as.properties.required[it];
+      sp_da_for(payload->as.properties.required, it) {
+        jtd_property_t* p = &payload->as.properties.required[it];
         if (sp_str_equal(p->key, s->as.discriminator.tag)) {
           jtd_fail(ctx, JTD_ERR_DISCRIMINATOR_TAG_REDEFINED, jtd_path_seg_cstr_str(ctx->temp, cpath, "properties", p->key));
           return SP_NULLPTR;
         }
       }
-      sp_da_for(child->as.properties.optional, it) {
-        jtd_property_t* p = &child->as.properties.optional[it];
+      sp_da_for(payload->as.properties.optional, it) {
+        jtd_property_t* p = &payload->as.properties.optional[it];
         if (sp_str_equal(p->key, s->as.discriminator.tag)) {
           jtd_fail(ctx, JTD_ERR_DISCRIMINATOR_TAG_REDEFINED, jtd_path_seg_cstr_str(ctx->temp, cpath, "optionalProperties", p->key));
           return SP_NULLPTR;

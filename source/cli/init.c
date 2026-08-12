@@ -1,5 +1,6 @@
 #include "cli/cli.h"
 
+#include "error/types.h"
 #include "sp/prompt.h"
 #include "tui/tui.h"
 

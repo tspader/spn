@@ -56,36 +56,30 @@ static const test_t tests [] = {
 sp_test_each(transcript, log_build, test_t, tests) {
   sp_mem_t mem = sp_test_arena(t);
 
-  spn_invocation_t invocation = {
-    .program = sp_str_lit("zig"),
-  };
-  sp_da_init(mem, invocation.args);
-  sp_da_push(invocation.args, sp_str_lit("cc"));
-  sp_da_push(invocation.args, sp_str_lit("-c"));
-  sp_da_push(invocation.args, sp_str_lit("main.c"));
+  sp_str_t command = sp_str_lit("zig cc -c main.c");
 
   spn_build_event_t event = {
     .kind = it->kind,
   };
   switch (it->kind) {
     case SPN_EVENT_TARGET_BUILD_PASSED: {
-      event.target.passed.invocation = &invocation;
-      event.target.passed.out = sp_str_view(it->transcript);
+      event.target_passed.command = command;
+      event.target_passed.out = sp_str_view(it->transcript);
       break;
     }
     case SPN_EVENT_TARGET_BUILD_FAILED: {
-      event.target.failed.invocation = &invocation;
-      event.target.failed.out = sp_str_view(it->transcript);
+      event.target_failed.command = command;
+      event.target_failed.out = sp_str_view(it->transcript);
       break;
     }
     case SPN_EVENT_LINK_PASSED: {
-      event.target.link_passed.invocation = &invocation;
-      event.target.link_passed.out = sp_str_view(it->transcript);
+      event.link_passed.command = command;
+      event.link_passed.out = sp_str_view(it->transcript);
       break;
     }
     case SPN_EVENT_LINK_FAILED: {
-      event.target.link_failed.invocation = &invocation;
-      event.target.link_failed.out = sp_str_view(it->transcript);
+      event.link_failed.command = command;
+      event.link_failed.out = sp_str_view(it->transcript);
       break;
     }
     default: {

@@ -14,7 +14,7 @@ static sp_str_t spn_cg_json_str(yyjson_val* obj, const c8* key, sp_mem_t mem) {
 
 {{ for .fwd }}
 static void spn_cg_{{ .name }}_read(yyjson_val* obj, {{ .type }}* out, sp_mem_t mem);
-static void spn_cg_{{ .name }}_write(const {{ .type }}* in, sp_io_writer_t* out);
+static void {{ .self }}_write(const {{ .type }}* in, sp_io_writer_t* out);
 {{ end }}
 
 {{ for .arrays }}

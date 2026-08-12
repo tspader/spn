@@ -2,9 +2,14 @@ add_executable(integration
   ${SRC}/compiler/driver.c
   ${SRC}/compiler/gnu.c
   ${SRC}/compiler/msvc.c
+  ${SRC}/codegen/gen/errors.gen.c
+  ${SRC}/codegen/gen/events.gen.c
+  ${SRC}/codegen/json.c
+  ${SRC}/codegen/loader.c
   ${SRC}/enum/enum.c
-  ${SRC}/error/str.c
+  ${SRC}/error/json.c
   ${SRC}/external/tom.c
+  ${SRC}/intern/intern.c
   ${SRC}/sp/str.c
   ${SRC}/triple/triple.c
   main.c
@@ -38,6 +43,7 @@ add_executable(integration
 )
 spn_test_binary(integration)
 target_include_directories(integration PRIVATE
+  ${SRC}/codegen/gen
   ${SRC}/external
   ${CMAKE_CURRENT_SOURCE_DIR}/tools
 )
@@ -45,5 +51,5 @@ target_compile_definitions(integration PRIVATE
   SPN_TEST_BIN=".build/store/${TRIPLE}/bin/spn${CMAKE_EXECUTABLE_SUFFIX}"
 )
 target_link_libraries(integration PRIVATE yyjson)
-add_dependencies(integration spn)
+add_dependencies(integration spn spn_codegen_gen)
 add_test(NAME integration COMMAND "$<TARGET_FILE:integration>")

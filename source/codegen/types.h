@@ -1,7 +1,8 @@
 #ifndef SPN_CODEGEN_TYPES_H
 #define SPN_CODEGEN_TYPES_H
 
-#include "error/types.h"
+#include "sp.h"
+#include "spn/core.h"
 #include "intern/types.h"
 
 #define SPN_CODEGEN_PATH_MAX 32
@@ -14,6 +15,8 @@ typedef struct spn_codegen_issue {
   sp_str_t path;
   sp_str_t detail;
 } spn_codegen_issue_t;
+
+typedef sp_da(spn_codegen_issue_t) spn_codegen_issues_t;
 
 typedef enum {
   SPN_CODEGEN_PATH_KEY,

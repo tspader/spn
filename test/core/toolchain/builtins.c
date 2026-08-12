@@ -69,6 +69,8 @@ static bool builtins_is_sha256(sp_str_t str) {
   return str.len == 64 && test_str_is_hex(str);
 }
 
+spn_opt_artifact_t get_artifact(sp_da(spn_toolchain_host_t) hosts, spn_triple_t host);
+
 sp_test_each(builtins, entries, builtins_test_t, tests) {
   spn_toolchain_catalog_t catalog = sp_zero;
   if (builtins_catalog(t, &catalog)) return SP_ERR;
@@ -82,7 +84,7 @@ sp_test_each(builtins, entries, builtins_test_t, tests) {
     if (fixture_triple_empty(it->expect.hosts[at])) {
       break;
     }
-    sp_expect(t, !sp_opt_is_null(spn_toolchain_select_artifact(info->hosts, it->expect.hosts[at])));
+    sp_expect(t, !sp_opt_is_null(get_artifact(info->hosts, it->expect.hosts[at])));
   }
 
   sp_carr_for(it->expect.targets, at) {

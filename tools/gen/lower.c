@@ -30,6 +30,9 @@ gen_t* gen_new(sp_mem_t mem) {
   g->containers.object = sp_da_new(mem, gen_type_t*);
   g->entries = sp_da_new(mem, gen_entry_t*);
   g->includes = sp_da_new(mem, sp_str_t);
+  g->kinds = sp_da_new(mem, gen_kind_t);
+  g->arms = sp_da_new(mem, gen_type_t*);
+  g->prefix = sp_str_lit("spn_cg");
   return g;
 }
 
@@ -178,9 +181,17 @@ static bool lower_field(gen_t* g, gen_type_t* type, jtd_property_t property) {
     val.kind = VAL_PRIM;
     val.prim = PRIM_BOOL;
   }
+  else if (target->form == JTD_FORM_TYPE && target->as.type == JTD_TYPE_UINT32) {
+    val.kind = VAL_PRIM;
+    val.prim = PRIM_U32;
+  }
   else if (target->form == JTD_FORM_TYPE && target->as.type == JTD_TYPE_UINT64) {
     val.kind = VAL_PRIM;
     val.prim = PRIM_U64;
+  }
+  else if (target->form == JTD_FORM_TYPE && target->as.type == JTD_TYPE_INT32) {
+    val.kind = VAL_PRIM;
+    val.prim = PRIM_S32;
   }
   else if (target->form == JTD_FORM_TYPE) {
     return fail_scalar(g, type->name, property.key, target->as.type);
@@ -323,4 +334,69 @@ static bool lower_type(gen_t* g, sp_str_t name, jtd_schema_t* schema, gen_type_t
 bool gen_lower(gen_t* g, sp_str_t name, jtd_schema_t* schema) {
   gen_type_t* type = SP_NULLPTR;
   return lower_type(g, name, schema, &type);
+}
+
+static void add_arm(gen_t* g, gen_type_t* payload) {
+  sp_da_for(g->arms, it) {
+    if (g->arms[it] == payload) {
+      return;
+    }
+  }
+  sp_da_push(g->arms, payload);
+}
+
+static bool lower_metadata_enum(gen_t* g, jtd_schema_t* schema, sp_str_t tag, const c8* key, const c8* fallback, const c8** values, u32 num_values, const c8* constant, sp_str_t* lowered) {
+  sp_str_t value = jtd_metadata(schema, key);
+  if (sp_str_empty(value)) {
+    value = sp_cstr_as_str(fallback);
+  }
+  sp_for(it, num_values) {
+    if (sp_str_equal_cstr(value, values[it])) {
+      *lowered = sp_fmt(g->mem, "{}_{}", sp_fmt_cstr(constant), sp_fmt_str(sp_str_to_upper(g->mem, value))).value;
+      return true;
+    }
+  }
+  g->err = sp_fmt(g->mem, "{.cyan}: unknown {} {.red}", sp_fmt_str(tag), sp_fmt_cstr(key), sp_fmt_str(value)).value;
+  return false;
+}
+
+bool gen_lower_union(gen_t* g, jtd_schema_t* root) {
+  if (root->form != JTD_FORM_DISCRIMINATOR) {
+    g->err = sp_fmt(g->mem, "schema must be a discriminator form, got {.red}", sp_fmt_cstr(jtd_form_name(root->form))).value;
+    return false;
+  }
+
+  sp_da_for(root->as.discriminator.mapping, it) {
+    jtd_mapping_t* mapping = &root->as.discriminator.mapping[it];
+    sp_str_t name = mapping->schema->form == JTD_FORM_REF ? mapping->schema->as.ref.name : mapping->tag;
+    jtd_schema_t* payload = deref(mapping->schema);
+
+    gen_kind_t kind = {
+      .tag = mapping->tag,
+    };
+    if (sp_da_size(payload->as.properties.all)) {
+      if (!lower_type(g, name, payload, &kind.payload)) {
+        return false;
+      }
+      add_arm(g, kind.payload);
+    }
+
+    if (g->format == GEN_FORMAT_EVENTS) {
+      kind.verb = jtd_metadata(mapping->schema, "verb");
+
+      static const c8* verbosities[] = { "normal", "verbose", "debug" };
+      if (!lower_metadata_enum(g, mapping->schema, kind.tag, "verbosity", "normal", verbosities, sp_carr_len(verbosities), "SPN_VERBOSITY", &kind.verbosity)) {
+        return false;
+      }
+
+      static const c8* severities[] = { "info", "error", "fatal" };
+      if (!lower_metadata_enum(g, mapping->schema, kind.tag, "severity", "info", severities, sp_carr_len(severities), "SPN_EVENT_SEVERITY", &kind.severity)) {
+        return false;
+      }
+    }
+
+    sp_da_push(g->kinds, kind);
+  }
+
+  return true;
 }

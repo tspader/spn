@@ -103,7 +103,7 @@ static void dump_error_request(sp_mem_t mem, spn_cg_resolve_error_t* error, cons
 
 static spn_cg_resolve_error_t dump_error(sp_mem_t mem, const spn_err_union_t* err) {
   spn_cg_resolve_error_t error = {
-    .kind = sp_cstr_as_str(spn_err_to_str(err->kind)),
+    .kind = spn_err_to_str(err->kind),
   };
 
   switch (err->kind) {

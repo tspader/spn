@@ -1,0 +1,24 @@
+#ifndef SPN_CG_{{ .guard }}_H
+#define SPN_CG_{{ .guard }}_H
+
+#include "sp.h"
+#include "spn/core.h"
+{{ for .includes }}
+#include "{{ .name }}"
+{{ end }}
+
+{{ $types }}
+typedef struct {
+  spn_err_t kind;
+  bool reported;
+  union {
+{{ for .arms }}
+    {{ .type }} {{ .name }};
+{{ end }}
+  };
+} spn_err_union_t;
+
+sp_str_t spn_err_to_str(spn_err_t err);
+void spn_err_write_json(sp_io_writer_t* json, const spn_err_union_t* err);
+
+#endif

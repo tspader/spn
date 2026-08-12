@@ -264,10 +264,10 @@ static s32 dag_user_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data
   spn_pkg_unit_announce_compile(pkg);
 
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
-    .kind = SPN_EVENT_BUILD_SCRIPT_USER_FN,
+    .kind = SPN_EVENT_SCRIPT_USER_FN,
     .pkg = pkg->info,
     .io = &pkg->logs.io,
-    .node = { .info = node }
+    .script_user_fn = { .tag = node->tag }
   });
 
   sp_da_init(spn.mem, ctx->obs);
@@ -474,7 +474,7 @@ static s32 dag_package_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_d
   }
   if (script) {
     spn_event_buffer_push(spn.events, (spn_build_event_t) {
-      .kind = SPN_EVENT_BUILD_SCRIPT_PACKAGE,
+      .kind = SPN_EVENT_SCRIPT_PACKAGE,
       .pkg = unit->info,
       .io = &unit->logs.io,
     });
@@ -486,7 +486,7 @@ static s32 dag_package_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_d
     unit->time.package = sp_tm_read_timer(&timer);
 
     spn_event_buffer_push(spn.events, (spn_build_event_t) {
-      .kind = SPN_EVENT_BUILD_SCRIPT_PACKAGE_OK,
+      .kind = SPN_EVENT_PACKAGE_OK,
       .pkg = unit->info,
       .io = &unit->logs.io,
       .package_ok = {
@@ -1204,7 +1204,7 @@ static void dag_emit_reports(spn_dag_build_t* b, u64 elapsed) {
           .profile = profile->name,
           .time = elapsed,
           .num_errors = 1,
-          .first_error = sp_cstr_as_str(spn_err_to_str(b->result)),
+          .first_error = spn_err_to_str(b->result),
         },
       });
     }
@@ -1213,8 +1213,8 @@ static void dag_emit_reports(spn_dag_build_t* b, u64 elapsed) {
         .kind = SPN_EVENT_BUILD_PASSED,
         .pkg = pkg,
         .io = io,
-        .build.passed = {
-          .profile = profile,
+        .build_passed = {
+          .profile = profile->name,
           .time = elapsed,
           .hits = hits,
           .misses = misses,

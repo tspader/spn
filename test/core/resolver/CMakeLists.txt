@@ -4,10 +4,9 @@ add_executable(resolver
   ${SRC}/intern/context.c
   ${SRC}/intern/intern.c
   ${SRC}/enum/enum.c
-  ${SRC}/error/str.c
+  ${SRC}/error/json.c
   ${SRC}/event/event.c
   ${SRC}/event/build.c
-  ${SRC}/event/log.c
   ${SRC}/external/git.c
   ${SRC}/external/tom.c
   ${SRC}/codegen/codegen.c
@@ -22,6 +21,8 @@ add_executable(resolver
   ${SRC}/toolchain/catalog.c
   ${SRC}/codegen/gen/toolchains.gen.c
   ${SRC}/codegen/gen/config.gen.c
+  ${SRC}/codegen/gen/errors.gen.c
+  ${SRC}/codegen/gen/events.gen.c
   ${SRC}/codegen/gen/manifest.gen.c
   ${SRC}/codegen/gen/release.gen.c
   ${SRC}/index/cache.c

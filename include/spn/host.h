@@ -48,7 +48,7 @@ spn_err_t spn_scaffold_check(spn_ctx_t* ctx, spn_scaffold_request_t request);
 spn_target_t* spn_session_find_target(spn_session_t* session, sp_str_t name);
 sp_str_t spn_target_name(spn_target_t* target);
 sp_str_t spn_target_path(sp_mem_t mem, spn_target_t* target);
-const c8* spn_err_to_str(spn_err_t err);
+sp_str_t spn_err_to_str(spn_err_t err);
 spn_err_t spn_triple_parse(sp_str_t str, spn_triple_t* triple);
 spn_triple_t spn_triple_merge(spn_triple_t base, spn_triple_t partial);
 sp_str_t spn_triple_to_str(sp_mem_t mem, spn_triple_t triple);

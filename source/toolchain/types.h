@@ -14,6 +14,11 @@ typedef enum {
   SPN_CC_DRIVER_MSVC,
 } spn_cc_driver_t;
 
+typedef enum {
+  SPN_TOOLCHAIN_ROLE_BUILD,
+  SPN_TOOLCHAIN_ROLE_SCRIPT,
+} spn_toolchain_role_t;
+
 typedef struct {
   sp_str_t program;
   sp_da(sp_str_t) args;

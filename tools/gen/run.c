@@ -172,6 +172,25 @@ static bool mark_shared(codegen_t* c, sp_str_t path, gen_t* gen, jtd_result_t* j
   return true;
 }
 
+static bool render_union(codegen_t* c, sp_fs_entry_t* entry, sp_str_t json, gen_format_t format, sp_str_t prefix) {
+  jtd_result_t jtd = sp_zero;
+  try(parse_jtd(c, entry->path, json, &jtd));
+
+  sp_str_t name = sp_str_strip_right(entry->name, sp_str_lit(".jtd.json"));
+  gen_t* gen = gen_new(c->mem);
+  gen->format = format;
+  gen->name = name;
+  gen->prefix = prefix;
+  if (!gen_lower_union(gen, jtd.root)) {
+    return fail(c, gen->err);
+  }
+
+  try(render_one(c, out_path(c, name, ".gen.h"), gen_render_union_decls(gen)));
+  try(render_one(c, out_path(c, name, ".gen.c"), gen_render_union_impl(gen)));
+  emit(c, sp_fmt(c->mem, "wrote {} ({} kinds)", sp_fmt_str(name), sp_fmt_uint(sp_da_size(gen->kinds))).value);
+  return true;
+}
+
 static bool render_kind(codegen_t* c, sp_fs_entry_t* entry) {
   sp_str_t json = sp_zero;
   yyjson_doc* doc = SP_NULLPTR;
@@ -189,6 +208,12 @@ static bool render_kind(codegen_t* c, sp_fs_entry_t* entry) {
   }
   else if (sp_cstr_equal(format, "json")) {
     kind = GEN_FORMAT_JSON;
+  }
+  else if (sp_cstr_equal(format, "errors")) {
+    return render_union(c, entry, json, GEN_FORMAT_ERRORS, sp_str_lit("spn_err"));
+  }
+  else if (sp_cstr_equal(format, "events")) {
+    return render_union(c, entry, json, GEN_FORMAT_EVENTS, sp_str_lit("spn_evt"));
   }
   else {
     return fail(c, sp_fmt(c->mem, "{}: unknown format {}", sp_fmt_str(entry->path), sp_fmt_cstr(format)).value);

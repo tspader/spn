@@ -16,6 +16,7 @@ typedef struct {
 spn_err_union_t         spn_build_render_compile(sp_mem_t mem, spn_compile_unit_t* unit, spn_invocation_t* invocation);
 spn_err_t               spn_session_write_compile_commands(spn_session_t* session, sp_str_t path);
 sp_str_t                spn_session_compile_commands_path(spn_session_t* session);
+sp_str_t                spn_invocation_to_str(sp_mem_t mem, const spn_invocation_t* invocation);
 spn_invocation_result_t spn_invocation_run(spn_invocation_t* invocation);
 
 #endif

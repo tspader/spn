@@ -99,8 +99,10 @@ static spn_err_union_t validate_config_keys(spn_session_t* session) {
       return (spn_err_union_t) {
         .kind = SPN_ERR_OPTION,
         .option = {
-          .kind = SPN_OPTION_ERR_UNKNOWN_PKG,
-          .pkg = entry->key,
+          .violation = {
+            .kind = SPN_OPTION_ERR_UNKNOWN_PKG,
+            .pkg = entry->key,
+          },
         },
       };
     }
@@ -215,9 +217,11 @@ spn_err_union_t spn_session_apply_options(spn_session_t* session, bool* reresolv
       return (spn_err_union_t) {
         .kind = SPN_ERR_OPTION,
         .option = {
-          .kind = SPN_OPTION_ERR_LATE_GATE,
-          .pkg = missing_pkg,
-          .a = { .kind = SPN_OPTION_SETTER_CONSUMER, .name = missing_dep },
+          .violation = {
+            .kind = SPN_OPTION_ERR_LATE_GATE,
+            .pkg = missing_pkg,
+            .a = { .kind = SPN_OPTION_SETTER_CONSUMER, .name = missing_dep },
+          },
         },
       };
     }

@@ -1,6 +1,7 @@
 #include "codegen/codegen.h"
 #include "sp.h"
 
+
 static void spn_codegen_json_writer_newline(spn_codegen_json_writer_t* w) {
   sp_io_write_c8(w->inner, '\n');
   sp_for(it, w->depth) {
@@ -133,5 +134,13 @@ void spn_codegen_json_str_array(sp_io_writer_t* out, sp_da(sp_str_t) values) {
     spn_codegen_json_str(out, values[it]);
   }
   sp_io_write_c8(out, ']');
+}
+
+void spn_codegen_json_s32(sp_io_writer_t* out, s32 value) {
+  sp_fmt_io(out, "{}", sp_fmt_int(value));
+}
+
+void spn_codegen_write_codegen_issues(sp_io_writer_t* out, const spn_codegen_issues_t* issues) {
+  spn_codegen_json_issues(out, *issues);
 }
 

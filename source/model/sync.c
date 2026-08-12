@@ -274,10 +274,10 @@ static spn_err_t stamp_patches(spn_session_t* session, spn_resolved_pkg_t* pkg, 
     }
     case SPN_PKG_PATCH_STAMP_NOT_GIT: {
       spn_event_buffer_push(spn.events, (spn_build_event_t) {
-        .kind = SPN_EVENT_ERR_PATCH,
-        .patch_err = {
-          .name = qualified,
-          .kind = SPN_PATCH_ERR_NOT_GIT,
+        .kind = SPN_EVENT_ERR,
+        .err = {
+          .kind = SPN_ERR_PATCH_NOT_GIT,
+          .patch = { .name = qualified },
         }});
       return SPN_ERROR;
     }
@@ -410,10 +410,10 @@ static spn_err_t check_unused_patches(spn_session_t* session) {
     }
 
     spn_event_buffer_push(spn.events, (spn_build_event_t) {
-      .kind = SPN_EVENT_ERR_PATCH,
-      .patch_err = {
-        .name = qualified,
-        .kind = SPN_PATCH_ERR_UNUSED,
+      .kind = SPN_EVENT_ERR,
+      .err = {
+        .kind = SPN_ERR_PATCH_UNUSED,
+        .patch = { .name = qualified },
       }});
     err = SPN_ERROR;
   }
