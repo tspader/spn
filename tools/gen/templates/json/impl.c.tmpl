@@ -1,0 +1,185 @@
+#include "{{ .root_name }}.gen.h"
+#include "codegen/codegen.h"
+#include "enum/enum.h"
+#include "yyjson.h"
+
+static sp_str_t spn_cg_json_str(yyjson_val* obj, const c8* key, sp_mem_t mem) {
+  yyjson_val* v = yyjson_obj_get(obj, key);
+  const c8* s = yyjson_get_str(v);
+  if (!s) {
+    return sp_str_lit("");
+  }
+  return sp_str_from_cstr_n(mem, s, (u32)yyjson_get_len(v));
+}
+
+{{ for .fwd }}
+static void spn_cg_{{ .name }}_read(yyjson_val* obj, {{ .type }}* out, sp_mem_t mem);
+static void spn_cg_{{ .name }}_write(const {{ .type }}* in, sp_io_writer_t* out);
+{{ end }}
+
+{{ for .arrays }}
+static void spn_cg_{{ .object }}_read_array(yyjson_val* obj, const c8* key, sp_da({{ .type }})* out, sp_mem_t mem) {
+  yyjson_val* arr = yyjson_obj_get(obj, key);
+  *out = sp_da_new(mem, {{ .type }});
+  size_t i, n;
+  yyjson_val* v;
+  yyjson_arr_foreach(arr, i, n, v) {
+    if (yyjson_is_obj(v)) {
+      {{ .type }} entry = sp_zero;
+      spn_cg_{{ .object }}_read(v, &entry, mem);
+      sp_da_push(*out, entry);
+    }
+  }
+}
+{{ end }}
+{{ for .keyeds }}
+static void spn_cg_{{ .object }}_read_named(yyjson_val* obj, const c8* key, spn_cg_{{ .object }}_om_t* out, sp_mem_t mem) {
+  yyjson_val* arr = yyjson_obj_get(obj, key);
+  sp_str_om_init(*out);
+  size_t i, n;
+  yyjson_val* v;
+  yyjson_arr_foreach(arr, i, n, v) {
+    if (yyjson_is_obj(v)) {
+      {{ .type }} entry = sp_zero;
+      spn_cg_{{ .object }}_read(v, &entry, mem);
+      sp_str_om_insert(*out, entry.{{ .key_field }}, entry);
+    }
+  }
+}
+{{ end }}
+{{ for .objects }}
+static void spn_cg_{{ .object }}_read_object(yyjson_val* obj, const c8* key, {{ .type }}* out, sp_mem_t mem) {
+  yyjson_val* child = yyjson_obj_get(obj, key);
+  if (yyjson_is_obj(child)) {
+    spn_cg_{{ .object }}_read(child, out, mem);
+  }
+}
+{{ end }}
+{{ for .entries }}
+static void spn_cg_{{ .entry }}_read_map(yyjson_val* obj, const c8* key, sp_da({{ .entry_type }})* out, sp_mem_t mem) {
+  yyjson_val* map = yyjson_obj_get(obj, key);
+  *out = sp_da_new(mem, {{ .entry_type }});
+  if (!yyjson_is_obj(map)) {
+    return;
+  }
+  size_t i, n;
+  yyjson_val* k;
+  yyjson_val* v;
+  yyjson_obj_foreach(map, i, n, k, v) {
+    {{ .entry_type }} entry = sp_zero;
+    entry.key = sp_str_from_cstr_n(mem, yyjson_get_str(k), (u32)yyjson_get_len(k));
+{{ if .object }}
+    if (yyjson_is_obj(v)) {
+      spn_cg_{{ .object }}_read(v, &entry.value, mem);
+{{ if .shorthand }}
+    } else {
+      const c8* s = yyjson_get_str(v);
+      if (s) {
+        entry.value.{{ .shorthand }} = sp_str_from_cstr_n(mem, s, (u32)yyjson_get_len(v));
+      }
+    }
+{{ else }}
+    }
+{{ end }}
+{{ else }}
+    const c8* s = yyjson_get_str(v);
+    if (s) {
+      entry.value = sp_str_from_cstr_n(mem, s, (u32)yyjson_get_len(v));
+    }
+{{ end }}
+    sp_da_push(*out, entry);
+  }
+}
+{{ end }}
+
+{{ for .types }}
+static void spn_cg_{{ .name }}_read(yyjson_val* obj, {{ .type }}* out, sp_mem_t mem) {
+{{ for .fields }}
+{{ if .k_str }}
+  out->{{ .name }} = spn_cg_json_str(obj, "{{ .key }}", mem);
+{{ end }}
+{{ if .k_prim }}
+{{ if .req }}
+  out->{{ .name }} = {{ .jget }}(yyjson_obj_get(obj, "{{ .key }}"));
+{{ else }}
+  {
+    yyjson_val* v = yyjson_obj_get(obj, "{{ .key }}");
+    if (v) {
+      out->{{ .name }}.value = {{ .jget }}(v);
+      out->{{ .name }}.some = SP_OPT_SOME;
+    }
+  }
+{{ end }}
+{{ end }}
+{{ if .k_enum }}
+{{ if .req }}
+  out->{{ .name }} = {{ .from }}(spn_cg_json_str(obj, "{{ .key }}", mem));
+{{ else }}
+  {
+    yyjson_val* v = yyjson_obj_get(obj, "{{ .key }}");
+    if (v) {
+      sp_opt_set(out->{{ .name }}, {{ .from }}(spn_cg_json_str(obj, "{{ .key }}", mem)));
+    }
+  }
+{{ end }}
+{{ end }}
+{{ if .k_object }}
+  spn_cg_{{ .object }}_read_object(obj, "{{ .key }}", &out->{{ .name }}, mem);
+{{ end }}
+{{ if .k_extern }}
+  spn_json_read_{{ .extern }}(obj, "{{ .key }}", &out->{{ .name }}, mem);
+{{ end }}
+{{ if .k_str_array }}
+  {
+    yyjson_val* arr = yyjson_obj_get(obj, "{{ .key }}");
+    out->{{ .name }} = sp_da_new(mem, sp_str_t);
+    size_t i, n;
+    yyjson_val* v;
+    yyjson_arr_foreach(arr, i, n, v) {
+      const c8* s = yyjson_get_str(v);
+      if (s) {
+        sp_da_push(out->{{ .name }}, sp_str_from_cstr_n(mem, s, (u32)yyjson_get_len(v)));
+      }
+    }
+  }
+{{ end }}
+{{ if .k_enum_array }}
+  {
+    yyjson_val* arr = yyjson_obj_get(obj, "{{ .key }}");
+    out->{{ .name }} = sp_da_new(mem, {{ .type }});
+    size_t i, n;
+    yyjson_val* v;
+    yyjson_arr_foreach(arr, i, n, v) {
+      const c8* s = yyjson_get_str(v);
+      if (s) {
+        sp_da_push(out->{{ .name }}, {{ .from }}(sp_str_from_cstr_n(mem, s, (u32)yyjson_get_len(v))));
+      }
+    }
+  }
+{{ end }}
+{{ if .k_object_array }}
+  spn_cg_{{ .object }}_read_array(obj, "{{ .key }}", &out->{{ .name }}, mem);
+{{ end }}
+{{ if .k_keyed }}
+  spn_cg_{{ .object }}_read_named(obj, "{{ .key }}", &out->{{ .name }}, mem);
+{{ end }}
+{{ if .k_map }}
+  spn_cg_{{ .entry }}_read_map(obj, "{{ .key }}", &out->{{ .name }}, mem);
+{{ end }}
+{{ end }}
+}
+
+{{ $write }}
+
+{{ end }}
+bool spn_{{ .root_name }}_read(sp_str_t json, spn_cg_{{ .root_name }}_t* out, sp_mem_t mem) {
+  yyjson_doc* doc = yyjson_read(json.data, json.len, 0);
+  if (!doc) {
+    return false;
+  }
+  spn_cg_{{ .root_name }}_read(yyjson_doc_get_root(doc), out, mem);
+  yyjson_doc_free(doc);
+  return true;
+}
+
+{{ $root_write }}

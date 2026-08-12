@@ -1,0 +1,14 @@
+#ifndef SPN_CG_{{ .guard }}_H
+#define SPN_CG_{{ .guard }}_H
+
+#include "common.gen.h"
+{{ for .includes }}
+#include "{{ .name }}"
+{{ end }}
+
+{{ $types }}
+bool spn_{{ .root_name }}_read(sp_str_t json, spn_cg_{{ .root_name }}_t* out, sp_mem_t mem);
+sp_str_t spn_{{ .root_name }}_write(sp_mem_t mem, const spn_cg_{{ .root_name }}_t* in);
+sp_str_t spn_{{ .root_name }}_write_compact(sp_mem_t mem, const spn_cg_{{ .root_name }}_t* in);
+
+#endif

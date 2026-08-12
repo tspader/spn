@@ -1,8 +1,0 @@
-    sp_io_write_c8(out, '[');
-    sp_da_for(in->{{ .name }}, it) {
-      if (it) {
-        sp_io_write_c8(out, ',');
-      }
-      spn_cg_{{ .object }}_write(&in->{{ .name }}[it], out);
-    }
-    sp_io_write_c8(out, ']');

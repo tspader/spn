@@ -14,12 +14,12 @@ source = [
   "tools/spn/build.c",
   "tools/spn/wasi.c",
   "tools/jtd.c",
-  "tools/codegen/extract.c",
-  "tools/codegen/render.c",
-  "tools/codegen/abi.c",
-  "tools/codegen/run.c",
+  "tools/gen/lower.c",
+  "tools/gen/bind.c",
+  "tools/gen/abi.c",
+  "tools/gen/run.c",
 ]
-include = ["include", "source", "tools", "tools/codegen"]
+include = ["include", "source", "tools", "tools/gen"]
 
 [deps.package]
 "spader/sp" = { path = "vendor/sp" }
@@ -84,6 +84,7 @@ source = [
   "test/core/compiler/*.c",
   "test/core/compiler/exports/*.c",
   "test/core/dag/*.c",
+  "test/core/gen/*.c",
   "test/core/git/*.c",
   "test/core/index/*.c",
   "test/core/jtd/*.c",
@@ -101,6 +102,7 @@ source = [
   "test/core/toolchain/*.c",
   "test/core/unit/*.c",
   "tools/jtd.c",
+  "tools/gen/lower.c",
   "source/codegen/codegen.c",
   "source/codegen/loader.c",
   "source/codegen/json.c",
@@ -185,7 +187,7 @@ source = [
   "test/tools/sp_sim.c",
   "test/tools/toml.c",
 ]
-include = ["include", "source", "source/codegen/gen", "source/external", "test/core/tools", "test/tools", "tools"]
+include = ["include", "source", "source/codegen/gen", "source/external", "test/core/tools", "test/tools", "tools", "tools/gen"]
 flags = [
   '-DSCHEMA_GEN_DIR="source/codegen/gen"',
   '-DSCHEMA_DIR="source/codegen/schema"',

@@ -1,9 +1,0 @@
-static void spn_cg_{{ .name }}_write(const {{ .type }}* in, sp_io_writer_t* out) {
-  sp_io_write_c8(out, '{');
-  bool first = true;
-{{ for .fields }}
-{{ $write_field }}
-{{ end }}
-  sp_io_write_c8(out, '}');
-}
-
