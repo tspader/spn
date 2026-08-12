@@ -3,12 +3,6 @@
 #include "triple/triple.h"
 #include "yyjson.h"
 
-#define SPN_EVENT_NAME(kind, name, ...) [kind] = name,
-static const c8* event_names[SPN_EVENT_COUNT] = {
-  SPN_EVENT_LIST(SPN_EVENT_NAME)
-};
-#undef SPN_EVENT_NAME
-
 #define expect_path(t, fixture, path) expect_exists(t, fixture, path, true, __FILE__, __LINE__)
 #define expect_no_path(t, fixture, path) expect_exists(t, fixture, path, false, __FILE__, __LINE__)
 
@@ -514,7 +508,7 @@ static bool event_matches(yyjson_val* line, const c8* event, const c8* key, cons
 }
 
 static u32 count_events(fixture_t* fixture, spn_build_event_kind_t kind, const c8* key, const c8* value) {
-  const c8* event = event_names[kind];
+  const c8* event = spn_event_info[kind].name;
   sp_mem_t mem = fixture->mem;
   sp_str_t path = sp_fs_join_path(mem, fixture->paths.storage, sp_str_lit("log/build.jsonl"));
 
@@ -538,7 +532,7 @@ static u32 count_events(fixture_t* fixture, spn_build_event_kind_t kind, const c
 }
 
 static sp_err_t expect_event(sp_test_t* t, fixture_t* fixture, spn_build_event_kind_t kind, const c8* key, const c8* value, bool expected, const c8* file, u32 line) {
-  const c8* event = event_names[kind];
+  const c8* event = spn_event_info[kind].name;
   sp_mem_t mem = fixture->mem;
   sp_str_t path = sp_fs_join_path(mem, fixture->paths.storage, sp_str_lit("log/build.jsonl"));
 
@@ -600,13 +594,13 @@ static sp_err_t expect_result(sp_test_t* t, fixture_t* fixture, spn_err_t err, c
     yyjson_doc_free(doc);
   }
 
-  if (actual && sp_cstr_equal(actual, spn_err_to_str(err))) return SP_OK;
+  if (actual && sp_str_equal_cstr(spn_err_to_str(err), actual)) return SP_OK;
 
   sp_test_kv(t, "log", path);
   sp_test_record(t, (sp_test_failure_t) {
     .file = sp_cstr_as_str(file),
     .line = line,
-    .expected = sp_cstr_as_str(spn_err_to_str(err)),
+    .expected = spn_err_to_str(err),
     .actual = actual ? sp_cstr_as_str(actual) : sp_str_lit("no result event"),
   });
   return SP_ERR;
@@ -1203,7 +1197,7 @@ sp_err_t run_actions(sp_test_t* t, fixture_t* fixture, const action_t* actions) 
       }
       case ACTION_VERIFY_EVENT_COUNT: {
         u32 count = count_events(fixture, action.verify_event_count.event, action.verify_event_count.key, action.verify_event_count.value);
-        sp_test_kv(t, "event", sp_str_view(event_names[action.verify_event_count.event]));
+        sp_test_kv(t, "event", sp_str_view(spn_event_info[action.verify_event_count.event].name));
         sp_expect_eq(t, action.verify_event_count.count, count);
         break;
       }

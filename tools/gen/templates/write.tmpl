@@ -1,4 +1,4 @@
-static void spn_cg_{{ .name }}_write(const {{ .type }}* in, sp_io_writer_t* out) {
+static void {{ .self }}_write(const {{ .type }}* in, sp_io_writer_t* out) {
   sp_io_write_c8(out, '{');
   bool first = true;
 {{ for .fields }}
@@ -15,7 +15,7 @@ static void spn_cg_{{ .name }}_write(const {{ .type }}* in, sp_io_writer_t* out)
     spn_codegen_write_{{ .extern }}(out, &in->{{ .name }});
 {{ end }}
 {{ if .k_object }}
-    spn_cg_{{ .object }}_write(&in->{{ .name }}, out);
+    {{ .owrite }}_write(&in->{{ .name }}, out);
 {{ end }}
 {{ if .k_str_array }}
     spn_codegen_json_str_array(out, in->{{ .name }});
@@ -38,7 +38,7 @@ static void spn_cg_{{ .name }}_write(const {{ .type }}* in, sp_io_writer_t* out)
         sp_io_write_c8(out, ',');
       }
       if ({{ .table_present }}) {
-        spn_cg_{{ .object }}_write(&in->{{ .name }}[it], out);
+        {{ .owrite }}_write(&in->{{ .name }}[it], out);
       } else {
         spn_codegen_json_str(out, in->{{ .name }}[it].{{ .shorthand }});
       }
@@ -50,7 +50,7 @@ static void spn_cg_{{ .name }}_write(const {{ .type }}* in, sp_io_writer_t* out)
       if (it) {
         sp_io_write_c8(out, ',');
       }
-      spn_cg_{{ .object }}_write(&in->{{ .name }}[it], out);
+      {{ .owrite }}_write(&in->{{ .name }}[it], out);
     }
     sp_io_write_c8(out, ']');
 {{ end }}
@@ -64,7 +64,7 @@ static void spn_cg_{{ .name }}_write(const {{ .type }}* in, sp_io_writer_t* out)
       }
       spn_codegen_json_str(out, entry->{{ .key_field }});
       sp_io_write_c8(out, ':');
-      spn_cg_{{ .object }}_write(entry, out);
+      {{ .owrite }}_write(entry, out);
     }
     sp_io_write_c8(out, '}');
 {{ end }}
@@ -77,7 +77,7 @@ static void spn_cg_{{ .name }}_write(const {{ .type }}* in, sp_io_writer_t* out)
       }
       spn_codegen_json_str(out, in->{{ .name }}[it].key);
       sp_io_write_c8(out, ':');
-      spn_cg_{{ .object }}_write(&in->{{ .name }}[it].value, out);
+      {{ .owrite }}_write(&in->{{ .name }}[it].value, out);
     }
     sp_io_write_c8(out, '}');
 {{ else }}

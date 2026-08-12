@@ -59,7 +59,7 @@ static spn_err_union_t run_test(spn_session_t* session, spn_target_unit_t* unit,
   spn_event_buffer_push(ctx->events, (spn_build_event_t) {
     .kind = SPN_EVENT_TARGET_RUN,
     .pkg = unit->pkg->info,
-    .run = {
+    .target_run = {
       .name = unit->info->name,
       .command = command,
     },

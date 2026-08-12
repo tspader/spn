@@ -10,7 +10,7 @@ else()
   target_link_libraries(embed PRIVATE m)
   add_dependencies(embed headers)
 
-  add_executable(jtd_gen gen/main.c gen/run.c gen/lower.c gen/bind.c gen/abi.c jtd.c)
+  add_executable(jtd_gen gen/main.c gen/run.c gen/lower.c gen/bind.c gen/union.c gen/abi.c jtd.c)
   set_target_properties(jtd_gen PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
   target_include_directories(jtd_gen PRIVATE
     ${STORE}/include
@@ -76,7 +76,11 @@ set(GEN_FILES
   ${GEN_DIR}/abi.gen.c
   ${GEN_DIR}/fuzz.gen.h
   ${GEN_DIR}/fuzz.gen.c
-  ${GEN_DIR}/fuzz.jtd.json)
+  ${GEN_DIR}/fuzz.jtd.json
+  ${GEN_DIR}/errors.gen.h
+  ${GEN_DIR}/errors.gen.c
+  ${GEN_DIR}/events.gen.h
+  ${GEN_DIR}/events.gen.c)
 file(GLOB JTD_GEN_SCHEMAS CONFIGURE_DEPENDS ${SCHEMA_DIR}/*.json)
 file(GLOB_RECURSE JTD_GEN_TEMPLATES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/gen/templates/*.tmpl)
 add_custom_command(

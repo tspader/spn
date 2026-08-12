@@ -147,11 +147,11 @@ sp_test_each(options_session, apply, session_test_t, tests, .setup = spn_test_ct
     return SP_OK;
   }
 
-  sp_expect_eq(t, err.option.kind, it->expect.option_err);
-  sp_expect(t, sp_str_equal_cstr(err.option.pkg, it->expect.pkg));
-  sp_expect_eq(t, err.option.a.kind, it->expect.setter);
+  sp_expect_eq(t, err.option.violation.kind, it->expect.option_err);
+  sp_expect(t, sp_str_equal_cstr(err.option.violation.pkg, it->expect.pkg));
+  sp_expect_eq(t, err.option.violation.a.kind, it->expect.setter);
   if (it->expect.setter_name) {
-    sp_expect(t, sp_str_equal_cstr(err.option.a.name, it->expect.setter_name));
+    sp_expect(t, sp_str_equal_cstr(err.option.violation.a.name, it->expect.setter_name));
   }
 
   return SP_OK;

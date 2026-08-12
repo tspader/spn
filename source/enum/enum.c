@@ -433,6 +433,93 @@ sp_str_t spn_option_setter_to_str(spn_option_setter_t setter) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
+sp_str_t spn_option_setter_kind_to_str(spn_option_setter_kind_t kind) {
+  switch (kind) {
+    case SPN_OPTION_SETTER_NONE: {
+      return sp_str_lit("none");
+    }
+    case SPN_OPTION_SETTER_DEFAULT: {
+      return sp_str_lit("default");
+    }
+    case SPN_OPTION_SETTER_PROFILE: {
+      return sp_str_lit("profile");
+    }
+    case SPN_OPTION_SETTER_ROOT_MANIFEST: {
+      return sp_str_lit("root_manifest");
+    }
+    case SPN_OPTION_SETTER_UNION: {
+      return sp_str_lit("union");
+    }
+    case SPN_OPTION_SETTER_CONSUMER: {
+      return sp_str_lit("consumer");
+    }
+  }
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
+sp_str_t spn_option_err_to_str(spn_option_err_t err) {
+  switch (err) {
+    case SPN_OPTION_ERR_UNDECLARED: {
+      return sp_str_lit("undeclared");
+    }
+    case SPN_OPTION_ERR_BAD_VALUE: {
+      return sp_str_lit("bad_value");
+    }
+    case SPN_OPTION_ERR_CONFLICT: {
+      return sp_str_lit("conflict");
+    }
+    case SPN_OPTION_ERR_VETO: {
+      return sp_str_lit("veto");
+    }
+    case SPN_OPTION_ERR_NO_VALUE: {
+      return sp_str_lit("no_value");
+    }
+    case SPN_OPTION_ERR_LATE_GATE: {
+      return sp_str_lit("late_gate");
+    }
+    case SPN_OPTION_ERR_UNKNOWN_PKG: {
+      return sp_str_lit("unknown_pkg");
+    }
+  }
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
+sp_str_t spn_toolchain_role_to_str(spn_toolchain_role_t role) {
+  switch (role) {
+    case SPN_TOOLCHAIN_ROLE_BUILD: {
+      return sp_str_lit("build");
+    }
+    case SPN_TOOLCHAIN_ROLE_SCRIPT: {
+      return sp_str_lit("script");
+    }
+  }
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
+sp_str_t spn_cc_feature_to_str(spn_cc_feature_t feature) {
+  switch (feature) {
+    case SPN_CC_FEATURE_COMPILE: {
+      return sp_str_lit("compile");
+    }
+    case SPN_CC_FEATURE_LINK_EXE: {
+      return sp_str_lit("link_exe");
+    }
+    case SPN_CC_FEATURE_LINK_SHARED: {
+      return sp_str_lit("link_shared");
+    }
+    case SPN_CC_FEATURE_LINK_REACTOR: {
+      return sp_str_lit("link_reactor");
+    }
+    case SPN_CC_FEATURE_ARCHIVE: {
+      return sp_str_lit("archive");
+    }
+    case SPN_CC_FEATURE_FRAMEWORKS: {
+      return sp_str_lit("frameworks");
+    }
+  }
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
 sp_str_t spn_linkage_to_str(spn_linkage_t kind) {
   switch (kind) {
     case SPN_LIB_KIND_SHARED: {

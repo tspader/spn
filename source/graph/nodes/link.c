@@ -52,10 +52,10 @@ static spn_err_t emit_link_passed(spn_target_unit_t* unit, spn_invocation_t* inv
     .kind = SPN_EVENT_LINK_PASSED,
     .pkg = unit->pkg->info,
     .io = &unit->logs,
-    .target.name = unit->info->name,
-    .target.link_passed = {
+    .link_passed = {
+      .target = unit->info->name,
       .output_path = output,
-      .invocation = invocation,
+      .command = spn_invocation_to_str(spn.mem, invocation),
       .out = out,
       .time = elapsed,
     }
@@ -68,12 +68,12 @@ static spn_err_t emit_link_failed(spn_target_unit_t* unit, spn_invocation_t* inv
     .kind = SPN_EVENT_LINK_FAILED,
     .pkg = unit->pkg->info,
     .io = &unit->logs,
-    .target.name = unit->info->name,
-    .target.link_failed = {
+    .link_failed = {
+      .target = unit->info->name,
       .exit_code = rc,
+      .command = spn_invocation_to_str(spn.mem, invocation),
       .out = out,
       .err = err,
-      .invocation = invocation,
     }
   });
   return SPN_ERROR;
@@ -227,9 +227,8 @@ s32 spn_link_target_run(spn_target_unit_t* target, sp_str_t output, sp_da(sp_str
     .kind = SPN_EVENT_LINK_START,
     .pkg = target->pkg->info,
     .io = &target->logs,
-    .target.name = target->info->name,
-    .target.link_start = {
-      .target = target
+    .link_start = {
+      .target = target->info->name,
     }
   });
 

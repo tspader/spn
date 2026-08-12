@@ -10,7 +10,6 @@
 
 #include "enum/enum.h"
 #include "event/event.h"
-#include "event/log.h"
 #include "semver/convert.h"
 #include "toml/issue.h"
 #include "toolchain/select.h"
@@ -202,7 +201,7 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
       }
       break;
     }
-    case SPN_EVENT_BUILD_SCRIPT_COMPILE: {
+    case SPN_EVENT_SCRIPT_COMPILE: {
       c8 buffer [64] = sp_zero;
       sp_fmt_write_duration_buf(buffer, sizeof(buffer), event->script_compile.time);
       sp_fmt_io(&w.base, "{.gray} in {.gray}",
@@ -211,11 +210,11 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
       );
       break;
     }
-    case SPN_EVENT_BUILD_SCRIPT_USER_FN: {
-      sp_fmt_io(&w.base, "{}", sp_fmt_str(event->node.info->tag));
+    case SPN_EVENT_SCRIPT_USER_FN: {
+      sp_fmt_io(&w.base, "{}", sp_fmt_str(event->script_user_fn.tag));
       break;
     }
-    case SPN_EVENT_BUILD_SCRIPT_PACKAGE_OK: {
+    case SPN_EVENT_PACKAGE_OK: {
       c8 buffer [64] = sp_zero;
       sp_fmt_write_duration_buf(buffer, sizeof(buffer), event->package_ok.time);
       sp_fmt_io(&w.base, "in {.gray}", sp_fmt_cstr(buffer));
@@ -223,18 +222,18 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
     }
     case SPN_EVENT_TARGET_BUILD_PASSED: {
       c8 buffer [64] = sp_zero;
-      sp_fmt_write_duration_buf(buffer, sizeof(buffer), event->target.passed.time);
+      sp_fmt_write_duration_buf(buffer, sizeof(buffer), event->target_passed.time);
       sp_fmt_io(&w.base, "{.gray} in {.gray}",
-        sp_fmt_str(event->target.passed.source_file),
+        sp_fmt_str(event->target_passed.source_file),
         sp_fmt_cstr(buffer)
       );
       break;
     }
     case SPN_EVENT_LINK_PASSED: {
       c8 buffer [64] = sp_zero;
-      sp_fmt_write_duration_buf(buffer, sizeof(buffer), event->target.link_passed.time);
+      sp_fmt_write_duration_buf(buffer, sizeof(buffer), event->link_passed.time);
       sp_fmt_io(&w.base, "{.gray} in {.gray}",
-        sp_fmt_str(event->target.link_passed.output_path),
+        sp_fmt_str(event->link_passed.output_path),
         sp_fmt_cstr(buffer)
       );
       break;
@@ -294,7 +293,7 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
       break;
     }
     case SPN_EVENT_TARGET_RUN: {
-      sp_fmt_io(&w.base, "{.gray}", sp_fmt_str(get_contextual_path(mem, event->run.command)));
+      sp_fmt_io(&w.base, "{.gray}", sp_fmt_str(get_contextual_path(mem, event->target_run.command)));
       break;
     }
     case SPN_EVENT_TEST_PASSED: {
@@ -331,18 +330,18 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
     }
     case SPN_EVENT_BUILD_PASSED: {
       c8 buffer [64] = sp_zero;
-      sp_fmt_write_duration_buf(buffer, sizeof(buffer), event->build.passed.time);
+      sp_fmt_write_duration_buf(buffer, sizeof(buffer), event->build_passed.time);
       sp_fmt_io(&w.base,
         "Compiled for profile {.cyan} in {.gray} {.gray}",
-        sp_fmt_str(event->build.passed.profile->name),
+        sp_fmt_str(event->build_passed.profile),
         sp_fmt_cstr(buffer),
         sp_fmt_str(sp_fmt(mem, "({} executed, {} cached)",
-          sp_fmt_uint(event->build.passed.misses),
-          sp_fmt_uint(event->build.passed.hits)).value)
+          sp_fmt_uint(event->build_passed.misses),
+          sp_fmt_uint(event->build_passed.hits)).value)
       );
       break;
     }
-    case SPN_EVENT_BUILD_SCRIPT_CRASHED: {
+    case SPN_EVENT_SCRIPT_CRASHED: {
       if (sp_str_empty(event->crashed.error)) {
         sp_io_write_str(&w.base, sp_str_lit("build script crashed"), SP_NULLPTR);
       }
@@ -351,12 +350,12 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
       }
       break;
     }
-    case SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED: {
+    case SPN_EVENT_SCRIPT_COMPILE_FAILED: {
       sp_fmt_io(&w.base, "{.cyan} failed to compile", sp_fmt_str(get_contextual_path(mem, event->compile_failed.script_path)));
       break;
     }
     case SPN_EVENT_TARGET_BUILD_FAILED: {
-      sp_fmt_io(&w.base, "{.cyan} failed to compile", sp_fmt_str(get_contextual_path(mem, event->target.failed.source_file)));
+      sp_fmt_io(&w.base, "{.cyan} failed to compile", sp_fmt_str(get_contextual_path(mem, event->target_failed.source_file)));
       break;
     }
     case SPN_EVENT_NODE_FAILED: {
@@ -390,48 +389,43 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
       );
       break;
     }
-    case SPN_EVENT_ERR_PATCH: {
-      switch (event->patch_err.kind) {
-        case SPN_PATCH_ERR_UNUSED: {
+    case SPN_EVENT_ERR: {
+      switch (event->err.kind) {
+        case SPN_ERR_PATCH_UNUSED: {
           sp_fmt_io(
             &w.base,
             "[patch.{.cyan}] does not name a package in this build",
-            sp_fmt_str(event->patch_err.name)
+            sp_fmt_str(event->err.patch.name)
           );
           break;
         }
-        case SPN_PATCH_ERR_NOT_GIT: {
+        case SPN_ERR_PATCH_NOT_GIT: {
           sp_fmt_io(
             &w.base,
             "[patch.{.cyan}] names a package whose sources are not fetched from git; only git sources can be patched",
-            sp_fmt_str(event->patch_err.name)
+            sp_fmt_str(event->err.patch.name)
           );
           break;
         }
-      }
-      break;
-    }
-    case SPN_EVENT_ERR_HEADER_COLLISION: {
-      sp_fmt_io(
-        &w.base,
-        "two headers are published to {.cyan}: {.gray} and {.gray}",
-        sp_fmt_str(event->header_collision.path),
-        sp_fmt_str(get_contextual_path(mem, event->header_collision.first)),
-        sp_fmt_str(get_contextual_path(mem, event->header_collision.second))
-      );
-      break;
-    }
-    case SPN_EVENT_ERR: {
-      switch (event->err.kind) {
+        case SPN_ERR_HEADER_COLLISION: {
+          sp_fmt_io(
+            &w.base,
+            "two headers are published to {.cyan}: {.gray} and {.gray}",
+            sp_fmt_str(event->err.header_collision.path),
+            sp_fmt_str(get_contextual_path(mem, event->err.header_collision.first)),
+            sp_fmt_str(get_contextual_path(mem, event->err.header_collision.second))
+          );
+          break;
+        }
         case SPN_ERR_OPTION: {
-          switch (event->err.option.kind) {
+          switch (event->err.option.violation.kind) {
             case SPN_OPTION_ERR_UNDECLARED: {
               sp_fmt_io(
                 &w.base,
                 "{} does not declare an option named {.yellow} (set by {.cyan})",
-                sp_fmt_str(get_colored_name(mem, event->err.option.pkg)),
-                sp_fmt_str(event->err.option.option),
-                sp_fmt_str(spn_option_setter_to_str(event->err.option.a))
+                sp_fmt_str(get_colored_name(mem, event->err.option.violation.pkg)),
+                sp_fmt_str(event->err.option.violation.option),
+                sp_fmt_str(spn_option_setter_to_str(event->err.option.violation.a))
               );
               break;
             }
@@ -439,10 +433,10 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
               sp_fmt_io(
                 &w.base,
                 "{.yellow} is not a valid value for {}.{.cyan} (set by {.cyan})",
-                sp_fmt_str(spn_option_value_to_str(mem, event->err.option.value)),
-                sp_fmt_str(get_colored_name(mem, event->err.option.pkg)),
-                sp_fmt_str(event->err.option.option),
-                sp_fmt_str(spn_option_setter_to_str(event->err.option.a))
+                sp_fmt_str(spn_option_value_to_str(mem, event->err.option.violation.value)),
+                sp_fmt_str(get_colored_name(mem, event->err.option.violation.pkg)),
+                sp_fmt_str(event->err.option.violation.option),
+                sp_fmt_str(spn_option_setter_to_str(event->err.option.violation.a))
               );
               break;
             }
@@ -450,10 +444,10 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
               sp_fmt_io(
                 &w.base,
                 "option conflict on {}.{.cyan}: {.cyan} and {.cyan} request different values",
-                sp_fmt_str(get_colored_name(mem, event->err.option.pkg)),
-                sp_fmt_str(event->err.option.option),
-                sp_fmt_str(spn_option_setter_to_str(event->err.option.a)),
-                sp_fmt_str(spn_option_setter_to_str(event->err.option.b))
+                sp_fmt_str(get_colored_name(mem, event->err.option.violation.pkg)),
+                sp_fmt_str(event->err.option.violation.option),
+                sp_fmt_str(spn_option_setter_to_str(event->err.option.violation.a)),
+                sp_fmt_str(spn_option_setter_to_str(event->err.option.violation.b))
               );
               break;
             }
@@ -461,11 +455,11 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
               sp_fmt_io(
                 &w.base,
                 "{.cyan} requires {}.{.cyan} != {.yellow}, but {} set it",
-                sp_fmt_str(spn_option_setter_to_str(event->err.option.a)),
-                sp_fmt_str(get_colored_name(mem, event->err.option.pkg)),
-                sp_fmt_str(event->err.option.option),
-                sp_fmt_str(spn_option_value_to_str(mem, event->err.option.value)),
-                sp_fmt_str(spn_option_setter_to_str(event->err.option.b))
+                sp_fmt_str(spn_option_setter_to_str(event->err.option.violation.a)),
+                sp_fmt_str(get_colored_name(mem, event->err.option.violation.pkg)),
+                sp_fmt_str(event->err.option.violation.option),
+                sp_fmt_str(spn_option_value_to_str(mem, event->err.option.violation.value)),
+                sp_fmt_str(spn_option_setter_to_str(event->err.option.violation.b))
               );
               break;
             }
@@ -473,8 +467,8 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
               sp_fmt_io(
                 &w.base,
                 "no value for {}.{.cyan}: no default matched and nothing set it",
-                sp_fmt_str(get_colored_name(mem, event->err.option.pkg)),
-                sp_fmt_str(event->err.option.option)
+                sp_fmt_str(get_colored_name(mem, event->err.option.violation.pkg)),
+                sp_fmt_str(event->err.option.violation.option)
               );
               break;
             }
@@ -482,8 +476,8 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
               sp_fmt_io(
                 &w.base,
                 "the dependency gate on {}'s edge to {.cyan} never settled",
-                sp_fmt_str(get_colored_name(mem, event->err.option.pkg)),
-                sp_fmt_str(spn_option_setter_to_str(event->err.option.a))
+                sp_fmt_str(get_colored_name(mem, event->err.option.violation.pkg)),
+                sp_fmt_str(spn_option_setter_to_str(event->err.option.violation.a))
               );
               break;
             }
@@ -491,7 +485,7 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
               sp_fmt_io(
                 &w.base,
                 "the root manifest configures {.yellow}, which is not a package in this build",
-                sp_fmt_str(event->err.option.pkg)
+                sp_fmt_str(event->err.option.violation.pkg)
               );
               break;
             }
@@ -1177,42 +1171,17 @@ sp_str_t spn_tui_render_event_detail(sp_mem_t mem, spn_build_event_t* event) {
       );
       break;
     }
-    case SPN_EVENT_PREPARE_BUILD_GRAPH_FAILED: {
-      switch (event->err.build_graph.kind) {
-        case SPN_BUILD_GRAPH_ERR_MISSING_INPUT: {
-          sp_fmt_io(
-            &w.base,
-            "Missing build graph input {.cyan}",
-            sp_fmt_str(get_contextual_path(mem, event->err.build_graph.file))
-          );
-          break;
-        }
-        case SPN_BUILD_GRAPH_ERR_DUPLICATE_OUTPUT: {
-          sp_fmt_io(
-            &w.base,
-            "Two graph nodes output the same file {.cyan}",
-            sp_fmt_str(get_contextual_path(mem, event->err.build_graph.file))
-          );
-          break;
-        }
-        case SPN_BUILD_GRAPH_ERR_UNKNOWN: {
-          sp_io_write_str(&w.base, sp_str_lit("Failed to prepare build graph"), SP_NULLPTR);
-          break;
-        }
-      }
-      break;
-    }
     case SPN_EVENT_LINK_START: {
       sp_fmt_io(&w.base, "Linking target {.cyan}",
-        sp_fmt_str(event->target.name)
+        sp_fmt_str(event->link_start.target)
       );
       break;
     }
     case SPN_EVENT_LINK_FAILED: {
-      sp_fmt_io(&w.base, "Failed to link target {.cyan}", sp_fmt_str(event->target.name));
+      sp_fmt_io(&w.base, "Failed to link target {.cyan}", sp_fmt_str(event->link_failed.target));
       break;
     }
-    case SPN_EVENT_BUILD_SCRIPT_CONFIGURE_OK: {
+    case SPN_EVENT_CONFIGURE_OK: {
       c8 buffer [64] = sp_zero;
       sp_fmt_write_duration_buf(buffer, sizeof(buffer), event->configure.time);
       sp_fmt_io(&w.base, "in {.gray}", sp_fmt_cstr(buffer));
@@ -1280,7 +1249,6 @@ static void write_error(sp_io_writer_t* w, sp_mem_t mem, sp_str_t verb, sp_str_t
 static sp_str_t event_subject(spn_build_event_t* event) {
   switch (event->kind) {
     case SPN_EVENT_SYNC_FAILED:               return event->sync_failed.name;
-    case SPN_EVENT_ERR_PATCH:                 return event->patch_err.name;
     case SPN_EVENT_ERR: {
       switch (event->err.kind) {
         case SPN_ERR_MANIFEST_ISSUES:  return event->err.manifest.name;
@@ -1290,6 +1258,8 @@ static sp_str_t event_subject(spn_build_event_t* event) {
         case SPN_ERR_UNIT_CYCLE:       return event->err.unit_cycle.id.name;
         case SPN_ERR_DYNAMIC_DUPLICATE: return event->err.dynamic_dup.id.name;
         case SPN_ERR_RESOLVE_TOO_COMPLEX: return event->err.too_complex.id.name;
+        case SPN_ERR_PATCH_UNUSED:     return event->err.patch.name;
+        case SPN_ERR_PATCH_NOT_GIT:    return event->err.patch.name;
         default:                       break;
       }
       return event->pkg ? event->pkg->name : sp_str_lit("");
@@ -1301,13 +1271,13 @@ static sp_str_t event_subject(spn_build_event_t* event) {
 static void render_event_extra(sp_io_writer_t* w, spn_build_event_t* event) {
   switch (event->kind) {
     case SPN_EVENT_TARGET_BUILD_FAILED: {
-      sp_io_write_str(w, event->target.failed.out, SP_NULLPTR);
-      sp_io_write_str(w, event->target.failed.err, SP_NULLPTR);
+      sp_io_write_str(w, event->target_failed.out, SP_NULLPTR);
+      sp_io_write_str(w, event->target_failed.err, SP_NULLPTR);
       break;
     }
     case SPN_EVENT_LINK_FAILED: {
-      sp_io_write_str(w, event->target.link_failed.err, SP_NULLPTR);
-      sp_io_write_str(w, event->target.link_failed.out, SP_NULLPTR);
+      sp_io_write_str(w, event->link_failed.err, SP_NULLPTR);
+      sp_io_write_str(w, event->link_failed.out, SP_NULLPTR);
       break;
     }
     case SPN_EVENT_TEST_FAILED: {
@@ -1315,21 +1285,8 @@ static void render_event_extra(sp_io_writer_t* w, spn_build_event_t* event) {
       sp_io_write_str(w, event->test_failed.err, SP_NULLPTR);
       break;
     }
-    case SPN_EVENT_BUILD_SCRIPT_COMPILE_FAILED: {
+    case SPN_EVENT_SCRIPT_COMPILE_FAILED: {
       sp_io_write_str(w, event->compile_failed.error, SP_NULLPTR);
-      break;
-    }
-    case SPN_EVENT_PREPARE_BUILD_GRAPH_FAILED: {
-      if (event->err.build_graph.kind == SPN_BUILD_GRAPH_ERR_DUPLICATE_OUTPUT) {
-        if (sp_str_valid(event->err.build_graph.command_a)) {
-          sp_io_write_str(w, event->err.build_graph.command_a, SP_NULLPTR);
-          sp_io_write_c8(w, '\n');
-        }
-        if (sp_str_valid(event->err.build_graph.command_b)) {
-          sp_io_write_str(w, event->err.build_graph.command_b, SP_NULLPTR);
-          sp_io_write_c8(w, '\n');
-        }
-      }
       break;
     }
     case SPN_EVENT_ERR: {
@@ -1343,17 +1300,11 @@ static void render_event_extra(sp_io_writer_t* w, spn_build_event_t* event) {
           break;
         }
         case SPN_ERR_TOOLCHAIN_TARGET: {
-          bool first = true;
-          sp_om_for(event->err.toolchain.catalog->entries, it) {
-            spn_toolchain_info_t* toolchain = sp_om_at(event->err.toolchain.catalog->entries, it);
-            if (!spn_toolchain_supports(toolchain, event->err.toolchain.target, event->err.toolchain.host)) {
-              continue;
-            }
-            sp_io_write_str(w, first ? sp_str_lit("toolchains that can: ") : sp_str_lit(", "), SP_NULLPTR);
-            sp_fmt_io(w, "{.green}", sp_fmt_str(toolchain->name));
-            first = false;
+          sp_da_for(event->err.toolchain.candidates, it) {
+            sp_io_write_str(w, it ? sp_str_lit(", ") : sp_str_lit("toolchains that can: "), SP_NULLPTR);
+            sp_fmt_io(w, "{.green}", sp_fmt_str(event->err.toolchain.candidates[it]));
           }
-          if (!first) {
+          if (!sp_da_empty(event->err.toolchain.candidates)) {
             sp_io_write_c8(w, '\n');
           }
           break;
@@ -1376,8 +1327,8 @@ void spn_tui_log_event(spn_tui_t* tui, spn_build_event_t* event) {
     return;
   }
 
-  const spn_event_info_t* display = &spn_event_info[event->kind];
-  if (display->verbosity > tui->logger.verbosity) {
+  const spn_event_info_t* info = &spn_event_info[event->kind];
+  if (info->severity == SPN_EVENT_SEVERITY_INFO && info->verbosity > tui->logger.verbosity) {
     if (event->kind == SPN_EVENT_USER_LOG) {
       sp_da_push(tui->buffered_logs, ((spn_tui_buffered_log_t) {
         .pkg = event->pkg ? sp_str_copy(tui->mem, event->pkg->name) : sp_str_lit(""),
@@ -1390,9 +1341,9 @@ void spn_tui_log_event(spn_tui_t* tui, spn_build_event_t* event) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   sp_mem_t mem = scratch.mem;
   sp_io_writer_t* io = &tui->writer.base;
-  sp_str_t verb = sp_cstr_as_str(display->display);
+  sp_str_t verb = sp_cstr_as_str(info->verb);
 
-  if (display->error) {
+  if (info->severity != SPN_EVENT_SEVERITY_INFO) {
     sp_da_for(tui->buffered_logs, it) {
       spn_tui_buffered_log_t* log = &tui->buffered_logs[it];
       write_event(io, mem, sp_str_lit(""), false, log->pkg, log->message);
@@ -1400,13 +1351,13 @@ void spn_tui_log_event(spn_tui_t* tui, spn_build_event_t* event) {
     sp_da_clear(tui->buffered_logs);
 
     sp_str_t detail = spn_tui_render_event_detail(mem, event);
-    if (display->terminal) {
+    if (info->severity == SPN_EVENT_SEVERITY_FATAL) {
       write_event(io, mem, sp_str_lit("Failed"), true, event_subject(event), sp_str_lit(""));
       sp_io_write_c8(io, '\n');
-      write_error(io, mem, verb, detail);
+      write_error(io, mem, sp_str_lit("error"), detail);
     } else {
       sp_str_t name = event->pkg ? event->pkg->name : sp_str_lit("");
-      write_event(io, mem, verb, true, name, detail);
+      write_event(io, mem, sp_str_lit("error"), true, name, detail);
     }
     render_event_extra(io, event);
     flush_writer(&tui->writer);
@@ -1460,7 +1411,7 @@ void spn_tui_log_event(spn_tui_t* tui, spn_build_event_t* event) {
     }
 
     case SPN_EVENT_TARGET_RUN: {
-      sp_str_t name = event->run.name;
+      sp_str_t name = event->target_run.name;
       if (sp_str_empty(name) && event->pkg) {
         name = event->pkg->name;
       }
@@ -1627,7 +1578,7 @@ void spn_tui_flush(spn_tui_t* tui) {
 void spn_tui_run_banner(spn_tui_t* tui, sp_str_t name, sp_str_t command) {
   spn_build_event_t event = {
     .kind = SPN_EVENT_TARGET_RUN,
-    .run = {
+    .target_run = {
       .name = name,
       .command = command,
     },

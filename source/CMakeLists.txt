@@ -37,10 +37,9 @@ set(SPN_SOURCES
   dag/wasi.c
   enum/enum.c
   error/error.c
-  error/str.c
+  error/json.c
   event/event.c
   event/build.c
-  event/log.c
   external/cc.c
   external/git.c
   external/obj.c
@@ -126,6 +125,8 @@ set(SPN_SOURCES
 
 add_executable(spn ${SPN_SOURCES}
   ${SRC}/codegen/gen/config.gen.c
+  ${SRC}/codegen/gen/errors.gen.c
+  ${SRC}/codegen/gen/events.gen.c
   ${SRC}/codegen/gen/manifest.gen.c
   ${SRC}/codegen/gen/release.gen.c
   ${SRC}/codegen/gen/toolchains.gen.c

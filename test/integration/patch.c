@@ -40,7 +40,7 @@ sp_test(patch, unused_entry_fails) {
     .copy = { "patches/*" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },
-      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_ERR_PATCH } },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_ERR, .key = "kind", .value = "patch_unused" } },
       { .kind = ACTION_VERIFY_NOT_EXISTS, .exists = exe("main") },
     },
   });

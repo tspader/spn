@@ -1,0 +1,315 @@
+{
+  "metadata": { "format": "errors" },
+  "discriminator": "kind",
+  "mapping": {
+    "manifest_parse": { "ref": "manifest_parse" },
+    "manifest_issues": { "ref": "manifest" },
+    "no_manifest": { "ref": "no_manifest" },
+    "not_git_repo": { "ref": "not_git_repo" },
+    "git": { "ref": "git" },
+    "version_exists": { "ref": "version_exists" },
+    "build_graph": { "ref": "build_graph" },
+    "toolchain_unknown": { "ref": "toolchain" },
+    "toolchain_none": { "ref": "toolchain" },
+    "toolchain_target": { "ref": "toolchain" },
+    "toolchain_host": { "ref": "toolchain" },
+    "toolchain_fetch": { "ref": "artifact" },
+    "toolchain_no_sha": { "ref": "artifact" },
+    "toolchain_sha": { "ref": "artifact" },
+    "toolchain_extract": { "ref": "artifact" },
+    "toolchain_no_cxx": { "ref": "toolchain" },
+    "toml_parse": { "properties": {} },
+    "codegen_expected_bool": { "properties": {} },
+    "codegen_expected_str": { "properties": {} },
+    "codegen_expected_int": { "properties": {} },
+    "codegen_expected_object": { "properties": {} },
+    "codegen_missing_key": { "properties": {} },
+    "codegen_duplicate_key": { "properties": {} },
+    "codegen_unknown_key": { "properties": {} },
+    "codegen_parse": { "properties": {} },
+    "codegen_file_missing": { "properties": {} },
+    "codegen_invalid": { "properties": {} },
+    "codegen_root_only": { "properties": {} },
+    "wasm_init_failed": { "ref": "wasm" },
+    "wasm_register_failed": { "ref": "wasm" },
+    "wasm_module_load_failed": { "ref": "wasm" },
+    "wasm_module_instance_failed": { "ref": "wasm" },
+    "wasm_ctx_failed": { "ref": "wasm" },
+    "wasm_module_call_failed": { "ref": "wasm" },
+    "wasm_read_failed": { "ref": "wasm" },
+    "wasm_thread_env_failed": { "ref": "wasm" },
+    "wasm_script_error": { "ref": "wasm" },
+    "wasm_no_script": { "ref": "wasm" },
+    "wasm_export_not_found": { "ref": "wasm" },
+    "profile_invalid": { "ref": "profile" },
+    "profile_undefined": { "ref": "profile" },
+    "sanitizer_unsupported": { "ref": "sanitizer" },
+    "sanitizer_static": { "ref": "sanitizer" },
+    "compiler_feature_unsupported": { "ref": "compiler" },
+    "toc_magic": { "properties": {} },
+    "toc_truncated": { "properties": {} },
+    "toc_missing": { "properties": {} },
+    "fs_remove": { "ref": "fs" },
+    "fs_read": { "ref": "fs" },
+    "fs_write": { "ref": "fs" },
+    "fs_create_dir": { "ref": "fs" },
+    "index_unknown": { "ref": "index" },
+    "index_sync": { "ref": "index" },
+    "index_pinned": { "ref": "index" },
+    "index_corrupt": { "ref": "index_corrupt" },
+    "index_publish_protocol": { "ref": "index" },
+    "publish_push": { "ref": "publish" },
+    "publish_dirty": { "ref": "publish" },
+    "publish_unpushed": { "ref": "publish" },
+    "index_path_dep": { "ref": "pkg" },
+    "pkg_unknown": { "ref": "unknown" },
+    "pkg_no_match": { "ref": "unsatisfiable" },
+    "pkg_mismatch": { "ref": "mismatch" },
+    "manifest_edit": { "ref": "manifest_parse" },
+    "dag_glob": { "properties": {} },
+    "dag_output_name": { "properties": {} },
+    "dag_duplicate_output": { "properties": {} },
+    "dag_stat": { "properties": {} },
+    "dag_missing_input": { "ref": "dag" },
+    "dag_missing_output": { "ref": "dag" },
+    "dag_scratch": { "properties": {} },
+    "dag_action": { "properties": {} },
+    "dag_store_read": { "ref": "dag" },
+    "dag_store_write": { "ref": "dag" },
+    "dag_store_missing": { "properties": {} },
+    "dag_tree": { "properties": {} },
+    "dag_stalled": { "properties": {} },
+    "dag_cancelled": { "properties": {} },
+    "dep_cycle": { "ref": "circular" },
+    "unit_cycle": { "ref": "unit_cycle" },
+    "target_linkage": { "ref": "target" },
+    "target_duplicate": { "ref": "target" },
+    "target_reserved": { "ref": "target" },
+    "target_dep": { "ref": "target" },
+    "target_selection": { "ref": "target" },
+    "script_missing": { "ref": "script" },
+    "script_failed": { "ref": "script" },
+    "triple_invalid": { "properties": {} },
+    "dynamic_duplicate": { "ref": "dynamic_dup" },
+    "resolve_too_complex": { "ref": "too_complex" },
+    "option": { "ref": "option" },
+    "configure_source": { "ref": "configure_source" },
+    "init_exists": { "ref": "fs" },
+    "init_name": { "ref": "pkg" },
+    "test_missing": { "ref": "script" },
+    "test_failed": { "properties": {} },
+    "version_invalid": { "ref": "version_invalid" },
+    "cancelled": { "properties": {} },
+    "patch_unused": { "ref": "patch" },
+    "patch_not_git": { "ref": "patch" },
+    "header_collision": { "ref": "header_collision" }
+  },
+  "definitions": {
+    "manifest_parse": {
+      "properties": {
+        "path": { "type": "string" }
+      }
+    },
+    "manifest": {
+      "properties": {
+        "name": { "type": "string" },
+        "path": { "type": "string" },
+        "issues": { "metadata": { "extern": "codegen_issues", "include": "codegen/types.h" } }
+      }
+    },
+    "no_manifest": {
+      "properties": {
+        "path": { "type": "string" }
+      }
+    },
+    "not_git_repo": {
+      "properties": {
+        "path": { "type": "string" }
+      }
+    },
+    "git": {
+      "properties": {
+        "command": { "type": "string" }
+      }
+    },
+    "version_exists": {
+      "properties": {
+        "name": { "type": "string" },
+        "version": { "type": "string" }
+      }
+    },
+    "version_invalid": {
+      "properties": {
+        "requested": { "type": "string" }
+      }
+    },
+    "build_graph": {
+      "properties": {
+        "file": { "type": "string" }
+      }
+    },
+    "toolchain": {
+      "properties": {
+        "role": { "ref": "toolchain_role" },
+        "name": { "type": "string" },
+        "target": { "metadata": { "extern": "triple" } },
+        "host": { "metadata": { "extern": "triple" } },
+        "candidates": { "elements": { "type": "string" } }
+      }
+    },
+    "toolchain_role": { "enum": ["build", "script"], "metadata": { "include": "toolchain/types.h" } },
+    "cc_feature": { "enum": ["compile", "link_exe", "link_shared", "link_reactor", "archive", "frameworks"], "metadata": { "include": "compiler/types.h" } },
+    "artifact": {
+      "properties": {
+        "name": { "type": "string" },
+        "url": { "type": "string" },
+        "expected": { "type": "string" },
+        "actual": { "type": "string" }
+      }
+    },
+    "wasm": {
+      "properties": {
+        "path": { "type": "string" },
+        "error": { "type": "string" },
+        "rc": { "type": "int32" }
+      }
+    },
+    "profile": {
+      "properties": {
+        "name": { "type": "string" }
+      }
+    },
+    "sanitizer": {
+      "properties": {
+        "toolchain": { "type": "string" },
+        "target": { "metadata": { "extern": "triple" } },
+        "unsupported": { "metadata": { "extern": "sanitizer_set" } }
+      }
+    },
+    "compiler": {
+      "properties": {
+        "toolchain": { "type": "string" },
+        "target": { "metadata": { "extern": "triple" } },
+        "feature": { "ref": "cc_feature" }
+      }
+    },
+    "fs": {
+      "properties": {
+        "path": { "type": "string" }
+      }
+    },
+    "index": {
+      "properties": {
+        "name": { "type": "string" },
+        "url": { "type": "string" }
+      }
+    },
+    "index_corrupt": {
+      "properties": {
+        "name": { "type": "string" },
+        "path": { "type": "string" }
+      }
+    },
+    "publish": {
+      "properties": {
+        "url": { "type": "string" },
+        "rev": { "type": "string" },
+        "path": { "type": "string" },
+        "output": { "type": "string" }
+      }
+    },
+    "pkg": {
+      "properties": {
+        "name": { "type": "string" },
+        "requested": { "type": "string" }
+      }
+    },
+    "unknown": {
+      "properties": {
+        "request": { "metadata": { "extern": "requested_dep", "include": "pkg/types.h" } }
+      }
+    },
+    "unsatisfiable": {
+      "properties": {
+        "request": { "metadata": { "extern": "requested_dep", "include": "pkg/types.h" } },
+        "requester": { "type": "string" },
+        "requester_version": { "metadata": { "extern": "semver", "include": "semver/types.h" } },
+        "conflict": { "type": "boolean" },
+        "selected": { "metadata": { "extern": "semver", "include": "semver/types.h" } }
+      }
+    },
+    "mismatch": {
+      "properties": {
+        "path": { "type": "string" },
+        "declared": { "type": "string" },
+        "requested": { "type": "string" }
+      }
+    },
+    "dag": {
+      "properties": {
+        "path": { "type": "string" }
+      }
+    },
+    "circular": {
+      "properties": {
+        "id": { "metadata": { "extern": "pkg_name", "include": "pkg/types.h" } }
+      }
+    },
+    "unit_cycle": {
+      "properties": {
+        "id": { "metadata": { "extern": "pkg_name", "include": "pkg/types.h" } },
+        "version": { "metadata": { "extern": "semver", "include": "semver/types.h" } }
+      }
+    },
+    "dynamic_dup": {
+      "properties": {
+        "id": { "metadata": { "extern": "pkg_name", "include": "pkg/types.h" } },
+        "low": { "metadata": { "extern": "semver", "include": "semver/types.h" } },
+        "high": { "metadata": { "extern": "semver", "include": "semver/types.h" } }
+      }
+    },
+    "too_complex": {
+      "properties": {
+        "id": { "metadata": { "extern": "pkg_name", "include": "pkg/types.h" } }
+      }
+    },
+    "target": {
+      "properties": {
+        "pkg": { "type": "string" },
+        "name": { "type": "string" },
+        "requested": { "type": "string" },
+        "requester": { "type": "string" }
+      }
+    },
+    "script": {
+      "properties": {
+        "name": { "type": "string" },
+        "path": { "type": "string" },
+        "code": { "type": "int32" }
+      }
+    },
+    "option": {
+      "properties": {
+        "violation": { "metadata": { "extern": "option_violation", "include": "pkg/types.h" } }
+      }
+    },
+    "configure_source": {
+      "properties": {
+        "name": { "type": "string" },
+        "source": { "type": "string" }
+      }
+    },
+    "patch": {
+      "properties": {
+        "name": { "type": "string" }
+      }
+    },
+    "header_collision": {
+      "properties": {
+        "path": { "type": "string" },
+        "first": { "type": "string" },
+        "second": { "type": "string" }
+      }
+    }
+  }
+}

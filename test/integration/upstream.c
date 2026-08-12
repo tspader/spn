@@ -73,7 +73,8 @@ sp_test(upstream, header_collision) {
     .copy = { "x.h" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .rc = 1 } },
-      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_ERR_HEADER_COLLISION, .key = "path", .value = "x.h" } },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_ERR, .key = "kind", .value = "header_collision" } },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_ERR, .key = "path", .value = "x.h" } },
     },
   });
 }

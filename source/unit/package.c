@@ -28,13 +28,16 @@ typedef sp_str_ht(sp_str_t) staged_header_set_t;
 
 static spn_err_t header_collision(spn_pkg_unit_t* unit, sp_str_t path, sp_str_t first, sp_str_t second) {
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
-    .kind = SPN_EVENT_ERR_HEADER_COLLISION,
+    .kind = SPN_EVENT_ERR,
     .pkg = unit->info,
     .io = &unit->logs.io,
-    .header_collision = {
-      .path = path,
-      .first = sp_str_copy(spn.mem, first),
-      .second = sp_str_copy(spn.mem, second),
+    .err = {
+      .kind = SPN_ERR_HEADER_COLLISION,
+      .header_collision = {
+        .path = path,
+        .first = sp_str_copy(spn.mem, first),
+        .second = sp_str_copy(spn.mem, second),
+      },
     },
   });
   return SPN_ERROR;

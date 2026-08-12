@@ -202,6 +202,8 @@ static const select_test_t select_tests [] = {
   },
 };
 
+bool is_supported(spn_toolchain_info_t* toolchain, spn_triple_t target, spn_triple_t host);
+
 sp_test_each(select, supports, supports_test_t, supports_tests) {
   sp_mem_t mem = sp_test_arena(t);
 
@@ -221,13 +223,14 @@ sp_test_each(select, supports, supports_test_t, supports_tests) {
     if (fixture_triple_empty(check.target)) {
       break;
     }
-    sp_expect_eq(t, check.supported, spn_toolchain_supports(&toolchain, check.target, (spn_triple_t) HOST_X64_LINUX));
+    sp_expect_eq(t, check.supported, is_supported(&toolchain, check.target, (spn_triple_t) HOST_X64_LINUX));
   }
 
   return SP_OK;
 }
 
 sp_test_each(select, resolve, select_test_t, select_tests) {
+  sp_mem_t mem = sp_test_arena(t);
   spn_toolchain_catalog_t catalog = sp_zero;
   if (fixture_catalog(t, &catalog, it->file)) return SP_ERR;
 
@@ -245,14 +248,18 @@ sp_test_each(select, resolve, select_test_t, select_tests) {
       .target = query.target,
       .host = host,
       .role = query.role,
-    }, &resolutions[at]);
+    }, mem, &resolutions[at]);
 
     sp_must_eq(t, (u32)query.expect.err, (u32)err.kind);
 
     if (query.expect.err) {
       sp_expect_str_eq_c(t, err.toolchain.name, query.name);
       sp_expect_eq(t, (u32)query.role, (u32)err.toolchain.role);
-      sp_expect(t, err.toolchain.catalog == &catalog);
+      sp_da_for(err.toolchain.candidates, ct) {
+        spn_toolchain_info_t* candidate = spn_toolchain_catalog_get(&catalog, err.toolchain.candidates[ct]);
+        sp_must(t, candidate);
+        sp_expect(t, is_supported(candidate, query.target, host));
+      }
       sp_expect(t, fixture_triple_equal(err.toolchain.host, host));
       if (query.expect.err != SPN_ERR_TOOLCHAIN_UNKNOWN) {
         sp_expect(t, fixture_triple_equal(err.toolchain.target, query.target));

@@ -9,7 +9,9 @@
 
 typedef enum {
   PRIM_BOOL,
+  PRIM_U32,
   PRIM_U64,
+  PRIM_S32,
 } gen_prim_t;
 
 typedef enum {
@@ -80,7 +82,17 @@ typedef struct {
 typedef enum {
   GEN_FORMAT_TOML,
   GEN_FORMAT_JSON,
+  GEN_FORMAT_ERRORS,
+  GEN_FORMAT_EVENTS,
 } gen_format_t;
+
+typedef struct {
+  sp_str_t tag;
+  gen_type_t* payload;
+  sp_str_t verb;
+  sp_str_t verbosity;
+  sp_str_t severity;
+} gen_kind_t;
 
 typedef struct {
   sp_mem_t mem;
@@ -94,8 +106,12 @@ typedef struct {
   } containers;
   sp_da(gen_entry_t*) entries;
   sp_da(sp_str_t) includes;
+  sp_da(gen_kind_t) kinds;
+  sp_da(gen_type_t*) arms;
   gen_type_t* root;
   gen_format_t format;
+  sp_str_t name;
+  sp_str_t prefix;
   sp_str_t err;
 } gen_t;
 
@@ -148,11 +164,21 @@ typedef struct {
 
 gen_t*      gen_new(sp_mem_t mem);
 bool        gen_lower(gen_t* g, sp_str_t name, jtd_schema_t* schema);
+bool        gen_lower_union(gen_t* g, jtd_schema_t* root);
 gen_type_t* gen_find(gen_t* g, sp_str_t name);
 
 gen_render_t gen_render_common(gen_t* g);
 gen_render_t gen_render_decls(gen_t* g);
 gen_render_t gen_render_impl(gen_t* g);
+gen_render_t gen_render_union_decls(gen_t* g);
+gen_render_t gen_render_union_impl(gen_t* g);
+
+void gen_bind_types(gen_t* g, sp_template_scope_t* scope);
+void gen_bind_type_impls(gen_t* g, sp_template_scope_t* scope);
+void gen_bind_includes(gen_t* g, sp_template_scope_t* scope);
+sp_str_t gen_struct_type(gen_t* g, sp_str_t name);
+sp_str_t gen_undecorated(gen_t* g, sp_str_t name);
+const c8* gen_format_name(gen_format_t format);
 
 yyjson_alc gen_yyjson_alc(sp_mem_t* mem);
 abi_t* abi_parse(sp_mem_t mem, sp_str_t path);

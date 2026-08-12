@@ -1,0 +1,319 @@
+{
+  "metadata": { "format": "events" },
+  "discriminator": "event",
+  "mapping": {
+    "err": { "metadata": { "severity": "fatal" }, "properties": {} },
+    "resolve_start": { "metadata": { "verb": "Resolving" }, "properties": {} },
+    "resolve_package": { "metadata": { "verb": "Resolving", "verbosity": "debug" }, "ref": "resolve_pkg" },
+    "resolve_end": {
+      "metadata": { "verb": "Resolved" },
+      "properties": {
+        "num_resolved": { "type": "uint32" },
+        "time_ns": { "type": "uint64", "metadata": { "field": "time" } }
+      }
+    },
+    "sync": { "metadata": { "verb": "Downloading" }, "ref": "sync" },
+    "sync_start": {
+      "metadata": { "verb": "Syncing", "verbosity": "debug" },
+      "properties": {
+        "num_packages": { "type": "uint32" },
+        "num_index": { "type": "uint32" },
+        "num_file": { "type": "uint32" }
+      }
+    },
+    "sync_package": { "metadata": { "verb": "Synced", "verbosity": "debug" }, "ref": "sync_pkg" },
+    "sync_failed": {
+      "metadata": { "severity": "fatal" },
+      "properties": {
+        "name": { "type": "string" },
+        "url": { "type": "string" },
+        "error": { "type": "string" }
+      }
+    },
+    "sync_stale": { "metadata": { "verb": "Stale" }, "ref": "sync" },
+    "sync_patch": { "metadata": { "verb": "Patching" }, "ref": "sync" },
+    "sync_end": {
+      "metadata": { "verb": "Downloaded" },
+      "properties": {
+        "num_synced": { "type": "uint32" },
+        "time_ns": { "type": "uint64", "metadata": { "field": "time" } }
+      }
+    },
+    "script_compile": {
+      "metadata": { "verb": "Compiling", "verbosity": "verbose" },
+      "properties": {
+        "script_path": { "type": "string" },
+        "time_ns": { "type": "uint64", "metadata": { "field": "time" } },
+        "has_configure": { "type": "boolean" },
+        "has_package": { "type": "boolean" }
+      }
+    },
+    "script_compile_failed": { "metadata": { "severity": "fatal" }, "ref": "compile_failed" },
+    "configure": { "metadata": { "verb": "Configuring", "verbosity": "debug" }, "properties": {} },
+    "configure_ok": { "metadata": { "verb": "Configured", "verbosity": "debug" }, "ref": "configure" },
+    "script_package": {
+      "metadata": { "verb": "Packaging", "verbosity": "debug" },
+      "properties": {
+        "time_ns": { "type": "uint64", "metadata": { "field": "time" } }
+      }
+    },
+    "package_ok": {
+      "metadata": { "verb": "Packaged", "verbosity": "debug" },
+      "properties": {
+        "time_ns": { "type": "uint64", "metadata": { "field": "time" } }
+      }
+    },
+    "script_crashed": { "metadata": { "severity": "fatal" }, "ref": "crashed" },
+    "script_user_fn": {
+      "metadata": { "verb": "Running", "verbosity": "debug" },
+      "properties": {
+        "tag": { "type": "string" }
+      }
+    },
+    "compile_start": { "metadata": { "verb": "Compiling" }, "properties": {} },
+    "target_build_passed": { "metadata": { "verb": "Compiled", "verbosity": "debug" }, "ref": "target_passed" },
+    "target_build_failed": { "metadata": { "severity": "error" }, "ref": "target_failed" },
+    "target_run": {
+      "metadata": { "verb": "Running" },
+      "properties": {
+        "name": { "type": "string" },
+        "command": { "type": "string" }
+      }
+    },
+    "test_passed": {
+      "metadata": { "verb": "Passed" },
+      "properties": {
+        "name": { "type": "string" },
+        "time_ns": { "type": "uint64", "metadata": { "field": "time" } }
+      }
+    },
+    "test_failed": {
+      "metadata": { "severity": "error" },
+      "properties": {
+        "name": { "type": "string" },
+        "exit_code": { "type": "int32", "metadata": { "field": "code" } },
+        "out": { "type": "string" },
+        "err": { "type": "string" },
+        "time_ns": { "type": "uint64", "metadata": { "field": "time" } }
+      }
+    },
+    "test_summary": {
+      "metadata": { "verb": "Tested" },
+      "properties": {
+        "passed": { "type": "uint32" },
+        "failed": { "type": "uint32" },
+        "time_ns": { "type": "uint64", "metadata": { "field": "time" } }
+      }
+    },
+    "link_start": {
+      "metadata": { "verb": "Linking", "verbosity": "verbose" },
+      "properties": {
+        "target": { "type": "string" }
+      }
+    },
+    "link_passed": {
+      "metadata": { "verb": "Linked", "verbosity": "debug" },
+      "properties": {
+        "target": { "type": "string" },
+        "output_path": { "type": "string" },
+        "command": { "type": "string" },
+        "time_ns": { "type": "uint64", "metadata": { "field": "time" } }
+      },
+      "optionalProperties": {
+        "out": { "type": "string" }
+      }
+    },
+    "link_failed": {
+      "metadata": { "severity": "error" },
+      "properties": {
+        "target": { "type": "string" },
+        "exit_code": { "type": "int32" },
+        "command": { "type": "string" },
+        "out": { "type": "string" },
+        "err": { "type": "string" }
+      }
+    },
+    "embed_start": {
+      "metadata": { "verb": "Embedding", "verbosity": "verbose" },
+      "properties": {
+        "num_files": { "type": "uint32" }
+      }
+    },
+    "embed_passed": {
+      "metadata": { "verb": "Embedded", "verbosity": "debug" },
+      "properties": {
+        "object_path": { "type": "string" },
+        "header_path": { "type": "string" },
+        "time_ns": { "type": "uint64", "metadata": { "field": "time" } }
+      }
+    },
+    "embed_failed": {
+      "metadata": { "severity": "error" },
+      "properties": {
+        "path": { "type": "string" },
+        "error": { "type": "string" }
+      }
+    },
+    "node_failed": {
+      "metadata": { "severity": "error" },
+      "properties": {
+        "path": { "type": "string" },
+        "message": { "type": "string" }
+      }
+    },
+    "init_build_graph": { "metadata": { "verb": "Building" }, "ref": "graph_init" },
+    "build_passed": {
+      "metadata": { "verb": "Finished" },
+      "properties": {
+        "profile": { "type": "string" },
+        "time_ns": { "type": "uint64", "metadata": { "field": "time" } },
+        "hits": { "type": "uint32" },
+        "misses": { "type": "uint32" }
+      }
+    },
+    "build_failed": {
+      "metadata": { "severity": "fatal" },
+      "properties": {
+        "profile": { "type": "string" },
+        "time_ns": { "type": "uint64", "metadata": { "field": "time" } },
+        "num_errors": { "type": "uint32" },
+        "first_error": { "type": "string" }
+      }
+    },
+    "build_summary": {
+      "metadata": { "verb": "Summary", "verbosity": "debug" },
+      "properties": {
+        "success": { "type": "boolean" },
+        "hits": { "type": "uint32" },
+        "misses": { "type": "uint32" },
+        "total": { "type": "uint32" },
+        "time_ns": { "type": "uint64", "metadata": { "field": "time" } },
+        "profile": { "type": "string" }
+      }
+    },
+    "api_call": {
+      "metadata": { "verb": "Calling", "verbosity": "debug" },
+      "properties": {
+        "fn": { "type": "string" },
+        "args": { "type": "string" }
+      }
+    },
+    "user_log": {
+      "metadata": { "verbosity": "verbose" },
+      "properties": {
+        "message": { "type": "string" }
+      }
+    },
+    "added": {
+      "metadata": { "verb": "Added" },
+      "properties": {
+        "name": { "type": "string" },
+        "version": { "type": "string" }
+      }
+    },
+    "update_incompatible": { "ref": "update" },
+    "publish": { "metadata": { "verb": "Publishing" }, "ref": "publish" },
+    "publish_end": { "metadata": { "verb": "Published" }, "ref": "publish" },
+    "result": {
+      "metadata": { "verbosity": "debug" },
+      "properties": {
+        "ok": { "type": "boolean" },
+        "err": { "metadata": { "extern": "err" } }
+      }
+    },
+    "open": {
+      "metadata": { "verbosity": "debug" },
+      "properties": {
+        "version": { "type": "string" },
+        "project": { "type": "string" }
+      }
+    }
+  },
+  "definitions": {
+    "resolve_pkg": {
+      "properties": {
+        "name": { "type": "string" },
+        "version": { "type": "string" }
+      }
+    },
+    "sync": {
+      "properties": {
+        "name": { "type": "string" },
+        "url": { "type": "string" }
+      }
+    },
+    "sync_pkg": {
+      "properties": {
+        "name": { "type": "string" },
+        "url": { "type": "string" },
+        "source_path": { "type": "string" },
+        "time_ns": { "type": "uint64", "metadata": { "field": "time" } },
+        "fetched": { "type": "boolean" }
+      }
+    },
+    "compile_failed": {
+      "properties": {
+        "script_path": { "type": "string" },
+        "error": { "type": "string" }
+      }
+    },
+    "configure": {
+      "properties": {
+        "time_ns": { "type": "uint64", "metadata": { "field": "time" } }
+      }
+    },
+    "crashed": {
+      "properties": {
+        "script_path": { "type": "string", "metadata": { "field": "path" } },
+        "error": { "type": "string" }
+      }
+    },
+    "target_passed": {
+      "properties": {
+        "target": { "type": "string" },
+        "source_file": { "type": "string" },
+        "object_file": { "type": "string" },
+        "command": { "type": "string" },
+        "time_ns": { "type": "uint64", "metadata": { "field": "time" } }
+      },
+      "optionalProperties": {
+        "out": { "type": "string" }
+      }
+    },
+    "target_failed": {
+      "properties": {
+        "target": { "type": "string" },
+        "source_file": { "type": "string" },
+        "object_file": { "type": "string" },
+        "rc": { "type": "int32" },
+        "command": { "type": "string" },
+        "out": { "type": "string" },
+        "err": { "type": "string" },
+        "time_ns": { "type": "uint64", "metadata": { "field": "time" } }
+      }
+    },
+    "graph_init": {
+      "properties": {
+        "profile": { "type": "string" },
+        "target": { "type": "string" },
+        "toolchain": { "type": "string" },
+        "force": { "type": "boolean" }
+      }
+    },
+    "update": {
+      "properties": {
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "latest": { "type": "string" }
+      }
+    },
+    "publish": {
+      "properties": {
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "index": { "type": "string" },
+        "url": { "type": "string" }
+      }
+    }
+  }
+}

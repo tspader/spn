@@ -1,0 +1,61 @@
+#ifndef SPN_CG_{{ .guard }}_H
+#define SPN_CG_{{ .guard }}_H
+
+#include "sp.h"
+#include "spn/core.h"
+#include "errors.gen.h"
+#include "core/types.h"
+#include "log/lazy/types.h"
+{{ for .includes }}
+#include "{{ .name }}"
+{{ end }}
+
+typedef enum {
+  SPN_VERBOSITY_QUIET,
+  SPN_VERBOSITY_NORMAL,
+  SPN_VERBOSITY_VERBOSE,
+  SPN_VERBOSITY_DEBUG,
+} spn_verbosity_t;
+
+typedef enum {
+  SPN_EVENT_SEVERITY_INFO,
+  SPN_EVENT_SEVERITY_ERROR,
+  SPN_EVENT_SEVERITY_FATAL,
+} spn_event_severity_t;
+
+typedef enum {
+  SPN_EVENT_NONE,
+{{ for .kinds }}
+  {{ .code }},
+{{ end }}
+  SPN_EVENT_COUNT,
+} spn_build_event_kind_t;
+
+typedef struct {
+  const c8* name;
+  const c8* verb;
+  spn_verbosity_t verbosity;
+  spn_event_severity_t severity;
+} spn_event_info_t;
+
+extern const spn_event_info_t spn_event_info[SPN_EVENT_COUNT];
+
+{{ $types }}
+typedef struct spn_build_event_t {
+  spn_build_event_kind_t kind;
+  spn_pkg_info_t* pkg;
+  spn_build_io_t* io;
+  u64 thread_id;
+  sp_tm_epoch_t epoch;
+
+  union {
+    spn_err_union_t err;
+{{ for .arms }}
+    {{ .type }} {{ .name }};
+{{ end }}
+  };
+} spn_build_event_t;
+
+void spn_event_log_jsonl(sp_io_writer_t* json, spn_build_event_t* event);
+
+#endif

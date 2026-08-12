@@ -1,0 +1,44 @@
+#include "{{ .root_name }}.gen.h"
+#include "codegen/codegen.h"
+#include "enum/enum.h"
+#include "error/json.h"
+
+{{ for .fwd }}
+static void {{ .self }}_write(const {{ .type }}* in, sp_io_writer_t* out);
+{{ end }}
+
+{{ for .types }}
+{{ $write }}
+
+{{ end }}
+sp_str_t spn_err_to_str(spn_err_t err) {
+  switch (err) {
+    case SPN_OK: return sp_str_lit("ok");
+    case SPN_ERROR: return sp_str_lit("error");
+{{ for .kinds }}
+    case {{ .code }}: return sp_str_lit("{{ .tag }}");
+{{ end }}
+    case SPN_ERR_COUNT: break;
+  }
+  sp_unreachable_return(sp_str_lit(""));
+}
+
+void spn_err_write_json(sp_io_writer_t* json, const spn_err_union_t* err) {
+  sp_io_write_cstr(json, ", \"kind\": ", SP_NULLPTR);
+  spn_codegen_json_str(json, spn_err_to_str(err->kind));
+
+  switch (err->kind) {
+{{ for .kinds }}
+{{ if .k_payload }}
+    case {{ .code }}: {
+      sp_io_write_cstr(json, ", \"data\": ", SP_NULLPTR);
+      {{ .awrite }}_write(&err->{{ .arm }}, json);
+      break;
+    }
+{{ end }}
+{{ end }}
+    default: {
+      break;
+    }
+  }
+}

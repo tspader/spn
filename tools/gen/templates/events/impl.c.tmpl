@@ -1,0 +1,69 @@
+#include "{{ .root_name }}.gen.h"
+#include "codegen/codegen.h"
+#include "enum/enum.h"
+#include "error/json.h"
+#include "pkg/types.h"
+
+const spn_event_info_t spn_event_info[SPN_EVENT_COUNT] = {
+  [SPN_EVENT_NONE] = { .name = "", .verb = "" },
+{{ for .kinds }}
+  [{{ .code }}] = { .name = "{{ .tag }}", .verb = "{{ .verb }}", .verbosity = {{ .verbosity }}, .severity = {{ .severity }} },
+{{ end }}
+};
+
+{{ for .fwd }}
+static void {{ .self }}_write(const {{ .type }}* in, sp_io_writer_t* out);
+{{ end }}
+
+{{ for .types }}
+{{ $write }}
+
+{{ end }}
+static const c8* level_name(const spn_event_info_t* info) {
+  if (info->severity != SPN_EVENT_SEVERITY_INFO) {
+    return "error";
+  }
+  if (info->verbosity == SPN_VERBOSITY_DEBUG) {
+    return "debug";
+  }
+  return "info";
+}
+
+void spn_event_log_jsonl(sp_io_writer_t* json, spn_build_event_t* event) {
+  const spn_event_info_t* info = &spn_event_info[event->kind];
+
+  sp_io_write_cstr(json, "{\"event\": \"", SP_NULLPTR);
+  sp_io_write_cstr(json, info->name, SP_NULLPTR);
+  sp_io_write_cstr(json, "\", \"level\": \"", SP_NULLPTR);
+  sp_io_write_cstr(json, level_name(info), SP_NULLPTR);
+  sp_io_write_cstr(json, "\"", SP_NULLPTR);
+
+  sp_fmt_io(json, ", \"ts_s\": {}, \"ts_ns\": {}", sp_fmt_uint(event->epoch.s), sp_fmt_uint(event->epoch.ns));
+  sp_fmt_io(json, ", \"tid\": {}", sp_fmt_uint(event->thread_id));
+
+  if (event->pkg) {
+    sp_io_write_cstr(json, ", \"pkg\": ", SP_NULLPTR);
+    spn_codegen_json_str(json, event->pkg->name);
+  }
+
+  switch (event->kind) {
+    case SPN_EVENT_ERR: {
+      spn_err_write_json(json, &event->err);
+      break;
+    }
+{{ for .kinds }}
+{{ if .k_payload }}
+    case {{ .code }}: {
+      sp_io_write_cstr(json, ", \"data\": ", SP_NULLPTR);
+      {{ .awrite }}_write(&event->{{ .arm }}, json);
+      break;
+    }
+{{ end }}
+{{ end }}
+    default: {
+      break;
+    }
+  }
+
+  sp_io_write_cstr(json, "}\n", SP_NULLPTR);
+}

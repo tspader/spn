@@ -10,16 +10,36 @@ typedef struct {
 
 static const gen_prim_row_t GEN_PRIMS[] = {
   [PRIM_BOOL] = { .c_type = "bool", .toml_read = "read_bool", .json_get = "yyjson_get_bool", .json_write = "spn_codegen_json_bool" },
+  [PRIM_U32]  = { .c_type = "u32",  .toml_read = "read_u32",  .json_get = "yyjson_get_uint", .json_write = "spn_codegen_json_u64" },
   [PRIM_U64]  = { .c_type = "u64",  .toml_read = "read_u64",  .json_get = "yyjson_get_uint", .json_write = "spn_codegen_json_u64" },
+  [PRIM_S32]  = { .c_type = "s32",  .toml_read = "read_s32",  .json_get = "(s32)yyjson_get_sint", .json_write = "spn_codegen_json_s32" },
 };
 
 static const c8* GEN_FORMATS[] = {
   [GEN_FORMAT_TOML] = "toml",
   [GEN_FORMAT_JSON] = "json",
+  [GEN_FORMAT_ERRORS] = "errors",
+  [GEN_FORMAT_EVENTS] = "events",
 };
 
+const c8* gen_format_name(gen_format_t format) {
+  return GEN_FORMATS[format];
+}
+
+sp_str_t gen_undecorated(gen_t* g, sp_str_t name) {
+  return sp_fmt(g->mem, "{}_{}", sp_fmt_str(g->prefix), sp_fmt_str(name)).value;
+}
+
+sp_str_t gen_struct_type(gen_t* g, sp_str_t name) {
+  return sp_fmt(g->mem, "{}_{}_t", sp_fmt_str(g->prefix), sp_fmt_str(name)).value;
+}
+
 static sp_str_t struct_type(gen_t* g, sp_str_t name) {
-  return sp_fmt(g->mem, "spn_cg_{}_t", sp_fmt_str(name)).value;
+  return gen_struct_type(g, name);
+}
+
+static sp_str_t om_type(gen_t* g, sp_str_t name) {
+  return sp_fmt(g->mem, "{}_{}_om_t", sp_fmt_str(g->prefix), sp_fmt_str(name)).value;
 }
 
 static sp_str_t enum_type(gen_t* g, sp_str_t name) {
@@ -61,7 +81,7 @@ static sp_str_t decl_type(gen_t* g, gen_field_t* f) {
       return sp_fmt(g->mem, "sp_da({})", sp_fmt_str(struct_type(g, f->as.array.object->name))).value;
     }
     case FIELD_KEYED: {
-      return sp_fmt(g->mem, "spn_cg_{}_om_t", sp_fmt_str(f->as.keyed.object->name)).value;
+      return om_type(g, f->as.keyed.object->name);
     }
     case FIELD_MAP: {
       return sp_fmt(g->mem, "sp_da({})", sp_fmt_str(struct_type(g, f->as.map->name))).value;
@@ -219,6 +239,7 @@ static void bind_field(gen_t* g, sp_template_scope_t* scope, gen_field_t* f) {
     case FIELD_OBJECT: {
       sp_template_set(scope, sp_str_lit("k_object"), sp_str_lit("1"));
       sp_template_set(scope, sp_str_lit("object"), f->as.object->name);
+      sp_template_set(scope, sp_str_lit("owrite"), gen_undecorated(g, f->as.object->name));
       sp_template_set(scope, sp_str_lit("required"), f->required ? sp_str_lit("true") : sp_str_lit("false"));
       break;
     }
@@ -241,6 +262,7 @@ static void bind_field(gen_t* g, sp_template_scope_t* scope, gen_field_t* f) {
     case FIELD_OBJECT_ARRAY: {
       sp_template_set(scope, sp_str_lit("k_object_array"), sp_str_lit("1"));
       sp_template_set(scope, sp_str_lit("object"), f->as.array.object->name);
+      sp_template_set(scope, sp_str_lit("owrite"), gen_undecorated(g, f->as.array.object->name));
       if (!sp_str_empty(f->as.array.shorthand)) {
         sp_template_set(scope, sp_str_lit("shorthand"), f->as.array.shorthand);
         sp_template_set(scope, sp_str_lit("table_present"), table_present(g, f));
@@ -250,6 +272,7 @@ static void bind_field(gen_t* g, sp_template_scope_t* scope, gen_field_t* f) {
     case FIELD_KEYED: {
       sp_template_set(scope, sp_str_lit("k_keyed"), sp_str_lit("1"));
       sp_template_set(scope, sp_str_lit("object"), f->as.keyed.object->name);
+      sp_template_set(scope, sp_str_lit("owrite"), gen_undecorated(g, f->as.keyed.object->name));
       sp_template_set(scope, sp_str_lit("key_field"), f->as.keyed.field);
       sp_template_set(scope, sp_str_lit("type"), struct_type(g, f->as.keyed.object->name));
       break;
@@ -261,6 +284,7 @@ static void bind_field(gen_t* g, sp_template_scope_t* scope, gen_field_t* f) {
       if (f->as.map->object) {
         sp_template_set(scope, sp_str_lit("map_object"), sp_str_lit("1"));
         sp_template_set(scope, sp_str_lit("object"), f->as.map->object->name);
+        sp_template_set(scope, sp_str_lit("owrite"), gen_undecorated(g, f->as.map->object->name));
       }
       break;
     }
@@ -273,7 +297,7 @@ static void bind_struct_field(sp_template_scope_t* scope, sp_str_t type, sp_str_
   sp_template_set(child, sp_str_lit("name"), name);
 }
 
-static void bind_types_block(gen_t* g, sp_template_scope_t* scope) {
+void gen_bind_types(gen_t* g, sp_template_scope_t* scope) {
   sp_template_set(scope, sp_str_lit("types"), sp_str_lit("types"));
 
   sp_template_list(scope, sp_str_lit("tags"));
@@ -283,17 +307,17 @@ static void bind_types_block(gen_t* g, sp_template_scope_t* scope) {
       continue;
     }
     sp_template_scope_t* tag = sp_template_push(scope, sp_str_lit("tags"));
-    sp_template_set(tag, sp_str_lit("tag"), sp_fmt(g->mem, "spn_cg_{}", sp_fmt_str(type->name)).value);
+    sp_template_set(tag, sp_str_lit("tag"), gen_undecorated(g, type->name));
   }
   sp_da_for(g->entries, it) {
     sp_template_scope_t* tag = sp_template_push(scope, sp_str_lit("tags"));
-    sp_template_set(tag, sp_str_lit("tag"), sp_fmt(g->mem, "spn_cg_{}", sp_fmt_str(g->entries[it]->name)).value);
+    sp_template_set(tag, sp_str_lit("tag"), gen_undecorated(g, g->entries[it]->name));
   }
 
   sp_template_list(scope, sp_str_lit("oms"));
   sp_da_for(g->containers.keyed, it) {
     sp_template_scope_t* om = sp_template_push(scope, sp_str_lit("oms"));
-    sp_template_set(om, sp_str_lit("object"), g->containers.keyed[it].object->name);
+    sp_template_set(om, sp_str_lit("om_type"), om_type(g, g->containers.keyed[it].object->name));
     sp_template_set(om, sp_str_lit("type"), struct_type(g, g->containers.keyed[it].object->name));
   }
 
@@ -304,7 +328,7 @@ static void bind_types_block(gen_t* g, sp_template_scope_t* scope) {
       continue;
     }
     sp_template_scope_t* child = sp_template_push(scope, sp_str_lit("structs"));
-    sp_template_set(child, sp_str_lit("name"), type->name);
+    sp_template_set(child, sp_str_lit("tag"), gen_undecorated(g, type->name));
     sp_template_list(child, sp_str_lit("fields"));
     sp_da_for(type->fields, field) {
       bind_struct_field(child, decl_type(g, &type->fields[field]), type->fields[field].name);
@@ -313,14 +337,14 @@ static void bind_types_block(gen_t* g, sp_template_scope_t* scope) {
   sp_da_for(g->entries, it) {
     gen_entry_t* entry = g->entries[it];
     sp_template_scope_t* child = sp_template_push(scope, sp_str_lit("structs"));
-    sp_template_set(child, sp_str_lit("name"), entry->name);
+    sp_template_set(child, sp_str_lit("tag"), gen_undecorated(g, entry->name));
     sp_template_list(child, sp_str_lit("fields"));
     bind_struct_field(child, sp_str_lit("sp_str_t"), sp_str_lit("key"));
     bind_struct_field(child, entry->object ? struct_type(g, entry->object->name) : sp_str_lit("sp_str_t"), sp_str_lit("value"));
   }
 }
 
-static void bind_includes(gen_t* g, sp_template_scope_t* scope) {
+void gen_bind_includes(gen_t* g, sp_template_scope_t* scope) {
   sp_template_list(scope, sp_str_lit("includes"));
   sp_da_for(g->includes, it) {
     sp_template_set(sp_template_push(scope, sp_str_lit("includes")), sp_str_lit("name"), g->includes[it]);
@@ -329,8 +353,8 @@ static void bind_includes(gen_t* g, sp_template_scope_t* scope) {
 
 gen_render_t gen_render_common(gen_t* g) {
   sp_template_scope_t* scope = sp_template_scope_create(g->mem);
-  bind_includes(g, scope);
-  bind_types_block(g, scope);
+  gen_bind_includes(g, scope);
+  gen_bind_types(g, scope);
   return (gen_render_t) { .template = sp_str_lit("common.h"), .scope = scope };
 }
 
@@ -343,25 +367,43 @@ static sp_template_scope_t* root_scope(gen_t* g) {
 
 gen_render_t gen_render_decls(gen_t* g) {
   sp_template_scope_t* scope = root_scope(g);
-  bind_includes(g, scope);
-  bind_types_block(g, scope);
+  gen_bind_includes(g, scope);
+  gen_bind_types(g, scope);
   return (gen_render_t) {
     .template = sp_fmt(g->mem, "{}/decls.h", sp_fmt_cstr(GEN_FORMATS[g->format])).value,
     .scope = scope,
   };
 }
 
-gen_render_t gen_render_impl(gen_t* g) {
-  sp_template_scope_t* scope = root_scope(g);
+void gen_bind_type_impls(gen_t* g, sp_template_scope_t* scope) {
   sp_template_set(scope, sp_str_lit("write"), sp_str_lit("write"));
-  sp_template_set(scope, sp_str_lit("root_write"), sp_str_lit("root_write"));
 
   sp_template_list(scope, sp_str_lit("fwd"));
   sp_da_for(g->types, it) {
     sp_template_scope_t* child = sp_template_push(scope, sp_str_lit("fwd"));
     sp_template_set(child, sp_str_lit("name"), g->types[it]->name);
+    sp_template_set(child, sp_str_lit("self"), gen_undecorated(g, g->types[it]->name));
     sp_template_set(child, sp_str_lit("type"), struct_type(g, g->types[it]->name));
   }
+
+  sp_template_list(scope, sp_str_lit("types"));
+  sp_da_for(g->types, it) {
+    gen_type_t* type = g->types[it];
+    sp_template_scope_t* child = sp_template_push(scope, sp_str_lit("types"));
+    sp_template_set(child, sp_str_lit("name"), type->name);
+    sp_template_set(child, sp_str_lit("self"), gen_undecorated(g, type->name));
+    sp_template_set(child, sp_str_lit("type"), struct_type(g, type->name));
+    sp_template_list(child, sp_str_lit("fields"));
+    sp_da_for(type->fields, field) {
+      bind_field(g, sp_template_push(child, sp_str_lit("fields")), &type->fields[field]);
+    }
+  }
+}
+
+gen_render_t gen_render_impl(gen_t* g) {
+  sp_template_scope_t* scope = root_scope(g);
+  gen_bind_type_impls(g, scope);
+  sp_template_set(scope, sp_str_lit("root_write"), sp_str_lit("root_write"));
 
   sp_template_list(scope, sp_str_lit("arrays"));
   sp_da_for(g->containers.array, it) {
@@ -406,18 +448,6 @@ gen_render_t gen_render_impl(gen_t* g) {
       if (!sp_str_empty(entry->shorthand)) {
         sp_template_set(child, sp_str_lit("shorthand"), entry->shorthand);
       }
-    }
-  }
-
-  sp_template_list(scope, sp_str_lit("types"));
-  sp_da_for(g->types, it) {
-    gen_type_t* type = g->types[it];
-    sp_template_scope_t* child = sp_template_push(scope, sp_str_lit("types"));
-    sp_template_set(child, sp_str_lit("name"), type->name);
-    sp_template_set(child, sp_str_lit("type"), struct_type(g, type->name));
-    sp_template_list(child, sp_str_lit("fields"));
-    sp_da_for(type->fields, field) {
-      bind_field(g, sp_template_push(child, sp_str_lit("fields")), &type->fields[field]);
     }
   }
 

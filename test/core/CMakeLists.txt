@@ -109,6 +109,8 @@ add_executable(core
   ${SRC}/codegen/options.c
   ${SRC}/codegen/when.c
   ${SRC}/codegen/gen/config.gen.c
+  ${SRC}/codegen/gen/errors.gen.c
+  ${SRC}/codegen/gen/events.gen.c
   ${SRC}/codegen/gen/manifest.gen.c
   ${SRC}/codegen/gen/release.gen.c
   ${SRC}/codegen/gen/toolchains.gen.c
@@ -125,10 +127,9 @@ add_executable(core
   ${SRC}/dag/store.c
   ${SRC}/dag/wasi.c
   ${SRC}/enum/enum.c
-  ${SRC}/error/str.c
+  ${SRC}/error/json.c
   ${SRC}/event/build.c
   ${SRC}/event/event.c
-  ${SRC}/event/log.c
   ${SRC}/external/git.c
   ${SRC}/external/tom.c
   ${SRC}/filter/filter.c

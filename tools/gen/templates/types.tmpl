@@ -3,14 +3,14 @@ typedef struct {{ .tag }} {{ .tag }}_t;
 {{ end }}
 
 {{ for .oms }}
-typedef sp_str_om({{ .type }}) spn_cg_{{ .object }}_om_t;
+typedef sp_str_om({{ .type }}) {{ .om_type }};
 {{ end }}
 
 {{ for .structs }}
-typedef struct spn_cg_{{ .name }} {
+typedef struct {{ .tag }} {
 {{ for .fields }}
   {{ .type }} {{ .name }};
 {{ end }}
-} spn_cg_{{ .name }}_t;
+} {{ .tag }}_t;
 
 {{ end }}

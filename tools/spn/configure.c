@@ -24,6 +24,10 @@ static void add_inputs(spn_t* spn, sp_mem_t mem, spn_node_t* node, sp_str_t dir)
   }
 }
 
+static bool is_union_schema(sp_str_t name) {
+  return sp_str_equal_cstr(name, "errors") || sp_str_equal_cstr(name, "events");
+}
+
 static void add_output(spn_t* spn, sp_mem_t mem, spn_node_t* node, sp_str_t name, const c8* suffix) {
   sp_str_t file = sp_fmt(mem, "source/codegen/gen/{}{}", sp_fmt_str(name), sp_fmt_cstr(suffix)).value;
   spn_node_add_output(node, spn_get_subdir(spn, SPN_DIR_SOURCE, sp_str_to_cstr(mem, file)));
@@ -55,7 +59,9 @@ static void add_codegen(spn_t* spn, spn_config_t* config) {
     sp_str_t name = sp_str_strip_right(entry->name, sp_str_lit(".jtd.json"));
     add_output(spn, mem, node, name, ".gen.h");
     add_output(spn, mem, node, name, ".gen.c");
-    add_output(spn, mem, node, name, ".jtd.json");
+    if (!is_union_schema(name)) {
+      add_output(spn, mem, node, name, ".jtd.json");
+    }
   }
 }
 
