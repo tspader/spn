@@ -26,7 +26,6 @@ typedef enum {
 #define SPN_EVENT_LIST(X) \
   X(SPN_EVENT_NONE,                         "",                           "",            DEBUG,   INFO,  false, false, SPN_EVT_NONE) \
   X(SPN_EVENT_ERR,                          "err",                        "error",       QUIET,   ERROR, true,  true,  SPN_EVT_NONE) \
-  X(SPN_EVENT_ERR_OPTION,                   "err_option",                 "error",       QUIET,   ERROR, true,  true,  SPN_EVT(option)) \
   X(SPN_EVENT_RESOLVE_START,                "resolve_start",              "Resolving",   NORMAL,  INFO,  false, false, SPN_EVT_NONE) \
   X(SPN_EVENT_RESOLVE_PACKAGE,              "resolve_package",            "Resolving",   DEBUG,   INFO,  false, false, SPN_EVT(resolve_pkg)) \
   X(SPN_EVENT_RESOLVE_END,                  "resolve_end",                "Resolved",    NORMAL,  INFO,  false, false, SPN_EVT(resolve_end)) \
@@ -119,38 +118,6 @@ typedef struct { sp_str_t name; u64 time; } spn_evt_test_passed_t;
 typedef struct { sp_str_t name; s32 code; sp_str_t out; sp_str_t err; u64 time; } spn_evt_test_failed_t;
 typedef struct { u32 passed; u32 failed; u64 time; } spn_evt_test_summary_t;
 
-typedef enum {
-  SPN_OPTION_ERR_UNDECLARED,
-  SPN_OPTION_ERR_BAD_VALUE,
-  SPN_OPTION_ERR_CONFLICT,
-  SPN_OPTION_ERR_VETO,
-  SPN_OPTION_ERR_NO_VALUE,
-  SPN_OPTION_ERR_LATE_GATE,
-  SPN_OPTION_ERR_UNKNOWN_PKG,
-} spn_option_err_t;
-
-typedef enum {
-  SPN_OPTION_SETTER_NONE,
-  SPN_OPTION_SETTER_DEFAULT,
-  SPN_OPTION_SETTER_PROFILE,
-  SPN_OPTION_SETTER_ROOT_MANIFEST,
-  SPN_OPTION_SETTER_UNION,
-  SPN_OPTION_SETTER_CONSUMER,
-} spn_option_setter_kind_t;
-
-typedef struct {
-  spn_option_setter_kind_t kind;
-  sp_str_t name;
-} spn_option_setter_t;
-
-typedef struct {
-  spn_option_err_t err;
-  sp_str_t pkg;
-  sp_str_t option;
-  sp_str_t value;
-  spn_option_setter_t a;
-  spn_option_setter_t b;
-} spn_evt_option_t;
 typedef struct { sp_str_t script_path; u64 time; bool has_configure; bool has_package; } spn_evt_script_compile_t;
 typedef struct { u64 time; } spn_evt_script_package_t;
 typedef struct { sp_str_t script_path; sp_str_t error; } spn_evt_compile_failed_t;
@@ -230,7 +197,6 @@ struct spn_build_event_t {
     spn_evt_test_passed_t test_passed;
     spn_evt_test_failed_t test_failed;
     spn_evt_test_summary_t test_summary;
-    spn_evt_option_t option;
     spn_evt_script_compile_t script_compile;
     spn_evt_compile_failed_t compile_failed;
     spn_evt_script_crashed_t crashed;

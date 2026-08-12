@@ -1,7 +1,5 @@
 #include "pkg/options.h"
 
-#include "event/event.h"
-#include "event/types.h"
 #include "resolve/types.h"
 #include "when/when.h"
 
@@ -35,171 +33,174 @@ void spn_when_env_add_options(spn_when_env_t* env, const spn_resolved_options_t*
   }
 }
 
-static spn_err_t option_fail(spn_event_buffer_t* events, spn_evt_option_t evt) {
-  if (events) {
-    spn_event_buffer_push(events, (spn_build_event_t) {
-      .kind = SPN_EVENT_ERR_OPTION,
-      .option = evt,
-    });
-  }
-  return SPN_ERROR;
+typedef struct {
+  const spn_when_t* clauses;
+  spn_option_setter_t setter;
+  bool defaults_declined;
+} option_set_t;
+
+static option_set_t find_set(const spn_resolved_pkg_t* pkg, const spn_profile_info_t* profile, sp_da(spn_pkg_config_entry_t) root_config) {
+  bool is_root = pkg->source == SPN_PKG_SOURCE_ROOT;
+  spn_pkg_config_t* config = spn_pkg_config_find(root_config, pkg->name);
+  return (option_set_t) {
+    .clauses = is_root ? &profile->options : config ? &config->options : SP_NULLPTR,
+    .setter = { .kind = is_root ? SPN_OPTION_SETTER_PROFILE : SPN_OPTION_SETTER_ROOT_MANIFEST },
+    .defaults_declined = config && config->defaults_declined,
+  };
 }
 
-static const spn_when_clause_t* find_clause(const spn_when_t* set, sp_str_t key) {
-  if (!set) {
-    return SP_NULLPTR;
-  }
-  sp_da_for(set->clauses, it) {
-    if (sp_str_equal(set->clauses[it].key, key)) {
-      return &set->clauses[it];
-    }
-  }
-  return SP_NULLPTR;
-}
+typedef struct {
+  sp_str_t option;
+  spn_option_setter_t setter;
+  spn_option_value_t value;
+  bool negated;
+} claim_t;
 
 static spn_option_setter_t setter_consumer(sp_str_t name) {
   return (spn_option_setter_t) { .kind = SPN_OPTION_SETTER_CONSUMER, .name = name };
 }
 
-static spn_err_t validate_setter(sp_mem_t mem, const spn_resolved_pkg_t* pkg, const spn_when_t* set, spn_option_setter_t setter, spn_event_buffer_t* events) {
+static void gather_claims(
+  const spn_resolved_pkg_t* pkg,
+  const spn_when_t* set,
+  spn_option_setter_t setter,
+  sp_da(claim_t)* claims,
+  spn_option_violations_t* violations
+) {
   sp_da_for(set->clauses, it) {
     const spn_when_clause_t* clause = &set->clauses[it];
     spn_option_info_t** option = sp_str_om_getp(pkg->options, clause->key);
     if (!option) {
-      return option_fail(events, (spn_evt_option_t) {
-        .err = SPN_OPTION_ERR_UNDECLARED,
+      sp_da_push(*violations, ((spn_option_violation_t) {
+        .kind = SPN_OPTION_ERR_UNDECLARED,
         .pkg = pkg->name,
         .option = clause->key,
         .a = setter,
-      });
+      }));
+      continue;
     }
     if (!spn_option_value_ok(*option, clause->value)) {
-      return option_fail(events, (spn_evt_option_t) {
-        .err = SPN_OPTION_ERR_BAD_VALUE,
+      sp_da_push(*violations, ((spn_option_violation_t) {
+        .kind = SPN_OPTION_ERR_BAD_VALUE,
         .pkg = pkg->name,
         .option = clause->key,
-        .value = spn_option_value_to_str(mem, clause->value),
+        .value = clause->value,
         .a = setter,
-      });
+      }));
+      continue;
     }
+    if (clause->negated && setter.kind != SPN_OPTION_SETTER_CONSUMER) {
+      continue;
+    }
+    sp_da_push(*claims, ((claim_t) {
+      .option = clause->key,
+      .setter = setter,
+      .value = clause->value,
+      .negated = clause->negated,
+    }));
   }
-  return SPN_OK;
 }
 
-spn_err_t spn_pkg_options_merge(
+void spn_pkg_options_merge(
   sp_mem_t mem,
   const spn_resolved_pkg_t* pkg,
   const spn_profile_info_t* profile,
   sp_da(spn_pkg_config_entry_t) root_config,
   spn_option_requests_t requests,
-  spn_event_buffer_t* events,
-  spn_resolved_options_t* resolved_options
+  spn_merged_options_t* merged
 ) {
-  bool is_root = pkg->source == SPN_PKG_SOURCE_ROOT;
-  spn_pkg_config_t* config = spn_pkg_config_find(root_config, pkg->name);
-  const spn_when_t* set = is_root ? &profile->options : config ? &config->options : SP_NULLPTR;
-  spn_option_setter_t setter = { .kind = is_root ? SPN_OPTION_SETTER_PROFILE : SPN_OPTION_SETTER_ROOT_MANIFEST };
-  bool defaults_declined = config && config->defaults_declined;
+  option_set_t set = find_set(pkg, profile, root_config);
 
-  if (events && set) {
-    spn_try(validate_setter(mem, pkg, set, setter, events));
+  merged->options = sp_da_new(mem, spn_resolved_option_t);
+  merged->violations = sp_da_new(mem, spn_option_violation_t);
+
+  sp_da(claim_t) claims = sp_da_new(mem, claim_t);
+  if (set.clauses) {
+    gather_claims(pkg, set.clauses, set.setter, &claims, &merged->violations);
   }
-  if (events) {
-    sp_da_for(requests, it) {
-      spn_try(validate_setter(mem, pkg, requests[it].options, setter_consumer(requests[it].consumer), events));
-    }
+  sp_da_for(requests, rt) {
+    gather_claims(pkg, requests[rt].options, setter_consumer(requests[rt].consumer), &claims, &merged->violations);
   }
 
-  *resolved_options = sp_da_new(mem, spn_resolved_option_t);
   spn_when_env_t env;
   spn_when_env_from_profile(mem, profile, &env);
 
   sp_str_om_for(pkg->options, it) {
     spn_option_info_t* option = sp_str_om_at(pkg->options, it);
-    const spn_when_clause_t* setter_clause = find_clause(set, option->name);
-    if (setter_clause && setter_clause->negated) {
-      setter_clause = SP_NULLPTR;
-    }
 
     spn_option_value_t fallback = sp_zero;
-    if (!defaults_declined) {
+    if (!set.defaults_declined) {
       fallback = spn_option_resolve(option, &env);
     }
     if (fallback.kind == SPN_OPTION_VALUE_NONE && option->type == SPN_OPTION_TYPE_BOOL) {
       fallback = spn_option_value_bool(false);
     }
 
-    spn_resolved_option_t resolved = { .name = option->name };
+    spn_resolved_option_t resolved = { .name = option->name, .setter = { .kind = SPN_OPTION_SETTER_DEFAULT } };
     bool settled = false;
-    spn_option_setter_t winner = { .kind = SPN_OPTION_SETTER_DEFAULT };
+    bool value_union = false;
+    const claim_t* last = SP_NULLPTR;
 
-    if (setter_clause) {
-      resolved.value = setter_clause->value;
+    sp_da_for(claims, ct) {
+      const claim_t* claim = &claims[ct];
+      if (!sp_str_equal(claim->option, option->name) || claim->negated) {
+        continue;
+      }
+      if (claim->setter.kind != SPN_OPTION_SETTER_CONSUMER) {
+        resolved.value = claim->value;
+        resolved.setter = claim->setter;
+        settled = true;
+        break;
+      }
+      if (option->additive) {
+        value_union |= claim->value.kind == SPN_OPTION_VALUE_BOOL && claim->value.b;
+        resolved.value = spn_option_value_bool(value_union);
+        resolved.setter = (spn_option_setter_t) { .kind = SPN_OPTION_SETTER_UNION };
+        settled = true;
+        continue;
+      }
+      if (last && !spn_option_value_equal(last->value, claim->value)) {
+        sp_da_push(merged->violations, ((spn_option_violation_t) {
+          .kind = SPN_OPTION_ERR_CONFLICT,
+          .pkg = pkg->name,
+          .option = option->name,
+          .value = claim->value,
+          .a = last->setter,
+          .b = claim->setter,
+        }));
+      }
+      resolved.value = claim->value;
+      resolved.setter = claim->setter;
       settled = true;
-      winner = setter;
-    }
-    else if (option->additive) {
-      bool value = false;
-      sp_da_for(requests, rt) {
-        const spn_when_clause_t* clause = find_clause(requests[rt].options, option->name);
-        if (!clause || clause->negated) {
-          continue;
-        }
-        value |= clause->value.kind == SPN_OPTION_VALUE_BOOL && clause->value.b;
-        settled = true;
-      }
-      if (settled) {
-        resolved.value = spn_option_value_bool(value);
-        winner = (spn_option_setter_t) { .kind = SPN_OPTION_SETTER_UNION };
-      }
-    }
-    else {
-      sp_da_for(requests, rt) {
-        const spn_when_clause_t* clause = find_clause(requests[rt].options, option->name);
-        if (!clause || clause->negated) {
-          continue;
-        }
-        if (settled && !spn_option_value_equal(resolved.value, clause->value)) {
-          return option_fail(events, (spn_evt_option_t) {
-            .err = SPN_OPTION_ERR_CONFLICT,
-            .pkg = pkg->name,
-            .option = option->name,
-            .value = spn_option_value_to_str(mem, clause->value),
-            .a = winner,
-            .b = setter_consumer(requests[rt].consumer),
-          });
-        }
-        resolved.value = clause->value;
-        winner = setter_consumer(requests[rt].consumer);
-        settled = true;
-      }
+      last = claim;
     }
 
     if (!settled) {
       resolved.value = fallback;
-      if (resolved.value.kind == SPN_OPTION_VALUE_NONE && events) {
-        return option_fail(events, (spn_evt_option_t) {
-          .err = SPN_OPTION_ERR_NO_VALUE,
-          .pkg = pkg->name,
-          .option = option->name,
-        });
-      }
     }
 
-    sp_da_for(requests, rt) {
-      const spn_when_clause_t* clause = find_clause(requests[rt].options, option->name);
-      if (!clause || !clause->negated) {
+    if (resolved.value.kind == SPN_OPTION_VALUE_NONE) {
+      sp_da_push(merged->violations, ((spn_option_violation_t) {
+        .kind = SPN_OPTION_ERR_NO_VALUE,
+        .pkg = pkg->name,
+        .option = option->name,
+      }));
+    }
+
+    sp_da_for(claims, ct) {
+      const claim_t* claim = &claims[ct];
+      if (!sp_str_equal(claim->option, option->name) || !claim->negated) {
         continue;
       }
-      if (spn_option_value_equal(resolved.value, clause->value)) {
-        return option_fail(events, (spn_evt_option_t) {
-          .err = SPN_OPTION_ERR_VETO,
+      if (spn_option_value_equal(resolved.value, claim->value)) {
+        sp_da_push(merged->violations, ((spn_option_violation_t) {
+          .kind = SPN_OPTION_ERR_VETO,
           .pkg = pkg->name,
           .option = option->name,
-          .value = spn_option_value_to_str(mem, clause->value),
-          .a = setter_consumer(requests[rt].consumer),
-          .b = winner,
-        });
+          .value = claim->value,
+          .a = claim->setter,
+          .b = resolved.setter,
+        }));
       }
     }
 
@@ -207,10 +208,8 @@ spn_err_t spn_pkg_options_merge(
     if (resolved.value.kind != SPN_OPTION_VALUE_NONE) {
       spn_when_env_set(&env, resolved.name, resolved.value);
     }
-    sp_da_push(*resolved_options, resolved);
+    sp_da_push(merged->options, resolved);
   }
-
-  return SPN_OK;
 }
 
 void spn_pkg_options_env(
@@ -221,10 +220,10 @@ void spn_pkg_options_env(
   spn_option_requests_t requests,
   spn_when_env_t* env
 ) {
-  spn_resolved_options_t resolved = sp_zero;
-  spn_pkg_options_merge(mem, pkg, profile, root_config, requests, SP_NULLPTR, &resolved);
+  spn_merged_options_t merged = sp_zero;
+  spn_pkg_options_merge(mem, pkg, profile, root_config, requests, &merged);
   spn_when_env_from_profile(mem, profile, env);
-  spn_when_env_add_options(env, &resolved);
+  spn_when_env_add_options(env, &merged.options);
 }
 
 static void apply_gated(sp_da(sp_str_t)* plain, spn_gated_list_t gated, spn_when_env_t* env) {

@@ -12,14 +12,13 @@ spn_pkg_config_t* spn_pkg_config_find(sp_da(spn_pkg_config_entry_t) config, sp_s
 void spn_when_env_from_profile(sp_mem_t mem, const spn_profile_info_t* profile, spn_when_env_t* env);
 void spn_when_env_add_options(spn_when_env_t* env, const spn_resolved_options_t* options);
 
-spn_err_t spn_pkg_options_merge(
+void spn_pkg_options_merge(
   sp_mem_t mem,
   const spn_resolved_pkg_t* pkg,
   const spn_profile_info_t* profile,
   sp_da(spn_pkg_config_entry_t) root_config,
   spn_option_requests_t requests,
-  spn_event_buffer_t* events,
-  spn_resolved_options_t* resolved);
+  spn_merged_options_t* merged);
 
 void spn_pkg_options_env(
   sp_mem_t mem,

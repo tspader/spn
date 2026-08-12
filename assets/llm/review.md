@@ -19,5 +19,28 @@ Defensive code is not "safe". It masks bugs, it makes debugging harder, and if i
 # no boolean parameters
 Boolean parameters are almost always a symptom of confusing conditional logic, and can almost always be solved by [pushing `if`s up and `for`s down](push-ifs-up-and-fors-down.md). In short, control flow should be centralized and pushed to higher level code which calls pure leaf functions.
 
-Don't evaluate this mechanically; the fact that the type literally says `bool` is meaningless; this can sneak through as e.g. an enum, or a NULL check. Be wary of conditional logic in *any* function; obviously, every program will branch. There's nothing wrong with branching, but every branch must be evaluated for this disease.
+Don't evaluate this mechanically; the fact that the type literally says `bool` is meaningless. A particularly nasty case is flagging this kind of violation, only for the author to refactor the boolean to a two-state enum. Pointless. In general, flag every boolean parameter as either fix it, justify why it must be this way (even accounting for @hacks.md), or fail the review.
+
+# branching based on arguments is almost always wrong
+
+The worst form of this disease is when a function has a small number of callers, and it uses an argument as a proxy for which caller:
+
+```c
+void do(bool all) {
+  do_thing();
+  if (all) do_extra_thing();
+}
+
+void something() {
+  do(true);
+}
+
+void whatever() {
+  do(false);
+}
+```
+
+You should task tracking to add a task checking every branch added for this. This should be flagged on site as an instant fail. If the author firmly believes this is the right shape, they can ask the human for permission to do this. This pattern shows up with strings, NULL checks, enums, all kinds of stuff. It is not limited to when the caller passes a constant.
+
+Be wary of conditional logic in *any* function; obviously, every program will branch. There's nothing wrong with branching, but every branch must be evaluated for this disease.
 

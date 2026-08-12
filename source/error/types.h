@@ -125,6 +125,7 @@ typedef struct {
     spn_err_dynamic_dup_t dynamic_dup;
     spn_err_too_complex_t too_complex;
     spn_err_mismatch_t mismatch;
+    spn_option_violation_t option;
     struct {
       sp_str_t name;
       sp_str_t path;

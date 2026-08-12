@@ -2,7 +2,6 @@
 
 typedef struct {
   spn_err_t err;
-  bool event;
   spn_option_err_t option_err;
   const c8* pkg;
   spn_option_setter_kind_t setter;
@@ -36,7 +35,6 @@ static const session_test_t tests [] = {
     .resolves = 4,
     .expect = {
       .err = SPN_ERR_OPTION,
-      .event = true,
       .option_err = SPN_OPTION_ERR_LATE_GATE,
       .pkg = "test",
       .setter = SPN_OPTION_SETTER_CONSUMER,
@@ -49,7 +47,6 @@ static const session_test_t tests [] = {
     .config = "spum",
     .expect = {
       .err = SPN_ERR_OPTION,
-      .event = true,
       .option_err = SPN_OPTION_ERR_UNKNOWN_PKG,
       .pkg = "spum",
     },
@@ -60,7 +57,6 @@ static const session_test_t tests [] = {
     .stale_loaded = true,
     .expect = {
       .err = SPN_ERR_OPTION,
-      .event = true,
       .option_err = SPN_OPTION_ERR_UNKNOWN_PKG,
       .pkg = "spum",
     },
@@ -140,24 +136,22 @@ sp_test_each(options_session, apply, session_test_t, tests, .setup = spn_test_ct
   }
 
   bool reresolve = sp_zero;
-  spn_err_t err = spn_session_apply_options(&session, &reresolve).kind;
-  sp_expect_eq(t, err, it->expect.err);
+  spn_err_union_t err = spn_session_apply_options(&session, &reresolve);
+  sp_expect_eq(t, err.kind, it->expect.err);
   sp_expect_eq(t, session.gates.resolves, it->expect.resolves);
   sp_expect_eq(t, reresolve, it->expect.reresolve);
 
   sp_da(spn_build_event_t) events = spn_event_buffer_drain(mem, spn.events);
-  sp_must_eq(t, sp_da_size(events), it->expect.event ? 1 : 0);
-  if (!it->expect.event) {
+  sp_must_eq(t, sp_da_size(events), 0);
+  if (!it->expect.err) {
     return SP_OK;
   }
 
-  spn_build_event_t* event = &events[0];
-  sp_expect_eq(t, event->kind, SPN_EVENT_ERR_OPTION);
-  sp_expect_eq(t, event->option.err, it->expect.option_err);
-  sp_expect(t, sp_str_equal_cstr(event->option.pkg, it->expect.pkg));
-  sp_expect_eq(t, event->option.a.kind, it->expect.setter);
+  sp_expect_eq(t, err.option.kind, it->expect.option_err);
+  sp_expect(t, sp_str_equal_cstr(err.option.pkg, it->expect.pkg));
+  sp_expect_eq(t, err.option.a.kind, it->expect.setter);
   if (it->expect.setter_name) {
-    sp_expect(t, sp_str_equal_cstr(event->option.a.name, it->expect.setter_name));
+    sp_expect(t, sp_str_equal_cstr(err.option.a.name, it->expect.setter_name));
   }
 
   return SP_OK;

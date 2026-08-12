@@ -44,7 +44,7 @@ typedef struct {
 } expect_setter_t;
 
 typedef struct {
-  spn_err_t err;
+  bool violation;
   spn_option_err_t option_err;
   const c8* option;
   expect_setter_t a;
@@ -168,7 +168,7 @@ static const merge_test_t tests [] = {
       { .consumer = "b", .options = { { "e", "vk" } } },
     },
     .expect = {
-      .err = SPN_ERROR,
+      .violation = true,
       .option_err = SPN_OPTION_ERR_CONFLICT,
       .option = "e",
       .a = { SPN_OPTION_SETTER_CONSUMER, "a" },
@@ -184,7 +184,7 @@ static const merge_test_t tests [] = {
       { .consumer = "a", .options = { { .key = "e", .str = "vk", .negated = true } } },
     },
     .expect = {
-      .err = SPN_ERROR,
+      .violation = true,
       .option_err = SPN_OPTION_ERR_VETO,
       .option = "e",
       .a = { SPN_OPTION_SETTER_CONSUMER, "a" },
@@ -212,7 +212,7 @@ static const merge_test_t tests [] = {
     },
     .config = { { "nosuch", "vk" } },
     .expect = {
-      .err = SPN_ERROR,
+      .violation = true,
       .option_err = SPN_OPTION_ERR_UNDECLARED,
       .option = "nosuch",
     },
@@ -224,7 +224,7 @@ static const merge_test_t tests [] = {
     },
     .config = { { "e", "dx12" } },
     .expect = {
-      .err = SPN_ERROR,
+      .violation = true,
       .option_err = SPN_OPTION_ERR_BAD_VALUE,
       .option = "e",
     },
@@ -238,7 +238,7 @@ static const merge_test_t tests [] = {
       { .consumer = "a", .options = { { "e", "dx12" } } },
     },
     .expect = {
-      .err = SPN_ERROR,
+      .violation = true,
       .option_err = SPN_OPTION_ERR_BAD_VALUE,
       .option = "e",
     },
@@ -249,7 +249,7 @@ static const merge_test_t tests [] = {
       { .name = "e", .type = SPN_OPTION_TYPE_ENUM, .values = { "gl", "vk" } },
     },
     .expect = {
-      .err = SPN_ERROR,
+      .violation = true,
       .option_err = SPN_OPTION_ERR_NO_VALUE,
       .option = "e",
     },
@@ -335,7 +335,7 @@ static const merge_test_t tests [] = {
       { .consumer = "a", .options = { { "e", "gl" } } },
     },
     .expect = {
-      .err = SPN_ERROR,
+      .violation = true,
       .option_err = SPN_OPTION_ERR_CONFLICT,
       .option = "e",
       .a = { .kind = SPN_OPTION_SETTER_ROOT_MANIFEST },
@@ -353,7 +353,7 @@ static const merge_test_t tests [] = {
       { .consumer = "a", .options = { { .key = "x", .is_bool = true, .b = true } } },
     },
     .expect = {
-      .err = SPN_ERROR,
+      .violation = true,
       .option_err = SPN_OPTION_ERR_CONFLICT,
       .option = "x",
       .a = { .kind = SPN_OPTION_SETTER_ROOT_MANIFEST },
@@ -398,7 +398,7 @@ static const merge_test_t tests [] = {
       { .consumer = "a", .options = { { .key = "e", .str = "dx", .negated = true } } },
     },
     .expect = {
-      .err = SPN_ERROR,
+      .violation = true,
       .option_err = SPN_OPTION_ERR_NO_VALUE,
       .option = "e",
     },
@@ -413,7 +413,7 @@ static const merge_test_t tests [] = {
       { .consumer = "a", .options = { { .key = "e", .str = "dx12", .negated = true } } },
     },
     .expect = {
-      .err = SPN_ERROR,
+      .violation = true,
       .option_err = SPN_OPTION_ERR_BAD_VALUE,
       .option = "e",
     },
@@ -429,7 +429,7 @@ static const merge_test_t tests [] = {
       { .consumer = "a", .options = { { .key = "e", .str = "vk", .negated = true } } },
     },
     .expect = {
-      .err = SPN_ERROR,
+      .violation = true,
       .option_err = SPN_OPTION_ERR_VETO,
       .option = "e",
       .a = { SPN_OPTION_SETTER_CONSUMER, "a" },
@@ -528,30 +528,30 @@ sp_test_each(options_merge, merge, merge_test_t, tests) {
     }));
   }
 
-  spn_event_buffer_t* events = spn_event_buffer_new(mem);
-  spn_resolved_options_t resolved = sp_zero;
-  spn_err_t err = spn_pkg_options_merge(mem, &pkg, &profile, config, requests, events, &resolved);
-  sp_expect_eq(t, err, it->expect.err);
+  spn_merged_options_t merged = sp_zero;
+  spn_pkg_options_merge(mem, &pkg, &profile, config, requests, &merged);
 
-  if (it->expect.err) {
-    sp_da(spn_build_event_t) drained = spn_event_buffer_drain(mem, events);
-
-    bool matched = false;
-    sp_da_for(drained, ex) {
-      spn_evt_option_t* option = &drained[ex].option;
-      if (drained[ex].kind != SPN_EVENT_ERR_OPTION) continue;
-      if (option->err != it->expect.option_err) continue;
-      if (!sp_str_equal_cstr(option->option, it->expect.option)) continue;
-      if (it->expect.a.kind && option->a.kind != it->expect.a.kind) continue;
-      if (it->expect.a.name && !sp_str_equal_cstr(option->a.name, it->expect.a.name)) continue;
-      if (it->expect.b.kind && option->b.kind != it->expect.b.kind) continue;
-      if (it->expect.b.name && !sp_str_equal_cstr(option->b.name, it->expect.b.name)) continue;
-      matched = true;
-      break;
+  if (it->expect.violation) {
+    sp_must(t, !sp_da_empty(merged.violations));
+    spn_option_violation_t* violation = &merged.violations[0];
+    sp_expect_eq(t, violation->kind, it->expect.option_err);
+    sp_expect(t, sp_str_equal_cstr(violation->option, it->expect.option));
+    if (it->expect.a.kind) {
+      sp_expect_eq(t, violation->a.kind, it->expect.a.kind);
     }
-    sp_expect(t, matched);
+    if (it->expect.a.name) {
+      sp_expect(t, sp_str_equal_cstr(violation->a.name, it->expect.a.name));
+    }
+    if (it->expect.b.kind) {
+      sp_expect_eq(t, violation->b.kind, it->expect.b.kind);
+    }
+    if (it->expect.b.name) {
+      sp_expect(t, sp_str_equal_cstr(violation->b.name, it->expect.b.name));
+    }
     return SP_OK;
   }
+
+  sp_expect(t, sp_da_empty(merged.violations));
 
   sp_carr_for(it->expect.options, ox) {
     expect_option_t* expected = &it->expect.options[ox];
@@ -559,10 +559,10 @@ sp_test_each(options_merge, merge, merge_test_t, tests) {
 
     sp_test_kv_c(t, "option", expected->name);
     bool found = false;
-    sp_da_for(resolved, rt) {
-      if (!sp_str_equal_cstr(resolved[rt].name, expected->name)) continue;
-      sp_expect(t, spn_option_value_equal(resolved[rt].value, make_value(expected->value)));
-      sp_expect_eq(t, resolved[rt].is_default, expected->is_default);
+    sp_da_for(merged.options, rt) {
+      if (!sp_str_equal_cstr(merged.options[rt].name, expected->name)) continue;
+      sp_expect(t, spn_option_value_equal(merged.options[rt].value, make_value(expected->value)));
+      sp_expect_eq(t, merged.options[rt].is_default, expected->is_default);
       found = true;
       break;
     }
