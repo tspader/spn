@@ -1,0 +1,9 @@
+{
+  "properties": {
+    "a": { "elements": { "ref": "T" }, "metadata": { "key": "k" } },
+    "b": { "elements": { "ref": "T" }, "metadata": { "key": "k" } }
+  },
+  "definitions": {
+    "T": { "properties": { "k": { "type": "string" }, "j": { "type": "string" } } }
+  }
+}

@@ -29,15 +29,12 @@ static void emit(codegen_t* c, sp_str_t message) {
   }
 }
 
-typedef bool (*render_fn_t)(void* model, sp_io_writer_t* io, sp_template_registry_t* reg);
+static bool render_one(codegen_t* c, sp_str_t path, gen_render_t render) {
+  sp_str_t source = sp_zero;
+  if (!sp_template_get(c->reg, render.template, &source)) {
+    return fail(c, sp_fmt(c->mem, "failed to find template {.cyan}", sp_fmt_str(render.template)).value);
+  }
 
-static bool common_fn(void* model, sp_io_writer_t* io, sp_template_registry_t* reg) { return gen_render_common(model, io, reg); }
-static bool decls_fn(void* model, sp_io_writer_t* io, sp_template_registry_t* reg) { return gen_render_decls(model, io, reg); }
-static bool impl_fn(void* model, sp_io_writer_t* io, sp_template_registry_t* reg) { return gen_render_impl(model, io, reg); }
-static bool abi_decls_fn(void* model, sp_io_writer_t* io, sp_template_registry_t* reg) { return abi_render_decls(model, io, reg); }
-static bool abi_impl_fn(void* model, sp_io_writer_t* io, sp_template_registry_t* reg) { return abi_render_impl(model, io, reg); }
-
-static bool render_one(codegen_t* c, sp_str_t path, void* model, sp_str_t* model_err, render_fn_t fn) {
   sp_fs_atomic_t file = sp_zero;
   if (sp_fs_atomic_open(&file, path)) {
     return fail(c, sp_fmt(c->mem, "failed to open {}", sp_fmt_str(path)).value);
@@ -47,9 +44,10 @@ static bool render_one(codegen_t* c, sp_str_t path, void* model, sp_str_t* model
   sp_io_writer_t* io = sp_fs_atomic_writer(&file);
   sp_io_writer_set_buffer(io, buffer, sizeof(buffer));
 
-  if (!fn(model, io, c->reg)) {
+  sp_template_err_t err = sp_template_render(io, source, render.scope, c->reg);
+  if (err) {
     sp_fs_atomic_abort(&file);
-    return fail(c, *model_err);
+    return fail(c, sp_fmt(c->mem, "failed to render template {.cyan} with code {.red}", sp_fmt_str(render.template), sp_fmt_int(err)).value);
   }
 
   if (sp_fs_atomic_commit(&file, SP_FS_ATOMIC_REPLACE)) {
@@ -108,7 +106,7 @@ static bool emit_common(codegen_t* c) {
   }
 
   sp_str_t path_out = out_path(c, sp_str_lit("common"), ".gen.h");
-  try(render_one(c, path_out, gen, &gen->err, common_fn));
+  try(render_one(c, path_out, gen_render_common(gen)));
   emit(c, sp_fmt(c->mem, "wrote {} common types to {}", sp_fmt_uint(sp_da_size(gen->types)), sp_fmt_str(path_out)).value);
   return true;
 }
@@ -210,9 +208,12 @@ static bool render_kind(codegen_t* c, sp_fs_entry_t* entry) {
   }
   gen->root = gen_find(gen, name);
   try(mark_shared(c, entry->path, gen, &jtd));
+  if (gen->format == GEN_FORMAT_JSON && sp_da_size(gen->containers.shorthand)) {
+    return fail(c, sp_fmt(c->mem, "{.cyan}: shorthand arrays are not supported for json schemas", sp_fmt_str(name)).value);
+  }
 
-  try(render_one(c, out_path(c, name, ".gen.h"), gen, &gen->err, decls_fn));
-  try(render_one(c, out_path(c, name, ".gen.c"), gen, &gen->err, impl_fn));
+  try(render_one(c, out_path(c, name, ".gen.h"), gen_render_decls(gen)));
+  try(render_one(c, out_path(c, name, ".gen.c"), gen_render_impl(gen)));
   try(write_file(c, out_path(c, name, ".jtd.json"), merged));
   emit(c, sp_fmt(c->mem, "wrote {} ({})", sp_fmt_str(name), sp_fmt_cstr(format)).value);
   return true;
@@ -225,8 +226,8 @@ static bool render_abi(codegen_t* c) {
     return fail(c, abi->err);
   }
 
-  try(render_one(c, out_path(c, sp_str_lit("abi"), ".gen.h"), abi, &abi->err, abi_decls_fn));
-  try(render_one(c, out_path(c, sp_str_lit("abi"), ".gen.c"), abi, &abi->err, abi_impl_fn));
+  try(render_one(c, out_path(c, sp_str_lit("abi"), ".gen.h"), abi_render_decls(abi)));
+  try(render_one(c, out_path(c, sp_str_lit("abi"), ".gen.c"), abi_render_impl(abi)));
   emit(c, sp_fmt(c->mem, "wrote abi ({} exports)", sp_fmt_uint(sp_da_size(abi->exports))).value);
   return true;
 }

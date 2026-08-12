@@ -609,25 +609,10 @@ static sp_template_scope_t* abi_scope(abi_t* abi) {
   return root;
 }
 
-static bool abi_render(abi_t* abi, sp_io_writer_t* io, sp_template_registry_t* reg, sp_str_t name) {
-  sp_str_t source = sp_zero;
-  if (!sp_template_get(reg, name, &source)) {
-    abi->err = sp_fmt(abi->mem, "failed to find template {.cyan}", sp_fmt_str(name)).value;
-    return false;
-  }
-
-  sp_template_err_t result = sp_template_render(io, source, abi_scope(abi), reg);
-  if (result) {
-    abi->err = sp_fmt(abi->mem, "failed to render template {.cyan} with code {.red}", sp_fmt_str(name), sp_fmt_int(result)).value;
-    return false;
-  }
-  return true;
+gen_render_t abi_render_decls(abi_t* abi) {
+  return (gen_render_t) { .template = sp_str_lit("abi/decls.h"), .scope = abi_scope(abi) };
 }
 
-bool abi_render_decls(abi_t* abi, sp_io_writer_t* io, sp_template_registry_t* reg) {
-  return abi_render(abi, io, reg, sp_str_lit("abi/decls.h"));
-}
-
-bool abi_render_impl(abi_t* abi, sp_io_writer_t* io, sp_template_registry_t* reg) {
-  return abi_render(abi, io, reg, sp_str_lit("abi/impl.c"));
+gen_render_t abi_render_impl(abi_t* abi) {
+  return (gen_render_t) { .template = sp_str_lit("abi/impl.c"), .scope = abi_scope(abi) };
 }

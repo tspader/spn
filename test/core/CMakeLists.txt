@@ -45,6 +45,8 @@ add_executable(core
   dag/strong_key.c
   dag/tree.c
   dag/wasm.c
+  gen/lower.c
+  gen/reader.c
   git/fixture.c
   git/cache.c
   git/key.c
@@ -99,6 +101,7 @@ add_executable(core
   unit/walk.c
   unit/link_plan.c
   ${CMAKE_SOURCE_DIR}/tools/jtd.c
+  ${CMAKE_SOURCE_DIR}/tools/gen/lower.c
   ${SRC}/codegen/codegen.c
   ${SRC}/codegen/loader.c
   ${SRC}/codegen/json.c
@@ -192,6 +195,7 @@ target_include_directories(core PRIVATE
   ${SRC}/external
   ${SOURCE_ROOT}/wamr/core/iwasm/include
   ${CMAKE_SOURCE_DIR}/tools
+  ${CMAKE_SOURCE_DIR}/tools/gen
   ${STORE}/include/sp
 )
 set_source_files_properties(schema/schema.c PROPERTIES COMPILE_DEFINITIONS
