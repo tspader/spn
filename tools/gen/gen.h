@@ -141,17 +141,22 @@ typedef struct {
   sp_str_t err;
 } abi_t;
 
+typedef struct {
+  sp_str_t template;
+  sp_template_scope_t* scope;
+} gen_render_t;
+
 gen_t*      gen_new(sp_mem_t mem);
 bool        gen_lower(gen_t* g, sp_str_t name, jtd_schema_t* schema);
 gen_type_t* gen_find(gen_t* g, sp_str_t name);
 
-bool gen_render_common(gen_t* g, sp_io_writer_t* io, sp_template_registry_t* reg);
-bool gen_render_decls(gen_t* g, sp_io_writer_t* io, sp_template_registry_t* reg);
-bool gen_render_impl(gen_t* g, sp_io_writer_t* io, sp_template_registry_t* reg);
+gen_render_t gen_render_common(gen_t* g);
+gen_render_t gen_render_decls(gen_t* g);
+gen_render_t gen_render_impl(gen_t* g);
 
 yyjson_alc gen_yyjson_alc(sp_mem_t* mem);
 abi_t* abi_parse(sp_mem_t mem, sp_str_t path);
-bool   abi_render_decls(abi_t* abi, sp_io_writer_t* io, sp_template_registry_t* reg);
-bool   abi_render_impl(abi_t* abi, sp_io_writer_t* io, sp_template_registry_t* reg);
+gen_render_t abi_render_decls(abi_t* abi);
+gen_render_t abi_render_impl(abi_t* abi);
 
 #endif

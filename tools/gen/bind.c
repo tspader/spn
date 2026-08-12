@@ -327,26 +327,11 @@ static void bind_includes(gen_t* g, sp_template_scope_t* scope) {
   }
 }
 
-static bool render_template(gen_t* g, sp_io_writer_t* io, sp_template_registry_t* reg, sp_str_t name, sp_template_scope_t* scope) {
-  sp_str_t source = sp_zero;
-  if (!sp_template_get(reg, name, &source)) {
-    g->err = sp_fmt(g->mem, "failed to find template {.cyan}", sp_fmt_str(name)).value;
-    return false;
-  }
-
-  sp_template_err_t result = sp_template_render(io, source, scope, reg);
-  if (result) {
-    g->err = sp_fmt(g->mem, "failed to render template {.cyan} with code {.red}", sp_fmt_str(name), sp_fmt_int(result)).value;
-    return false;
-  }
-  return true;
-}
-
-bool gen_render_common(gen_t* g, sp_io_writer_t* io, sp_template_registry_t* reg) {
+gen_render_t gen_render_common(gen_t* g) {
   sp_template_scope_t* scope = sp_template_scope_create(g->mem);
   bind_includes(g, scope);
   bind_types_block(g, scope);
-  return render_template(g, io, reg, sp_str_lit("common.h"), scope);
+  return (gen_render_t) { .template = sp_str_lit("common.h"), .scope = scope };
 }
 
 static sp_template_scope_t* root_scope(gen_t* g) {
@@ -356,20 +341,17 @@ static sp_template_scope_t* root_scope(gen_t* g) {
   return scope;
 }
 
-bool gen_render_decls(gen_t* g, sp_io_writer_t* io, sp_template_registry_t* reg) {
+gen_render_t gen_render_decls(gen_t* g) {
   sp_template_scope_t* scope = root_scope(g);
   bind_includes(g, scope);
   bind_types_block(g, scope);
-  sp_str_t name = sp_fmt(g->mem, "{}/decls.h", sp_fmt_cstr(GEN_FORMATS[g->format])).value;
-  return render_template(g, io, reg, name, scope);
+  return (gen_render_t) {
+    .template = sp_fmt(g->mem, "{}/decls.h", sp_fmt_cstr(GEN_FORMATS[g->format])).value,
+    .scope = scope,
+  };
 }
 
-bool gen_render_impl(gen_t* g, sp_io_writer_t* io, sp_template_registry_t* reg) {
-  if (g->format == GEN_FORMAT_JSON && sp_da_size(g->containers.shorthand)) {
-    g->err = sp_fmt(g->mem, "{.cyan}: shorthand arrays are not supported for json schemas", sp_fmt_str(g->root->name)).value;
-    return false;
-  }
-
+gen_render_t gen_render_impl(gen_t* g) {
   sp_template_scope_t* scope = root_scope(g);
   sp_template_set(scope, sp_str_lit("write"), sp_str_lit("write"));
   sp_template_set(scope, sp_str_lit("root_write"), sp_str_lit("root_write"));
@@ -439,6 +421,8 @@ bool gen_render_impl(gen_t* g, sp_io_writer_t* io, sp_template_registry_t* reg) 
     }
   }
 
-  sp_str_t name = sp_fmt(g->mem, "{}/impl.c", sp_fmt_cstr(GEN_FORMATS[g->format])).value;
-  return render_template(g, io, reg, name, scope);
+  return (gen_render_t) {
+    .template = sp_fmt(g->mem, "{}/impl.c", sp_fmt_cstr(GEN_FORMATS[g->format])).value,
+    .scope = scope,
+  };
 }
