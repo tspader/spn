@@ -420,7 +420,7 @@ static spn_err_t check_unused_patches(spn_session_t* session) {
   return err;
 }
 
-spn_err_union_t sync(spn_op_t* op, bool* reresolve) {
+spn_err_union_t sync_packages(spn_op_t* op, bool* reresolve) {
   spn_session_t* session = op->session;
   sp_da(pkg_job_t*) packages = sp_da_new(session->mem, pkg_job_t*);
   sp_da(toolchain_job_t*) toolchains = sp_da_new(session->mem, toolchain_job_t*);
