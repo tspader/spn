@@ -11,6 +11,7 @@
 #include "unit/unit.h"
 
 #include "compiler/driver.h"
+#include "error/error.h"
 #include "event/event.h"
 #include "intern/intern.h"
 #include "project/types.h"
@@ -98,7 +99,7 @@ static bool is_shared_linkage(spn_pkg_info_t* pkg) {
   return false;
 }
 
-spn_err_union_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem, spn_project_t* project, spn_session_config_t config) {
+spn_err_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem, spn_project_t* project, spn_session_config_t config) {
   spn_pkg_info_t* root = &project->package;
   s->ctx = ctx;
   s->project = project;
@@ -111,7 +112,7 @@ spn_err_union_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem,
   spn_triple_t host = spn_triple_host();
 
   sp_str_t builtins = sp_str((const c8*)toolchains_json, toolchains_json_size);
-  spn_try_union(spn_result(spn_toolchain_catalog_init(&s->catalog, builtins, s->mem)));
+  spn_try(spn_toolchain_catalog_init(&s->catalog, builtins, s->mem));
   sp_str_om_for(root->toolchains, it) {
     spn_toolchain_catalog_add(&s->catalog, *sp_str_om_at(root->toolchains, it));
   }
@@ -130,7 +131,7 @@ spn_err_union_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem,
   sp_om_new(s->units.targets);
   sp_om_new(s->units.objects);
 
-  spn_try_union(spn_profile_resolve(s->profiles, &config.profile, host, is_shared_linkage(root), &s->profile));
+  spn_try(spn_profile_resolve(s->profiles, &config.profile, host, is_shared_linkage(root), &s->profile));
 
   switch (s->profile.os) {
     case SPN_OS_MACOS: {
@@ -142,16 +143,16 @@ spn_err_union_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem,
     }
   }
 
-  spn_try_union(spn_build_add(s, spn_build_config_target(host, s->profile), &s->units.target));
-  spn_try_union(spn_build_add(s, spn_build_config_metaprogram(host), &s->units.metaprogram));
+  spn_try(spn_build_add(s, spn_build_config_target(host, s->profile), &s->units.target));
+  spn_try(spn_build_add(s, spn_build_config_metaprogram(host), &s->units.metaprogram));
   sp_da_push(s->units.metaprogram->include, ctx->paths.include);
 
   sp_str_t log = sp_fs_join_path(s->mem, s->units.target->paths.root, sp_str_lit(".spn/build.jsonl"));
   if (spn_event_log_open(ctx->events, log)) {
-    return (spn_err_union_t) {
+    return spn_err_emit(ctx, (spn_err_union_t) {
       .kind = SPN_ERR_FS_WRITE,
       .fs = { .path = log },
-    };
+    });
   }
 
   spn_build_plan_t plan = {
@@ -161,7 +162,7 @@ spn_err_union_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem,
   sp_da_init(s->mem, plan.roots);
   sp_da_push(s->plans, plan);
 
-  return spn_result(SPN_OK);
+  return SPN_OK;
 }
 
 sp_opt_spn_linkage_t spn_session_config_kind(spn_session_t* session, sp_str_t pkg_name) {
@@ -186,18 +187,16 @@ void spn_session_export_toolchain_env(spn_session_t* s) {
   }
 }
 
-spn_err_union_t spn_session_validate_flags(spn_session_t* s) {
+spn_err_t spn_session_validate_flags(spn_session_t* s) {
   sp_om_for(s->units.builds, it) {
     spn_build_unit_t* build = sp_om_at(s->units.builds, it);
     sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
     spn_cc_flags_t flags = sp_zero;
-    spn_err_union_t err = spn_cc_render_flags(scratch.mem, &build->toolchain->cc, &build->profile, &flags);
+    spn_err_t err = spn_cc_render_flags(scratch.mem, &build->toolchain->cc, &build->profile, &flags);
     sp_mem_end_scratch(scratch);
-    if (err.kind) {
-      return err;
-    }
+    spn_try(err);
   }
-  return spn_result(SPN_OK);
+  return SPN_OK;
 }
 
 spn_pkg_id_t spn_session_root_pkg(spn_session_t* session) {

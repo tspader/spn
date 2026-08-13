@@ -67,7 +67,7 @@ static spn_err_t setup_toolchain_unit(spn_toolchain_store_t* store, spn_toolchai
       }});
   }
 
-  spn_try(spn_err_emit(&spn, spn_toolchain_provision(store, toolchain, unit->artifact, &unit->root)));
+  spn_try(spn_toolchain_provision(store, toolchain, unit->artifact, &unit->root));
 
   spn_event_buffer_push(spn.events, (spn_build_event_t){
     .kind = SPN_EVENT_SYNC_PACKAGE,
@@ -166,15 +166,6 @@ static sp_da(spn_tree_path_t) resolve_paths(spn_gated_path_list_t entries, spn_l
   return resolved;
 }
 
-static spn_err_t configure_source_err(spn_ctx_t* ctx, sp_str_t name, sp_str_t source) {
-  return spn_err_emit(ctx, (spn_err_union_t) {
-    .kind = SPN_ERR_CONFIGURE_SOURCE,
-    .configure_source = {
-      .name = name,
-      .source = source,
-    }});
-}
-
 static spn_err_t resolve_configure_source(spn_ctx_t* ctx, sp_str_t name, spn_gated_path_list_t declared, spn_loaded_pkg_t* loaded, spn_when_env_t* env, sp_da(spn_tree_path_t)* source) {
   sp_da(spn_tree_path_t) resolved = sp_da_new(spn.mem, spn_tree_path_t);
   sp_da_for(declared, it) {
@@ -186,7 +177,12 @@ static spn_err_t resolve_configure_source(spn_ctx_t* ctx, sp_str_t name, spn_gat
     if (!sp_fs_is_glob(entry.path)) {
       sp_str_t path = spn_tree_path_resolve(spn.mem, loaded->roots, entry);
       if (!sp_fs_is_target_file(path)) {
-        return configure_source_err(ctx, name, entry.path);
+        return spn_err_emit(ctx, (spn_err_union_t) {
+          .kind = SPN_ERR_CONFIGURE_SOURCE_MISSING,
+          .configure_source = {
+            .name = name,
+            .source = entry.path,
+          }});
       }
       sp_da_push(resolved, ((spn_tree_path_t) { .path = path, .tree = entry.tree }));
       continue;
@@ -194,7 +190,12 @@ static spn_err_t resolve_configure_source(spn_ctx_t* ctx, sp_str_t name, spn_gat
 
     sp_da(spn_dag_match_t) matches = sp_da_new(spn.mem, spn_dag_match_t);
     if (spn_dag_glob(spn.mem, root, entry.path, SP_NULLPTR, &matches) || sp_da_empty(matches)) {
-      return configure_source_err(ctx, name, entry.path);
+      return spn_err_emit(ctx, (spn_err_union_t) {
+        .kind = SPN_ERR_CONFIGURE_SOURCE_GLOB,
+        .configure_source = {
+          .name = name,
+          .source = entry.path,
+        }});
     }
     sp_da_for(matches, jt) {
       sp_da_push(resolved, ((spn_tree_path_t) { .path = matches[jt].path, .tree = entry.tree }));
@@ -221,7 +222,20 @@ static sp_da(spn_tree_path_t) detect_configure_source(spn_loaded_pkg_t* loaded) 
 
 static spn_err_t load_manifest(spn_session_t* session, sp_str_t name, sp_str_t path, spn_pkg_info_t** info) {
   spn_pkg_info_t* parsed = sp_alloc_type(spn.mem, spn_pkg_info_t);
-  spn_try(spn_err_emit(session->ctx, spn_pkg_load(spn.mem, session->ctx->intern, path, SPN_MANIFEST_DEP, name, parsed)));
+  spn_codegen_issues_t issues = sp_zero;
+  spn_err_t loaded = spn_pkg_load(spn.mem, session->ctx->intern, path, SPN_MANIFEST_DEP, parsed, &issues);
+  if (loaded == SPN_ERR_NO_MANIFEST) {
+    return spn_err_emit(session->ctx, (spn_err_union_t) {
+      .kind = SPN_ERR_NO_MANIFEST,
+      .no_manifest = { .path = path },
+    });
+  }
+  if (loaded) {
+    return spn_err_emit(session->ctx, (spn_err_union_t) {
+      .kind = SPN_ERR_MANIFEST_ISSUES,
+      .manifest = { .name = name, .path = path, .issues = issues },
+    });
+  }
 
   // Short names only: published manifests routinely omit the namespace the
   // index assigns, but config keys and consumer routing use the name
@@ -273,13 +287,10 @@ static spn_err_t stamp_patches(spn_session_t* session, spn_resolved_pkg_t* pkg, 
       return SPN_OK;
     }
     case SPN_PKG_PATCH_STAMP_NOT_GIT: {
-      spn_event_buffer_push(spn.events, (spn_build_event_t) {
-        .kind = SPN_EVENT_ERR,
-        .err = {
-          .kind = SPN_ERR_PATCH_NOT_GIT,
-          .patch = { .name = qualified },
-        }});
-      return SPN_ERROR;
+      return spn_err_emit(session->ctx, (spn_err_union_t) {
+        .kind = SPN_ERR_PATCH_NOT_GIT,
+        .patch = { .name = qualified },
+      });
     }
   }
 
@@ -409,18 +420,18 @@ static spn_err_t check_unused_patches(spn_session_t* session) {
       continue;
     }
 
-    spn_event_buffer_push(spn.events, (spn_build_event_t) {
-      .kind = SPN_EVENT_ERR,
-      .err = {
-        .kind = SPN_ERR_PATCH_UNUSED,
-        .patch = { .name = qualified },
-      }});
-    err = SPN_ERROR;
+    spn_err_t kind = spn_err_emit(session->ctx, (spn_err_union_t) {
+      .kind = SPN_ERR_PATCH_UNUSED,
+      .patch = { .name = qualified },
+    });
+    if (!err) {
+      err = kind;
+    }
   }
   return err;
 }
 
-spn_err_union_t sync_packages(spn_op_t* op, bool* reresolve) {
+spn_err_t sync_packages(spn_op_t* op, bool* reresolve) {
   spn_session_t* session = op->session;
   sp_da(pkg_job_t*) packages = sp_da_new(session->mem, pkg_job_t*);
   sp_da(toolchain_job_t*) toolchains = sp_da_new(session->mem, toolchain_job_t*);
@@ -480,18 +491,14 @@ spn_err_union_t sync_packages(spn_op_t* op, bool* reresolve) {
   u64 elapsed = sp_tm_read_timer(&timer);
 
   if (spn_op_cancelled(op)) {
-    return spn_err_reported(SPN_ERR_CANCELLED);
+    return SPN_ERR_CANCELLED;
   }
 
   sp_da_for(packages, it) {
-    if (packages[it]->err) {
-      return spn_err_reported(packages[it]->err);
-    }
+    spn_try(packages[it]->err);
   }
   sp_da_for(toolchains, it) {
-    if (toolchains[it]->err) {
-      return spn_err_reported(toolchains[it]->err);
-    }
+    spn_try(toolchains[it]->err);
   }
 
   sp_da_for(packages, it) {
@@ -501,18 +508,15 @@ spn_err_union_t sync_packages(spn_op_t* op, bool* reresolve) {
     sp_ht_insert(session->packages, job->pkg->id, job->loaded);
   }
 
-  spn_try_union(spn_session_apply_options(session, reresolve));
+  spn_try(spn_session_apply_options(session, reresolve));
 
   if (*reresolve) {
-    return spn_result(SPN_OK);
+    return SPN_OK;
   }
 
   spn_session_export_toolchain_env(session);
-  spn_try_union(spn_session_validate_flags(session));
-
-  if (check_unused_patches(session)) {
-    return spn_err_reported(SPN_ERROR);
-  }
+  spn_try(spn_session_validate_flags(session));
+  spn_try(check_unused_patches(session));
 
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_SYNC_END,
@@ -521,5 +525,5 @@ spn_err_union_t sync_packages(spn_op_t* op, bool* reresolve) {
       .time = elapsed,
     }});
 
-  return spn_result(SPN_OK);
+  return SPN_OK;
 }

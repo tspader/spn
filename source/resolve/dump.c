@@ -114,9 +114,13 @@ static spn_cg_resolve_error_t dump_error(sp_mem_t mem, const spn_err_union_t* er
     case SPN_ERR_PKG_NO_MATCH: {
       dump_error_request(mem, &error, &err->unsatisfiable.request);
       error.requester = err->unsatisfiable.requester;
-      if (err->unsatisfiable.conflict) {
-        error.selected = spn_semver_to_str(mem, err->unsatisfiable.selected);
-      }
+      break;
+    }
+    case SPN_ERR_PKG_CONFLICT:
+    case SPN_ERR_PKG_CONFLICT_EXACT: {
+      dump_error_request(mem, &error, &err->unsatisfiable.request);
+      error.requester = err->unsatisfiable.requester;
+      error.selected = spn_semver_to_str(mem, err->unsatisfiable.selected);
       break;
     }
     case SPN_ERR_DEP_CYCLE: {

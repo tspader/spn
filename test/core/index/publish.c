@@ -176,7 +176,7 @@ sp_test_each(index_publish, publish, publish_test_t, tests, .setup = spn_test_ct
     };
   }
 
-  spn_err_t result = spn_index_publish(&index, mem, &rel).kind;
+  spn_err_t result = spn_index_publish(&index, mem, &rel);
   sp_expect_eq(t, it->expect.result, result);
 
   if (it->expect.lines > 0) {
@@ -236,7 +236,7 @@ sp_test_each(index_publish, protocol, protocol_test_t, protocol_tests, .setup = 
     .version = { 1, 0, 0 },
   };
 
-  sp_expect_eq(t, it->expect.result, spn_index_publish(&index, mem, &rel).kind);
+  sp_expect_eq(t, it->expect.result, spn_index_publish(&index, mem, &rel));
 
   return SP_OK;
 }

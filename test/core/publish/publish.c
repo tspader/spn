@@ -361,23 +361,27 @@ sp_test_each(cmd_publish, publish, case_t, cases, .setup = spn_test_ctx_setup) {
   };
 
   spn_index_release_t release = sp_zero;
-  spn_err_union_t result = spn_publish_build(&opts, &release);
-  if (!result.kind) {
+  spn_err_t result = spn_publish_build(&opts, &release);
+  if (!result) {
     result = spn_index_publish(&index, mem, &release);
   }
-  sp_expect_eq(t, c.expect.kind, result.kind);
+  sp_expect_eq(t, c.expect.kind, result);
 
   if (c.expect.path_dep.name) {
-    sp_expect_str_eq_c(t, result.pkg.name, c.expect.path_dep.name);
-    sp_expect_str_eq_c(t, result.pkg.requested, c.expect.path_dep.dep);
+    sp_da(spn_build_event_t) errs = spn_test_drain_errs(mem);
+    sp_must_eq(t, 1, sp_da_size(errs));
+    sp_expect_eq(t, errs[0].err.kind, SPN_ERR_INDEX_PATH_DEP);
+    sp_expect_str_eq_c(t, errs[0].err.pkg.name, c.expect.path_dep.name);
+    sp_expect_str_eq_c(t, errs[0].err.pkg.requested, c.expect.path_dep.dep);
   }
 
-  if (c.expect.namespace && result.kind == SPN_OK) {
+  if (c.expect.namespace && result == SPN_OK) {
     spn_index_pkg_t* pkg = SP_NULLPTR;
+    spn_index_diag_t diag = sp_zero;
     spn_index_get_package(&index, mem, spn.intern, (spn_pkg_name_t) {
       .namespace = sp_str_view(c.expect.namespace),
       .name = sp_str_view(c.expect.name),
-    }, &pkg);
+    }, &pkg, &diag);
 
     sp_must(t, pkg);
     sp_must(t, sp_da_size(pkg->releases));

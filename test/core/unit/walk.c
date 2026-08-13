@@ -145,8 +145,7 @@ sp_test_each(unit, walk, walk_test_t, tests, .setup = spn_test_ctx_setup) {
   sp_mem_t mem = sp_test_arena(t);
   spn_session_t* s = build_session(mem, &it->graph);
 
-  spn_err_union_t err = spn_units_add_packages(s);
-  sp_must_eq(t, SPN_OK, err.kind);
+  sp_must_eq(t, SPN_OK, spn_units_add_packages(s));
 
   u32 expected = 0;
   sp_carr_detect_len(it->expect, expected, it->expect[expected].pkg);

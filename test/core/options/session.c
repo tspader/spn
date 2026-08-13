@@ -2,7 +2,6 @@
 
 typedef struct {
   spn_err_t err;
-  spn_option_err_t option_err;
   const c8* pkg;
   spn_option_setter_kind_t setter;
   const c8* setter_name;
@@ -34,8 +33,7 @@ static const session_test_t tests [] = {
     .gated_dep = true,
     .resolves = 4,
     .expect = {
-      .err = SPN_ERR_OPTION,
-      .option_err = SPN_OPTION_ERR_LATE_GATE,
+      .err = SPN_ERR_OPTION_LATE_GATE,
       .pkg = "test",
       .setter = SPN_OPTION_SETTER_CONSUMER,
       .setter_name = "spum",
@@ -46,8 +44,7 @@ static const session_test_t tests [] = {
     .name = "unknown_config_package",
     .config = "spum",
     .expect = {
-      .err = SPN_ERR_OPTION,
-      .option_err = SPN_OPTION_ERR_UNKNOWN_PKG,
+      .err = SPN_ERR_OPTION_UNKNOWN_PKG,
       .pkg = "spum",
     },
   },
@@ -56,8 +53,7 @@ static const session_test_t tests [] = {
     .config = "spum",
     .stale_loaded = true,
     .expect = {
-      .err = SPN_ERR_OPTION,
-      .option_err = SPN_OPTION_ERR_UNKNOWN_PKG,
+      .err = SPN_ERR_OPTION_UNKNOWN_PKG,
       .pkg = "spum",
     },
   },
@@ -136,22 +132,24 @@ sp_test_each(options_session, apply, session_test_t, tests, .setup = spn_test_ct
   }
 
   bool reresolve = sp_zero;
-  spn_err_union_t err = spn_session_apply_options(&session, &reresolve);
-  sp_expect_eq(t, err.kind, it->expect.err);
+  spn_err_t err = spn_session_apply_options(&session, &reresolve);
+  sp_expect_eq(t, err, it->expect.err);
   sp_expect_eq(t, session.gates.resolves, it->expect.resolves);
   sp_expect_eq(t, reresolve, it->expect.reresolve);
 
-  sp_da(spn_build_event_t) events = spn_event_buffer_drain(mem, spn.events);
-  sp_must_eq(t, sp_da_size(events), 0);
+  sp_da(spn_build_event_t) errs = spn_test_drain_errs(mem);
   if (!it->expect.err) {
+    sp_must_eq(t, sp_da_size(errs), 0);
     return SP_OK;
   }
 
-  sp_expect_eq(t, err.option.violation.kind, it->expect.option_err);
-  sp_expect(t, sp_str_equal_cstr(err.option.violation.pkg, it->expect.pkg));
-  sp_expect_eq(t, err.option.violation.a.kind, it->expect.setter);
+  sp_must_eq(t, sp_da_size(errs), 1);
+  spn_option_violation_t* violation = &errs[0].err.option.violation;
+  sp_expect_eq(t, errs[0].err.kind, it->expect.err);
+  sp_expect(t, sp_str_equal_cstr(violation->pkg, it->expect.pkg));
+  sp_expect_eq(t, violation->a.kind, it->expect.setter);
   if (it->expect.setter_name) {
-    sp_expect(t, sp_str_equal_cstr(err.option.violation.a.name, it->expect.setter_name));
+    sp_expect(t, sp_str_equal_cstr(violation->a.name, it->expect.setter_name));
   }
 
   return SP_OK;

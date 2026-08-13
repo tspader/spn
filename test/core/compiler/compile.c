@@ -262,7 +262,7 @@ static const compile_test_t tests [] = {
   },
 };
 
-sp_test_each(render_compile, render, compile_test_t, tests) {
+sp_test_each(render_compile, render, compile_test_t, tests, .setup = spn_test_ctx_setup) {
   sp_mem_t mem = sp_test_arena(t);
   spn_cc_toolchain_t toolchain = test_toolchain(it->driver);
   spn_cc_compile_t compile = {
@@ -285,10 +285,13 @@ sp_test_each(render_compile, render, compile_test_t, tests) {
   }
 
   spn_invocation_t base = sp_zero;
-  spn_err_union_t err = spn_cc_render_compile(mem, &toolchain, &it->profile, &compile, &base);
-  sp_expect_eq(t, err.kind, it->expect.err);
+  spn_err_t err = spn_cc_render_compile(mem, &toolchain, &it->profile, &compile, &base);
+  sp_expect_eq(t, err, it->expect.err);
   if (it->expect.err) {
-    sp_expect_eq(t, err.compiler.feature, it->expect.feature);
+    sp_da(spn_build_event_t) errs = spn_test_drain_errs(mem);
+    sp_must_eq(t, 1, sp_da_size(errs));
+    sp_expect_eq(t, errs[0].err.kind, it->expect.err);
+    sp_expect_eq(t, errs[0].err.compiler.feature, it->expect.feature);
     return SP_OK;
   }
 
@@ -301,7 +304,7 @@ sp_test_each(render_compile, render, compile_test_t, tests) {
   return expect_args(t, &invocation, it->expect);
 }
 
-sp_test(render_compile, base_shared_across_commands) {
+sp_test(render_compile, base_shared_across_commands, .setup = spn_test_ctx_setup) {
   sp_mem_t mem = sp_test_arena(t);
   spn_cc_toolchain_t toolchain = test_toolchain(SPN_CC_DRIVER_GCC);
   spn_cc_compile_t compile = {
@@ -318,8 +321,8 @@ sp_test(render_compile, base_shared_across_commands) {
   };
 
   spn_invocation_t base = sp_zero;
-  spn_err_union_t err = spn_cc_render_compile(mem, &toolchain, &profile, &compile, &base);
-  sp_expect_eq(t, err.kind, SPN_OK);
+  spn_err_t err = spn_cc_render_compile(mem, &toolchain, &profile, &compile, &base);
+  sp_expect_eq(t, err, SPN_OK);
   u64 args = sp_da_size(base.args);
 
   spn_cc_compile_files_t first = {

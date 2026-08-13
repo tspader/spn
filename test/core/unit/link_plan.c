@@ -213,10 +213,8 @@ sp_test_each(link_plan, plan, plan_test_t, tests, .setup = spn_test_ctx_setup) {
     default:              sp_str_om_insert(s->pkg->exes, target.name, target); break;
   }
 
-  spn_err_union_t err = spn_units_add_packages(s);
-  sp_must_eq(t, SPN_OK, err.kind);
-  err = spn_units_add_targets(s, SPN_UNIT_SCOPE_TARGET);
-  sp_must_eq(t, SPN_OK, err.kind);
+  sp_must_eq(t, SPN_OK, spn_units_add_packages(s));
+  sp_must_eq(t, SPN_OK, spn_units_add_targets(s, SPN_UNIT_SCOPE_TARGET));
 
   spn_pkg_unit_t* root = spn_session_find_pkg_unit(s, s->units.target, find_pkg_id(s, &it->graph, it->graph.pkgs[0].name));
   sp_must(t, root != SP_NULLPTR);

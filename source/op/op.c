@@ -45,6 +45,10 @@ static void exec(spn_op_t* op) {
     }
   }
 
+  if (op->result.err) {
+    sp_atomic_s32_cas(&op->ctx->error, 0, op->result.err, SP_ATOMIC_SEQ_CST);
+  }
+
   sp_atomic_u32_store(&op->done, 1, SP_ATOMIC_RELEASE);
   spn_wake_pulse(&op->ctx->wake);
 }

@@ -126,6 +126,7 @@ add_executable(core
   ${SRC}/dag/store.c
   ${SRC}/dag/wasi.c
   ${SRC}/enum/enum.c
+  ${SRC}/error/error.c
   ${SRC}/error/json.c
   ${SRC}/event/event.c
   ${SRC}/external/git.c

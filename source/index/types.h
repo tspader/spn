@@ -1,11 +1,22 @@
 #ifndef SPN_INDEX_TYPES_H
 #define SPN_INDEX_TYPES_H
 
+#include "codegen/types.h"
 #include "core/types.h"
 #include "spn/types.h"
 #include "sp/sp_om.h"
 #include "pkg/types.h"
 #include "semver/types.h"
+
+// @spader this is just kind of a shim for now because the code that generates
+// this error doesn't know whether it's really an error yet (resolver calls
+// speculatively) but we dont have an error payload type publically yet to just
+// return what would get emitted so we shim
+typedef struct {
+  sp_str_t path;
+  spn_codegen_issues_t issues;
+  sp_str_t dep;
+} spn_index_diag_t;
 
 typedef enum {
   SPN_INDEX_DEP_NORMAL,

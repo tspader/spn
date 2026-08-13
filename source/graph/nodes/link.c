@@ -18,7 +18,7 @@
 #include "graph/nodes/nodes.h"
 #include "unit/package.h"
 
-spn_err_union_t spn_build_link_invocation(sp_mem_t mem, spn_target_unit_t* target, const spn_cc_link_files_t* files, spn_invocation_t* invocation) {
+spn_err_t spn_build_link_invocation(sp_mem_t mem, spn_target_unit_t* target, const spn_cc_link_files_t* files, spn_invocation_t* invocation) {
   spn_profile_info_t* profile = &target->pkg->build->profile;
   spn_cc_toolchain_t* toolchain = &target->pkg->build->toolchain->cc;
 
@@ -28,13 +28,13 @@ spn_err_union_t spn_build_link_invocation(sp_mem_t mem, spn_target_unit_t* targe
         .output = files->output,
         .objects = files->objects,
       };
-      spn_try_union(spn_cc_render_archive(mem, toolchain, profile, &archive_files, invocation));
+      spn_try(spn_cc_render_archive(mem, toolchain, profile, &archive_files, invocation));
       break;
     }
     case SPN_CC_OUTPUT_EXE:
     case SPN_CC_OUTPUT_SHARED_LIB:
     case SPN_CC_OUTPUT_REACTOR: {
-      spn_try_union(spn_cc_render_link(mem, toolchain, profile, &target->link.cc, files, invocation));
+      spn_try(spn_cc_render_link(mem, toolchain, profile, &target->link.cc, files, invocation));
       break;
     }
     case SPN_CC_OUTPUT_OBJECT: {
@@ -43,7 +43,7 @@ spn_err_union_t spn_build_link_invocation(sp_mem_t mem, spn_target_unit_t* targe
   }
 
   invocation->cwd = target->pkg->paths.work;
-  return spn_result(SPN_OK);
+  return SPN_OK;
 }
 
 
@@ -80,10 +80,10 @@ static spn_err_t emit_link_failed(spn_target_unit_t* unit, spn_invocation_t* inv
 
 typedef sp_str_ht(u8) spn_symbol_set_t;
 
-static spn_err_union_t read_archive_symbols(sp_str_t path, sp_da(sp_str_t)* symbols, spn_symbol_set_t* seen) {
+static spn_err_t read_archive_symbols(sp_str_t path, sp_da(sp_str_t)* symbols, spn_symbol_set_t* seen) {
   sp_io_file_reader_t reader = sp_zero;
   if (sp_io_file_reader_from_path(&reader, path)) {
-    return (spn_err_union_t) { .kind = SPN_ERR_FS_READ, .fs.path = path };
+    return spn_err_emit(&spn, (spn_err_union_t) { .kind = SPN_ERR_FS_READ, .fs.path = path });
   }
 
   spn_toc_parser_t toc;
@@ -103,10 +103,13 @@ static spn_err_union_t read_archive_symbols(sp_str_t path, sp_da(sp_str_t)* symb
   }
 
   sp_io_file_reader_close(&reader);
-  return spn_result(err);
+  if (err) {
+    return spn_err_emit(&spn, (spn_err_union_t) { .kind = err, .fs.path = path });
+  }
+  return SPN_OK;
 }
 
-static s32 spn_link_exports_exec(sp_mem_t scratch, spn_target_unit_t* target, sp_da(sp_str_t) objects, sp_str_t output) {
+static spn_err_t link_exports_exec(sp_mem_t scratch, spn_target_unit_t* target, sp_da(sp_str_t) objects, sp_str_t output) {
   spn_pkg_unit_t* pkg = target->pkg;
   spn_profile_info_t* profile = &pkg->build->profile;
   spn_cc_toolchain_t* toolchain = &pkg->build->toolchain->cc;
@@ -116,7 +119,7 @@ static s32 spn_link_exports_exec(sp_mem_t scratch, spn_target_unit_t* target, sp
     .objects = objects,
   };
   spn_invocation_t* invocation = sp_alloc_type(spn.mem, spn_invocation_t);
-  spn_try(spn_err_emit(&spn, spn_cc_render_archive(spn.mem, toolchain, profile, &files, invocation)));
+  spn_try(spn_cc_render_archive(spn.mem, toolchain, profile, &files, invocation));
   invocation->cwd = pkg->paths.work;
 
   spn_invocation_result_t run = spn_invocation_run(invocation);
@@ -127,9 +130,9 @@ static s32 spn_link_exports_exec(sp_mem_t scratch, spn_target_unit_t* target, sp
   spn_symbol_set_t seen;
   sp_str_ht_init(scratch, seen);
   sp_da(sp_str_t) symbols = sp_da_new(scratch, sp_str_t);
-  spn_try(spn_err_emit(&spn, read_archive_symbols(files.output, &symbols, &seen)));
+  spn_try(read_archive_symbols(files.output, &symbols, &seen));
   sp_da_for(target->link.cc.whole_archives, it) {
-    spn_try(spn_err_emit(&spn, read_archive_symbols(target->link.cc.whole_archives[it], &symbols, &seen)));
+    spn_try(read_archive_symbols(target->link.cc.whole_archives[it], &symbols, &seen));
   }
 
   sp_io_file_writer_t writer = sp_zero;
@@ -154,22 +157,22 @@ static s32 spn_link_exports_exec(sp_mem_t scratch, spn_target_unit_t* target, sp
   }
   sp_io_file_writer_close(&writer);
 
-  return 0;
+  return SPN_OK;
 }
 
-s32 spn_link_exports_run(spn_target_unit_t* target, sp_da(sp_str_t) objects, sp_str_t output) {
+spn_err_t spn_link_exports_run(spn_target_unit_t* target, sp_da(sp_str_t) objects, sp_str_t output) {
   spn_pkg_unit_announce_compile(target->pkg);
 
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  s32 result = spn_link_exports_exec(scratch.mem, target, objects, output);
+  spn_err_t result = link_exports_exec(scratch.mem, target, objects, output);
   sp_mem_end_scratch(scratch);
   return result;
 }
 
-static spn_err_union_t read_export_symbols(sp_mem_t mem, sp_str_t path, sp_da(sp_str_t)* symbols) {
+static spn_err_t read_export_symbols(sp_mem_t mem, sp_str_t path, sp_da(sp_str_t)* symbols) {
   sp_str_t content = sp_zero;
   if (sp_io_read_file(mem, path, &content)) {
-    return (spn_err_union_t) { .kind = SPN_ERR_FS_READ, .fs.path = path };
+    return spn_err_emit(&spn, (spn_err_union_t) { .kind = SPN_ERR_FS_READ, .fs.path = path });
   }
 
   sp_da(sp_str_t) lines = sp_str_split_c8(mem, content, '\n');
@@ -178,10 +181,10 @@ static spn_err_union_t read_export_symbols(sp_mem_t mem, sp_str_t path, sp_da(sp
       sp_da_push(*symbols, lines[it]);
     }
   }
-  return spn_result(SPN_OK);
+  return SPN_OK;
 }
 
-static s32 spn_link_target_exec(sp_mem_t scratch, spn_target_unit_t* target, sp_str_t output, sp_da(sp_str_t) objects, sp_str_t exports) {
+static spn_err_t link_target_exec(sp_mem_t scratch, spn_target_unit_t* target, sp_str_t output, sp_da(sp_str_t) objects, sp_str_t exports) {
   spn_cc_link_files_t files = {
     .output = output,
     .objects = objects,
@@ -189,7 +192,7 @@ static s32 spn_link_target_exec(sp_mem_t scratch, spn_target_unit_t* target, sp_
   switch (target->kind) {
     case SPN_CC_OUTPUT_REACTOR: {
       sp_da_init(scratch, files.exports.symbols);
-      spn_try(spn_err_emit(&spn, read_export_symbols(scratch, exports, &files.exports.symbols)));
+      spn_try(read_export_symbols(scratch, exports, &files.exports.symbols));
       break;
     }
     case SPN_CC_OUTPUT_SHARED_LIB: {
@@ -207,7 +210,7 @@ static s32 spn_link_target_exec(sp_mem_t scratch, spn_target_unit_t* target, sp_
   }
 
   spn_invocation_t* invocation = sp_alloc_type(spn.mem, spn_invocation_t);
-  spn_try(spn_err_emit(&spn, spn_build_link_invocation(spn.mem, target, &files, invocation)));
+  spn_try(spn_build_link_invocation(spn.mem, target, &files, invocation));
 
   spn_invocation_result_t run = spn_invocation_run(invocation);
 
@@ -218,7 +221,7 @@ static s32 spn_link_target_exec(sp_mem_t scratch, spn_target_unit_t* target, sp_
   return emit_link_passed(target, invocation, spn_target_output_path(spn.mem, target), run.result.out, run.elapsed);
 }
 
-s32 spn_link_target_run(spn_target_unit_t* target, sp_str_t output, sp_da(sp_str_t) objects, sp_str_t exports) {
+spn_err_t spn_link_target_run(spn_target_unit_t* target, sp_str_t output, sp_da(sp_str_t) objects, sp_str_t exports) {
   spn_pkg_unit_announce_compile(target->pkg);
 
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
@@ -230,7 +233,7 @@ s32 spn_link_target_run(spn_target_unit_t* target, sp_str_t output, sp_da(sp_str
   });
 
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  s32 result = spn_link_target_exec(scratch.mem, target, output, objects, exports);
+  spn_err_t result = link_target_exec(scratch.mem, target, output, objects, exports);
   sp_mem_end_scratch(scratch);
   return result;
 }

@@ -199,7 +199,7 @@ static void provision_create(sp_mem_t mem, sp_str_t dir, const c8* rel, const c8
   sp_fs_create_file_str(path, sp_str_view(content));
 }
 
-sp_test_each(provision, store, provision_test_t, tests) {
+sp_test_each(provision, store, provision_test_t, tests, .setup = spn_test_ctx_setup) {
   sp_mem_t mem = sp_test_arena(t);
   sp_str_t dir = sp_test_dir(t);
 
@@ -273,7 +273,7 @@ sp_test_each(provision, store, provision_test_t, tests) {
 
   sp_str_t roots [PROVISION_MAX_TOOLCHAINS] = sp_zero;
   u32 provisions = 0;
-  spn_err_union_t err = sp_zero;
+  spn_err_union_t payload = sp_zero;
 
   sp_carr_for(it->toolchains, at) {
     const c8* name = it->toolchains[at];
@@ -295,10 +295,14 @@ sp_test_each(provision, store, provision_test_t, tests) {
     }
 
     roots[at] = sp_str_lit("sentinel");
-    err = spn_toolchain_provision(&store, &toolchain, artifact, &roots[at]);
-    sp_must_eq(t, (u32)it->expect.kind, (u32)err.kind);
-    if (err.kind) {
-      sp_expect_str_eq_c(t, err.artifact.name, name);
+    spn_err_t err = spn_toolchain_provision(&store, &toolchain, artifact, &roots[at]);
+    sp_must_eq(t, (u32)it->expect.kind, (u32)err);
+    if (err) {
+      sp_da(spn_build_event_t) errs = spn_test_drain_errs(mem);
+      sp_must_eq(t, 1, sp_da_size(errs));
+      payload = errs[0].err;
+      sp_expect_eq(t, payload.kind, err);
+      sp_expect_str_eq_c(t, payload.artifact.name, name);
     }
     provisions++;
   }
@@ -326,8 +330,8 @@ sp_test_each(provision, store, provision_test_t, tests) {
     sp_expect_str_eq(t, entries[0].name, lock);
   }
   if (it->expect.err_reports_sha) {
-    sp_expect_str_eq(t, err.artifact.expected, artifact_sha);
-    sp_expect_str_eq(t, err.artifact.actual, sha);
+    sp_expect_str_eq(t, payload.artifact.expected, artifact_sha);
+    sp_expect_str_eq(t, payload.artifact.actual, sha);
   }
   if (provisions > 1) {
     sp_expect_str_eq(t, roots[0], roots[1]);

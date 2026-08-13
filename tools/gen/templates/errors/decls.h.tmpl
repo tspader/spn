@@ -10,7 +10,6 @@
 {{ $types }}
 typedef struct {
   spn_err_t kind;
-  bool reported;
   union {
 {{ for .arms }}
     {{ .type }} {{ .name }};

@@ -11,7 +11,7 @@
   "packages": [],
   "errors": [
     {
-      "kind": "pkg_no_match",
+      "kind": "pkg_conflict",
       "namespace": "spn",
       "name": "foo",
       "range": "^2.0.0",

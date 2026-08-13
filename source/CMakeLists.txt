@@ -91,7 +91,6 @@ set(SPN_SOURCES
   semver/parser.c
   session/invocation.c
   session/options.c
-  session/registry/registry.c
   session/session.c
   sha256/sha256.c
   sp/atomic_file.c

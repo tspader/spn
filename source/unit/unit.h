@@ -9,16 +9,16 @@
 spn_build_config_t spn_build_config_target(spn_triple_t host, spn_profile_info_t profile);
 spn_build_config_t spn_build_config_metaprogram(spn_triple_t host);
 spn_build_id_t     spn_build_id(const spn_build_config_t* config);
-spn_err_union_t    spn_build_add(spn_session_t* session, spn_build_config_t config, spn_build_unit_t** build);
+spn_err_t          spn_build_add(spn_session_t* session, spn_build_config_t config, spn_build_unit_t** build);
 
-spn_err_union_t spn_units_add_packages(spn_session_t* session);
+spn_err_t spn_units_add_packages(spn_session_t* session);
 
 // The metaprogram scope runs before the configure graph, the target scope after
 typedef enum {
   SPN_UNIT_SCOPE_METAPROGRAM,
   SPN_UNIT_SCOPE_TARGET,
 } spn_unit_scope_t;
-spn_err_union_t spn_units_add_targets(spn_session_t* session, spn_unit_scope_t scope);
+spn_err_t spn_units_add_targets(spn_session_t* session, spn_unit_scope_t scope);
 
 sp_da(spn_closure_entry_t) spn_target_link_closure(sp_mem_t mem, spn_target_unit_t* root);
 sp_da(spn_target_unit_t*)  spn_target_runtime_libs(sp_mem_t mem, spn_target_unit_t* root);

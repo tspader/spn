@@ -113,6 +113,8 @@ const c8* test_target_alternate(void) {
   return SP_NULLPTR;
 }
 
+spn_sanitizer_set_t get_supported_sanitizers(const spn_cc_toolchain_t* toolchain, spn_triple_t target);
+
 sp_str_t test_when_blocked(const test_when_t* when) {
   sp_mem_t mem = sp_mem_os_new();
   const test_toolchain_t* toolchain = test_toolchain();
@@ -135,14 +137,7 @@ sp_str_t test_when_blocked(const test_when_t* when) {
       .name = sp_str_view(toolchain->name),
       .driver = toolchain->driver,
     };
-    spn_profile_info_t profile = {
-      .arch = target.arch,
-      .os = target.os,
-      .abi = target.abi,
-      .linkage = SPN_LIB_KIND_SHARED,
-      .sanitizers = when->sanitize,
-    };
-    if (spn_cc_validate_profile(&cc, &profile).kind) {
+    if (when->sanitize & ~get_supported_sanitizers(&cc, target)) {
       return sp_fmt(mem, "{} targeting {} can't build sanitize={}",
         sp_fmt_cstr(toolchain->name),
         sp_fmt_str(spn_triple_to_str(mem, target)),

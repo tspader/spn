@@ -41,7 +41,7 @@ files = [
 
 [profile.default]
 toolchain = "zig"
-linkage = "shared"
+linkage = "static"
 standard = "c11"
 mode = "debug"
 
@@ -131,6 +131,7 @@ source = [
   "source/dag/store.c",
   "source/dag/wasi.c",
   "source/enum/enum.c",
+  "source/error/error.c",
   "source/error/json.c",
   "source/event/event.c",
   "source/external/git.c",
@@ -207,6 +208,7 @@ source = [
   "source/intern/context.c",
   "source/intern/intern.c",
   "source/enum/enum.c",
+  "source/error/error.c",
   "source/error/json.c",
   "source/event/event.c",
   "source/log/lazy/lazy.c",
@@ -241,7 +243,6 @@ source = [
   "source/pkg/options.c",
   "source/pkg/pkg.c",
   "source/profile/profile.c",
-  "source/session/registry/registry.c",
   "source/triple/triple.c",
   "source/resolve/resolve.c",
   "source/resolve/dump.c",
@@ -270,7 +271,12 @@ source = [
   "source/codegen/gen/events.gen.c",
   "source/codegen/json.c",
   "source/codegen/loader.c",
+  "source/core/core.c",
+  "source/ctx/ctx.c",
   "source/enum/enum.c",
+  "source/event/event.c",
+  "source/log/lazy/lazy.c",
+  "source/error/error.c",
   "source/error/json.c",
   "source/external/tom.c",
   "source/intern/intern.c",
@@ -325,6 +331,7 @@ source = [
   "source/intern/context.c",
   "source/intern/intern.c",
   "source/enum/enum.c",
+  "source/error/error.c",
   "source/error/json.c",
   "source/event/event.c",
   "source/log/lazy/lazy.c",
@@ -358,7 +365,6 @@ source = [
   "source/pkg/options.c",
   "source/pkg/pkg.c",
   "source/profile/profile.c",
-  "source/session/registry/registry.c",
   "source/triple/triple.c",
   "source/resolve/resolve.c",
   "source/sp/str.c",

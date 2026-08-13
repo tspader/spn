@@ -2,6 +2,7 @@
 
 #include "ctx/ctx.h"
 #include "dag/types.h"
+#include "error/error.h"
 #include "intern/intern.h"
 
 spn_ctx_t spn;
@@ -25,14 +26,14 @@ bool spn_ctx_progress(spn_ctx_t* ctx, spn_progress_t* progress) {
   return true;
 }
 
-spn_err_union_t spn_ctx_require_project(spn_ctx_t* ctx) {
+spn_err_t spn_ctx_require_project(spn_ctx_t* ctx) {
   if (!ctx->project) {
-    return (spn_err_union_t) {
+    return spn_err_emit(ctx, (spn_err_union_t) {
       .kind = SPN_ERR_NO_MANIFEST,
       .no_manifest = { .path = ctx->paths.project },
-    };
+    });
   }
-  return spn_result(SPN_OK);
+  return SPN_OK;
 }
 
 spn_index_info_t* spn_find_index(spn_ctx_t* ctx, sp_str_t name) {

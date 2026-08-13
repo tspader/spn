@@ -107,9 +107,10 @@ sp_test_each(index_cache, get_package, cache_test_t, tests, .setup = spn_test_ct
   };
 
   spn_index_pkg_t* pkg = SP_NULLPTR;
-  spn_err_union_t err = spn_index_cache_get_package(&cache, request, &pkg);
+  spn_index_diag_t diag = sp_zero;
+  spn_err_t err = spn_index_cache_get_package(&cache, request, &pkg, &diag);
 
-  sp_expect_eq(t, it->expect.err, err.kind);
+  sp_expect_eq(t, it->expect.err, err);
   sp_must_eq(t, it->expect.exists, pkg != SP_NULLPTR);
 
   if (pkg) {
@@ -119,7 +120,7 @@ sp_test_each(index_cache, get_package, cache_test_t, tests, .setup = spn_test_ct
 
   if (it->memoized) {
     spn_index_pkg_t* again = SP_NULLPTR;
-    spn_index_cache_get_package(&cache, request, &again);
+    spn_index_cache_get_package(&cache, request, &again, &diag);
     sp_must(t, again == pkg);
   }
 
