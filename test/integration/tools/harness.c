@@ -512,7 +512,7 @@ static bool event_matches(yyjson_val* line, const c8* event, const c8* key, cons
 }
 
 static u32 count_events(fixture_t* fixture, spn_build_event_kind_t kind, const c8* key, const c8* value) {
-  const c8* event = spn_event_info[kind].name;
+  const c8* event = spn_event_name(kind);
   sp_mem_t mem = fixture->mem;
 
   u32 count = 0;
@@ -532,7 +532,7 @@ static u32 count_events(fixture_t* fixture, spn_build_event_kind_t kind, const c
 }
 
 static sp_err_t expect_event(sp_test_t* t, fixture_t* fixture, spn_build_event_kind_t kind, const c8* key, const c8* value, bool expected, const c8* file, u32 line) {
-  const c8* event = spn_event_info[kind].name;
+  const c8* event = spn_event_name(kind);
   sp_mem_t mem = fixture->mem;
 
   bool found = false;
@@ -1195,7 +1195,7 @@ sp_err_t run_actions(sp_test_t* t, fixture_t* fixture, const action_t* actions) 
       }
       case ACTION_VERIFY_EVENT_COUNT: {
         u32 count = count_events(fixture, action.verify_event_count.event, action.verify_event_count.key, action.verify_event_count.value);
-        sp_test_kv(t, "event", sp_str_view(spn_event_info[action.verify_event_count.event].name));
+        sp_test_kv(t, "event", sp_str_view(spn_event_name(action.verify_event_count.event)));
         sp_expect_eq(t, action.verify_event_count.count, count);
         break;
       }

@@ -22,16 +22,7 @@ typedef enum {
   SPN_EVENT_SEVERITY_FATAL,
 } spn_event_severity_t;
 
-typedef enum {
-  SPN_EVENT_NONE,
-{{ for .kinds }}
-  {{ .code }},
-{{ end }}
-  SPN_EVENT_COUNT,
-} spn_build_event_kind_t;
-
 typedef struct {
-  const c8* name;
   const c8* verb;
   spn_verbosity_t verbosity;
   spn_event_severity_t severity;
@@ -54,6 +45,7 @@ typedef struct spn_build_event_t {
   };
 } spn_build_event_t;
 
+const c8* spn_event_name(spn_build_event_kind_t kind);
 void spn_event_log_jsonl(sp_io_writer_t* json, spn_build_event_t* event);
 
 #endif

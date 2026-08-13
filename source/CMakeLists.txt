@@ -99,7 +99,6 @@ set(SPN_SOURCES
   sp/io.c
   sp/os.c
   sp/str.c
-  sp/terminal.c
   target/mutate.c
   target/select.c
   target/target.c
