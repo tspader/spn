@@ -82,15 +82,6 @@ typedef struct {
 typedef sp_da(spn_option_request_t) spn_option_requests_t;
 typedef sp_ht(sp_intern_id_t, spn_option_requests_t) spn_option_seeds_t;
 
-typedef enum {
-  SPN_OPTION_SETTER_NONE,
-  SPN_OPTION_SETTER_DEFAULT,
-  SPN_OPTION_SETTER_PROFILE,
-  SPN_OPTION_SETTER_ROOT_MANIFEST,
-  SPN_OPTION_SETTER_UNION,
-  SPN_OPTION_SETTER_CONSUMER,
-} spn_option_setter_kind_t;
-
 typedef struct {
   spn_option_setter_kind_t kind;
   sp_str_t name;

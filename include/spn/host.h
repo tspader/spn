@@ -59,6 +59,8 @@ spn_build_mode_t spn_build_mode_from_str(sp_str_t str);
 spn_opt_level_t spn_opt_level_from_str(sp_str_t str);
 spn_sanitizer_t spn_sanitizer_from_str(sp_str_t str);
 bool spn_sanitizer_set_has_conflict(spn_sanitizer_set_t set);
+sp_str_t spn_sanitizer_set_to_str(sp_mem_t mem, spn_sanitizer_set_t set);
+sp_str_t spn_semver_to_str(sp_mem_t mem, spn_semver_t version);
 sp_str_t spn_index_kind_to_str(spn_index_kind_t kind);
 sp_str_t spn_index_protocol_to_str(spn_index_protocol_t protocol);
 

@@ -140,7 +140,4 @@ void spn_codegen_json_s32(sp_io_writer_t* out, s32 value) {
   sp_fmt_io(out, "{}", sp_fmt_int(value));
 }
 
-void spn_codegen_write_codegen_issues(sp_io_writer_t* out, const spn_codegen_issues_t* issues) {
-  spn_codegen_json_issues(out, *issues);
-}
 

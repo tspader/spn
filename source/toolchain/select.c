@@ -65,7 +65,6 @@ SP_PRIVATE spn_err_t make_error(spn_err_t kind, spn_toolchain_catalog_t* catalog
   return spn_err_emit(&spn, (spn_err_union_t) {
     .kind = kind,
     .toolchain = {
-      .role = query.role,
       .name = query.name,
       .target = query.target,
       .host = query.host,

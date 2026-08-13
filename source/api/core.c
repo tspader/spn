@@ -115,7 +115,7 @@ void spn_log(spn_t* s, const c8* message) {
   spn_pkg_unit_t* unit = spn_api_unit(s);
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_USER_LOG,
-    .pkg = unit->info,
+    .pkg = unit->info->name,
     .user_log = { .message = sp_str_from_cstr(spn.mem, message) },
   });
 }

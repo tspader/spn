@@ -17,6 +17,7 @@
 #include "sp/os.h"
 #include "sp/sp_glob.h"
 #include "spn.embed.h"
+#include "toml/issue.h"
 #include "toml/loader.h"
 #include "toolchain/provision.h"
 #include "version.h"
@@ -189,7 +190,7 @@ static spn_err_t open_ctx(spn_ctx_t* ctx, spn_open_request_t request) {
     if (loaded || !sp_da_empty(loader.issues)) {
       return spn_err_emit(ctx, (spn_err_union_t) {
         .kind = SPN_ERR_MANIFEST_ISSUES,
-        .manifest = { .path = ctx->paths.config.toml, .issues = loader.issues },
+        .manifest = { .path = ctx->paths.config.toml, .issues = spn_codegen_issues_to_err(ctx->mem, loader.issues) },
       });
     }
     ctx->config.indexes = indexes;

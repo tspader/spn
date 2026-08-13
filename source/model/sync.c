@@ -233,7 +233,7 @@ static spn_err_t load_manifest(spn_session_t* session, sp_str_t name, sp_str_t p
   if (loaded) {
     return spn_err_emit(session->ctx, (spn_err_union_t) {
       .kind = SPN_ERR_MANIFEST_ISSUES,
-      .manifest = { .name = name, .path = path, .issues = issues },
+      .manifest = { .name = name, .path = path, .issues = spn_codegen_issues_to_err(spn.mem, issues) },
     });
   }
 
@@ -368,7 +368,7 @@ static spn_err_t load_package(spn_session_t* session, spn_resolved_pkg_t* pkg, s
   loaded->elapsed = sp_tm_read_timer(&timer);
 
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
-    .kind = SPN_EVENT_SYNC_PACKAGE, .pkg = loaded->info,
+    .kind = SPN_EVENT_SYNC_PACKAGE, .pkg = loaded->info->name,
     .sync_pkg = {
       .name = qualified,
       .url = sync_url(pkg->origin.recipe, pkg->origin.source),

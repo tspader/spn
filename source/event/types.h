@@ -3,6 +3,7 @@
 
 #include "sp.h"
 
+#include "core/types.h"
 #include "events.gen.h"
 #include "log/lazy/types.h"
 

@@ -4,6 +4,7 @@
 #include "intern/intern.h"
 #include "lock/lock.h"
 #include "pkg/load.h"
+#include "toml/issue.h"
 #include "sp/atomic_file.h"
 
 sp_str_t spn_project_manifest_path(sp_mem_t mem, sp_str_t root) {
@@ -34,7 +35,7 @@ spn_err_t spn_project_load(spn_ctx_t* ctx, sp_str_t root, spn_project_t** projec
   if (parsed) {
     return spn_err_emit(ctx, (spn_err_union_t) {
       .kind = SPN_ERR_MANIFEST_ISSUES,
-      .manifest = { .path = manifest, .issues = issues },
+      .manifest = { .path = manifest, .issues = spn_codegen_issues_to_err(ctx->heap, issues) },
     });
   }
 

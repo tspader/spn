@@ -144,12 +144,12 @@ sp_test_each(options_session, apply, session_test_t, tests, .setup = spn_test_ct
   }
 
   sp_must_eq(t, sp_da_size(errs), 1);
-  spn_option_violation_t* violation = &errs[0].err.option.violation;
+  spn_err_option_t* option = &errs[0].err.option;
   sp_expect_eq(t, errs[0].err.kind, it->expect.err);
-  sp_expect(t, sp_str_equal_cstr(violation->pkg, it->expect.pkg));
-  sp_expect_eq(t, violation->a.kind, it->expect.setter);
+  sp_expect(t, sp_str_equal_cstr(option->pkg, it->expect.pkg));
+  sp_expect_eq(t, option->a.kind, it->expect.setter);
   if (it->expect.setter_name) {
-    sp_expect(t, sp_str_equal_cstr(violation->a.name, it->expect.setter_name));
+    sp_expect(t, sp_str_equal_cstr(option->a.name, it->expect.setter_name));
   }
 
   return SP_OK;

@@ -125,7 +125,16 @@
       "properties": {
         "name": { "type": "string" },
         "path": { "type": "string" },
-        "issues": { "metadata": { "extern": "codegen_issues", "include": "codegen/types.h" } }
+        "issues": { "elements": { "ref": "issue" } }
+      }
+    },
+    "issue": {
+      "properties": {
+        "code": { "metadata": { "extern": "err" } },
+        "path": { "type": "string" }
+      },
+      "optionalProperties": {
+        "detail": { "type": "string" }
       }
     },
     "no_manifest": {
@@ -161,15 +170,13 @@
     },
     "toolchain": {
       "properties": {
-        "role": { "ref": "toolchain_role" },
         "name": { "type": "string" },
         "target": { "metadata": { "extern": "triple" } },
         "host": { "metadata": { "extern": "triple" } },
         "candidates": { "elements": { "type": "string" } }
       }
     },
-    "toolchain_role": { "enum": ["build", "script"], "metadata": { "include": "toolchain/types.h" } },
-    "cc_feature": { "enum": ["compile", "link_exe", "link_shared", "link_reactor", "archive", "frameworks"], "metadata": { "include": "compiler/types.h" } },
+    "cc_feature": { "enum": ["compile", "link_exe", "link_shared", "link_reactor", "archive", "frameworks"] },
     "artifact": {
       "properties": {
         "name": { "type": "string" },
@@ -237,15 +244,21 @@
     },
     "unknown": {
       "properties": {
-        "request": { "metadata": { "extern": "requested_dep", "include": "pkg/types.h" } }
+        "qualified": { "type": "string" }
+      },
+      "optionalProperties": {
+        "range": { "type": "string" }
       }
     },
     "unsatisfiable": {
       "properties": {
-        "request": { "metadata": { "extern": "requested_dep", "include": "pkg/types.h" } },
+        "qualified": { "type": "string" }
+      },
+      "optionalProperties": {
+        "range": { "type": "string" },
         "requester": { "type": "string" },
-        "requester_version": { "metadata": { "extern": "semver", "include": "semver/types.h" } },
-        "selected": { "metadata": { "extern": "semver", "include": "semver/types.h" } }
+        "requester_version": { "metadata": { "extern": "semver" } },
+        "selected": { "metadata": { "extern": "semver" } }
       }
     },
     "mismatch": {
@@ -260,27 +273,35 @@
         "path": { "type": "string" }
       }
     },
+    "pkg_name": {
+      "properties": {
+        "name": { "type": "string" }
+      },
+      "optionalProperties": {
+        "namespace": { "type": "string" }
+      }
+    },
     "circular": {
       "properties": {
-        "id": { "metadata": { "extern": "pkg_name", "include": "pkg/types.h" } }
+        "id": { "ref": "pkg_name" }
       }
     },
     "unit_cycle": {
       "properties": {
-        "id": { "metadata": { "extern": "pkg_name", "include": "pkg/types.h" } },
-        "version": { "metadata": { "extern": "semver", "include": "semver/types.h" } }
+        "id": { "ref": "pkg_name" },
+        "version": { "metadata": { "extern": "semver" } }
       }
     },
     "dynamic_dup": {
       "properties": {
-        "id": { "metadata": { "extern": "pkg_name", "include": "pkg/types.h" } },
-        "low": { "metadata": { "extern": "semver", "include": "semver/types.h" } },
-        "high": { "metadata": { "extern": "semver", "include": "semver/types.h" } }
+        "id": { "ref": "pkg_name" },
+        "low": { "metadata": { "extern": "semver" } },
+        "high": { "metadata": { "extern": "semver" } }
       }
     },
     "too_complex": {
       "properties": {
-        "id": { "metadata": { "extern": "pkg_name", "include": "pkg/types.h" } }
+        "id": { "ref": "pkg_name" }
       }
     },
     "target": {
@@ -298,9 +319,24 @@
         "code": { "type": "int32" }
       }
     },
+    "option_setter_kind": { "enum": ["none", "default", "profile", "root_manifest", "union", "consumer"] },
+    "setter": {
+      "properties": {
+        "kind": { "ref": "option_setter_kind" }
+      },
+      "optionalProperties": {
+        "name": { "type": "string" }
+      }
+    },
     "option": {
       "properties": {
-        "violation": { "metadata": { "extern": "option_violation", "include": "pkg/types.h" } }
+        "pkg": { "type": "string" },
+        "a": { "ref": "setter" },
+        "b": { "ref": "setter" }
+      },
+      "optionalProperties": {
+        "option": { "type": "string" },
+        "value": { "type": "string" }
       }
     },
     "configure_source": {

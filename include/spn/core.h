@@ -51,6 +51,31 @@ typedef struct {
   u16 minor;
 } spn_os_version_t;
 
+typedef struct {
+  u32 major;
+  u32 minor;
+  u32 patch;
+  u8 padding [4];
+} spn_semver_t;
+
+typedef enum {
+  SPN_CC_FEATURE_COMPILE,
+  SPN_CC_FEATURE_LINK_EXE,
+  SPN_CC_FEATURE_LINK_SHARED,
+  SPN_CC_FEATURE_LINK_REACTOR,
+  SPN_CC_FEATURE_ARCHIVE,
+  SPN_CC_FEATURE_FRAMEWORKS,
+} spn_cc_feature_t;
+
+typedef enum {
+  SPN_OPTION_SETTER_NONE,
+  SPN_OPTION_SETTER_DEFAULT,
+  SPN_OPTION_SETTER_PROFILE,
+  SPN_OPTION_SETTER_ROOT_MANIFEST,
+  SPN_OPTION_SETTER_UNION,
+  SPN_OPTION_SETTER_CONSUMER,
+} spn_option_setter_kind_t;
+
 typedef enum {
   SPN_BUILD_MODE_NONE,
   SPN_BUILD_MODE_DEBUG,

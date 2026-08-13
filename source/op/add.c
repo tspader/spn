@@ -15,6 +15,7 @@
 #include "semver/parser.h"
 #include "sp/atomic_file.h"
 #include "toml/edit.h"
+#include "toml/issue.h"
 
 typedef struct {
   sp_str_t path [4];
@@ -53,7 +54,7 @@ static spn_err_t index_err(spn_ctx_t* ctx, spn_pkg_name_t name, spn_err_t kind, 
     case SPN_ERR_MANIFEST_ISSUES: {
       return spn_err_emit(ctx, (spn_err_union_t) {
         .kind = kind,
-        .manifest = { .name = spn_pkg_name_to_qualified(name), .path = diag->path, .issues = diag->issues },
+        .manifest = { .name = spn_pkg_name_to_qualified(name), .path = diag->path, .issues = spn_codegen_issues_to_err(ctx->heap, diag->issues) },
       });
     }
     case SPN_ERR_INDEX_CORRUPT: {
@@ -89,7 +90,7 @@ static spn_err_t add(spn_ctx_t* ctx, spn_add_request_t request, spn_semver_range
     return index_err(ctx, name, got, &diag);
   }
   if (!pkg || sp_da_empty(pkg->releases)) {
-    return spn_err_emit(ctx, (spn_err_union_t) { .kind = SPN_ERR_PKG_UNKNOWN, .unknown = { .request = { .qualified = spn_pkg_name_to_qualified(name) } } });
+    return spn_err_emit(ctx, (spn_err_union_t) { .kind = SPN_ERR_PKG_UNKNOWN, .unknown = { .qualified = spn_pkg_name_to_qualified(name) } });
   }
 
   spn_index_release_t* release = SP_NULLPTR;
@@ -107,11 +108,8 @@ static spn_err_t add(spn_ctx_t* ctx, spn_add_request_t request, spn_semver_range
 
   if (!release) {
     return spn_err_emit(ctx, (spn_err_union_t) { .kind = SPN_ERR_PKG_NO_MATCH, .unsatisfiable = {
-      .request = {
-        .qualified = spn_pkg_name_to_qualified(name),
-        .source = SPN_PKG_SOURCE_INDEX,
-        .index = { .range = range },
-      },
+      .qualified = spn_pkg_name_to_qualified(name),
+      .range = spn_semver_range_to_str(ctx->heap, range),
     }});
   }
 

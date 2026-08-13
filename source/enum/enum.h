@@ -44,10 +44,7 @@ sp_str_t spn_linkage_to_str(spn_linkage_t kind);
 
 spn_option_type_t spn_option_type_from_str(sp_str_t str);
 sp_str_t spn_option_type_to_str(spn_option_type_t type);
-sp_str_t spn_option_setter_to_str(spn_option_setter_t setter);
 sp_str_t spn_option_setter_kind_to_str(spn_option_setter_kind_t kind);
-sp_str_t spn_option_err_to_str(spn_option_err_t err);
-sp_str_t spn_toolchain_role_to_str(spn_toolchain_role_t role);
 sp_str_t spn_cc_feature_to_str(spn_cc_feature_t feature);
 
 spn_dir_t spn_cache_dir_kind_from_str(sp_str_t str);

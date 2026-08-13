@@ -409,30 +409,6 @@ sp_str_t spn_option_type_to_str(spn_option_type_t type) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
-sp_str_t spn_option_setter_to_str(spn_option_setter_t setter) {
-  switch (setter.kind) {
-    case SPN_OPTION_SETTER_NONE: {
-      return sp_str_lit("");
-    }
-    case SPN_OPTION_SETTER_DEFAULT: {
-      return sp_str_lit("the default");
-    }
-    case SPN_OPTION_SETTER_PROFILE: {
-      return sp_str_lit("the profile");
-    }
-    case SPN_OPTION_SETTER_ROOT_MANIFEST: {
-      return sp_str_lit("the root manifest");
-    }
-    case SPN_OPTION_SETTER_UNION: {
-      return sp_str_lit("the union of requests");
-    }
-    case SPN_OPTION_SETTER_CONSUMER: {
-      return setter.name;
-    }
-  }
-  SP_UNREACHABLE_RETURN(sp_str_lit(""));
-}
-
 sp_str_t spn_option_setter_kind_to_str(spn_option_setter_kind_t kind) {
   switch (kind) {
     case SPN_OPTION_SETTER_NONE: {
@@ -452,45 +428,6 @@ sp_str_t spn_option_setter_kind_to_str(spn_option_setter_kind_t kind) {
     }
     case SPN_OPTION_SETTER_CONSUMER: {
       return sp_str_lit("consumer");
-    }
-  }
-  SP_UNREACHABLE_RETURN(sp_str_lit(""));
-}
-
-sp_str_t spn_option_err_to_str(spn_option_err_t err) {
-  switch (err) {
-    case SPN_OPTION_ERR_UNDECLARED: {
-      return sp_str_lit("undeclared");
-    }
-    case SPN_OPTION_ERR_BAD_VALUE: {
-      return sp_str_lit("bad_value");
-    }
-    case SPN_OPTION_ERR_CONFLICT: {
-      return sp_str_lit("conflict");
-    }
-    case SPN_OPTION_ERR_VETO: {
-      return sp_str_lit("veto");
-    }
-    case SPN_OPTION_ERR_NO_VALUE: {
-      return sp_str_lit("no_value");
-    }
-    case SPN_OPTION_ERR_LATE_GATE: {
-      return sp_str_lit("late_gate");
-    }
-    case SPN_OPTION_ERR_UNKNOWN_PKG: {
-      return sp_str_lit("unknown_pkg");
-    }
-  }
-  SP_UNREACHABLE_RETURN(sp_str_lit(""));
-}
-
-sp_str_t spn_toolchain_role_to_str(spn_toolchain_role_t role) {
-  switch (role) {
-    case SPN_TOOLCHAIN_ROLE_BUILD: {
-      return sp_str_lit("build");
-    }
-    case SPN_TOOLCHAIN_ROLE_SCRIPT: {
-      return sp_str_lit("script");
     }
   }
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
