@@ -14,7 +14,6 @@ set(SPN_SOURCES
   cli/main.c
   cli/profile.c
   cli/publish.c
-  cli/run.c
   cli/test.c
   codegen/codegen.c
   codegen/loader.c
@@ -43,6 +42,7 @@ set(SPN_SOURCES
   external/git.c
   external/obj.c
   external/tom.c
+  external/toml.c
   external/wasm/abi.c
   external/wasm/guest.c
   external/wasm/wasm.c
@@ -76,7 +76,7 @@ set(SPN_SOURCES
   op/clean.c
   op/index.c
   op/op.c
-  op/run.c
+  op/test.c
   op/scaffold.c
   op/publish.c
   pkg/id.c
@@ -94,10 +94,21 @@ set(SPN_SOURCES
   session/registry/registry.c
   session/session.c
   sha256/sha256.c
+  sp/atomic_file.c
+  sp/coff.c
   sp/color.c
   sp/fs.c
   sp/io.c
+  sp/macho.c
   sp/os.c
+  sp/prompt.c
+  sp/queue.c
+  sp/sp.c
+  sp/sp_cli.c
+  sp/sp_elf.c
+  sp/sp_glob.c
+  sp/sp_math.c
+  sp/sp_template.c
   sp/str.c
   target/mutate.c
   target/select.c

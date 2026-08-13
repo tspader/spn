@@ -21,7 +21,7 @@ static void index_list() {
   width.kind = sp_max(width.kind, sp_cstr_len(headers[1]));
   width.protocol = sp_max(width.protocol, sp_cstr_len(headers[2]));
 
-  spn_print("{:<$ .gray} {:<$ .gray} {:<$ .gray} {.gray}",
+  spn_print(&tui, "{:<$ .gray} {:<$ .gray} {:<$ .gray} {.gray}",
     sp_fmt_uint(width.name),
     sp_fmt_cstr(headers[0]),
     sp_fmt_uint(width.kind),
@@ -32,7 +32,7 @@ static void index_list() {
 
   sp_for(it, indexes.count) {
     spn_index_desc_t* index = &indexes.items[it];
-    spn_print("{:>$} {:>$} {:>$} {}",
+    spn_print(&tui, "{:>$} {:>$} {:>$} {}",
       sp_fmt_uint(width.name),
       sp_fmt_str(index->name),
       sp_fmt_uint(width.kind),
@@ -62,7 +62,7 @@ sp_cli_result_t spn_cli_index_path(sp_cli_t* cli) {
   }
 
   spn_tui_handoff(&tui);
-  spn_print("{}", sp_fmt_str(index.location));
+  spn_print(&tui, "{}", sp_fmt_str(index.location));
   return SP_CLI_OK;
 }
 

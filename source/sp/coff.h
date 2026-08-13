@@ -64,7 +64,12 @@ sp_err_t            sp_coff_write_to_file(sp_coff_t* coff, sp_str_t path);
 #endif // SP_COFF_H
 
 
-#if defined(SP_IMPLEMENTATION)
+#if defined(SP_IMPLEMENTATION) && !defined(SP_COFF_IMPLEMENTATION)
+  #define SP_COFF_IMPLEMENTATION
+#endif
+
+#if defined(SP_COFF_IMPLEMENTATION) && !defined(SP_COFF_IMPLEMENTATION_GUARD)
+#define SP_COFF_IMPLEMENTATION_GUARD
 
 static void sp_coff_write_u8(sp_io_writer_t* w, u8 v)   { sp_io_write(w, &v, 1, SP_NULLPTR); }
 static void sp_coff_write_u16(sp_io_writer_t* w, u16 v)  { sp_io_write(w, &v, 2, SP_NULLPTR); }
@@ -246,4 +251,4 @@ sp_err_t sp_coff_write_to_file(sp_coff_t* coff, sp_str_t path) {
   return err;
 }
 
-#endif // SP_IMPLEMENTATION
+#endif // SP_COFF_IMPLEMENTATION

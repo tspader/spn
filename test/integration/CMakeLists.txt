@@ -30,7 +30,6 @@ add_executable(integration
   platform.c
   profile.c
   reexport.c
-  run.c
   script.c
   target.c
   units.c

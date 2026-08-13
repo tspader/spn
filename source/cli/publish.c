@@ -21,9 +21,9 @@ static sp_cli_result_t publish_dry() {
   }
 
   spn_tui_handoff(&tui);
-  spn_print("{}", sp_fmt_str(spn_op_result(op).publish.json));
+  spn_print(&tui, "{}", sp_fmt_str(spn_op_result(op).publish.json));
   spn_op_free(op);
-  spn_print_err("{.cyan}: dry run, nothing published", sp_fmt_cstr("note"));
+  spn_print_err(&tui, "{.cyan}: dry run, nothing published", sp_fmt_cstr("note"));
   return SP_CLI_OK;
 }
 

@@ -57,7 +57,12 @@ sp_err_t             sp_macho_write_to_file(sp_macho_t* macho, sp_str_t path);
 #endif // SP_MACHO_H
 
 
-#if defined(SP_IMPLEMENTATION)
+#if defined(SP_IMPLEMENTATION) && !defined(SP_MACHO_IMPLEMENTATION)
+  #define SP_MACHO_IMPLEMENTATION
+#endif
+
+#if defined(SP_MACHO_IMPLEMENTATION) && !defined(SP_MACHO_IMPLEMENTATION_GUARD)
+#define SP_MACHO_IMPLEMENTATION_GUARD
 
 static void sp_macho_write_u32(sp_io_writer_t* w, u32 v) { sp_io_write(w, &v, 4, SP_NULLPTR); }
 static void sp_macho_write_u64(sp_io_writer_t* w, u64 v) { sp_io_write(w, &v, 8, SP_NULLPTR); }
@@ -237,4 +242,4 @@ sp_err_t sp_macho_write_to_file(sp_macho_t* macho, sp_str_t path) {
   return err;
 }
 
-#endif // SP_IMPLEMENTATION
+#endif // SP_MACHO_IMPLEMENTATION

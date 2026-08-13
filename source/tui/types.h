@@ -40,6 +40,7 @@ typedef struct {
 } spn_tui_buffered_log_t;
 
 typedef struct {
+  spn_ctx_t* ctx;
   spn_tui_mode_t mode;
   sp_mem_t mem;
   spn_logger_t logger;
@@ -68,6 +69,5 @@ typedef struct {
   } handoff;
 } spn_tui_t;
 
-extern spn_tui_t tui;
 
 #endif

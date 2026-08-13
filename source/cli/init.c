@@ -101,12 +101,12 @@ static spn_err_t run_unattended(spn_cli_init_t* command, sp_str_t dir, sp_str_t 
 
   spn_str_arr_t files = spn_op_result(op).scaffold.files;
   sp_for(it, files.count) {
-    spn_print("- {}", sp_fmt_str(files.items[it]));
+    spn_print(&tui, "- {}", sp_fmt_str(files.items[it]));
   }
   spn_op_free(op);
 
-  spn_print("");
-  spn_print("To build your program:\n\n  spn build {}", sp_fmt_str(name));
+  spn_print(&tui, "");
+  spn_print(&tui, "To build your program:\n\n  spn build {}", sp_fmt_str(name));
 
   return SPN_OK;
 }

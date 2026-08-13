@@ -6,6 +6,8 @@
 
 #include "spn/host.h"
 
+#include "tui/types.h"
+
 typedef struct spn_cli spn_cli_t;
 
 typedef struct {
@@ -43,10 +45,6 @@ typedef struct {
 } spn_cli_build_t;
 
 typedef struct {
-  sp_str_t entry;
-} spn_cli_run_t;
-
-typedef struct {
   sp_str_t index;
   sp_str_t source_url;
   sp_str_t source_rev;
@@ -71,7 +69,6 @@ struct spn_cli {
   spn_cli_add_t add;
   spn_cli_init_t init;
   spn_cli_build_t build;
-  spn_cli_run_t run;
   spn_cli_publish_t publish;
   spn_cli_index_t index;
 };
@@ -89,5 +86,6 @@ typedef struct {
 
 extern spn_cli_t args;
 extern spn_cli_host_t host;
+extern spn_tui_t tui;
 
 #endif

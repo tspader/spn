@@ -22,26 +22,6 @@
 #include "cli/cli.h"
 #include "tui/tui.h"
 
-#define SP_IMPLEMENTATION
-#include "sp.h"
-#include "sp/atomic_file.h"
-#include "sp/queue.h"
-#include "sp/prompt.h"
-#include "sp/sp_cli.h"
-#include "sp/sp_template.h"
-#include "sp/coff.h"
-#include "sp/sp_elf.h"
-#include "sp/macho.h"
-
-#define SP_MATH_IMPLEMENTATION
-#include "sp/sp_math.h"
-
-#define SP_GLOB_IMPLEMENTATION
-#include "sp/sp_glob.h"
-
-#define TOML_IMPLEMENTATION
-#include "toml.h"
-
 static struct {
   s32 num_args;
   const c8** args;
@@ -113,8 +93,8 @@ s32 spn_main(s32 num_args, const c8** argv) {
   }
   host.mem = sp_mem_arena_as_allocator(sp_mem_arena_new(sp_mem_os_new()));
   sp_sys_pipe(&host.doorbell.read, &host.doorbell.write);
-  spn_tui_open(&tui, mode, verbosity, host.doorbell.read, host.doorbell.write);
   host.ctx = spn_ctx_new(on_wake, SP_NULLPTR);
+  spn_tui_open(&tui, host.ctx, mode, verbosity, host.doorbell.read, host.doorbell.write);
   sp_os_register_signal_handler(SP_OS_SIGNAL_INTERRUPT, on_signal, SP_NULLPTR);
 
   sp_cli_result_t status = sp_cli_dispatch(&app.cli);
