@@ -23,7 +23,6 @@ spn_err_t spn_cli_wait(spn_op_t* op);
 sp_cli_result_t spn_cli_init(sp_cli_t* cli);
 sp_cli_result_t spn_cli_add(sp_cli_t* cli);
 sp_cli_result_t spn_cli_build(sp_cli_t* cli);
-sp_cli_result_t spn_cli_run(sp_cli_t* cli);
 sp_cli_result_t spn_cli_test(sp_cli_t* cli);
 sp_cli_result_t spn_cli_clean(sp_cli_t* cli);
 sp_cli_result_t spn_cli_publish(sp_cli_t* cli);

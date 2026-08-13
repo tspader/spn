@@ -26,7 +26,7 @@ sp_test(layout, staged_test) {
 
 sp_test(layout, staged_script) {
   return run_command_test(t, (command_test_t) {
-    .project = "test/integration/fixtures/run/manifest",
+    .project = "test/integration/fixtures/script/staged",
     .args = { "build", "main" },
     .expect.exists = { exe("main") },
   });

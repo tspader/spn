@@ -4,6 +4,7 @@
 
 spn_cli_t args;
 spn_cli_host_t host;
+spn_tui_t tui;
 
 static sp_cli_cmd_t cmd_init = {
   .name = "init",
@@ -187,59 +188,6 @@ static sp_cli_cmd_t cmd_build = {
     },
   },
   .handler = spn_cli_build,
-};
-
-static sp_cli_cmd_t cmd_run = {
-  .name = "run",
-  .summary = "Run a manifest script target or a relative C source file",
-  .opts = {
-    {
-      .brief = 'p',
-      .name = "profile",
-      .kind = SP_CLI_OPT_STR,
-      .summary = "Profile to use when resolving build dependencies",
-      .placeholder = "PROFILE",
-      .ptr = &args.profile.name,
-    },
-    {
-      .name = "toolchain",
-      .kind = SP_CLI_OPT_STR,
-      .summary = "Override toolchain",
-      .placeholder = "NAME",
-      .ptr = &args.profile.toolchain,
-    },
-    {
-      .brief = 'm',
-      .name = "mode",
-      .kind = SP_CLI_OPT_STR,
-      .summary = "Override build mode (debug, release)",
-      .placeholder = "MODE",
-      .ptr = &args.profile.mode,
-    },
-    {
-      .name = "opt",
-      .kind = SP_CLI_OPT_STR,
-      .summary = "Override optimization level (0, 1, 2, 3, s, z)",
-      .placeholder = "LEVEL",
-      .ptr = &args.profile.opt,
-    },
-    {
-      .name = "sanitize",
-      .kind = SP_CLI_OPT_STR,
-      .summary = "Enable sanitizers (address, thread, undefined, memory, leak)",
-      .placeholder = "LIST",
-      .ptr = &args.profile.sanitize,
-    },
-  },
-  .args = {
-    {
-      .name = "entry",
-      .kind = SP_CLI_OPT_STR,
-      .summary = "Script target name or relative .c file",
-      .ptr = &args.run.entry,
-    },
-  },
-  .handler = spn_cli_run,
 };
 
 static sp_cli_cmd_t cmd_test = {
@@ -438,7 +386,6 @@ static sp_cli_cmd_t cmd_root = {
     &cmd_add,
     &cmd_clean,
     &cmd_build,
-    &cmd_run,
     &cmd_test,
     &cmd_publish,
     &cmd_index,

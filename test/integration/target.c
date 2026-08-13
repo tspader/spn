@@ -137,12 +137,12 @@ sp_test(target, selection_test_command) {
   });
 }
 
-sp_test(target, selection_run_command) {
+sp_test(target, selection_named_script) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/target/selection",
     .copy = { "spum.c", "script.c" },
     .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { "run", .args = { "script" } } },
+      { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "script" } } },
       { .kind = ACTION_VERIFY_EXISTS, .exists = store_file("bin/script") },
       { .kind = ACTION_VERIFY_NOT_EXISTS, .exists = store_file("bin/main") },
       { .kind = ACTION_VERIFY_NOT_EXISTS, .exists = test_exe("test") },

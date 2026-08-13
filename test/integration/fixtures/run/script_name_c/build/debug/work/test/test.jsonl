@@ -1,3 +1,0 @@
-{"event": "compile_start", "level": 2, "level_name": "info", "ts_s": 1786081636, "ts_ns": 436714344, "tid": 139935709374144, "pkg": "test"}
-{"event": "build_passed", "level": 2, "level_name": "info", "ts_s": 1786081636, "ts_ns": 503426726, "tid": 139935931692736, "pkg": "test"}
-{"event": "build_summary", "level": 2, "level_name": "info", "ts_s": 1786081636, "ts_ns": 503436526, "tid": 139935931692736, "pkg": "test", "data": {"success": true, "hits": 0, "misses": 3, "total": 3, "time_ns": 66668501, "profile": "debug"}}

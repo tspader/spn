@@ -40,7 +40,6 @@ static void exec(spn_op_t* op) {
       case SPN_OP_SCAFFOLD:      op->result.err = spn_op_scaffold(op); break;
       case SPN_OP_BUILD:         op->result.err = spn_op_build(op); break;
       case SPN_OP_TEST:          op->result.err = spn_op_test(op); break;
-      case SPN_OP_RUN_TARGET:    op->result.err = spn_op_run_target(op); break;
       case SPN_OP_CLEAN:         op->result.err = spn_op_clean(op); break;
       case SPN_OP_CLEAN_PROFILE: op->result.err = spn_op_clean_profile(op); break;
     }

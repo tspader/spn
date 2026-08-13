@@ -78,7 +78,6 @@ typedef enum {
   SPN_OP_SCAFFOLD,
   SPN_OP_BUILD,
   SPN_OP_TEST,
-  SPN_OP_RUN_TARGET,
   SPN_OP_CLEAN,
   SPN_OP_CLEAN_PROFILE,
 } spn_op_kind_t;

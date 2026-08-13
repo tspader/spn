@@ -13,7 +13,6 @@ SP_BEGIN_EXTERN_C()
 
 typedef struct spn_ctx_t spn_ctx_t;
 typedef struct spn_session_t spn_session_t;
-typedef struct spn_target_unit spn_target_t;
 typedef struct spn_op_t spn_op_t;
 typedef struct spn_build_event_t spn_build_event_t;
 
@@ -23,7 +22,6 @@ spn_err_t spn_ctx_open_session(spn_ctx_t* ctx, const spn_session_config_t* confi
 void spn_ctx_close(spn_ctx_t* ctx, bool ok);
 bool spn_ctx_progress(spn_ctx_t* ctx, spn_progress_t* progress);
 spn_build_event_t* spn_ctx_drain(spn_ctx_t* ctx);
-bool spn_ctx_find_target(spn_ctx_t* ctx, sp_str_t name, spn_target_kind_t* kind);
 sp_str_t spn_ctx_project_dir(spn_ctx_t* ctx);
 sp_str_t spn_ctx_cache_dir(spn_ctx_t* ctx);
 bool spn_get_index(spn_ctx_t* ctx, sp_str_t name, spn_index_desc_t* index);
@@ -34,7 +32,6 @@ spn_op_t* spn_sync_indexes(spn_ctx_t* ctx, spn_sync_request_t request);
 spn_op_t* spn_scaffold_project(spn_ctx_t* ctx, spn_scaffold_request_t request);
 spn_op_t* spn_build(spn_session_t* session);
 spn_op_t* spn_run_tests(spn_session_t* session);
-spn_op_t* spn_run_target(spn_session_t* session, spn_target_t* target);
 spn_op_t* spn_clean(spn_ctx_t* ctx);
 spn_op_t* spn_clean_profile(spn_session_t* session);
 spn_op_t* spn_op_new(spn_ctx_t* ctx, spn_session_t* session, spn_op_kind_t kind);
@@ -45,9 +42,6 @@ bool spn_op_done(spn_op_t* op);
 spn_op_result_t spn_op_result(spn_op_t* op);
 void spn_op_free(spn_op_t* op);
 spn_err_t spn_scaffold_check(spn_ctx_t* ctx, spn_scaffold_request_t request);
-spn_target_t* spn_session_find_target(spn_session_t* session, sp_str_t name);
-sp_str_t spn_target_name(spn_target_t* target);
-sp_str_t spn_target_path(sp_mem_t mem, spn_target_t* target);
 sp_str_t spn_err_to_str(spn_err_t err);
 const c8* spn_event_name(spn_build_event_kind_t kind);
 spn_err_t spn_triple_parse(sp_str_t str, spn_triple_t* triple);

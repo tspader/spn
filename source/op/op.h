@@ -15,7 +15,6 @@ spn_err_t spn_op_sync_indexes(spn_op_t* op);
 spn_err_t spn_op_scaffold(spn_op_t* op);
 spn_err_t spn_op_build(spn_op_t* op);
 spn_err_t spn_op_test(spn_op_t* op);
-spn_err_t spn_op_run_target(spn_op_t* op);
 spn_err_t spn_op_clean(spn_op_t* op);
 spn_err_t spn_op_clean_profile(spn_op_t* op);
 
