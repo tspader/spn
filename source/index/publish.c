@@ -8,6 +8,7 @@
 #include "index/release.h"
 #include "index/publish.h"
 #include "pkg/load.h"
+#include "toml/issue.h"
 
 spn_err_t spn_publish_build(spn_publish_opts_t* opts, spn_index_release_t* built) {
   sp_str_t manifest_path = sp_fs_join_path(opts->mem, opts->cwd, sp_str_lit("spn.toml"));
@@ -24,7 +25,7 @@ spn_err_t spn_publish_build(spn_publish_opts_t* opts, spn_index_release_t* built
   if (loaded) {
     return spn_err_emit(&spn, (spn_err_union_t) {
       .kind = SPN_ERR_MANIFEST_ISSUES,
-      .manifest = { .path = manifest_path, .issues = issues },
+      .manifest = { .path = manifest_path, .issues = spn_codegen_issues_to_err(spn.mem, issues) },
     });
   }
 

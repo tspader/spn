@@ -2,7 +2,6 @@
 #include "codegen/codegen.h"
 #include "enum/enum.h"
 #include "error/json.h"
-#include "pkg/types.h"
 
 const spn_event_info_t spn_event_info[SPN_EVENT_COUNT] = {
   [SPN_EVENT_NONE] = { .verb = "" },
@@ -52,9 +51,9 @@ void spn_event_log_jsonl(sp_io_writer_t* json, spn_build_event_t* event) {
   sp_fmt_io(json, ", \"ts_s\": {}, \"ts_ns\": {}", sp_fmt_uint(event->epoch.s), sp_fmt_uint(event->epoch.ns));
   sp_fmt_io(json, ", \"tid\": {}", sp_fmt_uint(event->thread_id));
 
-  if (event->pkg) {
+  if (!sp_str_empty(event->pkg)) {
     sp_io_write_cstr(json, ", \"pkg\": ", SP_NULLPTR);
-    spn_codegen_json_str(json, event->pkg->name);
+    spn_codegen_json_str(json, event->pkg);
   }
 
   switch (event->kind) {

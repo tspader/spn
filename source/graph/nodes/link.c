@@ -50,7 +50,7 @@ spn_err_t spn_build_link_invocation(sp_mem_t mem, spn_target_unit_t* target, con
 static spn_err_t emit_link_passed(spn_target_unit_t* unit, spn_invocation_t* invocation, sp_str_t output, sp_str_t out, u64 elapsed) {
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_LINK_PASSED,
-    .pkg = unit->pkg->info,
+    .pkg = unit->pkg->info->name,
     .link_passed = {
       .target = unit->info->name,
       .output_path = output,
@@ -65,7 +65,7 @@ static spn_err_t emit_link_passed(spn_target_unit_t* unit, spn_invocation_t* inv
 static spn_err_t emit_link_failed(spn_target_unit_t* unit, spn_invocation_t* invocation, s32 rc, sp_str_t out, sp_str_t err) {
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_LINK_FAILED,
-    .pkg = unit->pkg->info,
+    .pkg = unit->pkg->info->name,
     .link_failed = {
       .target = unit->info->name,
       .exit_code = rc,
@@ -226,7 +226,7 @@ spn_err_t spn_link_target_run(spn_target_unit_t* target, sp_str_t output, sp_da(
 
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_LINK_START,
-    .pkg = target->pkg->info,
+    .pkg = target->pkg->info->name,
     .link_start = {
       .target = target->info->name,
     }

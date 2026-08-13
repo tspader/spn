@@ -28,6 +28,23 @@ static spn_err_t violation_kind(spn_option_err_t kind) {
   sp_unreachable_return(SPN_ERROR);
 }
 
+static spn_err_setter_t violation_setter(spn_option_setter_t setter) {
+  return (spn_err_setter_t) { .kind = setter.kind, .name = setter.name };
+}
+
+static spn_err_union_t violation_err(sp_mem_t mem, spn_option_violation_t violation) {
+  return (spn_err_union_t) {
+    .kind = violation_kind(violation.kind),
+    .option = {
+      .pkg = violation.pkg,
+      .option = violation.option,
+      .value = violation.value.kind == SPN_OPTION_VALUE_NONE ? sp_str_lit("") : spn_option_value_to_str(mem, violation.value),
+      .a = violation_setter(violation.a),
+      .b = violation_setter(violation.b),
+    },
+  };
+}
+
 static spn_resolved_dep_t* node_find_edge(spn_resolved_pkg_t* node, sp_intern_id_t qualified, spn_dep_kind_t kind) {
   sp_da_for(node->edges, it) {
     if (node->edges[it].id.qualified == qualified && node->edges[it].kind == kind) {
@@ -112,12 +129,7 @@ static spn_err_t validate_config_keys(spn_session_t* session) {
     if (!known) {
       return spn_err_emit(session->ctx, (spn_err_union_t) {
         .kind = SPN_ERR_OPTION_UNKNOWN_PKG,
-        .option = {
-          .violation = {
-            .kind = SPN_OPTION_ERR_UNKNOWN_PKG,
-            .pkg = entry->key,
-          },
-        },
+        .option = { .pkg = entry->key },
       });
     }
   }
@@ -181,10 +193,7 @@ spn_err_t spn_session_apply_options(spn_session_t* session, bool* reresolve) {
       if (!sp_da_empty(merged.violations)) {
         spn_err_t first = SPN_OK;
         sp_da_for(merged.violations, vt) {
-          spn_err_t kind = spn_err_emit(session->ctx, (spn_err_union_t) {
-            .kind = violation_kind(merged.violations[vt].kind),
-            .option.violation = merged.violations[vt],
-          });
+          spn_err_t kind = spn_err_emit(session->ctx, violation_err(mem, merged.violations[vt]));
           if (!first) {
             first = kind;
           }
@@ -241,11 +250,8 @@ spn_err_t spn_session_apply_options(spn_session_t* session, bool* reresolve) {
       return spn_err_emit(session->ctx, (spn_err_union_t) {
         .kind = SPN_ERR_OPTION_LATE_GATE,
         .option = {
-          .violation = {
-            .kind = SPN_OPTION_ERR_LATE_GATE,
-            .pkg = missing_pkg,
-            .a = { .kind = SPN_OPTION_SETTER_CONSUMER, .name = missing_dep },
-          },
+          .pkg = missing_pkg,
+          .a = { .kind = SPN_OPTION_SETTER_CONSUMER, .name = missing_dep },
         },
       });
     }

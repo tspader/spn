@@ -6,15 +6,7 @@
 #include "sp/prompt.h"
 #include "sp/str.h"
 
-#include "ctx/types.h"
-
-#include "enum/enum.h"
-#include "event/event.h"
-#include "semver/convert.h"
-#include "toml/issue.h"
-#include "toolchain/select.h"
 #include "tui/tui.h"
-#include "when/when.h"
 
 
 sp_prompt_widget_t sp_prompt_progress_widget(sp_prompt_ctx_t* ctx, sp_prompt_progress_t config);
@@ -124,6 +116,79 @@ static sp_str_t get_colored_name(sp_mem_t mem, sp_str_t name) {
   return sp_fmt(mem, "{}{}" SP_ANSI_RESET, sp_fmt_str(name_to_color(mem, name)), sp_fmt_str(name)).value;
 }
 
+static void write_manifest_issue(sp_io_writer_t* w, const spn_err_issue_t* issue) {
+  switch (issue->code) {
+    case SPN_ERR_CODEGEN_MISSING_KEY:
+      sp_fmt_io(w, "missing required field {.cyan}", SP_FMT_STR(issue->path));
+      break;
+    case SPN_ERR_CODEGEN_EXPECTED_STR:
+      sp_fmt_io(w, "{.cyan} must be a string", SP_FMT_STR(issue->path));
+      break;
+    case SPN_ERR_CODEGEN_EXPECTED_INT:
+      sp_fmt_io(w, "{.cyan} must be a non-negative integer", SP_FMT_STR(issue->path));
+      break;
+    case SPN_ERR_CODEGEN_EXPECTED_BOOL:
+      sp_fmt_io(w, "{.cyan} must be a boolean", SP_FMT_STR(issue->path));
+      break;
+    case SPN_ERR_CODEGEN_EXPECTED_OBJECT:
+      sp_fmt_io(w, "{.cyan} must be a table", SP_FMT_STR(issue->path));
+      break;
+    case SPN_ERR_CODEGEN_DUPLICATE_KEY:
+      sp_fmt_io(w, "duplicate {.yellow} at {.cyan}", SP_FMT_STR(issue->detail), SP_FMT_STR(issue->path));
+      break;
+    case SPN_ERR_CODEGEN_UNKNOWN_KEY:
+      if (sp_str_empty(issue->path)) {
+        sp_fmt_io(w, "unknown field {.red}", SP_FMT_STR(issue->detail));
+      } else {
+        sp_fmt_io(w, "unknown field {.red} in {.cyan}", SP_FMT_STR(issue->detail), SP_FMT_STR(issue->path));
+      }
+      break;
+    case SPN_ERR_CODEGEN_INVALID:
+      sp_fmt_io(w, "invalid value at {.cyan}", SP_FMT_STR(issue->path));
+      break;
+    case SPN_ERR_CODEGEN_PARSE:
+      if (sp_str_empty(issue->detail)) {
+        sp_io_write_str(w, sp_str_lit("not valid toml"), SP_NULLPTR);
+      } else {
+        sp_fmt_io(w, "not valid toml: {}", SP_FMT_STR(issue->detail));
+      }
+      break;
+    case SPN_ERR_CODEGEN_FILE_MISSING:
+      sp_io_write_str(w, sp_str_lit("file is missing"), SP_NULLPTR);
+      break;
+    case SPN_ERR_CODEGEN_ROOT_ONLY:
+      sp_fmt_io(w, "{.cyan} is only allowed in the root manifest", SP_FMT_STR(issue->path));
+      break;
+    default:
+      sp_fmt_io(w, "invalid field at {.cyan}", SP_FMT_STR(issue->path));
+      break;
+  }
+}
+
+static sp_str_t setter_to_str(spn_err_setter_t setter) {
+  switch (setter.kind) {
+    case SPN_OPTION_SETTER_NONE: {
+      return sp_str_lit("");
+    }
+    case SPN_OPTION_SETTER_DEFAULT: {
+      return sp_str_lit("the default");
+    }
+    case SPN_OPTION_SETTER_PROFILE: {
+      return sp_str_lit("the profile");
+    }
+    case SPN_OPTION_SETTER_ROOT_MANIFEST: {
+      return sp_str_lit("the root manifest");
+    }
+    case SPN_OPTION_SETTER_UNION: {
+      return sp_str_lit("the union of requests");
+    }
+    case SPN_OPTION_SETTER_CONSUMER: {
+      return setter.name;
+    }
+  }
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
 static sp_str_t get_contextual_path(spn_ctx_t* ctx, sp_mem_t mem, sp_str_t path) {
   sp_str_t cache = spn_ctx_cache_dir(ctx);
   if (!sp_str_empty(cache) && sp_str_starts_with(path, cache)) {
@@ -195,8 +260,8 @@ static sp_str_t render_event_detail(spn_ctx_t* ctx, sp_mem_t mem, spn_build_even
       break;
     }
     case SPN_EVENT_COMPILE_START: {
-      if (event->pkg) {
-        sp_fmt_io(&w.base, "v{}", sp_fmt_str(spn_semver_to_str(mem, event->pkg->version)));
+      if (!sp_str_empty(event->compile_start.version)) {
+        sp_fmt_io(&w.base, "v{}", sp_fmt_str(event->compile_start.version));
       }
       break;
     }
@@ -420,9 +485,9 @@ static sp_str_t render_event_detail(spn_ctx_t* ctx, sp_mem_t mem, spn_build_even
           sp_fmt_io(
             &w.base,
             "{} does not declare an option named {.yellow} (set by {.cyan})",
-            sp_fmt_str(get_colored_name(mem, event->err.option.violation.pkg)),
-            sp_fmt_str(event->err.option.violation.option),
-            sp_fmt_str(spn_option_setter_to_str(event->err.option.violation.a))
+            sp_fmt_str(get_colored_name(mem, event->err.option.pkg)),
+            sp_fmt_str(event->err.option.option),
+            sp_fmt_str(setter_to_str(event->err.option.a))
           );
           break;
         }
@@ -430,10 +495,10 @@ static sp_str_t render_event_detail(spn_ctx_t* ctx, sp_mem_t mem, spn_build_even
           sp_fmt_io(
             &w.base,
             "{.yellow} is not a valid value for {}.{.cyan} (set by {.cyan})",
-            sp_fmt_str(spn_option_value_to_str(mem, event->err.option.violation.value)),
-            sp_fmt_str(get_colored_name(mem, event->err.option.violation.pkg)),
-            sp_fmt_str(event->err.option.violation.option),
-            sp_fmt_str(spn_option_setter_to_str(event->err.option.violation.a))
+            sp_fmt_str(event->err.option.value),
+            sp_fmt_str(get_colored_name(mem, event->err.option.pkg)),
+            sp_fmt_str(event->err.option.option),
+            sp_fmt_str(setter_to_str(event->err.option.a))
           );
           break;
         }
@@ -441,10 +506,10 @@ static sp_str_t render_event_detail(spn_ctx_t* ctx, sp_mem_t mem, spn_build_even
           sp_fmt_io(
             &w.base,
             "option conflict on {}.{.cyan}: {.cyan} and {.cyan} request different values",
-            sp_fmt_str(get_colored_name(mem, event->err.option.violation.pkg)),
-            sp_fmt_str(event->err.option.violation.option),
-            sp_fmt_str(spn_option_setter_to_str(event->err.option.violation.a)),
-            sp_fmt_str(spn_option_setter_to_str(event->err.option.violation.b))
+            sp_fmt_str(get_colored_name(mem, event->err.option.pkg)),
+            sp_fmt_str(event->err.option.option),
+            sp_fmt_str(setter_to_str(event->err.option.a)),
+            sp_fmt_str(setter_to_str(event->err.option.b))
           );
           break;
         }
@@ -452,11 +517,11 @@ static sp_str_t render_event_detail(spn_ctx_t* ctx, sp_mem_t mem, spn_build_even
           sp_fmt_io(
             &w.base,
             "{.cyan} requires {}.{.cyan} != {.yellow}, but {} set it",
-            sp_fmt_str(spn_option_setter_to_str(event->err.option.violation.a)),
-            sp_fmt_str(get_colored_name(mem, event->err.option.violation.pkg)),
-            sp_fmt_str(event->err.option.violation.option),
-            sp_fmt_str(spn_option_value_to_str(mem, event->err.option.violation.value)),
-            sp_fmt_str(spn_option_setter_to_str(event->err.option.violation.b))
+            sp_fmt_str(setter_to_str(event->err.option.a)),
+            sp_fmt_str(get_colored_name(mem, event->err.option.pkg)),
+            sp_fmt_str(event->err.option.option),
+            sp_fmt_str(event->err.option.value),
+            sp_fmt_str(setter_to_str(event->err.option.b))
           );
           break;
         }
@@ -464,8 +529,8 @@ static sp_str_t render_event_detail(spn_ctx_t* ctx, sp_mem_t mem, spn_build_even
           sp_fmt_io(
             &w.base,
             "no value for {}.{.cyan}: no default matched and nothing set it",
-            sp_fmt_str(get_colored_name(mem, event->err.option.violation.pkg)),
-            sp_fmt_str(event->err.option.violation.option)
+            sp_fmt_str(get_colored_name(mem, event->err.option.pkg)),
+            sp_fmt_str(event->err.option.option)
           );
           break;
         }
@@ -473,8 +538,8 @@ static sp_str_t render_event_detail(spn_ctx_t* ctx, sp_mem_t mem, spn_build_even
           sp_fmt_io(
             &w.base,
             "the dependency gate on {}'s edge to {.cyan} never settled",
-            sp_fmt_str(get_colored_name(mem, event->err.option.violation.pkg)),
-            sp_fmt_str(spn_option_setter_to_str(event->err.option.violation.a))
+            sp_fmt_str(get_colored_name(mem, event->err.option.pkg)),
+            sp_fmt_str(setter_to_str(event->err.option.a))
           );
           break;
         }
@@ -482,7 +547,7 @@ static sp_str_t render_event_detail(spn_ctx_t* ctx, sp_mem_t mem, spn_build_even
           sp_fmt_io(
             &w.base,
             "the root manifest configures {.yellow}, which is not a package in this build",
-            sp_fmt_str(event->err.option.violation.pkg)
+            sp_fmt_str(event->err.option.pkg)
           );
           break;
         }
@@ -526,7 +591,7 @@ static sp_str_t render_event_detail(spn_ctx_t* ctx, sp_mem_t mem, spn_build_even
           sp_fmt_io(
             &w.base,
             "{} could not be located",
-            sp_fmt_str(get_colored_name(mem, event->err.unknown.request.qualified))
+            sp_fmt_str(get_colored_name(mem, event->err.unknown.qualified))
           );
           break;
         }
@@ -539,8 +604,8 @@ static sp_str_t render_event_detail(spn_ctx_t* ctx, sp_mem_t mem, spn_build_even
           sp_fmt_io(
             &w.base,
             "no version of {} satisfies {.yellow}, required by {}",
-            sp_fmt_str(get_colored_name(mem, err->request.qualified)),
-            sp_fmt_str(spn_semver_range_to_str(mem, err->request.index.range)),
+            sp_fmt_str(get_colored_name(mem, err->qualified)),
+            sp_fmt_str(err->range),
             sp_fmt_str(requester)
           );
           break;
@@ -554,10 +619,10 @@ static sp_str_t render_event_detail(spn_ctx_t* ctx, sp_mem_t mem, spn_build_even
           sp_fmt_io(
             &w.base,
             "{} is already selected at {.yellow}, but {} requires {.yellow}",
-            sp_fmt_str(get_colored_name(mem, err->request.qualified)),
+            sp_fmt_str(get_colored_name(mem, err->qualified)),
             sp_fmt_str(spn_semver_to_str(mem, err->selected)),
             sp_fmt_str(requester),
-            sp_fmt_str(spn_semver_range_to_str(mem, err->request.index.range))
+            sp_fmt_str(err->range)
           );
           break;
         }
@@ -570,7 +635,7 @@ static sp_str_t render_event_detail(spn_ctx_t* ctx, sp_mem_t mem, spn_build_even
           sp_fmt_io(
             &w.base,
             "{} is already selected at {.yellow}, which conflicts with the version required by {}",
-            sp_fmt_str(get_colored_name(mem, err->request.qualified)),
+            sp_fmt_str(get_colored_name(mem, err->qualified)),
             sp_fmt_str(spn_semver_to_str(mem, err->selected)),
             sp_fmt_str(requester)
           );
@@ -1281,10 +1346,10 @@ static sp_str_t event_subject(spn_build_event_t* event) {
     case SPN_EVENT_ERR: {
       switch (event->err.kind) {
         case SPN_ERR_MANIFEST_ISSUES:  return event->err.manifest.name;
-        case SPN_ERR_PKG_UNKNOWN:      return event->err.unknown.request.qualified;
-        case SPN_ERR_PKG_NO_MATCH:     return event->err.unsatisfiable.request.qualified;
-        case SPN_ERR_PKG_CONFLICT:     return event->err.unsatisfiable.request.qualified;
-        case SPN_ERR_PKG_CONFLICT_EXACT: return event->err.unsatisfiable.request.qualified;
+        case SPN_ERR_PKG_UNKNOWN:      return event->err.unknown.qualified;
+        case SPN_ERR_PKG_NO_MATCH:     return event->err.unsatisfiable.qualified;
+        case SPN_ERR_PKG_CONFLICT:     return event->err.unsatisfiable.qualified;
+        case SPN_ERR_PKG_CONFLICT_EXACT: return event->err.unsatisfiable.qualified;
         case SPN_ERR_DEP_CYCLE:        return event->err.circular.id.name;
         case SPN_ERR_UNIT_CYCLE:       return event->err.unit_cycle.id.name;
         case SPN_ERR_DYNAMIC_DUPLICATE: return event->err.dynamic_dup.id.name;
@@ -1293,9 +1358,9 @@ static sp_str_t event_subject(spn_build_event_t* event) {
         case SPN_ERR_PATCH_NOT_GIT:    return event->err.patch.name;
         default:                       break;
       }
-      return event->pkg ? event->pkg->name : sp_str_lit("");
+      return event->pkg;
     }
-    default:                                  return event->pkg ? event->pkg->name : sp_str_lit("");
+    default:                                  return event->pkg;
   }
 }
 
@@ -1325,7 +1390,7 @@ static void render_event_extra(sp_io_writer_t* w, spn_build_event_t* event) {
         case SPN_ERR_MANIFEST_ISSUES: {
           sp_da_for(event->err.manifest.issues, it) {
             sp_io_write_str(w, sp_str_lit("  - "), SP_NULLPTR);
-            spn_codegen_issue_write(w, &event->err.manifest.issues[it]);
+            write_manifest_issue(w, &event->err.manifest.issues[it]);
             sp_io_write_c8(w, '\n');
           }
           break;
@@ -1363,7 +1428,7 @@ void spn_tui_log_event(spn_tui_t* tui, spn_build_event_t* event) {
   if (info->severity == SPN_EVENT_SEVERITY_INFO && info->verbosity > tui->logger.verbosity) {
     if (event->kind == SPN_EVENT_USER_LOG) {
       sp_da_push(tui->buffered_logs, ((spn_tui_buffered_log_t) {
-        .pkg = event->pkg ? sp_str_copy(tui->mem, event->pkg->name) : sp_str_lit(""),
+        .pkg = sp_str_copy(tui->mem, event->pkg),
         .message = sp_str_copy(tui->mem, event->user_log.message),
       }));
     }
@@ -1388,7 +1453,7 @@ void spn_tui_log_event(spn_tui_t* tui, spn_build_event_t* event) {
       sp_io_write_c8(io, '\n');
       write_error(io, mem, sp_str_lit("error"), detail);
     } else {
-      sp_str_t name = event->pkg ? event->pkg->name : sp_str_lit("");
+      sp_str_t name = event->pkg;
       write_event(io, mem, sp_str_lit("error"), true, name, detail);
     }
     render_event_extra(io, event);
@@ -1444,21 +1509,21 @@ void spn_tui_log_event(spn_tui_t* tui, spn_build_event_t* event) {
 
     case SPN_EVENT_TARGET_RUN: {
       sp_str_t name = event->target_run.name;
-      if (sp_str_empty(name) && event->pkg) {
-        name = event->pkg->name;
+      if (sp_str_empty(name)) {
+        name = event->pkg;
       }
       write_event(io, mem, verb, false, name, render_event_detail(tui->ctx, mem, event));
       break;
     }
 
     case SPN_EVENT_USER_LOG: {
-      sp_str_t name = event->pkg ? event->pkg->name : sp_str_lit("");
+      sp_str_t name = event->pkg;
       write_event(io, mem, sp_str_lit(""), false, name, event->user_log.message);
       break;
     }
 
     default: {
-      sp_str_t name = event->pkg ? event->pkg->name : sp_str_lit("");
+      sp_str_t name = event->pkg;
       write_event(io, mem, verb, false, name, render_event_detail(tui->ctx, mem, event));
       break;
     }

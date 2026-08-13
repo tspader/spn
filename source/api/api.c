@@ -15,7 +15,7 @@ s32 spn_run_ex(spn_t* ctx, spn_run_t run) {
       spn.events,
       (spn_build_event_t){
           .kind = SPN_EVENT_API_CALL,
-          .pkg = unit->info,
+          .pkg = unit->info->name,
           .api_call = {
               .fn = sp_str_lit("spn_run_ex"),
               .args = target ? sp_str_copy(spn.mem, target->name)

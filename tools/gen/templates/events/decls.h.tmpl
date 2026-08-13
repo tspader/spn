@@ -4,7 +4,6 @@
 #include "sp.h"
 #include "spn/core.h"
 #include "errors.gen.h"
-#include "core/types.h"
 {{ for .includes }}
 #include "{{ .name }}"
 {{ end }}
@@ -33,7 +32,7 @@ extern const spn_event_info_t spn_event_info[SPN_EVENT_COUNT];
 {{ $types }}
 typedef struct spn_build_event_t {
   spn_build_event_kind_t kind;
-  spn_pkg_info_t* pkg;
+  sp_str_t pkg;
   u64 thread_id;
   sp_tm_epoch_t epoch;
 

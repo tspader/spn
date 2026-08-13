@@ -258,7 +258,6 @@ sp_test_each(select, resolve, select_test_t, select_tests, .setup = spn_test_ctx
       spn_err_toolchain_t* toolchain = &errs[0].err.toolchain;
       sp_expect_eq(t, errs[0].err.kind, query.expect.err);
       sp_expect_str_eq_c(t, toolchain->name, query.name);
-      sp_expect_eq(t, (u32)query.role, (u32)toolchain->role);
       sp_da_for(toolchain->candidates, ct) {
         spn_toolchain_info_t* candidate = spn_toolchain_catalog_get(&catalog, toolchain->candidates[ct]);
         sp_must(t, candidate);

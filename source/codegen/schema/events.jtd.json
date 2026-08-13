@@ -70,7 +70,12 @@
         "tag": { "type": "string" }
       }
     },
-    "compile_start": { "metadata": { "verb": "Compiling" }, "properties": {} },
+    "compile_start": {
+      "metadata": { "verb": "Compiling" },
+      "optionalProperties": {
+        "version": { "type": "string" }
+      }
+    },
     "target_build_passed": { "metadata": { "verb": "Compiled", "verbosity": "debug" }, "ref": "target_passed" },
     "target_build_failed": { "metadata": { "severity": "error" }, "ref": "target_failed" },
     "target_run": {

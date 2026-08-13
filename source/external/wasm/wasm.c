@@ -64,7 +64,7 @@ static spn_err_t script_fail(spn_pkg_unit_t* unit, spn_err_t err, spn_err_wasm_t
   wasm.error = sp_str_copy(spn.mem, wasm.error);
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_ERR,
-    .pkg = unit->info,
+    .pkg = unit->info->name,
     .err = { .kind = err, .wasm = wasm },
   });
   return err;

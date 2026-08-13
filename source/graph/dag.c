@@ -265,7 +265,7 @@ static s32 dag_user_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data
 
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_SCRIPT_USER_FN,
-    .pkg = pkg->info,
+    .pkg = pkg->info->name,
     .script_user_fn = { .tag = node->tag }
   });
 
@@ -285,7 +285,7 @@ static s32 dag_user_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data
     if (!sp_fs_exists(artifact->target)) {
       spn_event_buffer_push(spn.events, (spn_build_event_t) {
         .kind = SPN_EVENT_NODE_FAILED,
-        .pkg = pkg->info,
+        .pkg = pkg->info->name,
         .node_failed = {
           .path = artifact->target,
           .message = sp_fmt(spn.mem, "was declared as an output of node {} but was not produced", sp_fmt_str(node->tag)).value,
@@ -296,7 +296,7 @@ static s32 dag_user_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data
     if (sp_fs_copy(artifact->target, artifact->path)) {
       spn_event_buffer_push(spn.events, (spn_build_event_t) {
         .kind = SPN_EVENT_NODE_FAILED,
-        .pkg = pkg->info,
+        .pkg = pkg->info->name,
         .node_failed = {
           .path = artifact->target,
           .message = sp_fmt(spn.mem, "output of node {} could not be copied into the build", sp_fmt_str(node->tag)).value,
@@ -349,7 +349,7 @@ spn_err_t spn_build_publish_copies(spn_pkg_unit_t* unit, sp_str_t root, spn_publ
     if (err) {
       spn_event_buffer_push(spn.events, (spn_build_event_t) {
         .kind = SPN_EVENT_NODE_FAILED,
-        .pkg = unit->info,
+        .pkg = unit->info->name,
         .node_failed = {
           .path = copy->from,
           .message = sp_fmt(spn.mem, "could not be published to {}", sp_fmt_str(copy->to)).value,
@@ -379,7 +379,7 @@ static s32 dag_tree_copy_user_outputs(spn_dag_tree_ctx_t* ctx, sp_str_t root) {
       if (err) {
         spn_event_buffer_push(spn.events, (spn_build_event_t) {
           .kind = SPN_EVENT_NODE_FAILED,
-          .pkg = unit->info,
+          .pkg = unit->info->name,
           .node_failed = {
             .path = path,
             .message = sp_fmt(spn.mem, "output of node {} could not be published to the package store", sp_fmt_str(node->tag)).value,
@@ -452,7 +452,7 @@ static s32 dag_package_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_d
     if (err) {
       spn_event_buffer_push(spn.events, (spn_build_event_t) {
         .kind = SPN_EVENT_NODE_FAILED,
-        .pkg = unit->info,
+        .pkg = unit->info->name,
         .node_failed = {
           .path = copy->from,
           .message = sp_fmt(spn.mem, "could not be published to {}", sp_fmt_str(copy->to)).value,
@@ -469,7 +469,7 @@ static s32 dag_package_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_d
   if (script) {
     spn_event_buffer_push(spn.events, (spn_build_event_t) {
       .kind = SPN_EVENT_SCRIPT_PACKAGE,
-      .pkg = unit->info,
+      .pkg = unit->info->name,
     });
 
     sp_tm_timer_t timer = sp_tm_start_timer();
@@ -480,7 +480,7 @@ static s32 dag_package_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_d
 
     spn_event_buffer_push(spn.events, (spn_build_event_t) {
       .kind = SPN_EVENT_PACKAGE_OK,
-      .pkg = unit->info,
+      .pkg = unit->info->name,
       .package_ok = {
         .time = unit->time.package
       }
@@ -1189,7 +1189,7 @@ static void dag_emit_reports(spn_dag_build_t* b, u64 elapsed) {
     if (failed) {
       spn_event_buffer_push(session->ctx->events, (spn_build_event_t) {
         .kind = SPN_EVENT_BUILD_FAILED,
-        .pkg = pkg,
+        .pkg = pkg->name,
         .build_failed = {
           .profile = profile->name,
           .time = elapsed,
@@ -1201,7 +1201,7 @@ static void dag_emit_reports(spn_dag_build_t* b, u64 elapsed) {
     else {
       spn_event_buffer_push(session->ctx->events, (spn_build_event_t) {
         .kind = SPN_EVENT_BUILD_PASSED,
-        .pkg = pkg,
+        .pkg = pkg->name,
         .build_passed = {
           .profile = profile->name,
           .time = elapsed,
@@ -1213,7 +1213,7 @@ static void dag_emit_reports(spn_dag_build_t* b, u64 elapsed) {
 
     spn_event_buffer_push(session->ctx->events, (spn_build_event_t) {
       .kind = SPN_EVENT_BUILD_SUMMARY,
-      .pkg = pkg,
+      .pkg = pkg->name,
       .build_summary = {
         .success = !failed,
         .hits = hits,
@@ -1306,7 +1306,7 @@ spn_err_t spn_dag_build_session(spn_op_t* op) {
   spn_triple_t target = { session->profile.arch, session->profile.os, session->profile.abi };
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_INIT_BUILD_GRAPH,
-    .pkg = session->pkg,
+    .pkg = session->pkg->name,
     .graph_init = {
       .profile = session->profile.name,
       .target = spn_triple_to_str(session->mem, target),

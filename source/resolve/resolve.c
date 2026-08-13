@@ -13,6 +13,7 @@
 #include "intern/intern.h"
 #include "pkg/id.h"
 #include "pkg/load.h"
+#include "toml/issue.h"
 #include "pkg/pkg.h"
 #include "resolve/resolve.h"
 #include "semver/compare.h"
@@ -142,11 +143,16 @@ static spn_dep_kind_t dep_kind_from_index(spn_index_dep_kind_t kind) {
   sp_unreachable_return(SPN_DEP_KIND_PACKAGE);
 }
 
+static spn_err_pkg_name_t err_pkg_name(spn_pkg_name_t id) {
+  return (spn_err_pkg_name_t) { .name = id.name, .namespace = id.namespace };
+}
+
 static spn_err_union_t unsatisfiable_err(spn_resolver_t* resolver, spn_resolved_pkg_t* from, spn_requested_dep_t* request, spn_err_t kind, spn_semver_t selected) {
   return (spn_err_union_t) {
     .kind = kind,
     .unsatisfiable = {
-      .request = *request,
+      .qualified = request->qualified,
+      .range = request->source == SPN_PKG_SOURCE_INDEX ? spn_semver_range_to_str(resolver->mem, request->index.range) : sp_str_lit(""),
       .requester = from ? sp_intern_str_from_id(resolver->intern, from->id.qualified) : sp_str_lit(""),
       .requester_version = from ? from->id.version : sp_zero_s(spn_semver_t),
       .selected = selected,
@@ -154,12 +160,12 @@ static spn_err_union_t unsatisfiable_err(spn_resolver_t* resolver, spn_resolved_
   };
 }
 
-static spn_err_union_t index_err(spn_requested_dep_t* request, spn_err_t kind, spn_index_diag_t* diag) {
+static spn_err_union_t index_err(spn_resolver_t* resolver, spn_requested_dep_t* request, spn_err_t kind, spn_index_diag_t* diag) {
   switch (kind) {
     case SPN_ERR_MANIFEST_ISSUES: {
       return (spn_err_union_t) {
         .kind = kind,
-        .manifest = { .name = request->qualified, .path = diag->path, .issues = diag->issues },
+        .manifest = { .name = request->qualified, .path = diag->path, .issues = spn_codegen_issues_to_err(resolver->mem, diag->issues) },
       };
     }
     case SPN_ERR_INDEX_CORRUPT: {
@@ -202,7 +208,7 @@ static spn_err_union_t load_file_pkg(spn_resolver_t* resolver, spn_requested_dep
   if (loaded) {
     return (spn_err_union_t) {
       .kind = SPN_ERR_MANIFEST_ISSUES,
-      .manifest = { .name = request->qualified, .path = request->file.path, .issues = issues },
+      .manifest = { .name = request->qualified, .path = request->file.path, .issues = spn_codegen_issues_to_err(resolver->mem, issues) },
     };
   }
 
@@ -436,7 +442,7 @@ static spn_err_union_t resolve_local_package(spn_resolver_t* resolver, spn_resol
   if (sp_ht_getp(run->visited, name)) {
     return (spn_err_union_t) {
       .kind = SPN_ERR_DEP_CYCLE,
-      .circular.id = spn_pkg_name_from_qualified(request->qualified),
+      .circular.id = err_pkg_name(spn_pkg_name_from_qualified(request->qualified)),
     };
   }
 
@@ -454,7 +460,7 @@ static spn_err_union_t resolve_local_package(spn_resolver_t* resolver, spn_resol
   if (!pkg) {
     return (spn_err_union_t) {
       .kind = SPN_ERR_PKG_UNKNOWN,
-      .unknown.request = *request
+      .unknown.qualified = request->qualified
     };
   }
 
@@ -509,7 +515,7 @@ static spn_err_union_t try_candidate(spn_resolver_t* resolver, spn_resolve_run_t
     run->fatal = true;
     return (spn_err_union_t) {
       .kind = SPN_ERR_RESOLVE_TOO_COMPLEX,
-      .too_complex.id = release->id,
+      .too_complex.id = err_pkg_name(release->id),
     };
   }
   run->budget--;
@@ -567,7 +573,7 @@ static spn_err_union_t resolve_index_package(spn_resolver_t* resolver, spn_resol
   if (sp_ht_getp(run->visited, name)) {
     return (spn_err_union_t) {
       .kind = SPN_ERR_DEP_CYCLE,
-      .circular.id = spn_pkg_name_from_qualified(request->qualified),
+      .circular.id = err_pkg_name(spn_pkg_name_from_qualified(request->qualified)),
     };
   }
 
@@ -586,12 +592,15 @@ static spn_err_union_t resolve_index_package(spn_resolver_t* resolver, spn_resol
   spn_index_diag_t diag = sp_zero;
   spn_err_t got = spn_index_cache_get_package(resolver->index, spn_pkg_name_from_qualified(request->qualified), &pkg, &diag);
   if (got) {
-    return index_err(request, got, &diag);
+    return index_err(resolver, request, got, &diag);
   }
   if (!pkg) {
     return (spn_err_union_t) {
       .kind = SPN_ERR_PKG_UNKNOWN,
-      .unknown.request = *request
+      .unknown = {
+        .qualified = request->qualified,
+        .range = spn_semver_range_to_str(resolver->mem, request->index.range),
+      },
     };
   }
 
@@ -1037,7 +1046,7 @@ static spn_err_union_t check_group_cycle(spn_resolver_t* resolver, spn_resolve_r
     return (spn_err_union_t) {
       .kind = SPN_ERR_UNIT_CYCLE,
       .unit_cycle = {
-        .id = spn_pkg_name_from_qualified(sp_intern_str_from_id(resolver->intern, node->id.qualified)),
+        .id = err_pkg_name(spn_pkg_name_from_qualified(sp_intern_str_from_id(resolver->intern, node->id.qualified))),
         .version = node->id.version,
       }
     };
@@ -1213,7 +1222,7 @@ static spn_err_union_t check_dynamic_duplicates(spn_resolver_t* resolver, spn_re
         result = (spn_err_union_t) {
           .kind = SPN_ERR_DYNAMIC_DUPLICATE,
           .dynamic_dup = {
-            .id = spn_pkg_name_from_qualified(sp_intern_str_from_id(resolver->intern, node->id.qualified)),
+            .id = err_pkg_name(spn_pkg_name_from_qualified(sp_intern_str_from_id(resolver->intern, node->id.qualified))),
             .low = low,
             .high = high,
           }

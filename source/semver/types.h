@@ -2,6 +2,7 @@
 #define SPN_SEMVER_TYPES_H
 
 #include "sp.h"
+#include "spn/core.h"
 
 typedef enum {
   SPN_SEMVER_OP_LT = 0,
@@ -18,13 +19,6 @@ typedef enum {
   SPN_SEMVER_MOD_WILDCARD,
   SPN_SEMVER_MOD_CMP,
 } spn_semver_mod_t;
-
-typedef struct {
-  u32 major;
-  u32 minor;
-  u32 patch;
-  u8 padding [4];
-} spn_semver_t;
 
 typedef struct {
   bool major;

@@ -262,6 +262,35 @@ void spn_codegen_issue_write(sp_io_writer_t* w, const spn_codegen_issue_t* issue
   }
 }
 
+sp_str_t spn_err_issues_message(sp_mem_t mem, sp_da(spn_err_issue_t) issues) {
+  sp_io_dyn_mem_writer_t b = sp_zero;
+  sp_io_dyn_mem_writer_init(mem, &b);
+  sp_da_for(issues, it) {
+    if (it) {
+      sp_fmt_io(&b.base, "; ");
+    }
+    spn_codegen_issue_t issue = {
+      .code = issues[it].code,
+      .path = issues[it].path,
+      .detail = issues[it].detail,
+    };
+    spn_codegen_issue_write(&b.base, &issue);
+  }
+  return sp_io_dyn_mem_writer_as_str(&b);
+}
+
+sp_da(spn_err_issue_t) spn_codegen_issues_to_err(sp_mem_t mem, sp_da(spn_codegen_issue_t) issues) {
+  sp_da(spn_err_issue_t) projected = sp_da_new(mem, spn_err_issue_t);
+  sp_da_for(issues, it) {
+    sp_da_push(projected, ((spn_err_issue_t) {
+      .code = issues[it].code,
+      .path = issues[it].path,
+      .detail = issues[it].detail,
+    }));
+  }
+  return projected;
+}
+
 sp_str_t spn_codegen_issues_message(sp_mem_t mem, sp_da(spn_codegen_issue_t) issues) {
   sp_io_dyn_mem_writer_t b = sp_zero;
   sp_io_dyn_mem_writer_init(mem, &b);

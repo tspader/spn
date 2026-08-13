@@ -29,7 +29,7 @@ s32 spn_compile_object_run(spn_compile_unit_t* unit, sp_str_t object, sp_str_t d
   if (run.result.status.exit_code) {
     spn_event_buffer_push(session->ctx->events, (spn_build_event_t) {
       .kind = SPN_EVENT_TARGET_BUILD_FAILED,
-      .pkg = pkg->info,
+      .pkg = pkg->info->name,
       .target_failed = {
         .target = unit->target->info->name,
         .source_file = unit->paths.file,
@@ -43,7 +43,7 @@ s32 spn_compile_object_run(spn_compile_unit_t* unit, sp_str_t object, sp_str_t d
   } else {
     spn_event_buffer_push(session->ctx->events, (spn_build_event_t) {
       .kind = SPN_EVENT_TARGET_BUILD_PASSED,
-      .pkg = pkg->info,
+      .pkg = pkg->info->name,
       .target_passed = {
         .target = unit->target->info->name,
         .source_file = unit->paths.file,

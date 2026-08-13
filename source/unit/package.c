@@ -8,6 +8,7 @@
 #include "external/git.h"
 #include "external/tom.h"
 #include "pkg/pkg.h"
+#include "semver/convert.h"
 #include "session/session.h"
 #include "target/target.h"
 #include "unit/types.h"
@@ -29,7 +30,7 @@ typedef sp_str_ht(sp_str_t) staged_header_set_t;
 static spn_err_t header_collision(spn_pkg_unit_t* unit, sp_str_t path, sp_str_t first, sp_str_t second) {
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_ERR,
-    .pkg = unit->info,
+    .pkg = unit->info->name,
     .err = {
       .kind = SPN_ERR_HEADER_COLLISION,
       .header_collision = {
@@ -45,7 +46,7 @@ static spn_err_t header_collision(spn_pkg_unit_t* unit, sp_str_t path, sp_str_t 
 static spn_err_t header_copy_failed(spn_pkg_unit_t* unit, sp_str_t path) {
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_NODE_FAILED,
-    .pkg = unit->info,
+    .pkg = unit->info->name,
     .node_failed = {
       .path = path,
       .message = sp_str_lit("could not be published to the package store"),
@@ -116,6 +117,9 @@ void spn_pkg_unit_announce_compile(spn_pkg_unit_t* unit) {
 
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_COMPILE_START,
-    .pkg = unit->info,
+    .pkg = unit->info->name,
+    .compile_start = {
+      .version = spn_semver_to_str(spn.mem, unit->info->version),
+    },
   });
 }

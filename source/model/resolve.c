@@ -12,6 +12,7 @@
 #include "intern/intern.h"
 #include "pkg/id.h"
 #include "pkg/load.h"
+#include "toml/issue.h"
 #include "pkg/pkg.h"
 #include "resolve/resolve.h"
 #include "semver/convert.h"
@@ -60,7 +61,7 @@ static spn_err_t apply_patch_overrides(spn_session_t* session, spn_resolve_query
     if (loaded) {
       result = spn_err_emit(session->ctx, (spn_err_union_t) {
         .kind = SPN_ERR_MANIFEST_ISSUES,
-        .manifest = { .name = name, .path = manifest, .issues = issues },
+        .manifest = { .name = name, .path = manifest, .issues = spn_codegen_issues_to_err(spn.mem, issues) },
       });
       continue;
     }
@@ -105,7 +106,7 @@ spn_err_t resolve(spn_op_t* op) {
   spn_session_t* session = op->session;
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_RESOLVE_START,
-    .pkg = session->pkg,
+    .pkg = session->pkg->name,
   });
 
   sp_ht_insert(session->registry, spn_pkg_id(session->ctx->intern, session->pkg->qualified), ((spn_registry_pkg_t) {
