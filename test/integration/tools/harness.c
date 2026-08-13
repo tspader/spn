@@ -109,7 +109,7 @@ sp_str_t store_file(const c8* rest) {
 }
 
 sp_str_t work_file(const c8* rest) {
-  return layout_path(SP_NULLPTR, "debug", layout_sub("work", rest));
+  return layout_path(SP_NULLPTR, "debug", layout_sub(".spn", rest));
 }
 
 sp_str_t target_store_file(const c8* rest, const c8* triple) {
@@ -216,7 +216,7 @@ static sp_err_t fixture_publish(sp_test_t* t, fixture_t* fixture, sp_str_t repo,
     .cwd = repo,
     .io = {
       .in.mode = SP_PS_IO_MODE_NULL,
-      .err.mode = SP_PS_IO_MODE_REDIRECT,
+      .err.mode = SP_PS_IO_MODE_CREATE,
     },
     .env = {
       .extra = {
@@ -226,6 +226,8 @@ static sp_err_t fixture_publish(sp_test_t* t, fixture_t* fixture, sp_str_t repo,
       },
     },
   };
+  sp_ps_config_add_arg(mem, &config, sp_str_lit("-o"));
+  sp_ps_config_add_arg(mem, &config, sp_str_lit("json"));
   sp_ps_config_add_arg(mem, &config, sp_str_lit("publish"));
   sp_ps_config_add_arg(mem, &config, sp_str_lit("--source-url"));
   sp_ps_config_add_arg(mem, &config, sp_str_replace_c8(mem, url, '\\', '/'));
@@ -233,9 +235,11 @@ static sp_err_t fixture_publish(sp_test_t* t, fixture_t* fixture, sp_str_t repo,
   sp_ps_config_add_arg(mem, &config, rev);
 
   sp_ps_output_t output = sp_ps_run(mem, config);
+  fixture->events = output.out;
   sp_test_kv(t, "command", ps_command_line(mem, &config));
   sp_test_kv(t, "cwd", repo);
-  sp_test_kv(t, "output", output.out);
+  sp_test_kv(t, "stdout", output.out);
+  sp_test_kv(t, "stderr", output.err);
   sp_must_eq(t, 0, output.status.exit_code);
   return SP_OK;
 }
@@ -510,13 +514,9 @@ static bool event_matches(yyjson_val* line, const c8* event, const c8* key, cons
 static u32 count_events(fixture_t* fixture, spn_build_event_kind_t kind, const c8* key, const c8* value) {
   const c8* event = spn_event_info[kind].name;
   sp_mem_t mem = fixture->mem;
-  sp_str_t path = sp_fs_join_path(mem, fixture->paths.storage, sp_str_lit("log/build.jsonl"));
-
-  sp_str_t content = sp_zero;
-  sp_io_read_file(mem, path, &content);
 
   u32 count = 0;
-  sp_da(sp_str_t) lines = sp_str_split_c8(mem, content, '\n');
+  sp_da(sp_str_t) lines = sp_str_split_c8(mem, fixture->events, '\n');
   sp_da_for(lines, it) {
     if (sp_str_empty(lines[it])) continue;
 
@@ -534,13 +534,9 @@ static u32 count_events(fixture_t* fixture, spn_build_event_kind_t kind, const c
 static sp_err_t expect_event(sp_test_t* t, fixture_t* fixture, spn_build_event_kind_t kind, const c8* key, const c8* value, bool expected, const c8* file, u32 line) {
   const c8* event = spn_event_info[kind].name;
   sp_mem_t mem = fixture->mem;
-  sp_str_t path = sp_fs_join_path(mem, fixture->paths.storage, sp_str_lit("log/build.jsonl"));
-
-  sp_str_t content = sp_zero;
-  sp_io_read_file(mem, path, &content);
 
   bool found = false;
-  sp_da(sp_str_t) lines = sp_str_split_c8(mem, content, '\n');
+  sp_da(sp_str_t) lines = sp_str_split_c8(mem, fixture->events, '\n');
   sp_da_for(lines, it) {
     if (sp_str_empty(lines[it])) continue;
 
@@ -560,7 +556,7 @@ static sp_err_t expect_event(sp_test_t* t, fixture_t* fixture, spn_build_event_k
       sp_fmt_cstr(key),
       sp_fmt_cstr(value)).value);
   }
-  sp_test_kv(t, "log", path);
+  sp_test_kv(t, "events", fixture->events);
   sp_test_record(t, (sp_test_failure_t) {
     .file = sp_cstr_as_str(file),
     .line = line,
@@ -572,13 +568,9 @@ static sp_err_t expect_event(sp_test_t* t, fixture_t* fixture, spn_build_event_k
 
 static sp_err_t expect_result(sp_test_t* t, fixture_t* fixture, spn_err_t err, const c8* file, u32 line) {
   sp_mem_t mem = fixture->mem;
-  sp_str_t path = sp_fs_join_path(mem, fixture->paths.storage, sp_str_lit("log/build.jsonl"));
-
-  sp_str_t content = sp_zero;
-  sp_io_read_file(mem, path, &content);
 
   const c8* actual = SP_NULLPTR;
-  sp_da(sp_str_t) lines = sp_str_split_c8(mem, content, '\n');
+  sp_da(sp_str_t) lines = sp_str_split_c8(mem, fixture->events, '\n');
   sp_da_for(lines, it) {
     if (sp_str_empty(lines[it])) continue;
 
@@ -596,7 +588,7 @@ static sp_err_t expect_result(sp_test_t* t, fixture_t* fixture, spn_err_t err, c
 
   if (actual && sp_str_equal_cstr(spn_err_to_str(err), actual)) return SP_OK;
 
-  sp_test_kv(t, "log", path);
+  sp_test_kv(t, "events", fixture->events);
   sp_test_record(t, (sp_test_failure_t) {
     .file = sp_cstr_as_str(file),
     .line = line,
@@ -740,14 +732,14 @@ static sp_err_t expect_command_cc(sp_test_t* t, fixture_t* fixture, command_cc_t
   return SP_ERR;
 }
 
-static sp_ps_output_t run_spn_command(sp_test_t* t, fixture_t* fixture, const c8* const* args, const c8* const* env) {
+static sp_ps_output_t run_spn_command(sp_test_t* t, fixture_t* fixture, const c8* output_mode, const c8* const* args, const c8* const* env) {
   sp_mem_t mem = fixture->mem;
   sp_ps_config_t config = {
     .command = fixture->paths.spn,
     .cwd = fixture->root,
     .io = {
       .in.mode = SP_PS_IO_MODE_NULL,
-      .err.mode = SP_PS_IO_MODE_REDIRECT,
+      .err.mode = SP_PS_IO_MODE_CREATE,
     },
     .env = {
       .extra = {
@@ -774,6 +766,9 @@ static sp_ps_output_t run_spn_command(sp_test_t* t, fixture_t* fixture, const c8
     }
   }
 
+  sp_ps_config_add_arg(mem, &config, sp_str_lit("-o"));
+  sp_ps_config_add_arg(mem, &config, sp_cstr_as_str(output_mode));
+
   if (args) {
     sp_for(it, SPN_TEST_COMMAND_MAX_ARGS) {
       if (!args[it]) {
@@ -784,8 +779,10 @@ static sp_ps_output_t run_spn_command(sp_test_t* t, fixture_t* fixture, const c8
   }
 
   sp_ps_output_t output = sp_ps_run(mem, config);
+  fixture->events = output.out;
   sp_test_kv(t, "command", ps_command_line(mem, &config));
-  sp_test_kv(t, "output", output.out);
+  sp_test_kv(t, "stdout", output.out);
+  sp_test_kv(t, "stderr", output.err);
   return output;
 }
 
@@ -893,16 +890,17 @@ sp_err_t run_command(sp_test_t* t, fixture_t* fixture, command_test_t test) {
   if (test.project) {
     sp_try(prepare_test(t, fixture, test.project, test.copy));
   }
-  sp_ps_output_t output = run_spn_command(t, fixture, test.args, test.env);
+  sp_ps_output_t output = run_spn_command(t, fixture, test.output ? test.output : "json", test.args, test.env);
   sp_expect_eq(t, test.expect.rc, output.status.exit_code);
 
+  sp_str_t streams = sp_str_concat(fixture->mem, output.out, output.err);
   sp_carr_for(test.expect.contains, it) {
     if (!test.expect.contains[it]) {
       break;
     }
     sp_test_kv(t, "needle", sp_str_view(test.expect.contains[it]));
-    sp_test_kv(t, "output", output.out);
-    sp_expect(t, sp_str_contains(output.out, sp_str_view(test.expect.contains[it])));
+    sp_test_kv(t, "output", streams);
+    sp_expect(t, sp_str_contains(streams, sp_str_view(test.expect.contains[it])));
   }
 
   sp_carr_for(test.expect.excludes, it) {
@@ -910,8 +908,8 @@ sp_err_t run_command(sp_test_t* t, fixture_t* fixture, command_test_t test) {
       break;
     }
     sp_test_kv(t, "needle", sp_str_view(test.expect.excludes[it]));
-    sp_test_kv(t, "output", output.out);
-    sp_expect(t, !sp_str_contains(output.out, sp_str_view(test.expect.excludes[it])));
+    sp_test_kv(t, "output", streams);
+    sp_expect(t, !sp_str_contains(streams, sp_str_view(test.expect.excludes[it])));
   }
 
   sp_carr_for(test.expect.files, it) {
@@ -1177,7 +1175,7 @@ sp_err_t run_actions(sp_test_t* t, fixture_t* fixture, const action_t* actions) 
           }
           args[it + 1] = action.cli.args[it];
         }
-        sp_ps_output_t output = run_spn_command(t, fixture, args, action.cli.env);
+        sp_ps_output_t output = run_spn_command(t, fixture, "json", args, action.cli.env);
         sp_expect_eq(t, action.cli.rc, output.status.exit_code);
         break;
       }

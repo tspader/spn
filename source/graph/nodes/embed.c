@@ -34,8 +34,7 @@ s32 spn_embed_write(spn_target_unit_t* unit, sp_str_t obj, sp_str_t hdr, sp_mem_
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_EMBED_START,
     .pkg = unit->pkg->info,
-    .io = &unit->logs,
-    .embed_start = { .num_files = sp_da_size(info->embed) },
+    .embed_start = { .target = info->name, .num_files = sp_da_size(info->embed) },
   });
 
   sp_tm_timer_t timer = sp_tm_start_timer();
@@ -65,8 +64,7 @@ s32 spn_embed_write(spn_target_unit_t* unit, sp_str_t obj, sp_str_t hdr, sp_mem_
           spn_event_buffer_push(spn.events, (spn_build_event_t) {
             .kind = SPN_EVENT_EMBED_FAILED,
             .pkg = unit->pkg->info,
-            .io = &unit->logs,
-            .embed_failed = { .path = embed.file.path, .error = sp_str_lit("file not found") },
+            .embed_failed = { .target = info->name, .path = embed.file.path, .error = sp_str_lit("file not found") },
           });
           return SPN_ERROR;
         }
@@ -113,8 +111,7 @@ s32 spn_embed_write(spn_target_unit_t* unit, sp_str_t obj, sp_str_t hdr, sp_mem_
             spn_event_buffer_push(spn.events, (spn_build_event_t) {
               .kind = SPN_EVENT_EMBED_FAILED,
               .pkg = unit->pkg->info,
-              .io = &unit->logs,
-              .embed_failed = { .path = sp_str_copy(spn.mem, entries[e].path), .error = sp_str_lit("embed add failed") },
+              .embed_failed = { .target = info->name, .path = sp_str_copy(spn.mem, entries[e].path), .error = sp_str_lit("embed add failed") },
             });
             sp_mem_end_scratch(scratch);
             return SPN_ERROR;
@@ -130,8 +127,7 @@ s32 spn_embed_write(spn_target_unit_t* unit, sp_str_t obj, sp_str_t hdr, sp_mem_
       spn_event_buffer_push(spn.events, (spn_build_event_t) {
         .kind = SPN_EVENT_EMBED_FAILED,
         .pkg = unit->pkg->info,
-        .io = &unit->logs,
-        .embed_failed = { .error = sp_str_lit("embed add failed") },
+        .embed_failed = { .target = info->name, .error = sp_str_lit("embed add failed") },
       });
       return SPN_ERROR;
     }
@@ -143,8 +139,7 @@ s32 spn_embed_write(spn_target_unit_t* unit, sp_str_t obj, sp_str_t hdr, sp_mem_
     spn_event_buffer_push(spn.events, (spn_build_event_t) {
       .kind = SPN_EVENT_EMBED_FAILED,
       .pkg = unit->pkg->info,
-      .io = &unit->logs,
-      .embed_failed = { .error = sp_str_lit("embed write failed") },
+      .embed_failed = { .target = info->name, .error = sp_str_lit("embed write failed") },
     });
     return SPN_ERROR;
   }
@@ -153,8 +148,7 @@ s32 spn_embed_write(spn_target_unit_t* unit, sp_str_t obj, sp_str_t hdr, sp_mem_
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_EMBED_PASSED,
     .pkg = unit->pkg->info,
-    .io = &unit->logs,
-    .embed_passed = { .object_path = obj, .header_path = hdr, .time = elapsed },
+    .embed_passed = { .target = info->name, .object_path = obj, .header_path = hdr, .time = elapsed },
   });
 
   return SPN_OK;

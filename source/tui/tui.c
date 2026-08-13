@@ -1591,10 +1591,17 @@ static void print_line(sp_io_writer_t* io, const c8* fmt, va_list args) {
   sp_io_write_new_line(io);
 }
 
+static sp_io_writer_t* print_writer() {
+  if (tui.mode == SPN_OUTPUT_MODE_JSON) {
+    return &tui.logger.err.base;
+  }
+  return &tui.logger.out.base;
+}
+
 void spn_print(const c8* fmt, ...) {
   va_list args;
   va_start(args, fmt);
-  print_line(&tui.logger.out.base, fmt, args);
+  print_line(print_writer(), fmt, args);
   va_end(args);
 }
 

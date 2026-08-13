@@ -133,6 +133,7 @@ typedef struct {
   const c8* copy [16];
   const c8* args [SPN_TEST_COMMAND_MAX_ARGS];
   const c8* env [SPN_TEST_COMMAND_MAX_ENV];
+  const c8* output;
   command_expect_t expect;
 } command_test_t;
 
@@ -201,6 +202,7 @@ typedef struct {
 typedef struct {
   sp_mem_t mem;
   sp_str_t root;
+  sp_str_t events;
   struct {
     sp_str_t root;
     sp_str_t spn;

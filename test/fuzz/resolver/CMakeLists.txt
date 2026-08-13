@@ -6,7 +6,7 @@ add_executable(fuzz_resolver
   ${SRC}/enum/enum.c
   ${SRC}/error/json.c
   ${SRC}/event/event.c
-  ${SRC}/event/build.c
+  ${SRC}/log/lazy/lazy.c
   ${SRC}/external/git.c
   ${SRC}/external/tom.c
   ${SRC}/codegen/codegen.c

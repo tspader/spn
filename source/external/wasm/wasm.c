@@ -62,8 +62,9 @@ void spn_wasm_script_init(spn_wasm_script_t* script, sp_str_t module) {
 static spn_err_t script_fail(spn_pkg_unit_t* unit, spn_err_t err, spn_err_wasm_t wasm) {
   wasm.path = sp_str_copy(spn.mem, wasm.path);
   wasm.error = sp_str_copy(spn.mem, wasm.error);
-  spn_event_buffer_push_ex(spn.events, unit->info, &unit->logs.io, (spn_build_event_t) {
+  spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_ERR,
+    .pkg = unit->info,
     .err = { .kind = err, .wasm = wasm },
   });
   return err;

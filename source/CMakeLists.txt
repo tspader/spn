@@ -39,7 +39,6 @@ set(SPN_SOURCES
   error/error.c
   error/json.c
   event/event.c
-  event/build.c
   external/cc.c
   external/git.c
   external/obj.c

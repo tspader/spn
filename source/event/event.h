@@ -6,6 +6,6 @@
 spn_event_buffer_t*      spn_event_buffer_new(sp_mem_t mem);
 sp_da(spn_build_event_t) spn_event_buffer_drain(sp_mem_t mem, spn_event_buffer_t* events);
 void                     spn_event_buffer_push(spn_event_buffer_t* events, spn_build_event_t event);
-void                     spn_event_buffer_push_ex(spn_event_buffer_t* evs, spn_pkg_info_t* pkg, spn_build_io_t* io, spn_build_event_t e);
+spn_err_t                spn_event_log_open(spn_event_buffer_t* events, sp_str_t path);
 
 #endif

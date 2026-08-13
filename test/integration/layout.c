@@ -37,7 +37,7 @@ sp_test(layout, script_ctx_footprint) {
     .project = "test/integration/fixtures/script/default_script",
     .args = { "build" },
     .expect = {
-      .exists = { sp_str_lit("build/wasm32-wasi/work/default_script/spn/configure.wasm") },
+      .exists = { sp_str_lit("build/wasm32-wasi/.spn/default_script/configure.wasm") },
     },
   });
 }

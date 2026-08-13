@@ -29,7 +29,6 @@ typedef struct {
   sp_str_t index;
   sp_str_t runtime;
   sp_str_t version;
-  sp_str_t log;
   sp_str_t include;
   sp_str_t toolchain;
   sp_str_t patches;
