@@ -44,8 +44,9 @@ static void guest_copy(spn_wasm_ctx_t* abi, const c8* name, const c8* from, cons
     return;
   }
 
-  spn_event_buffer_push_ex(spn.events, unit->info, &unit->logs.io, (spn_build_event_t) {
+  spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_API_CALL,
+    .pkg = unit->info,
     .api_call = { .fn = sp_cstr_as_str(name), .args = sp_fmt(spn.mem, "{} -> {}", SP_FMT_STR(from_path), SP_FMT_STR(to_path)).value },
   });
 

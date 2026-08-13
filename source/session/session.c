@@ -11,8 +11,8 @@
 #include "unit/unit.h"
 
 #include "compiler/driver.h"
+#include "event/event.h"
 #include "intern/intern.h"
-#include "log/lazy/lazy.h"
 #include "project/types.h"
 #include "pkg/pkg.h"
 #include "pkg/options.h"
@@ -146,6 +146,14 @@ spn_err_union_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem,
   spn_try_union(spn_build_add(s, spn_build_config_metaprogram(host), &s->units.metaprogram));
   sp_da_push(s->units.metaprogram->include, ctx->paths.include);
 
+  sp_str_t log = sp_fs_join_path(s->mem, s->units.target->paths.root, sp_str_lit(".spn/build.jsonl"));
+  if (spn_event_log_open(ctx->events, log)) {
+    return (spn_err_union_t) {
+      .kind = SPN_ERR_FS_WRITE,
+      .fs = { .path = log },
+    };
+  }
+
   spn_build_plan_t plan = {
     .build = s->units.target,
     .selection = config.selection,
@@ -237,53 +245,5 @@ spn_target_unit_t* spn_session_find_target_in_pkg(spn_session_t* session, spn_pk
 spn_target_unit_t* spn_session_get_target_unit(spn_session_t* session, spn_target_unit_id_t id) {
   sp_assert(sp_om_has(session->units.targets, id));
   return sp_om_get(session->units.targets, id);
-}
-
-void spn_session_finalize(spn_session_t* session) {
-  if (sp_da_empty(session->plans)) {
-    return;
-  }
-
-  sp_da_for(session->plans, it) {
-    spn_build_unit_t* build = session->plans[it].build;
-    spn_pkg_unit_t* requested = spn_session_find_pkg_unit(session, build, spn_session_root_pkg(session));
-    if (!requested) {
-      continue;
-    }
-
-    sp_da_for(build->packages, jt) {
-      spn_pkg_unit_t* unit = build->packages[jt];
-      if (unit == requested) {
-        continue;
-      }
-
-      sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-      sp_str_t links [] = {
-        sp_fs_join_path(scratch.mem, requested->paths.work, unit->logs.build),
-        sp_fs_join_path(scratch.mem, requested->paths.work, unit->logs.jsonl),
-      };
-      sp_str_t targets [] = {
-        unit->paths.logs.build,
-        unit->paths.logs.jsonl,
-      };
-      sp_carr_for(links, lt) {
-        sp_fs_remove_file(links[lt]);
-        sp_fs_create_sym_link(targets[lt], links[lt]);
-      }
-      sp_mem_end_scratch(scratch);
-    }
-  }
-
-  sp_om_for(session->units.packages, it) {
-    spn_pkg_unit_t* unit = sp_om_at(session->units.packages, it);
-    spn_lazy_log_close(&unit->logs.io.build);
-    spn_lazy_log_close(&unit->logs.io.jsonl);
-  }
-
-  sp_om_for(session->units.targets, it) {
-    spn_target_unit_t* target = sp_om_at(session->units.targets, it);
-    spn_lazy_log_close(&target->logs.build);
-    spn_lazy_log_close(&target->logs.jsonl);
-  }
 }
 

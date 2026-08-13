@@ -11,6 +11,7 @@ struct spn_event_buffer_t {
   spn_build_event_t current;
   sp_mutex_t mutex;
   spn_lazy_log_t log;
+  sp_io_dyn_mem_writer_t backlog;
   spn_wake_t* wake;
 };
 

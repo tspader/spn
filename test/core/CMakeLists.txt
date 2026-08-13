@@ -8,7 +8,6 @@ add_executable(core
   intern.c
   lazy.c
   stable_map.c
-  transcript.c
   triple.c
   when.c
   closure/harness.c
@@ -128,7 +127,6 @@ add_executable(core
   ${SRC}/dag/wasi.c
   ${SRC}/enum/enum.c
   ${SRC}/error/json.c
-  ${SRC}/event/build.c
   ${SRC}/event/event.c
   ${SRC}/external/git.c
   ${SRC}/external/tom.c

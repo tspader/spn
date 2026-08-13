@@ -30,7 +30,6 @@ static spn_err_t header_collision(spn_pkg_unit_t* unit, sp_str_t path, sp_str_t 
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_ERR,
     .pkg = unit->info,
-    .io = &unit->logs.io,
     .err = {
       .kind = SPN_ERR_HEADER_COLLISION,
       .header_collision = {
@@ -47,7 +46,6 @@ static spn_err_t header_copy_failed(spn_pkg_unit_t* unit, sp_str_t path) {
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_NODE_FAILED,
     .pkg = unit->info,
-    .io = &unit->logs.io,
     .node_failed = {
       .path = path,
       .message = sp_str_lit("could not be published to the package store"),
@@ -119,6 +117,5 @@ void spn_pkg_unit_announce_compile(spn_pkg_unit_t* unit) {
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_COMPILE_START,
     .pkg = unit->info,
-    .io = &unit->logs.io,
   });
 }

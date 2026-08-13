@@ -1,10 +1,10 @@
 #include "spn/host.h"
 
 #include "event/event.h"
-#include "event/build.h"
 
 #include "core/core.h"
 #include "ctx/types.h"
+#include "log/lazy/lazy.h"
 
 #if defined(SP_POSIX)
   #include <pthread.h>
@@ -27,14 +27,19 @@ static u64 current_thread_id() {
 spn_event_buffer_t* spn_event_buffer_new(sp_mem_t mem) {
   spn_event_buffer_t* events = sp_alloc_type(mem, spn_event_buffer_t);
   sp_rb_init(mem, events->buffer);
+  sp_io_dyn_mem_writer_init(mem, &events->backlog);
   return events;
 }
 
-void spn_event_buffer_push_ex(spn_event_buffer_t* events, spn_pkg_info_t* pkg, spn_build_io_t* io, spn_build_event_t e) {
-  spn_build_event_t event = e;
-  event.pkg = pkg;
-  event.io = io;
-  spn_event_buffer_push(events, event);
+spn_err_t spn_event_log_open(spn_event_buffer_t* events, sp_str_t path) {
+  sp_mutex_lock(&events->mutex);
+  if (!events->log.writer.write) {
+    spn_lazy_log_init(&events->log, path);
+    sp_io_write(&events->log.writer, events->backlog.storage.data, events->backlog.cursor, SP_NULLPTR);
+  }
+  spn_err_t err = events->log.failed ? SPN_ERR_FS_WRITE : SPN_OK;
+  sp_mutex_unlock(&events->mutex);
+  return err;
 }
 
 void spn_event_buffer_push(spn_event_buffer_t* events, spn_build_event_t event) {
@@ -44,29 +49,15 @@ void spn_event_buffer_push(spn_event_buffer_t* events, spn_build_event_t event) 
   sp_mutex_lock(&events->mutex);
   sp_rb_push(events->buffer, event);
 
-  if (events->log.writer.write || event.io) {
-    sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_io_writer_t* sink = events->log.writer.write ? &events->log.writer : &events->backlog.base;
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
 
-    sp_io_dyn_mem_writer_t line = sp_zero;
-    sp_io_dyn_mem_writer_init(scratch.mem, &line);
-    spn_event_log_jsonl(&line.base, &event);
-    if (events->log.writer.write) {
-      sp_io_write(&events->log.writer, line.storage.data, line.cursor, SP_NULLPTR);
-    }
+  sp_io_dyn_mem_writer_t line = sp_zero;
+  sp_io_dyn_mem_writer_init(scratch.mem, &line);
+  spn_event_log_jsonl(&line.base, &event);
+  sp_io_write(sink, line.storage.data, line.cursor, SP_NULLPTR);
 
-    if (event.io) {
-      sp_io_write(&event.io->jsonl.writer, line.storage.data, line.cursor, SP_NULLPTR);
-
-      sp_io_dyn_mem_writer_t text = sp_zero;
-      sp_io_dyn_mem_writer_init(scratch.mem, &text);
-      spn_event_log_build(&text.base, &event);
-      if (text.cursor) {
-        sp_io_write(&event.io->build.writer, text.storage.data, text.cursor, SP_NULLPTR);
-      }
-    }
-
-    sp_mem_end_scratch(scratch);
-  }
+  sp_mem_end_scratch(scratch);
 
   sp_mutex_unlock(&events->mutex);
 

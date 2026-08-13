@@ -136,12 +136,14 @@
     "embed_start": {
       "metadata": { "verb": "Embedding", "verbosity": "verbose" },
       "properties": {
+        "target": { "type": "string" },
         "num_files": { "type": "uint32" }
       }
     },
     "embed_passed": {
       "metadata": { "verb": "Embedded", "verbosity": "debug" },
       "properties": {
+        "target": { "type": "string" },
         "object_path": { "type": "string" },
         "header_path": { "type": "string" },
         "time_ns": { "type": "uint64", "metadata": { "field": "time" } }
@@ -150,6 +152,7 @@
     "embed_failed": {
       "metadata": { "severity": "error" },
       "properties": {
+        "target": { "type": "string" },
         "path": { "type": "string" },
         "error": { "type": "string" }
       }

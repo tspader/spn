@@ -129,9 +129,15 @@ static spn_err_union_t extract_runtime(spn_ctx_t* ctx) {
 static spn_err_union_t open_ctx(spn_ctx_t* ctx, spn_open_request_t request) {
   sp_assert(!ctx->config.indexes);
 
+  if (sp_str_valid(request.dir)) {
+    ctx->paths.project = sp_fs_canonicalize_path(ctx->heap, request.dir);
+  }
+  else {
+    ctx->paths.project = ctx->paths.cwd;
+  }
+
   // Make sure any per-machine directories we need exist
   sp_str_t dirs [] = {
-    ctx->paths.log,
     ctx->paths.caches.dir,
     ctx->paths.caches.git.dir,
     ctx->paths.caches.build.dir,
@@ -159,13 +165,6 @@ static spn_err_union_t open_ctx(spn_ctx_t* ctx, spn_open_request_t request) {
 
   spn_try_union(extract_runtime(ctx));
 
-  if (sp_str_valid(request.dir)) {
-    ctx->paths.project = sp_fs_canonicalize_path(ctx->heap, request.dir);
-  }
-  else {
-    ctx->paths.project = ctx->paths.cwd;
-  }
-
   spn_event_buffer_push(ctx->events, (spn_build_event_t) {
     .kind = SPN_EVENT_OPEN,
     .open = {
@@ -173,12 +172,6 @@ static spn_err_union_t open_ctx(spn_ctx_t* ctx, spn_open_request_t request) {
       .project = ctx->paths.project,
     },
   });
-  if (ctx->events->log.failed) {
-    return (spn_err_union_t) {
-      .kind = SPN_ERR_FS_WRITE,
-      .fs = { .path = ctx->events->log.path },
-    };
-  }
 
   // Load the per-machine config file
   ctx->config.indexes = sp_da_new(ctx->heap, spn_index_info_t);
@@ -247,12 +240,9 @@ spn_ctx_t* spn_ctx_new(spn_wake_fn_t wake, void* wake_data) {
       ctx->paths.caches.build.dir = join_path(ctx, ctx->paths.caches.dir, "build");
       ctx->paths.toolchain = env_or(ctx, "SPN_TOOLCHAIN_DIR", join_path(ctx, ctx->paths.caches.dir, "toolchain"));
     ctx->paths.index = join_path(ctx, ctx->paths.storage, "index");
-    ctx->paths.log = join_path(ctx, ctx->paths.storage, "log");
     ctx->paths.runtime = join_path(ctx, ctx->paths.storage, "runtime");
       ctx->paths.include = join_path(ctx, ctx->paths.runtime, "include");
       ctx->paths.version = join_path(ctx, ctx->paths.runtime, "version.stamp");
-
-  spn_lazy_log_init(&ctx->events->log, sp_fs_join_path(ctx->heap, ctx->paths.log, sp_str_lit("build.jsonl")));
 
   spn_op_thread_start(ctx);
   return ctx;
@@ -294,10 +284,7 @@ void spn_ctx_close(spn_ctx_t* ctx, bool ok) {
     },
   });
 
-  if (ctx->session) {
-    spn_session_finalize(ctx->session);
-    ctx->session = SP_NULLPTR;
-  }
+  ctx->session = SP_NULLPTR;
 
   spn_lazy_log_close(&ctx->events->log);
 }

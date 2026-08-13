@@ -12,7 +12,6 @@
 #include "profile/types.h"
 #include "target/types.h"
 #include "external/wasm/types.h"
-#include "log/lazy/types.h"
 
 typedef enum {
   SPN_PUBLISH_EXISTING,
@@ -95,12 +94,6 @@ struct spn_user_node_t {
 };
 
 typedef struct {
-  sp_str_t build;
-  sp_str_t test;
-  sp_str_t jsonl;
-} spn_build_log_paths_t;
-
-typedef struct {
   spn_compile_unit_id_t id;
   spn_target_unit_t* target;
   spn_lang_t lang;
@@ -129,8 +122,6 @@ struct spn_target_unit {
   sp_da(spn_target_unit_t*) deps;
 
   spn_link_plan_t link;
-
-  spn_build_io_t logs;
 };
 
 struct spn_pkg_unit_t {
@@ -161,8 +152,6 @@ struct spn_pkg_unit_t {
       sp_str_t package;
     } stamp;
 
-    spn_build_log_paths_t logs;
-
     sp_str_t manifest;
     sp_str_t script;
     spn_tree_roots_t roots;
@@ -175,12 +164,6 @@ struct spn_pkg_unit_t {
     sp_str_t bin;
     sp_str_t vendor;
   } paths;
-
-  struct {
-    sp_str_t build;
-    sp_str_t jsonl;
-    spn_build_io_t io;
-  } logs;
 
   struct {
     u64 compile;
