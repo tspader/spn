@@ -5,9 +5,9 @@
 #include "pkg/types.h"
 
 const spn_event_info_t spn_event_info[SPN_EVENT_COUNT] = {
-  [SPN_EVENT_NONE] = { .name = "", .verb = "" },
+  [SPN_EVENT_NONE] = { .verb = "" },
 {{ for .kinds }}
-  [{{ .code }}] = { .name = "{{ .tag }}", .verb = "{{ .verb }}", .verbosity = {{ .verbosity }}, .severity = {{ .severity }} },
+  [{{ .code }}] = { .verb = "{{ .verb }}", .verbosity = {{ .verbosity }}, .severity = {{ .severity }} },
 {{ end }}
 };
 
@@ -19,6 +19,17 @@ static void {{ .self }}_write(const {{ .type }}* in, sp_io_writer_t* out);
 {{ $write }}
 
 {{ end }}
+const c8* spn_event_name(spn_build_event_kind_t kind) {
+  switch (kind) {
+    case SPN_EVENT_NONE: return "";
+{{ for .kinds }}
+    case {{ .code }}: return "{{ .tag }}";
+{{ end }}
+    case SPN_EVENT_COUNT: break;
+  }
+  sp_unreachable_return("");
+}
+
 static const c8* level_name(const spn_event_info_t* info) {
   if (info->severity != SPN_EVENT_SEVERITY_INFO) {
     return "error";
@@ -33,7 +44,7 @@ void spn_event_log_jsonl(sp_io_writer_t* json, spn_build_event_t* event) {
   const spn_event_info_t* info = &spn_event_info[event->kind];
 
   sp_io_write_cstr(json, "{\"event\": \"", SP_NULLPTR);
-  sp_io_write_cstr(json, info->name, SP_NULLPTR);
+  sp_io_write_cstr(json, spn_event_name(event->kind), SP_NULLPTR);
   sp_io_write_cstr(json, "\", \"level\": \"", SP_NULLPTR);
   sp_io_write_cstr(json, level_name(info), SP_NULLPTR);
   sp_io_write_cstr(json, "\"", SP_NULLPTR);
