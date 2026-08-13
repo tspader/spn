@@ -60,28 +60,26 @@ if you find that you are pulling in tons and tons of unrelated TUs for a unit te
 # Errors
 
 There are two error types:
-- `spn_err_t`: a plain error code. Prefer it. Leaf modules return codes; the caller has the context.
-- `spn_err_union_t`: a code plus structured payload, for errors whose rendered message needs data. Add a kind to `spn_err_t` in `include/spn/core.h`, a payload struct to `spn_err_union_t` in `source/error/types.h`, and a message in `spn_tui_render_event_detail`.
+- `spn_err_t`: a plain code. It is the only error type that crosses function boundaries; every fallible function returns it.
+- `spn_err_union_t`: a code plus structured payload, for errors whose rendered message needs data. Payloads are generated: add a kind to `spn_err_t` in `include/spn/core.h`, a mapping entry in `source/codegen/schema/errors.jtd.json`, and a message in `spn_tui_render_event_detail`; `make` regenerates `source/codegen/gen/errors.gen.*`.
+
+Reporting is the event stream. A failure is detected exactly once, at the site with the context; that site constructs the union literal and reports it:
 
 ```c
-spn_err_union_t spum(kram_t kram) {
-  if (!kram.gaz) {
-    return (spn_err_union_t) {
-      .kind = SPN_ERR_EXPECTED_KRAM_IN_SPUM,
-      .qux = { .slurf = kram.slurf }
-    };
-  }
-  return spn_result(SPN_OK);
-}
+return spn_err_emit(ctx, (spn_err_union_t) {
+  .kind = SPN_ERR_FS_WRITE,
+  .fs = { .path = output },
+});
 ```
 
-Reporting is the event stream. `spn_err_emit(ctx, err)` is the single gate between the two types: it pushes the error as an `SPN_EVENT_ERR` event exactly once (skipped when `err.reported` is set), records the first error kind on the context for the exit code, and returns the plain code. Frontends render events; they never build error messages themselves.
+`spn_err_emit(ctx, err)` pushes the union as an `SPN_EVENT_ERR` event, records the first error kind on the context for the exit code, and returns the plain code. Callers above the detection site just `spn_try` the code. Frontends render events; they never build error messages themselves.
 
 The rules:
-- Library internals construct unions and propagate them unreported with `spn_try_union()`.
-- Ops are data: verbs return an `spn_op_t*` handle; completion is state (`spn_op_done()`, `spn_op_result()`), signaled through the host's wake callback (registered at `spn_ctx_new`), and cancellation is per-op (`spn_op_cancel()`). An op's exec function is the boundary: every union crosses `spn_err_emit()` exactly once inside it, so the `err` in `spn_op_result()` always means "already reported"; frontends only map it to an exit status. Context lifecycle (`spn_ctx_*`) and public queries return `spn_err_t` under the same contract.
-- Concurrent and streaming code (build workers, sync jobs) reports at the point of occurrence -- `spn_err_emit()`, or a specialized error event like `SPN_EVENT_LINK_FAILED` -- and propagates `spn_err_reported(kind)` so the boundary skips it.
-- The reporting layer (`tui.c`, `spn_tui_render_event_detail`) is the only place messages are built:
+- Domain failure events (`SPN_EVENT_LINK_FAILED`, `SPN_EVENT_TARGET_BUILD_FAILED`, `SPN_EVENT_TEST_FAILED`, `SPN_EVENT_SYNC_FAILED`, `SPN_EVENT_NODE_FAILED`, the script compile and crash events) are already the diagnostic for their failures; those paths return the bare code and never emit an err event. Cancellation (`SPN_ERR_CANCELLED`) is never emitted either.
+- Layers below the event stream return codes plus structured out-params and never emit: `source/dag/` (`spn_dag_diag_t` + trace callbacks), the toc parser, the git cache, `spn_pkg_load` (`spn_codegen_issues_t`), the index getters (`spn_index_diag_t`), sp-level io. The spn-layer caller is the detection site: `graph/dag.c` `dag_result()` converts `env.diag` into the union and emits it, while its `SPN_ERR_DAG_CANCELLED`/`SPN_ERR_DAG_ACTION` arms return the bare code because their diagnostics already went out as node events.
+- Speculative code emits at its commit point, not at detection. The resolver backtracks, so `source/resolve/` internals pass `spn_err_union_t` between themselves and accumulate survivors in `query->errors`; `model/resolve.c` flushes each through `spn_err_emit` and returns the code. The union appears in no signature outside those internals except as `spn_err_emit`'s parameter.
+- Ops are data: verbs return an `spn_op_t*` handle; completion is state (`spn_op_done()`, `spn_op_result()`), signaled through the host's wake callback (registered at `spn_ctx_new`), and cancellation is per-op (`spn_op_cancel()`). The op thread records the result code on the context after exec, so the `err` in `spn_op_result()` always means "already reported"; frontends only map it to an exit status. Context lifecycle (`spn_ctx_*`) and public queries return `spn_err_t` under the same contract.
+- The reporting layer (`tui.c`, `spn_tui_render_event_detail`) is the only place messages are built; its `SPN_EVENT_ERR` arm is a single flat switch on `event->err.kind`:
 
 ```c
 case SPN_ERR_TOOLCHAIN_UNKNOWN: {
@@ -90,14 +88,9 @@ case SPN_ERR_TOOLCHAIN_UNKNOWN: {
 }
 ```
 
-The complete toolkit is five names; there are deliberately no others:
+The complete toolkit is two names; there are deliberately no others:
 - `spn_try(expr)` propagates a code
-- `spn_try_union(expr)` propagates a union
-- `spn_result(kind)` lifts a code into a union
-- `spn_err_reported(kind)` lifts an already-reported code into a union
-- `spn_err_emit(ctx, err)` reports a union and returns its code
-
-Prefer the try macros unless a conditional reads more simply; report-and-propagate composes as `spn_try(spn_err_emit(ctx, expr))`.
+- `spn_err_emit(ctx, (spn_err_union_t) { ... })` reports at the detection site and returns the code
 
 ## Rules
 - Never, ever comment your code. Code with newly added comments will be rejected. If you're reviewing code, flag comments.

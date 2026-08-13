@@ -152,25 +152,29 @@ static const flags_test_t tests [] = {
   },
 };
 
-sp_test_each(render_flags, resolve, flags_test_t, tests) {
+sp_test_each(render_flags, resolve, flags_test_t, tests, .setup = spn_test_ctx_setup) {
+  sp_mem_t mem = sp_test_arena(t);
   spn_cc_toolchain_t toolchain = test_toolchain(it->driver);
   if (it->toolchain) {
     toolchain.name = sp_str_view(it->toolchain);
   }
 
   spn_cc_flags_t flags = sp_zero;
-  spn_err_union_t err = spn_cc_render_flags(sp_test_arena(t), &toolchain, &it->profile, &flags);
+  spn_err_t err = spn_cc_render_flags(mem, &toolchain, &it->profile, &flags);
 
   if (it->expect.unsupported) {
-    sp_expect_eq(t, err.kind, it->expect.kind ? it->expect.kind : SPN_ERR_SANITIZER_UNSUPPORTED);
-    sp_expect_eq(t, err.sanitizer.unsupported, it->expect.unsupported);
-    sp_expect_eq(t, err.sanitizer.target.arch, it->profile.arch);
-    sp_expect_eq(t, err.sanitizer.target.os, it->profile.os);
-    sp_expect_eq(t, err.sanitizer.target.abi, it->profile.abi);
+    sp_expect_eq(t, err, it->expect.kind ? it->expect.kind : SPN_ERR_SANITIZER_UNSUPPORTED);
+    sp_da(spn_build_event_t) errs = spn_test_drain_errs(mem);
+    sp_must_eq(t, 1, sp_da_size(errs));
+    sp_expect_eq(t, errs[0].err.kind, err);
+    sp_expect_eq(t, errs[0].err.sanitizer.unsupported, it->expect.unsupported);
+    sp_expect_eq(t, errs[0].err.sanitizer.target.arch, it->profile.arch);
+    sp_expect_eq(t, errs[0].err.sanitizer.target.os, it->profile.os);
+    sp_expect_eq(t, errs[0].err.sanitizer.target.abi, it->profile.abi);
     return SP_OK;
   }
 
-  sp_expect_eq(t, err.kind, SPN_OK);
+  sp_expect_eq(t, err, SPN_OK);
 
   sp_must_strs_eq(t, flags.compile, sp_da_size(flags.compile), it->expect.compile);
   sp_must_strs_eq(t, flags.link, sp_da_size(flags.link), it->expect.link);

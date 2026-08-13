@@ -1,5 +1,6 @@
 #include "profile/profile.h"
 #include "ctx/types.h"
+#include "error/error.h"
 #include "core/types.h"
 #include "sp/macro.h"
 #include "intern/intern.h"
@@ -143,29 +144,29 @@ static spn_abi_t spn_profile_default_abi(spn_os_t os, bool shared) {
   SP_UNREACHABLE_RETURN(SPN_ABI_NONE);
 }
 
-spn_err_union_t spn_profile_resolve(spn_profile_table_t profiles, const spn_profile_override_t* override, spn_triple_t host, bool is_shared, spn_profile_info_t* result) {
+spn_err_t spn_profile_resolve(spn_profile_table_t profiles, const spn_profile_override_t* override, spn_triple_t host, bool is_shared, spn_profile_info_t* result) {
   sp_str_t name = select_name(override);
 
   if (sp_str_find_c8(name, '/') >= 0 || sp_str_find_c8(name, '\\') >= 0) {
-    return (spn_err_union_t) {
+    return spn_err_emit(&spn, (spn_err_union_t) {
       .kind = SPN_ERR_PROFILE_INVALID,
       .profile = { .name = name },
-    };
+    });
   }
 
   if (spn_triple_from_str(name).arch) {
-    return (spn_err_union_t) {
+    return spn_err_emit(&spn, (spn_err_union_t) {
       .kind = SPN_ERR_PROFILE_INVALID,
       .profile = { .name = name },
-    };
+    });
   }
 
   spn_profile_info_t* info = sp_str_ht_get(profiles, name);
   if (!info) {
-    return (spn_err_union_t) {
+    return spn_err_emit(&spn, (spn_err_union_t) {
       .kind = SPN_ERR_PROFILE_UNDEFINED,
       .profile = { .name = name },
-    };
+    });
   }
 
   spn_profile_info_t merged = *info;
@@ -201,6 +202,6 @@ spn_err_union_t spn_profile_resolve(spn_profile_table_t profiles, const spn_prof
     .options    = merged.options,
     .targeted   = targeted,
   };
-  return spn_result(SPN_OK);
+  return SPN_OK;
 }
 

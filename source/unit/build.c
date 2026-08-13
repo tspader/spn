@@ -61,15 +61,15 @@ static bool same_triple(spn_triple_t lhs, spn_triple_t rhs) {
   return lhs.arch == rhs.arch && lhs.os == rhs.os && lhs.abi == rhs.abi;
 }
 
-static spn_err_union_t bind_toolchain(spn_session_t* s, spn_toolchain_query_t query, spn_toolchain_unit_t** out) {
+static spn_err_t bind_toolchain(spn_session_t* s, spn_toolchain_query_t query, spn_toolchain_unit_t** out) {
   spn_toolchain_resolution_t resolution = sp_zero;
-  spn_try_union(spn_toolchain_select(&s->catalog, query, s->mem, &resolution));
+  spn_try(spn_toolchain_select(&s->catalog, query, s->mem, &resolution));
 
   sp_da_for(s->units.toolchains, it) {
     spn_toolchain_unit_t* unit = s->units.toolchains[it];
     if (unit->info == resolution.info && same_triple(unit->host, query.host)) {
       *out = unit;
-      return spn_result(SPN_OK);
+      return SPN_OK;
     }
   }
 
@@ -81,7 +81,7 @@ static spn_err_union_t bind_toolchain(spn_session_t* s, spn_toolchain_query_t qu
   };
   sp_da_push(s->units.toolchains, unit);
   *out = unit;
-  return spn_result(SPN_OK);
+  return SPN_OK;
 }
 
 static sp_str_t build_root(spn_session_t* s, const spn_build_config_t* config) {
@@ -97,15 +97,15 @@ static sp_str_t build_root(spn_session_t* s, const spn_build_config_t* config) {
   sp_unreachable_return(sp_str_lit(""));
 }
 
-spn_err_union_t spn_build_add(spn_session_t* s, spn_build_config_t config, spn_build_unit_t** out) {
+spn_err_t spn_build_add(spn_session_t* s, spn_build_config_t config, spn_build_unit_t** out) {
   spn_build_id_t id = spn_build_id(&config);
   if (sp_om_has(s->units.builds, id)) {
     *out = sp_om_get(s->units.builds, id);
-    return spn_result(SPN_OK);
+    return SPN_OK;
   }
 
   spn_toolchain_unit_t* toolchain = SP_NULLPTR;
-  spn_try_union(bind_toolchain(s, (spn_toolchain_query_t) {
+  spn_try(bind_toolchain(s, (spn_toolchain_query_t) {
     .name = config.profile.toolchain,
     .target = { config.profile.arch, config.profile.os, config.profile.abi },
     .host = config.host,
@@ -122,5 +122,5 @@ spn_err_union_t spn_build_add(spn_session_t* s, spn_build_config_t config, spn_b
   sp_da_init(s->mem, build->packages);
 
   *out = build;
-  return spn_result(SPN_OK);
+  return SPN_OK;
 }

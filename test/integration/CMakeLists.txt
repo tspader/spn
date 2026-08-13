@@ -6,8 +6,13 @@ add_executable(integration
   ${SRC}/codegen/gen/events.gen.c
   ${SRC}/codegen/json.c
   ${SRC}/codegen/loader.c
+  ${SRC}/core/core.c
+  ${SRC}/ctx/ctx.c
   ${SRC}/enum/enum.c
+  ${SRC}/error/error.c
   ${SRC}/error/json.c
+  ${SRC}/event/event.c
+  ${SRC}/log/lazy/lazy.c
   ${SRC}/external/tom.c
   ${SRC}/intern/intern.c
   ${SRC}/sp/str.c

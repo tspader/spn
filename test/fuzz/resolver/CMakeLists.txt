@@ -4,6 +4,7 @@ add_executable(fuzz_resolver
   ${SRC}/intern/context.c
   ${SRC}/intern/intern.c
   ${SRC}/enum/enum.c
+  ${SRC}/error/error.c
   ${SRC}/error/json.c
   ${SRC}/event/event.c
   ${SRC}/log/lazy/lazy.c
@@ -36,7 +37,6 @@ add_executable(fuzz_resolver
   ${SRC}/pkg/mutate.c
   ${SRC}/pkg/options.c
   ${SRC}/profile/profile.c
-  ${SRC}/session/registry/registry.c
   ${SRC}/pkg/load.c
   ${SRC}/triple/triple.c
   ${SRC}/resolve/resolve.c

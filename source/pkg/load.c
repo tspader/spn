@@ -3,12 +3,10 @@
 #include "codegen/lower.h"
 #include "toml/loader.h"
 
-spn_err_union_t spn_pkg_load(sp_mem_t mem, sp_intern_t* intern, sp_str_t path, spn_manifest_role_t role, sp_str_t name, spn_pkg_info_t* pkg) {
+spn_err_t spn_pkg_load(sp_mem_t mem, sp_intern_t* intern, sp_str_t path, spn_manifest_role_t role, spn_pkg_info_t* pkg, spn_codegen_issues_t* issues) {
+  *issues = SP_NULLPTR;
   if (!sp_fs_exists(path)) {
-    return (spn_err_union_t) {
-      .kind = SPN_ERR_NO_MANIFEST,
-      .no_manifest = { .path = path },
-    };
+    return SPN_ERR_NO_MANIFEST;
   }
 
   spn_toml_loader_t t = sp_zero;
@@ -20,10 +18,8 @@ spn_err_union_t spn_pkg_load(sp_mem_t mem, sp_intern_t* intern, sp_str_t path, s
   }
 
   if (err) {
-    return (spn_err_union_t) {
-      .kind = SPN_ERR_MANIFEST_ISSUES,
-      .manifest = { .name = name, .path = path, .issues = t.issues },
-    };
+    *issues = t.issues;
+    return SPN_ERR_MANIFEST_ISSUES;
   }
-  return spn_result(SPN_OK);
+  return SPN_OK;
 }

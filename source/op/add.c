@@ -48,8 +48,34 @@ static site_t find_site(spn_toml_edit_t* edit, sp_mem_t mem, sp_str_t table, sp_
   };
 }
 
-static spn_err_union_t add(spn_ctx_t* ctx, spn_add_request_t request, spn_semver_range_t range) {
-  spn_try_union(spn_ctx_require_project(ctx));
+static spn_err_t index_err(spn_ctx_t* ctx, spn_pkg_name_t name, spn_err_t kind, spn_index_diag_t* diag) {
+  switch (kind) {
+    case SPN_ERR_MANIFEST_ISSUES: {
+      return spn_err_emit(ctx, (spn_err_union_t) {
+        .kind = kind,
+        .manifest = { .name = spn_pkg_name_to_qualified(name), .path = diag->path, .issues = diag->issues },
+      });
+    }
+    case SPN_ERR_INDEX_CORRUPT: {
+      return spn_err_emit(ctx, (spn_err_union_t) {
+        .kind = kind,
+        .index_corrupt = { .name = spn_pkg_name_to_qualified(name), .path = diag->path },
+      });
+    }
+    case SPN_ERR_INDEX_PATH_DEP: {
+      return spn_err_emit(ctx, (spn_err_union_t) {
+        .kind = kind,
+        .pkg = { .name = spn_pkg_name_to_qualified(name), .requested = diag->dep },
+      });
+    }
+    default: {
+      return spn_err_emit(ctx, (spn_err_union_t) { .kind = kind });
+    }
+  }
+}
+
+static spn_err_t add(spn_ctx_t* ctx, spn_add_request_t request, spn_semver_range_t range) {
+  spn_try(spn_ctx_require_project(ctx));
 
   spn_pkg_name_t name = spn_pkg_name_from_qualified(request.name);
 
@@ -57,9 +83,13 @@ static spn_err_union_t add(spn_ctx_t* ctx, spn_add_request_t request, spn_semver
   spn_index_cache_init(&cache, ctx->heap, ctx->intern, &ctx->indexes);
 
   spn_index_pkg_t* pkg = SP_NULLPTR;
-  spn_try_union(spn_index_cache_get_package(&cache, name, &pkg));
+  spn_index_diag_t diag = sp_zero;
+  spn_err_t got = spn_index_cache_get_package(&cache, name, &pkg, &diag);
+  if (got) {
+    return index_err(ctx, name, got, &diag);
+  }
   if (!pkg || sp_da_empty(pkg->releases)) {
-    return (spn_err_union_t) { .kind = SPN_ERR_PKG_UNKNOWN, .unknown = { .request = { .qualified = spn_pkg_name_to_qualified(name) } } };
+    return spn_err_emit(ctx, (spn_err_union_t) { .kind = SPN_ERR_PKG_UNKNOWN, .unknown = { .request = { .qualified = spn_pkg_name_to_qualified(name) } } });
   }
 
   spn_index_release_t* release = SP_NULLPTR;
@@ -76,13 +106,13 @@ static spn_err_union_t add(spn_ctx_t* ctx, spn_add_request_t request, spn_semver
   }
 
   if (!release) {
-    return (spn_err_union_t) { .kind = SPN_ERR_PKG_NO_MATCH, .unsatisfiable = {
+    return spn_err_emit(ctx, (spn_err_union_t) { .kind = SPN_ERR_PKG_NO_MATCH, .unsatisfiable = {
       .request = {
         .qualified = spn_pkg_name_to_qualified(name),
         .source = SPN_PKG_SOURCE_INDEX,
         .index = { .range = range },
       },
-    }};
+    }});
   }
 
   sp_str_t version = request.version;
@@ -90,20 +120,20 @@ static spn_err_union_t add(spn_ctx_t* ctx, spn_add_request_t request, spn_semver
     version = spn_semver_to_str(ctx->heap, release->version);
   }
 
-  spn_err_union_t result = spn_result(SPN_OK);
+  spn_err_t result = SPN_OK;
 
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
 
   sp_str_t source = sp_zero;
   sp_str_t manifest = ctx->project->paths.manifest;
   if (sp_io_read_file(s.mem, manifest, &source) != SP_OK) {
-    result = (spn_err_union_t) { .kind = SPN_ERR_FS_READ, .fs = { .path = manifest } };
+    result = spn_err_emit(ctx, (spn_err_union_t) { .kind = SPN_ERR_FS_READ, .fs = { .path = manifest } });
     goto cleanup;
   }
 
   spn_toml_edit_t edit = sp_zero;
   if (spn_toml_edit_init(&edit, s.mem, source)) {
-    result = (spn_err_union_t) { .kind = SPN_ERR_MANIFEST_PARSE, .manifest_parse = { .path = manifest } };
+    result = spn_err_emit(ctx, (spn_err_union_t) { .kind = SPN_ERR_MANIFEST_PARSE, .manifest_parse = { .path = manifest } });
     goto cleanup;
   }
 
@@ -116,13 +146,13 @@ static spn_err_union_t add(spn_ctx_t* ctx, spn_add_request_t request, spn_semver
 
   site_t site = find_site(&edit, s.mem, sp_cstr_as_str(table), request.name, spn_pkg_name_to_qualified(name));
   if (spn_toml_edit_set_str(&edit, site.path, site.num_segments, version)) {
-    result = (spn_err_union_t) { .kind = SPN_ERR_MANIFEST_EDIT, .manifest_parse = { .path = manifest } };
+    result = spn_err_emit(ctx, (spn_err_union_t) { .kind = SPN_ERR_MANIFEST_EDIT, .manifest_parse = { .path = manifest } });
     goto cleanup;
   }
 
   sp_str_t updated = spn_toml_edit_render(&edit, s.mem);
   if (sp_fs_write_atomic(manifest, updated) != SP_OK) {
-    result = (spn_err_union_t) { .kind = SPN_ERR_FS_WRITE, .fs = { .path = manifest } };
+    result = spn_err_emit(ctx, (spn_err_union_t) { .kind = SPN_ERR_FS_WRITE, .fs = { .path = manifest } });
     goto cleanup;
   }
 
@@ -151,7 +181,7 @@ spn_err_t spn_op_add(spn_op_t* op) {
     });
   }
 
-  return spn_err_emit(ctx, add(ctx, request, range));
+  return add(ctx, request, range);
 }
 
 spn_op_t* spn_add_dependency(spn_ctx_t* ctx, spn_add_request_t request) {

@@ -48,9 +48,20 @@ static spn_err_t apply_patch_overrides(spn_session_t* session, spn_resolve_query
     sp_str_t manifest = sp_fs_join_path(spn.mem, patch, pkg->origin.paths.manifest);
     sp_str_t name = sp_intern_str_from_id(session->ctx->intern, pkg->id.qualified);
     spn_pkg_info_t* info = sp_alloc_type(spn.mem, spn_pkg_info_t);
-    spn_err_union_t loaded = spn_pkg_load(spn.mem, session->ctx->intern, manifest, SPN_MANIFEST_DEP, name, info);
-    if (loaded.kind) {
-      result = spn_err_emit(session->ctx, loaded);
+    spn_codegen_issues_t issues = sp_zero;
+    spn_err_t loaded = spn_pkg_load(spn.mem, session->ctx->intern, manifest, SPN_MANIFEST_DEP, info, &issues);
+    if (loaded == SPN_ERR_NO_MANIFEST) {
+      result = spn_err_emit(session->ctx, (spn_err_union_t) {
+        .kind = SPN_ERR_NO_MANIFEST,
+        .no_manifest = { .path = manifest },
+      });
+      continue;
+    }
+    if (loaded) {
+      result = spn_err_emit(session->ctx, (spn_err_union_t) {
+        .kind = SPN_ERR_MANIFEST_ISSUES,
+        .manifest = { .name = name, .path = manifest, .issues = issues },
+      });
       continue;
     }
 
@@ -90,7 +101,7 @@ static void emit_resolved(sp_mem_t mem, spn_resolve_query_t* query) {
   });
 }
 
-spn_err_union_t resolve(spn_op_t* op) {
+spn_err_t resolve(spn_op_t* op) {
   spn_session_t* session = op->session;
   spn_event_buffer_push(spn.events, (spn_build_event_t) {
     .kind = SPN_EVENT_RESOLVE_START,
@@ -118,16 +129,13 @@ spn_err_union_t resolve(spn_op_t* op) {
     sp_da_for(query.errors, it) {
       spn_err_emit(session->ctx, query.errors[it]);
     }
-    return spn_err_reported(query.errors[0].kind);
+    return query.errors[0].kind;
   }
 
-  spn_err_t patched = apply_patch_overrides(session, &query);
-  if (patched) {
-    return spn_err_reported(patched);
-  }
+  spn_try(apply_patch_overrides(session, &query));
   session->resolve = query.result;
 
   emit_resolved(session->mem, &query);
 
-  return spn_result(SPN_OK);
+  return SPN_OK;
 }

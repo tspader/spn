@@ -143,7 +143,7 @@ static const select_test_t select_tests [] = {
         .name = "A",
         .role = SPN_TOOLCHAIN_ROLE_SCRIPT,
         .target = TARGET_WIN_GNU,
-        .expect = { .err = SPN_ERR_TOOLCHAIN_TARGET },
+        .expect = { .err = SPN_ERR_TOOLCHAIN_SCRIPT_TARGET },
       },
     },
   },
@@ -229,7 +229,7 @@ sp_test_each(select, supports, supports_test_t, supports_tests) {
   return SP_OK;
 }
 
-sp_test_each(select, resolve, select_test_t, select_tests) {
+sp_test_each(select, resolve, select_test_t, select_tests, .setup = spn_test_ctx_setup) {
   sp_mem_t mem = sp_test_arena(t);
   spn_toolchain_catalog_t catalog = sp_zero;
   if (fixture_catalog(t, &catalog, it->file)) return SP_ERR;
@@ -243,26 +243,30 @@ sp_test_each(select, resolve, select_test_t, select_tests) {
     }
 
     spn_triple_t host = fixture_triple_empty(query.host) ? (spn_triple_t) HOST_X64_LINUX : query.host;
-    spn_err_union_t err = spn_toolchain_select(&catalog, (spn_toolchain_query_t) {
+    spn_err_t err = spn_toolchain_select(&catalog, (spn_toolchain_query_t) {
       .name = sp_str_view(query.name),
       .target = query.target,
       .host = host,
       .role = query.role,
     }, mem, &resolutions[at]);
 
-    sp_must_eq(t, (u32)query.expect.err, (u32)err.kind);
+    sp_must_eq(t, (u32)query.expect.err, (u32)err);
 
     if (query.expect.err) {
-      sp_expect_str_eq_c(t, err.toolchain.name, query.name);
-      sp_expect_eq(t, (u32)query.role, (u32)err.toolchain.role);
-      sp_da_for(err.toolchain.candidates, ct) {
-        spn_toolchain_info_t* candidate = spn_toolchain_catalog_get(&catalog, err.toolchain.candidates[ct]);
+      sp_da(spn_build_event_t) errs = spn_test_drain_errs(mem);
+      sp_must_eq(t, 1, sp_da_size(errs));
+      spn_err_toolchain_t* toolchain = &errs[0].err.toolchain;
+      sp_expect_eq(t, errs[0].err.kind, query.expect.err);
+      sp_expect_str_eq_c(t, toolchain->name, query.name);
+      sp_expect_eq(t, (u32)query.role, (u32)toolchain->role);
+      sp_da_for(toolchain->candidates, ct) {
+        spn_toolchain_info_t* candidate = spn_toolchain_catalog_get(&catalog, toolchain->candidates[ct]);
         sp_must(t, candidate);
         sp_expect(t, is_supported(candidate, query.target, host));
       }
-      sp_expect(t, fixture_triple_equal(err.toolchain.host, host));
+      sp_expect(t, fixture_triple_equal(toolchain->host, host));
       if (query.expect.err != SPN_ERR_TOOLCHAIN_UNKNOWN) {
-        sp_expect(t, fixture_triple_equal(err.toolchain.target, query.target));
+        sp_expect(t, fixture_triple_equal(toolchain->target, query.target));
       }
     } else {
       sp_must(t, resolutions[at].info);

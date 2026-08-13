@@ -8,6 +8,7 @@
 #include "spn/core.h"
 #include "unit/types.h"
 
+#include "error/error.h"
 #include "external/wasm/wasm.h"
 #include "graph/build.h"
 #include "graph/dag.h"
@@ -87,14 +88,14 @@ static void add_reactor_edges(spn_dag_build_t* b, spn_target_unit_t* reactor) {
   }
 }
 
-spn_err_union_t configure(spn_op_t* op) {
+spn_err_t configure(spn_op_t* op) {
   spn_session_t* s = op->session;
   if (spn_wasm_init()) {
-    return (spn_err_union_t) { .kind = SPN_ERR_WASM_INIT_FAILED };
+    return spn_err_emit(s->ctx, (spn_err_union_t) { .kind = SPN_ERR_WASM_INIT_FAILED });
   }
 
-  spn_try_union(spn_units_add_packages(s));
-  spn_try_union(spn_units_add_targets(s, SPN_UNIT_SCOPE_METAPROGRAM));
+  spn_try(spn_units_add_packages(s));
+  spn_try(spn_units_add_targets(s, SPN_UNIT_SCOPE_METAPROGRAM));
 
   spn_dag_build_t* dag = spn_dag_build_new(op);
   s->dag.configure = dag;
@@ -104,7 +105,7 @@ spn_err_union_t configure(spn_op_t* op) {
     if (!configure) {
       continue;
     }
-    spn_try_union(spn_dag_build_add_target(dag, configure));
+    spn_try(spn_dag_build_add_target(dag, configure));
   }
 
   sp_om_for(s->units.packages, it) {
@@ -113,7 +114,7 @@ spn_err_union_t configure(spn_op_t* op) {
       continue;
     }
     if (add_configure_action(dag, unit)) {
-      return (spn_err_union_t) { .kind = SPN_ERR_BUILD_GRAPH, .build_graph = { .file = unit->paths.stamp.configure } };
+      return spn_err_emit(s->ctx, (spn_err_union_t) { .kind = SPN_ERR_BUILD_GRAPH, .build_graph = { .file = unit->paths.stamp.configure } });
     }
   }
 
@@ -132,6 +133,5 @@ spn_err_union_t configure(spn_op_t* op) {
     }
   }
 
-  spn_try_union(spn_dag_build_run(dag, 8));
-  return spn_result(SPN_OK);
+  return spn_dag_build_run(dag, 8);
 }

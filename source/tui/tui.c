@@ -416,79 +416,74 @@ static sp_str_t render_event_detail(spn_ctx_t* ctx, sp_mem_t mem, spn_build_even
           );
           break;
         }
-        case SPN_ERR_OPTION: {
-          switch (event->err.option.violation.kind) {
-            case SPN_OPTION_ERR_UNDECLARED: {
-              sp_fmt_io(
-                &w.base,
-                "{} does not declare an option named {.yellow} (set by {.cyan})",
-                sp_fmt_str(get_colored_name(mem, event->err.option.violation.pkg)),
-                sp_fmt_str(event->err.option.violation.option),
-                sp_fmt_str(spn_option_setter_to_str(event->err.option.violation.a))
-              );
-              break;
-            }
-            case SPN_OPTION_ERR_BAD_VALUE: {
-              sp_fmt_io(
-                &w.base,
-                "{.yellow} is not a valid value for {}.{.cyan} (set by {.cyan})",
-                sp_fmt_str(spn_option_value_to_str(mem, event->err.option.violation.value)),
-                sp_fmt_str(get_colored_name(mem, event->err.option.violation.pkg)),
-                sp_fmt_str(event->err.option.violation.option),
-                sp_fmt_str(spn_option_setter_to_str(event->err.option.violation.a))
-              );
-              break;
-            }
-            case SPN_OPTION_ERR_CONFLICT: {
-              sp_fmt_io(
-                &w.base,
-                "option conflict on {}.{.cyan}: {.cyan} and {.cyan} request different values",
-                sp_fmt_str(get_colored_name(mem, event->err.option.violation.pkg)),
-                sp_fmt_str(event->err.option.violation.option),
-                sp_fmt_str(spn_option_setter_to_str(event->err.option.violation.a)),
-                sp_fmt_str(spn_option_setter_to_str(event->err.option.violation.b))
-              );
-              break;
-            }
-            case SPN_OPTION_ERR_VETO: {
-              sp_fmt_io(
-                &w.base,
-                "{.cyan} requires {}.{.cyan} != {.yellow}, but {} set it",
-                sp_fmt_str(spn_option_setter_to_str(event->err.option.violation.a)),
-                sp_fmt_str(get_colored_name(mem, event->err.option.violation.pkg)),
-                sp_fmt_str(event->err.option.violation.option),
-                sp_fmt_str(spn_option_value_to_str(mem, event->err.option.violation.value)),
-                sp_fmt_str(spn_option_setter_to_str(event->err.option.violation.b))
-              );
-              break;
-            }
-            case SPN_OPTION_ERR_NO_VALUE: {
-              sp_fmt_io(
-                &w.base,
-                "no value for {}.{.cyan}: no default matched and nothing set it",
-                sp_fmt_str(get_colored_name(mem, event->err.option.violation.pkg)),
-                sp_fmt_str(event->err.option.violation.option)
-              );
-              break;
-            }
-            case SPN_OPTION_ERR_LATE_GATE: {
-              sp_fmt_io(
-                &w.base,
-                "the dependency gate on {}'s edge to {.cyan} never settled",
-                sp_fmt_str(get_colored_name(mem, event->err.option.violation.pkg)),
-                sp_fmt_str(spn_option_setter_to_str(event->err.option.violation.a))
-              );
-              break;
-            }
-            case SPN_OPTION_ERR_UNKNOWN_PKG: {
-              sp_fmt_io(
-                &w.base,
-                "the root manifest configures {.yellow}, which is not a package in this build",
-                sp_fmt_str(event->err.option.violation.pkg)
-              );
-              break;
-            }
-          }
+        case SPN_ERR_OPTION_UNDECLARED: {
+          sp_fmt_io(
+            &w.base,
+            "{} does not declare an option named {.yellow} (set by {.cyan})",
+            sp_fmt_str(get_colored_name(mem, event->err.option.violation.pkg)),
+            sp_fmt_str(event->err.option.violation.option),
+            sp_fmt_str(spn_option_setter_to_str(event->err.option.violation.a))
+          );
+          break;
+        }
+        case SPN_ERR_OPTION_BAD_VALUE: {
+          sp_fmt_io(
+            &w.base,
+            "{.yellow} is not a valid value for {}.{.cyan} (set by {.cyan})",
+            sp_fmt_str(spn_option_value_to_str(mem, event->err.option.violation.value)),
+            sp_fmt_str(get_colored_name(mem, event->err.option.violation.pkg)),
+            sp_fmt_str(event->err.option.violation.option),
+            sp_fmt_str(spn_option_setter_to_str(event->err.option.violation.a))
+          );
+          break;
+        }
+        case SPN_ERR_OPTION_CONFLICT: {
+          sp_fmt_io(
+            &w.base,
+            "option conflict on {}.{.cyan}: {.cyan} and {.cyan} request different values",
+            sp_fmt_str(get_colored_name(mem, event->err.option.violation.pkg)),
+            sp_fmt_str(event->err.option.violation.option),
+            sp_fmt_str(spn_option_setter_to_str(event->err.option.violation.a)),
+            sp_fmt_str(spn_option_setter_to_str(event->err.option.violation.b))
+          );
+          break;
+        }
+        case SPN_ERR_OPTION_VETO: {
+          sp_fmt_io(
+            &w.base,
+            "{.cyan} requires {}.{.cyan} != {.yellow}, but {} set it",
+            sp_fmt_str(spn_option_setter_to_str(event->err.option.violation.a)),
+            sp_fmt_str(get_colored_name(mem, event->err.option.violation.pkg)),
+            sp_fmt_str(event->err.option.violation.option),
+            sp_fmt_str(spn_option_value_to_str(mem, event->err.option.violation.value)),
+            sp_fmt_str(spn_option_setter_to_str(event->err.option.violation.b))
+          );
+          break;
+        }
+        case SPN_ERR_OPTION_NO_VALUE: {
+          sp_fmt_io(
+            &w.base,
+            "no value for {}.{.cyan}: no default matched and nothing set it",
+            sp_fmt_str(get_colored_name(mem, event->err.option.violation.pkg)),
+            sp_fmt_str(event->err.option.violation.option)
+          );
+          break;
+        }
+        case SPN_ERR_OPTION_LATE_GATE: {
+          sp_fmt_io(
+            &w.base,
+            "the dependency gate on {}'s edge to {.cyan} never settled",
+            sp_fmt_str(get_colored_name(mem, event->err.option.violation.pkg)),
+            sp_fmt_str(spn_option_setter_to_str(event->err.option.violation.a))
+          );
+          break;
+        }
+        case SPN_ERR_OPTION_UNKNOWN_PKG: {
+          sp_fmt_io(
+            &w.base,
+            "the root manifest configures {.yellow}, which is not a package in this build",
+            sp_fmt_str(event->err.option.violation.pkg)
+          );
           break;
         }
         case SPN_ERR_MANIFEST_PARSE: {
@@ -541,34 +536,44 @@ static sp_str_t render_event_detail(spn_ctx_t* ctx, sp_mem_t mem, spn_build_even
             sp_str_lit("the project") :
             sp_fmt(mem, "{} {}", sp_fmt_str(get_colored_name(mem, err->requester)), sp_fmt_str(spn_semver_to_str(mem, err->requester_version))).value;
 
-          if (err->conflict && err->request.source == SPN_PKG_SOURCE_INDEX) {
-            sp_fmt_io(
-              &w.base,
-              "{} is already selected at {.yellow}, but {} requires {.yellow}",
-              sp_fmt_str(get_colored_name(mem, err->request.qualified)),
-              sp_fmt_str(spn_semver_to_str(mem, err->selected)),
-              sp_fmt_str(requester),
-              sp_fmt_str(spn_semver_range_to_str(mem, err->request.index.range))
-            );
-          }
-          else if (err->conflict) {
-            sp_fmt_io(
-              &w.base,
-              "{} is already selected at {.yellow}, which conflicts with the version required by {}",
-              sp_fmt_str(get_colored_name(mem, err->request.qualified)),
-              sp_fmt_str(spn_semver_to_str(mem, err->selected)),
-              sp_fmt_str(requester)
-            );
-          }
-          else {
-            sp_fmt_io(
-              &w.base,
-              "no version of {} satisfies {.yellow}, required by {}",
-              sp_fmt_str(get_colored_name(mem, err->request.qualified)),
-              sp_fmt_str(spn_semver_range_to_str(mem, err->request.index.range)),
-              sp_fmt_str(requester)
-            );
-          }
+          sp_fmt_io(
+            &w.base,
+            "no version of {} satisfies {.yellow}, required by {}",
+            sp_fmt_str(get_colored_name(mem, err->request.qualified)),
+            sp_fmt_str(spn_semver_range_to_str(mem, err->request.index.range)),
+            sp_fmt_str(requester)
+          );
+          break;
+        }
+        case SPN_ERR_PKG_CONFLICT: {
+          spn_err_unsatisfiable_t* err = &event->err.unsatisfiable;
+          sp_str_t requester = sp_str_empty(err->requester) ?
+            sp_str_lit("the project") :
+            sp_fmt(mem, "{} {}", sp_fmt_str(get_colored_name(mem, err->requester)), sp_fmt_str(spn_semver_to_str(mem, err->requester_version))).value;
+
+          sp_fmt_io(
+            &w.base,
+            "{} is already selected at {.yellow}, but {} requires {.yellow}",
+            sp_fmt_str(get_colored_name(mem, err->request.qualified)),
+            sp_fmt_str(spn_semver_to_str(mem, err->selected)),
+            sp_fmt_str(requester),
+            sp_fmt_str(spn_semver_range_to_str(mem, err->request.index.range))
+          );
+          break;
+        }
+        case SPN_ERR_PKG_CONFLICT_EXACT: {
+          spn_err_unsatisfiable_t* err = &event->err.unsatisfiable;
+          sp_str_t requester = sp_str_empty(err->requester) ?
+            sp_str_lit("the project") :
+            sp_fmt(mem, "{} {}", sp_fmt_str(get_colored_name(mem, err->requester)), sp_fmt_str(spn_semver_to_str(mem, err->requester_version))).value;
+
+          sp_fmt_io(
+            &w.base,
+            "{} is already selected at {.yellow}, which conflicts with the version required by {}",
+            sp_fmt_str(get_colored_name(mem, err->request.qualified)),
+            sp_fmt_str(spn_semver_to_str(mem, err->selected)),
+            sp_fmt_str(requester)
+          );
           break;
         }
         case SPN_ERR_DEP_CYCLE: {
@@ -673,23 +678,22 @@ static sp_str_t render_event_detail(spn_ctx_t* ctx, sp_mem_t mem, spn_build_even
           sp_io_write_str(&w.base, sp_str_lit("failed to initialize the wasm runtime"), SP_NULLPTR);
           break;
         }
-        case SPN_ERR_CONFIGURE_SOURCE: {
-          if (sp_fs_is_glob(event->err.configure_source.source)) {
-            sp_fmt_io(
-              &w.base,
-              "{.cyan} declares a configure source {.yellow}, which matched no files",
-              sp_fmt_str(event->err.configure_source.name),
-              sp_fmt_str(event->err.configure_source.source)
-            );
-          }
-          else {
-            sp_fmt_io(
-              &w.base,
-              "{.cyan} declares a configure source {.yellow}, which is not a file",
-              sp_fmt_str(event->err.configure_source.name),
-              sp_fmt_str(event->err.configure_source.source)
-            );
-          }
+        case SPN_ERR_CONFIGURE_SOURCE_GLOB: {
+          sp_fmt_io(
+            &w.base,
+            "{.cyan} declares a configure source {.yellow}, which matched no files",
+            sp_fmt_str(event->err.configure_source.name),
+            sp_fmt_str(event->err.configure_source.source)
+          );
+          break;
+        }
+        case SPN_ERR_CONFIGURE_SOURCE_MISSING: {
+          sp_fmt_io(
+            &w.base,
+            "{.cyan} declares a configure source {.yellow}, which is not a file",
+            sp_fmt_str(event->err.configure_source.name),
+            sp_fmt_str(event->err.configure_source.source)
+          );
           break;
         }
         case SPN_ERR_BUILD_GRAPH: {
@@ -704,6 +708,38 @@ static sp_str_t render_event_detail(spn_ctx_t* ctx, sp_mem_t mem, spn_build_even
           sp_fmt_io(
             &w.base,
             "failed to read {.cyan}",
+            sp_fmt_str(get_contextual_path(ctx, mem, event->err.fs.path))
+          );
+          break;
+        }
+        case SPN_ERR_TOC_MAGIC: {
+          sp_fmt_io(
+            &w.base,
+            "{.cyan} is not a static archive",
+            sp_fmt_str(get_contextual_path(ctx, mem, event->err.fs.path))
+          );
+          break;
+        }
+        case SPN_ERR_TOC_TRUNCATED: {
+          sp_fmt_io(
+            &w.base,
+            "the symbol table in {.cyan} is truncated",
+            sp_fmt_str(get_contextual_path(ctx, mem, event->err.fs.path))
+          );
+          break;
+        }
+        case SPN_ERR_TOC_MISSING: {
+          sp_fmt_io(
+            &w.base,
+            "{.cyan} has no symbol table",
+            sp_fmt_str(get_contextual_path(ctx, mem, event->err.fs.path))
+          );
+          break;
+        }
+        case SPN_ERR_SCAFFOLD_TEMPLATE: {
+          sp_fmt_io(
+            &w.base,
+            "failed to render the template for {.cyan}",
             sp_fmt_str(get_contextual_path(ctx, mem, event->err.fs.path))
           );
           break;
@@ -898,27 +934,21 @@ static sp_str_t render_event_detail(spn_ctx_t* ctx, sp_mem_t mem, spn_build_even
           break;
         }
         case SPN_ERR_TOOLCHAIN_TARGET: {
-          sp_str_t target = spn_triple_to_str(mem, event->err.toolchain.target);
-          switch (event->err.toolchain.role) {
-            case SPN_TOOLCHAIN_ROLE_BUILD: {
-              sp_fmt_io(
-                &w.base,
-                "toolchain {} can't target {.yellow}",
-                sp_fmt_str(get_colored_name(mem, event->err.toolchain.name)),
-                sp_fmt_str(target)
-              );
-              break;
-            }
-            case SPN_TOOLCHAIN_ROLE_SCRIPT: {
-              sp_fmt_io(
-                &w.base,
-                "build scripts compile to {.yellow}, but toolchain {} can't target it",
-                sp_fmt_str(target),
-                sp_fmt_str(get_colored_name(mem, event->err.toolchain.name))
-              );
-              break;
-            }
-          }
+          sp_fmt_io(
+            &w.base,
+            "toolchain {} can't target {.yellow}",
+            sp_fmt_str(get_colored_name(mem, event->err.toolchain.name)),
+            sp_fmt_str(spn_triple_to_str(mem, event->err.toolchain.target))
+          );
+          break;
+        }
+        case SPN_ERR_TOOLCHAIN_SCRIPT_TARGET: {
+          sp_fmt_io(
+            &w.base,
+            "build scripts compile to {.yellow}, but toolchain {} can't target it",
+            sp_fmt_str(spn_triple_to_str(mem, event->err.toolchain.target)),
+            sp_fmt_str(get_colored_name(mem, event->err.toolchain.name))
+          );
           break;
         }
         case SPN_ERR_TOOLCHAIN_NONE: {
@@ -1253,6 +1283,8 @@ static sp_str_t event_subject(spn_build_event_t* event) {
         case SPN_ERR_MANIFEST_ISSUES:  return event->err.manifest.name;
         case SPN_ERR_PKG_UNKNOWN:      return event->err.unknown.request.qualified;
         case SPN_ERR_PKG_NO_MATCH:     return event->err.unsatisfiable.request.qualified;
+        case SPN_ERR_PKG_CONFLICT:     return event->err.unsatisfiable.request.qualified;
+        case SPN_ERR_PKG_CONFLICT_EXACT: return event->err.unsatisfiable.request.qualified;
         case SPN_ERR_DEP_CYCLE:        return event->err.circular.id.name;
         case SPN_ERR_UNIT_CYCLE:       return event->err.unit_cycle.id.name;
         case SPN_ERR_DYNAMIC_DUPLICATE: return event->err.dynamic_dup.id.name;
@@ -1298,7 +1330,8 @@ static void render_event_extra(sp_io_writer_t* w, spn_build_event_t* event) {
           }
           break;
         }
-        case SPN_ERR_TOOLCHAIN_TARGET: {
+        case SPN_ERR_TOOLCHAIN_TARGET:
+        case SPN_ERR_TOOLCHAIN_SCRIPT_TARGET: {
           sp_da_for(event->err.toolchain.candidates, it) {
             sp_io_write_str(w, it ? sp_str_lit(", ") : sp_str_lit("toolchains that can: "), SP_NULLPTR);
             sp_fmt_io(w, "{.green}", sp_fmt_str(event->err.toolchain.candidates[it]));

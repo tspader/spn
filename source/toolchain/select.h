@@ -16,6 +16,6 @@ typedef struct {
   spn_opt_artifact_t artifact;
 } spn_toolchain_resolution_t;
 
-spn_err_union_t spn_toolchain_select(spn_toolchain_catalog_t* catalog, spn_toolchain_query_t query, sp_mem_t mem, spn_toolchain_resolution_t* resolution);
+spn_err_t spn_toolchain_select(spn_toolchain_catalog_t* catalog, spn_toolchain_query_t query, sp_mem_t mem, spn_toolchain_resolution_t* resolution);
 
 #endif

@@ -243,7 +243,7 @@ sp_test_each(index_transaction, publish, txn_test_t, tests, .setup = spn_test_ct
         };
         sp_da_init(mem, rel.deps);
         sp_da_init(mem, rel.targets);
-        sp_expect_eq(t, action.publish.err, spn_index_publish(&index, mem, &rel).kind);
+        sp_expect_eq(t, action.publish.err, spn_index_publish(&index, mem, &rel));
         break;
       }
       case TXN_ACTION_SYNC: {

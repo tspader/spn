@@ -1,5 +1,7 @@
 #include "toolchain/select.h"
 
+#include "ctx/types.h"
+#include "error/error.h"
 #include "toolchain/catalog.h"
 #include "triple/triple.h"
 
@@ -32,7 +34,10 @@ spn_opt_artifact_t get_artifact(sp_da(spn_toolchain_host_t) hosts, spn_triple_t 
 
 SP_PRIVATE spn_err_t try_toolchain(spn_toolchain_info_t* toolchain, spn_toolchain_query_t query, spn_toolchain_resolution_t* resolution) {
   if (!is_supported(toolchain, query.target, query.host)) {
-    return SPN_ERR_TOOLCHAIN_TARGET;
+    switch (query.role) {
+      case SPN_TOOLCHAIN_ROLE_BUILD:  return SPN_ERR_TOOLCHAIN_TARGET;
+      case SPN_TOOLCHAIN_ROLE_SCRIPT: return SPN_ERR_TOOLCHAIN_SCRIPT_TARGET;
+    }
   }
 
   spn_opt_artifact_t artifact = sp_zero;
@@ -48,7 +53,7 @@ SP_PRIVATE spn_err_t try_toolchain(spn_toolchain_info_t* toolchain, spn_toolchai
   return SPN_OK;
 }
 
-SP_PRIVATE spn_err_union_t make_error(spn_err_t kind, spn_toolchain_catalog_t* catalog, spn_toolchain_query_t query, sp_mem_t mem) {
+SP_PRIVATE spn_err_t make_error(spn_err_t kind, spn_toolchain_catalog_t* catalog, spn_toolchain_query_t query, sp_mem_t mem) {
   sp_da(sp_str_t) candidates = sp_da_new(mem, sp_str_t);
   sp_om_for(catalog->entries, it) {
     spn_toolchain_info_t* toolchain = sp_om_at(catalog->entries, it);
@@ -57,7 +62,7 @@ SP_PRIVATE spn_err_union_t make_error(spn_err_t kind, spn_toolchain_catalog_t* c
     }
   }
 
-  return (spn_err_union_t) {
+  return spn_err_emit(&spn, (spn_err_union_t) {
     .kind = kind,
     .toolchain = {
       .role = query.role,
@@ -66,16 +71,16 @@ SP_PRIVATE spn_err_union_t make_error(spn_err_t kind, spn_toolchain_catalog_t* c
       .host = query.host,
       .candidates = candidates,
     },
-  };
+  });
 }
 
-spn_err_union_t spn_toolchain_select(spn_toolchain_catalog_t* catalog, spn_toolchain_query_t query, sp_mem_t mem, spn_toolchain_resolution_t* resolution) {
+spn_err_t spn_toolchain_select(spn_toolchain_catalog_t* catalog, spn_toolchain_query_t query, sp_mem_t mem, spn_toolchain_resolution_t* resolution) {
   *resolution = (spn_toolchain_resolution_t)sp_zero;
 
   if (sp_str_equal_cstr(query.name, "auto")) {
     sp_om_for(catalog->entries, it) {
       if (!try_toolchain(sp_om_at(catalog->entries, it), query, resolution)) {
-        return spn_result(SPN_OK);
+        return SPN_OK;
       }
     }
     return make_error(SPN_ERR_TOOLCHAIN_NONE, catalog, query, mem);
@@ -90,5 +95,5 @@ spn_err_union_t spn_toolchain_select(spn_toolchain_catalog_t* catalog, spn_toolc
   if (err) {
     return make_error(err, catalog, query, mem);
   }
-  return spn_result(SPN_OK);
+  return SPN_OK;
 }

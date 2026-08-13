@@ -12,16 +12,4 @@
     } \
   } while (0)
 
-#define spn_try_union(expr) \
-  do { \
-    spn_err_union_t __err = (expr); \
-    if (__err.kind) { \
-      return __err; \
-    } \
-  } while (0)
-
-#define spn_result(kind_) ((spn_err_union_t) { .kind = (kind_) })
-
-#define spn_err_reported(kind_) ((spn_err_union_t) { .kind = (kind_), .reported = true })
-
 #endif

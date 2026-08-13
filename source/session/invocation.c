@@ -71,14 +71,14 @@ static spn_cc_compile_t spn_build_compile_desc(sp_mem_t mem, spn_compile_unit_t*
   return compile;
 }
 
-spn_err_union_t spn_build_render_compile(sp_mem_t mem, spn_compile_unit_t* unit, spn_invocation_t* invocation) {
+spn_err_t spn_build_render_compile(sp_mem_t mem, spn_compile_unit_t* unit, spn_invocation_t* invocation) {
   spn_pkg_unit_t* pkg = unit->target->pkg;
   spn_build_unit_t* build = pkg->build;
 
   spn_cc_compile_t compile = spn_build_compile_desc(mem, unit);
-  spn_try_union(spn_cc_render_compile(mem, &build->toolchain->cc, &build->profile, &compile, invocation));
+  spn_try(spn_cc_render_compile(mem, &build->toolchain->cc, &build->profile, &compile, invocation));
   invocation->cwd = pkg->paths.work;
-  return spn_result(SPN_OK);
+  return SPN_OK;
 }
 
 spn_err_t spn_session_write_compile_commands(spn_session_t* session, sp_str_t path) {

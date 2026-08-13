@@ -49,10 +49,10 @@ static sp_str_t read_stamp(sp_mem_t mem, spn_ctx_t* ctx) {
   return version;
 }
 
-static spn_err_union_t extract(spn_ctx_t* ctx, sp_mem_t mem, sp_str_t stamp) {
+static spn_err_t extract(spn_ctx_t* ctx, sp_mem_t mem, sp_str_t stamp) {
   sp_str_t staging = sp_zero;
   if (sp_fs_staging_dir(mem, ctx->paths.runtime, sp_str_lit("tmp"), &staging) != SP_OK) {
-    return (spn_err_union_t) { .kind = SPN_ERR_FS_WRITE, .fs = { .path = ctx->paths.runtime } };
+    return spn_err_emit(ctx, (spn_err_union_t) { .kind = SPN_ERR_FS_WRITE, .fs = { .path = ctx->paths.runtime } });
   }
 
   sp_glob_set_t* glob = sp_glob_set_new(mem);
@@ -69,29 +69,29 @@ static spn_err_union_t extract(spn_ctx_t* ctx, sp_mem_t mem, sp_str_t stamp) {
     sp_fs_create_dir(sp_fs_parent_path(path));
     if (!write_file(path, entry.data, entry.size)) {
       sp_fs_remove_dir(staging);
-      return (spn_err_union_t) { .kind = SPN_ERR_FS_WRITE, .fs = { .path = sp_str_copy(ctx->heap, path) } };
+      return spn_err_emit(ctx, (spn_err_union_t) { .kind = SPN_ERR_FS_WRITE, .fs = { .path = sp_str_copy(ctx->heap, path) } });
     }
   }
 
   sp_str_t stamp_path = sp_fs_join_path(mem, staging, sp_str_lit("version.stamp"));
   if (!write_file(stamp_path, stamp.data, stamp.len)) {
     sp_fs_remove_dir(staging);
-    return (spn_err_union_t) { .kind = SPN_ERR_FS_WRITE, .fs = { .path = sp_str_copy(ctx->heap, stamp_path) } };
+    return spn_err_emit(ctx, (spn_err_union_t) { .kind = SPN_ERR_FS_WRITE, .fs = { .path = sp_str_copy(ctx->heap, stamp_path) } });
   }
 
   sp_fs_remove_dir(ctx->paths.runtime);
   sp_sys_fd_t root = sp_sys_get_root(0);
   if (sp_sys_rename_s(root, staging, root, ctx->paths.runtime)) {
     sp_fs_remove_dir(staging);
-    return (spn_err_union_t) { .kind = SPN_ERR_FS_WRITE, .fs = { .path = ctx->paths.runtime } };
+    return spn_err_emit(ctx, (spn_err_union_t) { .kind = SPN_ERR_FS_WRITE, .fs = { .path = ctx->paths.runtime } });
   }
 
-  return spn_result(SPN_OK);
+  return SPN_OK;
 }
 
-static spn_err_union_t extract_runtime(spn_ctx_t* ctx) {
+static spn_err_t extract_runtime(spn_ctx_t* ctx) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  spn_err_union_t result = spn_result(SPN_OK);
+  spn_err_t result = SPN_OK;
 
   // @spader Use SHA256 for this
   // The stamp must change whenever the embedded runtime does, not just on
@@ -112,7 +112,7 @@ static spn_err_union_t extract_runtime(spn_ctx_t* ctx) {
     sp_fs_lock_t lock = sp_zero;
     sp_str_t lock_path = sp_fs_join_path(scratch.mem, ctx->paths.storage, sp_str_lit("runtime.lock"));
     if (sp_fs_lock_acquire(&lock, lock_path) != SP_OK) {
-      result = (spn_err_union_t) { .kind = SPN_ERR_FS_WRITE, .fs = { .path = sp_str_copy(ctx->heap, lock_path) } };
+      result = spn_err_emit(ctx, (spn_err_union_t) { .kind = SPN_ERR_FS_WRITE, .fs = { .path = sp_str_copy(ctx->heap, lock_path) } });
     }
     else {
       if (!sp_str_equal(read_stamp(scratch.mem, ctx), stamp)) {
@@ -126,7 +126,7 @@ static spn_err_union_t extract_runtime(spn_ctx_t* ctx) {
   return result;
 }
 
-static spn_err_union_t open_ctx(spn_ctx_t* ctx, spn_open_request_t request) {
+static spn_err_t open_ctx(spn_ctx_t* ctx, spn_open_request_t request) {
   sp_assert(!ctx->config.indexes);
 
   if (sp_str_valid(request.dir)) {
@@ -147,10 +147,10 @@ static spn_err_union_t open_ctx(spn_ctx_t* ctx, spn_open_request_t request) {
   };
   sp_carr_for(dirs, it) {
     if (sp_fs_create_dir(dirs[it])) {
-      return (spn_err_union_t) {
+      return spn_err_emit(ctx, (spn_err_union_t) {
         .kind = SPN_ERR_FS_CREATE_DIR,
         .fs = { .path = dirs[it] }
-      };
+      });
     }
   }
 
@@ -163,7 +163,7 @@ static spn_err_union_t open_ctx(spn_ctx_t* ctx, spn_open_request_t request) {
     .fetch = spn_fetch_curl,
   };
 
-  spn_try_union(extract_runtime(ctx));
+  spn_try(extract_runtime(ctx));
 
   spn_event_buffer_push(ctx->events, (spn_build_event_t) {
     .kind = SPN_EVENT_OPEN,
@@ -187,17 +187,17 @@ static spn_err_union_t open_ctx(spn_ctx_t* ctx, spn_open_request_t request) {
       }
     }
     if (loaded || !sp_da_empty(loader.issues)) {
-      return (spn_err_union_t) {
+      return spn_err_emit(ctx, (spn_err_union_t) {
         .kind = SPN_ERR_MANIFEST_ISSUES,
         .manifest = { .path = ctx->paths.config.toml, .issues = loader.issues },
-      };
+      });
     }
     ctx->config.indexes = indexes;
   }
 
-  spn_try_union(spn_project_load(ctx->heap, ctx->intern, ctx->events, ctx->paths.project, &ctx->project));
+  spn_try(spn_project_load(ctx, ctx->paths.project, &ctx->project));
   if (!request.project_optional) {
-    spn_try_union(spn_ctx_require_project(ctx));
+    spn_try(spn_ctx_require_project(ctx));
   }
 
   spn_index_assemble(ctx->heap, ctx->project ? &ctx->project->package.indexes : SP_NULLPTR, ctx->config.indexes, &ctx->indexes);
@@ -210,7 +210,7 @@ static spn_err_union_t open_ctx(spn_ctx_t* ctx, spn_open_request_t request) {
     }
   }
 
-  return spn_result(SPN_OK);
+  return SPN_OK;
 }
 
 spn_ctx_t* spn_ctx_new(spn_wake_fn_t wake, void* wake_data) {
@@ -248,19 +248,19 @@ spn_ctx_t* spn_ctx_new(spn_wake_fn_t wake, void* wake_data) {
   return ctx;
 }
 
-static spn_err_union_t open_session(spn_ctx_t* ctx, spn_session_config_t config) {
-  spn_try_union(spn_ctx_require_project(ctx));
+static spn_err_t open_session(spn_ctx_t* ctx, spn_session_config_t config) {
+  spn_try(spn_ctx_require_project(ctx));
 
   ctx->session = sp_alloc_type(ctx->heap, spn_session_t);
   return spn_session_init(ctx->session, ctx, ctx->heap, ctx->project, config);
 }
 
 spn_err_t spn_ctx_open(spn_ctx_t* ctx, spn_open_request_t request) {
-  return spn_err_emit(ctx, open_ctx(ctx, request));
+  return open_ctx(ctx, request);
 }
 
 spn_err_t spn_ctx_open_session(spn_ctx_t* ctx, const spn_session_config_t* config, spn_session_t** session) {
-  spn_err_t err = spn_err_emit(ctx, open_session(ctx, *config));
+  spn_err_t err = open_session(ctx, *config);
   *session = err ? SP_NULLPTR : ctx->session;
   return err;
 }

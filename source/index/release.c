@@ -13,7 +13,8 @@ static spn_index_dep_kind_t dep_kind_to_index(spn_dep_kind_t kind) {
   sp_unreachable_return(SPN_INDEX_DEP_NORMAL);
 }
 
-spn_err_union_t spn_index_release_from_pkg(sp_mem_t mem, spn_pkg_info_t* info, spn_index_release_t* release) {
+spn_err_t spn_index_release_from_pkg(sp_mem_t mem, spn_pkg_info_t* info, spn_index_release_t* release, sp_str_t* dep) {
+  *dep = sp_str_lit("");
   *release = (spn_index_release_t) {
     .id = spn_pkg_name_from_qualified(info->qualified),
     .version = info->version,
@@ -31,10 +32,8 @@ spn_err_union_t spn_index_release_from_pkg(sp_mem_t mem, spn_pkg_info_t* info, s
   sp_da_for(info->deps, it) {
     spn_requested_dep_t* req = &info->deps[it];
     if (req->source != SPN_PKG_SOURCE_INDEX) {
-      return (spn_err_union_t) {
-        .kind = SPN_ERR_INDEX_PATH_DEP,
-        .pkg = { .name = info->qualified, .requested = req->qualified },
-      };
+      *dep = req->qualified;
+      return SPN_ERR_INDEX_PATH_DEP;
     }
 
     sp_da_push(release->deps, ((spn_index_dep_t) {
@@ -62,5 +61,5 @@ spn_err_union_t spn_index_release_from_pkg(sp_mem_t mem, spn_pkg_info_t* info, s
     sp_da_push(release->targets, target);
   }
 
-  return spn_result(SPN_OK);
+  return SPN_OK;
 }

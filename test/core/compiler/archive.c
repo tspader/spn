@@ -28,7 +28,7 @@ static const archive_test_t tests [] = {
   },
 };
 
-sp_test_each(render_archive, render, archive_test_t, tests) {
+sp_test_each(render_archive, render, archive_test_t, tests, .setup = spn_test_ctx_setup) {
   sp_mem_t mem = sp_test_arena(t);
   spn_cc_toolchain_t toolchain = test_toolchain(it->compiler);
   toolchain.archiver_driver = it->archiver;
@@ -44,10 +44,13 @@ sp_test_each(render_archive, render, archive_test_t, tests) {
   sp_da_push(files.objects, sp_str_lit("main.o"));
 
   spn_invocation_t invocation = sp_zero;
-  spn_err_union_t err = spn_cc_render_archive(mem, &toolchain, &profile, &files, &invocation);
-  sp_expect_eq(t, err.kind, it->expect.err);
+  spn_err_t err = spn_cc_render_archive(mem, &toolchain, &profile, &files, &invocation);
+  sp_expect_eq(t, err, it->expect.err);
   if (it->expect.err) {
-    sp_expect_eq(t, err.compiler.feature, SPN_CC_FEATURE_ARCHIVE);
+    sp_da(spn_build_event_t) errs = spn_test_drain_errs(mem);
+    sp_must_eq(t, 1, sp_da_size(errs));
+    sp_expect_eq(t, errs[0].err.kind, it->expect.err);
+    sp_expect_eq(t, errs[0].err.compiler.feature, SPN_CC_FEATURE_ARCHIVE);
     return SP_OK;
   }
   return expect_args(t, &invocation, it->expect);

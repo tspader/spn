@@ -1,5 +1,7 @@
 #include "toolchain/provision.h"
 
+#include "ctx/types.h"
+#include "error/error.h"
 #include "sha256/sha256.h"
 #include "sp/fs.h"
 
@@ -49,25 +51,25 @@ SP_PRIVATE spn_err_t spn_toolchain_provision_fetch(spn_toolchain_store_t* store,
   return store->fetch(*url, dest, store->fetch_user_data);
 }
 
-SP_PRIVATE spn_err_union_t spn_toolchain_provision_fill(spn_toolchain_store_t* store, spn_toolchain_info_t* toolchain, spn_artifact_t artifact, sp_str_t dest) {
+SP_PRIVATE spn_err_t spn_toolchain_provision_fill(spn_toolchain_store_t* store, spn_toolchain_info_t* toolchain, spn_artifact_t artifact, sp_str_t dest) {
   sp_str_t tarball = sp_fs_staging_path(store->mem, dest, sp_str_lit("download"));
 
   sp_str_t url = sp_zero;
   if (spn_toolchain_provision_fetch(store, artifact, tarball, &url)) {
     sp_fs_remove_file(tarball);
-    return (spn_err_union_t) {
+    return spn_err_emit(&spn, (spn_err_union_t) {
       .kind = SPN_ERR_TOOLCHAIN_FETCH,
       .artifact = {
         .name = toolchain->name,
         .url = url,
       },
-    };
+    });
   }
 
   sp_str_t actual = sp_zero;
   if (spn_sha256_file(store->mem, tarball, &actual) || !sp_str_equal(actual, artifact.sha256)) {
     sp_fs_remove_file(tarball);
-    return (spn_err_union_t) {
+    return spn_err_emit(&spn, (spn_err_union_t) {
       .kind = SPN_ERR_TOOLCHAIN_SHA,
       .artifact = {
         .name = toolchain->name,
@@ -75,19 +77,19 @@ SP_PRIVATE spn_err_union_t spn_toolchain_provision_fill(spn_toolchain_store_t* s
         .expected = artifact.sha256,
         .actual = actual,
       },
-    };
+    });
   }
 
   sp_str_t work = sp_zero;
   if (sp_fs_staging_dir(store->mem, dest, sp_str_lit("tmp"), &work)) {
     sp_fs_remove_file(tarball);
-    return (spn_err_union_t) {
+    return spn_err_emit(&spn, (spn_err_union_t) {
       .kind = SPN_ERR_TOOLCHAIN_EXTRACT,
       .artifact = {
         .name = toolchain->name,
         .url = url,
       },
-    };
+    });
   }
 
   sp_ps_output_t extract = sp_ps_run(store->mem, (sp_ps_config_t) {
@@ -107,56 +109,56 @@ SP_PRIVATE spn_err_union_t spn_toolchain_provision_fill(spn_toolchain_store_t* s
   bool empty = sp_da_empty(sp_fs_collect(store->mem, work));
   if (extract.status.exit_code || empty) {
     sp_fs_remove_dir(work);
-    return (spn_err_union_t) {
+    return spn_err_emit(&spn, (spn_err_union_t) {
       .kind = SPN_ERR_TOOLCHAIN_EXTRACT,
       .artifact = {
         .name = toolchain->name,
         .url = url,
       },
-    };
+    });
   }
 
   sp_sys_fd_t cwd = sp_sys_get_root(0);
   if (sp_sys_rename_s(cwd, work, cwd, dest)) {
     sp_fs_remove_dir(work);
     if (!sp_fs_is_dir(dest)) {
-      return (spn_err_union_t) {
+      return spn_err_emit(&spn, (spn_err_union_t) {
         .kind = SPN_ERR_TOOLCHAIN_EXTRACT,
         .artifact = {
           .name = toolchain->name,
           .url = url,
         },
-      };
+      });
     }
   }
 
-  return spn_result(SPN_OK);
+  return SPN_OK;
 }
 
-spn_err_union_t spn_toolchain_provision(spn_toolchain_store_t* store, spn_toolchain_info_t* toolchain, spn_opt_artifact_t selected, sp_str_t* root) {
+spn_err_t spn_toolchain_provision(spn_toolchain_store_t* store, spn_toolchain_info_t* toolchain, spn_opt_artifact_t selected, sp_str_t* root) {
   *root = sp_str_lit("");
   if (toolchain->source == SPN_TOOLCHAIN_SOURCE_LOCAL) {
     sp_assert(sp_opt_is_null(selected));
-    return spn_result(SPN_OK);
+    return SPN_OK;
   }
 
   sp_assert(!sp_opt_is_null(selected));
   spn_artifact_t artifact = sp_opt_get(selected);
   if (sp_str_empty(artifact.sha256)) {
-    return (spn_err_union_t) {
+    return spn_err_emit(&spn, (spn_err_union_t) {
       .kind = SPN_ERR_TOOLCHAIN_NO_SHA,
       .artifact = {
         .name = toolchain->name,
         .url = artifact.url,
       },
-    };
+    });
   }
 
   sp_str_t dest = spn_toolchain_store_path(store, artifact);
   *root = dest;
 
   if (sp_fs_is_dir(dest)) {
-    return spn_result(SPN_OK);
+    return SPN_OK;
   }
   sp_fs_create_dir(store->dir);
 
@@ -166,10 +168,10 @@ spn_err_union_t spn_toolchain_provision(spn_toolchain_store_t* store, spn_toolch
 
   if (locked && sp_fs_is_dir(dest)) {
     sp_fs_lock_release(&lock);
-    return spn_result(SPN_OK);
+    return SPN_OK;
   }
 
-  spn_err_union_t result = spn_toolchain_provision_fill(store, toolchain, artifact, dest);
+  spn_err_t result = spn_toolchain_provision_fill(store, toolchain, artifact, dest);
   sp_fs_lock_release(&lock);
   return result;
 }

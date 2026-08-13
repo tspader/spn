@@ -10,7 +10,7 @@
 #include "session/types.h"
 #include "unit/types.h"
 
-static spn_err_union_t run_test(spn_session_t* session, spn_target_unit_t* unit, bool* passed) {
+static spn_err_t run_test(spn_session_t* session, spn_target_unit_t* unit, bool* passed) {
   spn_ctx_t* ctx = session->ctx;
   sp_str_t command = spn_target_unit_staged_path(session->mem, unit);
 
@@ -24,10 +24,10 @@ static spn_err_union_t run_test(spn_session_t* session, spn_target_unit_t* unit,
   });
 
   if (!sp_fs_exists(command)) {
-    return (spn_err_union_t) {
+    return spn_err_emit(ctx, (spn_err_union_t) {
       .kind = SPN_ERR_TEST_MISSING,
       .script = { .name = unit->info->name, .path = command },
-    };
+    });
   }
 
   sp_tm_timer_t timer = sp_tm_start_timer();
@@ -65,7 +65,7 @@ static spn_err_union_t run_test(spn_session_t* session, spn_target_unit_t* unit,
     });
   }
 
-  return spn_result(SPN_OK);
+  return SPN_OK;
 }
 
 spn_err_t spn_op_test(spn_op_t* op) {
@@ -83,7 +83,7 @@ spn_err_t spn_op_test(spn_op_t* op) {
         continue;
       }
       bool test_passed = sp_zero;
-      spn_try(spn_err_emit(ctx, run_test(session, unit, &test_passed)));
+      spn_try(run_test(session, unit, &test_passed));
       if (test_passed) {
         result->passed++;
       }
@@ -103,7 +103,7 @@ spn_err_t spn_op_test(spn_op_t* op) {
   });
 
   if (result->failed) {
-    return spn_err_emit(ctx, spn_err_reported(SPN_ERR_TEST_FAILED));
+    return SPN_ERR_TEST_FAILED;
   }
   return SPN_OK;
 }

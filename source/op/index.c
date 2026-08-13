@@ -31,14 +31,14 @@ static void sync_index_node(void* data) {
   job->err = spn_index_sync(job->index, job->force);
 }
 
-static spn_err_union_t sync_indexes(spn_op_t* op) {
+static spn_err_t sync_indexes(spn_op_t* op) {
   spn_ctx_t* ctx = op->ctx;
   spn_sync_request_t request = op->request.indexes;
   if (!sp_str_empty(request.only) && !spn_find_index(ctx, request.only)) {
-    return (spn_err_union_t) {
+    return spn_err_emit(ctx, (spn_err_union_t) {
       .kind = SPN_ERR_INDEX_UNKNOWN,
       .index = { .name = request.only },
-    };
+    });
   }
 
   sp_da(job_t*) jobs = sp_da_new(ctx->mem, job_t*);
@@ -82,7 +82,7 @@ static spn_err_union_t sync_indexes(spn_op_t* op) {
   spn_thread_pool_deinit(&pool);
 
   if (spn_op_cancelled(op)) {
-    return spn_err_reported(SPN_ERR_CANCELLED);
+    return SPN_ERR_CANCELLED;
   }
 
   sp_da_for(jobs, it) {
@@ -101,19 +101,19 @@ static spn_err_union_t sync_indexes(spn_op_t* op) {
       continue;
     }
 
-    return (spn_err_union_t) {
+    return spn_err_emit(ctx, (spn_err_union_t) {
       .kind = SPN_ERR_INDEX_SYNC,
       .index = {
         .name = job->index->name,
         .url = spn_index_source(job->index),
-      }};
+      }});
   }
 
-  return spn_result(SPN_OK);
+  return SPN_OK;
 }
 
 spn_err_t spn_op_sync_indexes(spn_op_t* op) {
-  return spn_err_emit(op->ctx, sync_indexes(op));
+  return sync_indexes(op);
 }
 
 spn_op_t* spn_sync_indexes(spn_ctx_t* ctx, spn_sync_request_t request) {

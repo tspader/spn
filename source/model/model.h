@@ -4,6 +4,6 @@
 #include "error/types.h"
 #include "core/types.h"
 
-spn_err_union_t spn_model_establish(spn_op_t* op);
+spn_err_t spn_model_establish(spn_op_t* op);
 
 #endif

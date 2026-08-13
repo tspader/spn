@@ -144,7 +144,7 @@ static void drain(spn_session_t* s, sp_da(spn_pkg_unit_t*)* pending) {
   sp_da_clear(*pending);
 }
 
-spn_err_union_t spn_units_add_packages(spn_session_t* s) {
+spn_err_t spn_units_add_packages(spn_session_t* s) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   sp_da(spn_pkg_unit_t*) pending = sp_da_new(scratch.mem, spn_pkg_unit_t*);
 
@@ -193,5 +193,5 @@ spn_err_union_t spn_units_add_packages(spn_session_t* s) {
   }
 
   sp_mem_end_scratch(scratch);
-  return spn_result(SPN_OK);
+  return SPN_OK;
 }

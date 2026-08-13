@@ -57,19 +57,19 @@ static bool is_name_valid(sp_str_t name) {
   return true;
 }
 
-static spn_err_union_t scaffold(spn_ctx_t* ctx, spn_scaffold_request_t request, sp_mem_t mem, spn_str_arr_t* files) {
+static spn_err_t scaffold(spn_ctx_t* ctx, spn_scaffold_request_t request, sp_mem_t mem, spn_str_arr_t* files) {
   *files = sp_zero_s(spn_str_arr_t);
   if (!is_name_valid(request.name)) {
-    return (spn_err_union_t) { .kind = SPN_ERR_INIT_NAME, .pkg = { .name = sp_str_copy(ctx->heap, request.name) } };
+    return spn_err_emit(ctx, (spn_err_union_t) { .kind = SPN_ERR_INIT_NAME, .pkg = { .name = sp_str_copy(ctx->heap, request.name) } });
   }
   if (sp_fs_create_dir(request.dir) != SP_OK) {
-    return (spn_err_union_t) { .kind = SPN_ERR_FS_WRITE, .fs = { .path = sp_str_copy(ctx->heap, request.dir) } };
+    return spn_err_emit(ctx, (spn_err_union_t) { .kind = SPN_ERR_FS_WRITE, .fs = { .path = sp_str_copy(ctx->heap, request.dir) } });
   }
 
   sp_da(sp_str_t) created = sp_da_new(mem, sp_str_t);
 
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-  spn_err_union_t err = spn_result(SPN_OK);
+  spn_err_t err = SPN_OK;
 
   sp_template_scope_t* scope = sp_template_scope_create(s.mem);
   sp_template_set(scope, sp_str_lit("name"), request.name);
@@ -80,11 +80,11 @@ static spn_err_union_t scaffold(spn_ctx_t* ctx, spn_scaffold_request_t request, 
     sp_io_dyn_mem_writer_t writer = sp_zero;
     sp_io_dyn_mem_writer_init(s.mem, &writer);
     if (sp_template_render(&writer.base, it.tpl, scope, SP_NULLPTR)) {
-      err = spn_result(SPN_ERROR);
+      err = spn_err_emit(ctx, (spn_err_union_t) { .kind = SPN_ERR_SCAFFOLD_TEMPLATE, .fs = { .path = sp_str_copy(ctx->heap, path) } });
       break;
     }
     if (sp_fs_create_file_str(path, sp_io_dyn_mem_writer_take_str(&writer)) != SP_OK) {
-      err = (spn_err_union_t) { .kind = SPN_ERR_FS_WRITE, .fs = { .path = sp_str_copy(ctx->heap, path) } };
+      err = spn_err_emit(ctx, (spn_err_union_t) { .kind = SPN_ERR_FS_WRITE, .fs = { .path = sp_str_copy(ctx->heap, path) } });
       break;
     }
 
@@ -96,14 +96,14 @@ static spn_err_union_t scaffold(spn_ctx_t* ctx, spn_scaffold_request_t request, 
   return err;
 }
 
-static spn_err_union_t check(spn_ctx_t* ctx, spn_scaffold_request_t request) {
+static spn_err_t check(spn_ctx_t* ctx, spn_scaffold_request_t request) {
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-  spn_err_union_t err = spn_result(SPN_OK);
+  spn_err_t err = SPN_OK;
 
   for (iterator_t it = it_new(request.bare); !it.done; it_next(&it)) {
     sp_str_t path = sp_fs_join_path(s.mem, request.dir, it.rel);
     if (sp_fs_exists(path)) {
-      err = (spn_err_union_t) { .kind = SPN_ERR_INIT_EXISTS, .fs = { .path = sp_str_copy(ctx->heap, path) } };
+      err = spn_err_emit(ctx, (spn_err_union_t) { .kind = SPN_ERR_INIT_EXISTS, .fs = { .path = sp_str_copy(ctx->heap, path) } });
       break;
     }
   }
@@ -113,7 +113,7 @@ static spn_err_union_t check(spn_ctx_t* ctx, spn_scaffold_request_t request) {
 }
 
 spn_err_t spn_op_scaffold(spn_op_t* op) {
-  return spn_err_emit(op->ctx, scaffold(op->ctx, op->request.scaffold, op->mem, &op->result.scaffold.files));
+  return scaffold(op->ctx, op->request.scaffold, op->mem, &op->result.scaffold.files);
 }
 
 spn_op_t* spn_scaffold_project(spn_ctx_t* ctx, spn_scaffold_request_t request) {
@@ -128,5 +128,5 @@ spn_op_t* spn_scaffold_project(spn_ctx_t* ctx, spn_scaffold_request_t request) {
 }
 
 spn_err_t spn_scaffold_check(spn_ctx_t* ctx, spn_scaffold_request_t request) {
-  return spn_err_emit(ctx, check(ctx, request));
+  return check(ctx, request);
 }

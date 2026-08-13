@@ -5,6 +5,7 @@
 #include "resolve/types.h"
 #include "session/types.h"
 
+#include "error/error.h"
 #include "error/types.h"
 #include "intern/intern.h"
 #include "pkg/id.h"
@@ -13,6 +14,19 @@
 #include "when/when.h"
 
 #define SPN_GATE_MAX_RESOLVES 4
+
+static spn_err_t violation_kind(spn_option_err_t kind) {
+  switch (kind) {
+    case SPN_OPTION_ERR_UNDECLARED:  return SPN_ERR_OPTION_UNDECLARED;
+    case SPN_OPTION_ERR_BAD_VALUE:   return SPN_ERR_OPTION_BAD_VALUE;
+    case SPN_OPTION_ERR_CONFLICT:    return SPN_ERR_OPTION_CONFLICT;
+    case SPN_OPTION_ERR_VETO:        return SPN_ERR_OPTION_VETO;
+    case SPN_OPTION_ERR_NO_VALUE:    return SPN_ERR_OPTION_NO_VALUE;
+    case SPN_OPTION_ERR_LATE_GATE:   return SPN_ERR_OPTION_LATE_GATE;
+    case SPN_OPTION_ERR_UNKNOWN_PKG: return SPN_ERR_OPTION_UNKNOWN_PKG;
+  }
+  sp_unreachable_return(SPN_ERROR);
+}
 
 static spn_resolved_dep_t* node_find_edge(spn_resolved_pkg_t* node, sp_intern_id_t qualified, spn_dep_kind_t kind) {
   sp_da_for(node->edges, it) {
@@ -71,7 +85,7 @@ static void sweep_unreachable(spn_session_t* session) {
   session->resolve = kept;
 }
 
-static spn_err_union_t validate_config_keys(spn_session_t* session) {
+static spn_err_t validate_config_keys(spn_session_t* session) {
   sp_da_for(session->pkg->config, it) {
     spn_pkg_config_entry_t* entry = &session->pkg->config[it];
 
@@ -96,21 +110,21 @@ static spn_err_union_t validate_config_keys(spn_session_t* session) {
     }
 
     if (!known) {
-      return (spn_err_union_t) {
-        .kind = SPN_ERR_OPTION,
+      return spn_err_emit(session->ctx, (spn_err_union_t) {
+        .kind = SPN_ERR_OPTION_UNKNOWN_PKG,
         .option = {
           .violation = {
             .kind = SPN_OPTION_ERR_UNKNOWN_PKG,
             .pkg = entry->key,
           },
         },
-      };
+      });
     }
   }
-  return spn_result(SPN_OK);
+  return SPN_OK;
 }
 
-spn_err_union_t spn_session_apply_options(spn_session_t* session, bool* reresolve) {
+spn_err_t spn_session_apply_options(spn_session_t* session, bool* reresolve) {
   sp_mem_t mem = session->mem;
   sp_str_t missing_pkg = sp_zero;
   sp_str_t missing_dep = sp_zero;
@@ -165,7 +179,17 @@ spn_err_union_t spn_session_apply_options(spn_session_t* session, bool* reresolv
       spn_merged_options_t merged = sp_zero;
       spn_pkg_options_merge(mem, node, &session->profile, session->pkg->config, node_requests, &merged);
       if (!sp_da_empty(merged.violations)) {
-        return (spn_err_union_t) { .kind = SPN_ERR_OPTION, .option = merged.violations[0] };
+        spn_err_t first = SPN_OK;
+        sp_da_for(merged.violations, vt) {
+          spn_err_t kind = spn_err_emit(session->ctx, (spn_err_union_t) {
+            .kind = violation_kind(merged.violations[vt].kind),
+            .option.violation = merged.violations[vt],
+          });
+          if (!first) {
+            first = kind;
+          }
+        }
+        return first;
       }
 
       sp_ht_insert(session->options, node->id, merged.options);
@@ -212,10 +236,10 @@ spn_err_union_t spn_session_apply_options(spn_session_t* session, bool* reresolv
       if (session->gates.resolves < SPN_GATE_MAX_RESOLVES) {
         session->gates.resolves++;
         *reresolve = true;
-        return spn_result(SPN_OK);
+        return SPN_OK;
       }
-      return (spn_err_union_t) {
-        .kind = SPN_ERR_OPTION,
+      return spn_err_emit(session->ctx, (spn_err_union_t) {
+        .kind = SPN_ERR_OPTION_LATE_GATE,
         .option = {
           .violation = {
             .kind = SPN_OPTION_ERR_LATE_GATE,
@@ -223,11 +247,11 @@ spn_err_union_t spn_session_apply_options(spn_session_t* session, bool* reresolv
             .a = { .kind = SPN_OPTION_SETTER_CONSUMER, .name = missing_dep },
           },
         },
-      };
+      });
     }
     break;
   }
 
-  spn_try_union(validate_config_keys(session));
-  return spn_result(SPN_OK);
+  spn_try(validate_config_keys(session));
+  return SPN_OK;
 }

@@ -15,11 +15,11 @@
 #include "project/types.h"
 #include "semver/convert.h"
 
-static spn_err_union_t publish_build(spn_ctx_t* ctx, spn_publish_request_t request, spn_index_release_t* release) {
-  spn_try_union(spn_ctx_require_project(ctx));
+static spn_err_t publish_build(spn_ctx_t* ctx, spn_publish_request_t request, spn_index_release_t* release) {
+  spn_try(spn_ctx_require_project(ctx));
 
   if (!spn_find_index(ctx, request.index)) {
-    return (spn_err_union_t) { .kind = SPN_ERR_INDEX_UNKNOWN, .index = { .name = request.index } };
+    return spn_err_emit(ctx, (spn_err_union_t) { .kind = SPN_ERR_INDEX_UNKNOWN, .index = { .name = request.index } });
   }
 
   spn_publish_opts_t opts = {
@@ -33,7 +33,7 @@ static spn_err_union_t publish_build(spn_ctx_t* ctx, spn_publish_request_t reque
   return spn_publish_build(&opts, release);
 }
 
-static spn_err_union_t publish(spn_ctx_t* ctx, spn_publish_request_t request, spn_index_release_t* release) {
+static spn_err_t publish(spn_ctx_t* ctx, spn_publish_request_t request, spn_index_release_t* release) {
   spn_index_info_t* index = spn_find_index(ctx, request.index);
 
   spn_evt_publish_t evt = {
@@ -48,24 +48,24 @@ static spn_err_union_t publish(spn_ctx_t* ctx, spn_publish_request_t request, sp
     .publish = evt,
   });
 
-  spn_try_union(spn_index_publish(index, ctx->mem, release));
+  spn_try(spn_index_publish(index, ctx->mem, release));
 
   spn_event_buffer_push(ctx->events, (spn_build_event_t) {
     .kind = SPN_EVENT_PUBLISH_END,
     .publish = evt,
   });
 
-  return spn_result(SPN_OK);
+  return SPN_OK;
 }
 
 spn_err_t spn_op_publish(spn_op_t* op) {
   spn_index_release_t release = sp_zero;
-  spn_try(spn_err_emit(op->ctx, publish_build(op->ctx, op->request.publish, &release)));
+  spn_try(publish_build(op->ctx, op->request.publish, &release));
   if (op->request.publish.dry) {
     op->result.publish.json = spn_index_release_to_json(op->mem, &release);
     return SPN_OK;
   }
-  return spn_err_emit(op->ctx, publish(op->ctx, op->request.publish, &release));
+  return publish(op->ctx, op->request.publish, &release);
 }
 
 spn_op_t* spn_publish(spn_ctx_t* ctx, spn_publish_request_t request) {
