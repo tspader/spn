@@ -20,8 +20,8 @@ spn_err_t codegen(spn_t* spn) {
   codegen_io_t io = { .spn = spn, .mem = mem };
 
   sp_str_t err = codegen_run(mem, (codegen_paths_t) {
-    .schema = sp_str_lit("/source/source/codegen/schema"),
-    .out = sp_str_lit("/source/source/codegen/gen"),
+    .schema = sp_str_lit("/source/source/core/codegen/schema"),
+    .out = sp_str_lit("/source/source/core/codegen/gen"),
     .include = sp_str_lit("/source/include/spn"),
     .templates = sp_str_lit("/source/tools/gen/templates"),
   }, codegen_log, &io);
