@@ -7,6 +7,7 @@ add_executable(integration
   ${SRC}/codegen/json.c
   ${SRC}/codegen/loader.c
   ${SRC}/core/core.c
+  ${SRC}/sp/io.c
   ${SRC}/ctx/ctx.c
   ${SRC}/enum/enum.c
   ${SRC}/error/error.c

@@ -143,7 +143,7 @@ sp_str_t spn_sha256_hex(sp_mem_t mem, const void* data, u64 len) {
   return spn_sha256_digest_hex(mem, digest);
 }
 
-spn_err_t spn_sha256_file_digest(sp_str_t path, u8 digest [32]) {
+spn_err_t spn_sha256_file_digest(sp_str_t path, u8 digest [32], u64* size) {
   sp_io_file_reader_t reader = sp_zero;
   if (sp_io_file_reader_from_path(&reader, path)) {
     return SPN_ERROR;
@@ -152,12 +152,14 @@ spn_err_t spn_sha256_file_digest(sp_str_t path, u8 digest [32]) {
   spn_sha256_ctx_t ctx = sp_zero;
   spn_sha256_init(&ctx);
 
+  *size = 0;
   u8 chunk [65536];
   while (true) {
     u64 bytes_read = 0;
     sp_err_t err = sp_io_read(&reader.base, chunk, sizeof(chunk), &bytes_read);
     if (bytes_read) {
       spn_sha256_update(&ctx, chunk, bytes_read);
+      *size += bytes_read;
     }
     if (err == SP_ERR_IO_EOF) {
       break;
@@ -178,7 +180,8 @@ spn_err_t spn_sha256_file_digest(sp_str_t path, u8 digest [32]) {
 
 spn_err_t spn_sha256_file(sp_mem_t mem, sp_str_t path, sp_str_t* hex) {
   u8 digest [32];
-  if (spn_sha256_file_digest(path, digest)) {
+  u64 size = 0;
+  if (spn_sha256_file_digest(path, digest, &size)) {
     return SPN_ERROR;
   }
   *hex = spn_sha256_digest_hex(mem, digest);

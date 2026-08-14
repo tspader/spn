@@ -8,6 +8,7 @@
 #include "spn/core.h"
 #include "unit/types.h"
 
+#include "cpu/cpu.h"
 #include "error/error.h"
 #include "external/wasm/wasm.h"
 #include "graph/build.h"
@@ -133,5 +134,5 @@ spn_err_t configure(spn_op_t* op) {
     }
   }
 
-  return spn_dag_build_run(dag, 8);
+  return spn_dag_build_run(dag, spn_cpu_count());
 }

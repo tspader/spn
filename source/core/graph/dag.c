@@ -11,6 +11,7 @@
 #include "api/api.h"
 #include "compiler/driver.h"
 #include "core/core.h"
+#include "cpu/cpu.h"
 #include "dag/occ.h"
 #include "enum/enum.h"
 #include "event/event.h"
@@ -332,7 +333,7 @@ spn_err_t spn_build_publish_copies(spn_pkg_unit_t* unit, sp_str_t root, spn_publ
       sp_fs_create_dir(dest);
       sp_da_for(matches, mt) {
         sp_str_t to = sp_fs_join_path(scratch.mem, dest, sp_fs_get_name(matches[mt].path));
-        if (sp_fs_copy(matches[mt].path, to)) {
+        if (spn_fs_update_file(matches[mt].path, to)) {
           err = 1;
           break;
         }
@@ -343,7 +344,7 @@ spn_err_t spn_build_publish_copies(spn_pkg_unit_t* unit, sp_str_t root, spn_publ
     }
     else {
       sp_fs_create_dir(sp_fs_parent_path(dest));
-      err = sp_fs_copy(matches[0].path, dest) ? 1 : 0;
+      err = spn_fs_update_file(matches[0].path, dest) ? 1 : 0;
     }
 
     sp_mem_end_scratch(scratch);
@@ -375,7 +376,7 @@ static s32 dag_tree_copy_user_outputs(spn_dag_tree_ctx_t* ctx, sp_str_t root) {
       sp_str_t relative = sp_str_strip_left(sp_str_strip_left(path, unit->paths.include), sp_str_lit("/"));
       sp_str_t to = sp_fs_join_path(scratch.mem, root, relative);
       sp_fs_create_dir(sp_fs_parent_path(to));
-      s32 err = sp_fs_copy(path, to);
+      s32 err = spn_fs_update_file(path, to);
       sp_mem_end_scratch(scratch);
       if (err) {
         spn_event_buffer_push(spn.events, (spn_event_t) {
@@ -1222,6 +1223,12 @@ static void dag_emit_reports(spn_dag_build_t* b, u64 elapsed) {
         .total = (u32)sp_da_size(b->graph->actions),
         .time = elapsed,
         .profile = profile->name,
+        .hashed_files = sp_atomic_u32_load(&b->stats.hashed_files, SP_ATOMIC_SEQ_CST),
+        .hashed_bytes = sp_atomic_u64_load(&b->stats.hashed_bytes, SP_ATOMIC_SEQ_CST),
+        .stats = sp_atomic_u32_load(&b->stats.stats, SP_ATOMIC_SEQ_CST),
+        .obs_rows = sp_atomic_u32_load(&b->stats.obs_rows, SP_ATOMIC_SEQ_CST),
+        .cache_reads = sp_atomic_u32_load(&b->stats.cache_reads, SP_ATOMIC_SEQ_CST),
+        .cache_writes = sp_atomic_u32_load(&b->stats.cache_writes, SP_ATOMIC_SEQ_CST),
       },
     });
   }
@@ -1265,15 +1272,20 @@ spn_dag_build_t* spn_dag_build_new(spn_op_t* op) {
   spn_dag_file_cache_init(&b->files, spn.mem);
   spn_dag_action_cache_init(&b->actions, spn.mem, sp_fs_join_path(session->mem, root, sp_str_lit("strong")));
   spn_dag_obs_table_init(&b->discovery, spn.mem, sp_fs_join_path(session->mem, root, sp_str_lit("weak")), &b->roots);
-  spn_dag_obs_table_init(&b->memos, spn.mem, sp_fs_join_path(session->mem, root, sp_str_lit("weak")), &b->roots);
+  b->files.stats = &b->stats;
+  b->actions.stats = &b->stats;
+  b->discovery.stats = &b->stats;
+  b->store.stats = &b->stats;
+  b->files_path = sp_fs_join_path(session->mem, root, sp_str_lit("files"));
+  spn_dag_file_cache_load(&b->files, b->files_path, &b->roots);
 
   b->env = (spn_dag_env_t) {
     .files = &b->files,
     .cache = &b->actions,
     .store = &b->store,
     .discovery = &b->discovery,
-    .memos = &b->memos,
     .roots = &b->roots,
+    .stats = &b->stats,
     .progress = &b->progress,
     .wake = &op->ctx->wake,
     .cancel = &op->cancelled,
@@ -1285,13 +1297,14 @@ spn_dag_build_t* spn_dag_build_new(spn_op_t* op) {
 
 spn_err_t spn_dag_build_run(spn_dag_build_t* b, u32 workers) {
   spn_thread_pool_init(&b->pool, spn.mem, (spn_thread_pool_config_t) {
-    .workers = workers,
+    .workers = sp_min(workers, (u32)sp_da_size(b->graph->actions)),
     .on_worker_exit = spn_wasm_thread_exit,
   });
 
   b->timer = sp_tm_start_timer();
   b->result = spn_dag_run_executor(b->graph, &b->env, &b->pool.executor);
   spn_thread_pool_deinit(&b->pool);
+  spn_dag_file_cache_flush(&b->files, b->files_path, &b->roots);
   return dag_result(b);
 }
 
@@ -1317,7 +1330,7 @@ spn_err_t spn_dag_build_session(spn_op_t* op) {
   });
 
   sp_atomic_ptr_store(&session->ctx->progress, &b->progress, SP_ATOMIC_SEQ_CST);
-  spn_err_t result = spn_dag_build_run(b, 16);
+  spn_err_t result = spn_dag_build_run(b, spn_cpu_count());
   sp_atomic_ptr_store(&session->ctx->progress, SP_NULLPTR, SP_ATOMIC_SEQ_CST);
   u64 elapsed = sp_tm_read_timer(&b->timer);
 

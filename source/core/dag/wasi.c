@@ -69,9 +69,10 @@ static void wasi_push(spn_dag_wasi_t* w, spn_dag_obs_t obs) {
   if (!w->obs || sp_str_empty(obs.path)) {
     return;
   }
+  sp_str_t canonical = sp_fs_canonicalize_path(w->obs_mem, obs.path);
   sp_da_push(*w->obs, ((spn_dag_obs_t) {
     .kind = obs.kind,
-    .path = sp_str_copy(w->obs_mem, obs.path),
+    .path = sp_str_empty(canonical) ? sp_str_copy(w->obs_mem, obs.path) : canonical,
     .filter = sp_str_copy(w->obs_mem, obs.filter)
   }));
 }

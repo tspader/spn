@@ -171,15 +171,16 @@ sp_test_each(dag_action_cache, ops, cache_test_t, cache_tests) {
         break;
       }
       case CACHE_OP_GET: {
-        const spn_dag_action_entry_t* entry = spn_dag_action_cache_get(&c, dag_test_digest(op.key));
-        sp_expect_eq(t, op.expect.hit, entry != SP_NULLPTR);
-        if (op.expect.hit && entry) {
+        spn_dag_action_entry_t entry = sp_zero;
+        bool present = spn_dag_action_cache_get(&c, dag_test_digest(op.key), &entry);
+        sp_expect_eq(t, op.expect.hit, present);
+        if (op.expect.hit && present) {
           u32 count = 0;
           get_output_count(&op, &count);
-          sp_must_eq(t, count, (u32)sp_da_size(entry->outputs));
+          sp_must_eq(t, count, (u32)sp_da_size(entry.outputs));
           sp_for(oi, count) {
-            sp_expect_str_eq_c(t, entry->outputs[oi].name, op.outputs[oi].name);
-            sp_expect(t, spn_dag_digest_equal(entry->outputs[oi].digest, dag_test_digest(op.outputs[oi].blob)));
+            sp_expect_str_eq_c(t, entry.outputs[oi].name, op.outputs[oi].name);
+            sp_expect(t, spn_dag_digest_equal(entry.outputs[oi].digest, dag_test_digest(op.outputs[oi].blob)));
           }
         }
         break;

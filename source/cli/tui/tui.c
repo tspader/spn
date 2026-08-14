@@ -316,12 +316,20 @@ static sp_str_t render_event_detail(spn_ctx_t* ctx, sp_mem_t mem, spn_event_t* e
       break;
     }
     case SPN_EVENT_BUILD_SUMMARY: {
-      c8 buffer [64] = sp_zero;
-      sp_fmt_write_duration_buf(buffer, sizeof(buffer), event->build_summary.time);
-      sp_fmt_io(&w.base, "{} executed, {} cached in {.gray}",
+      c8 duration [64] = sp_zero;
+      c8 bytes [64] = sp_zero;
+      sp_fmt_write_duration_buf(duration, sizeof(duration), event->build_summary.time);
+      sp_fmt_write_size_buf(bytes, sizeof(bytes), event->build_summary.hashed_bytes);
+      sp_fmt_io(&w.base, "{} executed, {} cached in {.gray} | hashed {} ({.gray}), stats {}, rows {}, cache {}r/{}w",
         sp_fmt_uint(event->build_summary.misses),
         sp_fmt_uint(event->build_summary.hits),
-        sp_fmt_cstr(buffer)
+        sp_fmt_cstr(duration),
+        sp_fmt_uint(event->build_summary.hashed_files),
+        sp_fmt_cstr(bytes),
+        sp_fmt_uint(event->build_summary.stats),
+        sp_fmt_uint(event->build_summary.obs_rows),
+        sp_fmt_uint(event->build_summary.cache_reads),
+        sp_fmt_uint(event->build_summary.cache_writes)
       );
       break;
     }

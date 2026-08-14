@@ -1,6 +1,7 @@
 #include "sp.h"
 #include "sp/macro.h"
 
+#include "cpu/cpu.h"
 #include "ctx/ctx.h"
 #include "ctx/types.h"
 #include "error/error.h"
@@ -70,7 +71,7 @@ static spn_err_t sync_indexes(spn_op_t* op) {
 
   spn_thread_pool_t pool = sp_zero;
   spn_thread_pool_init(&pool, ctx->mem, (spn_thread_pool_config_t) {
-    .workers = (u32)sp_min(8, sp_da_size(jobs)),
+    .workers = sp_min(spn_cpu_count(), (u32)sp_da_size(jobs)),
     .on_worker_exit = spn_wasm_thread_exit,
   });
 

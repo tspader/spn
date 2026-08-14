@@ -79,7 +79,7 @@ static spn_err_t publish_target_headers(spn_pkg_unit_t* unit, sp_str_t root, spn
         continue;
       }
       sp_fs_create_dir(sp_fs_parent_path(to));
-      if (sp_fs_copy(from, to)) {
+      if (spn_fs_update_file(from, to)) {
         return header_copy_failed(unit, header.path);
       }
     }

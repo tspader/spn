@@ -288,22 +288,6 @@ spn_dag_digest_t spn_dag_strong_key(spn_dag_digest_t weak, const spn_dag_roots_t
   return spn_dag_hash_final(&ctx);
 }
 
-static spn_dag_digest_t path_key(sp_str_t salt, sp_str_t path) {
-  spn_sha256_ctx_t ctx = sp_zero;
-  spn_sha256_init(&ctx);
-  spn_dag_hash_str(&ctx, salt);
-  spn_dag_hash_str(&ctx, path);
-  return spn_dag_hash_final(&ctx);
-}
-
-spn_dag_digest_t spn_dag_source_key(sp_str_t path) {
-  return path_key(sp_str_lit("spn.dag.source.v1"), path);
-}
-
-spn_dag_digest_t spn_dag_settle_key(sp_str_t path) {
-  return path_key(sp_str_lit("spn.dag.settle.v1"), path);
-}
-
 spn_dag_digest_t spn_dag_digest(const void* data, u64 len) {
   spn_dag_digest_t digest = sp_zero;
   spn_sha256(data, len, digest.bytes);

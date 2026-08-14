@@ -1,5 +1,6 @@
 #include "sp.h"
 #include "sp/str.h"
+#include "cpu/cpu.h"
 #include "ctx/ctx.h"
 #include "ctx/types.h"
 #include "dag/dag.h"
@@ -473,7 +474,7 @@ spn_err_t sync_packages(spn_op_t* op, bool* reresolve) {
   u32 num_jobs = (u32)(sp_da_size(packages) + sp_da_size(toolchains));
   spn_thread_pool_t pool = sp_zero;
   spn_thread_pool_init(&pool, spn.mem, (spn_thread_pool_config_t) {
-    .workers = sp_min(8, num_jobs),
+    .workers = sp_min(spn_cpu_count(), num_jobs),
     .on_worker_exit = spn_wasm_thread_exit,
   });
 

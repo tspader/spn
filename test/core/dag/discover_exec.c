@@ -15,7 +15,7 @@ typedef struct {
   bool cold;
   bool manifest_stable;
   const c8* output;
-  const c8* manifest_fresh;
+  const c8* hint_fresh;
   spn_err_t expect_err;
   u32 expect_runs;
 } discover_run_t;
@@ -143,12 +143,12 @@ static const discover_test_t discover_tests [] = {
     }
   },
   {
-    .name = "manifest_rewritten_on_hit",
+    .name = "hint_refreshed_on_hit",
     .input = "A",
     .runs = {
       { .headers = { { "H", "A" } }, .expect_runs = 1 },
       { .headers = { { "H", "A" } }, .cold = true, .expect_runs = 1 },
-      { .headers = { { "H", "A" } }, .cold = true, .expect_runs = 1, .manifest_fresh = "H" },
+      { .cold = true, .expect_runs = 1, .hint_fresh = "H" },
     }
   },
   {
@@ -228,17 +228,6 @@ static sp_sys_file_meta_t manifest_meta(discover_env_t* env) {
   return meta;
 }
 
-static sp_str_t manifest_read(discover_env_t* env) {
-  sp_str_t dir = dag_test_env_path(&env->dag, sp_str_lit("manifests"));
-  sp_da(sp_fs_entry_t) entries = sp_fs_collect(env->dag.mem, dir);
-  if (sp_da_size(entries) != 1) {
-    return sp_str_lit("");
-  }
-  sp_str_t content = sp_zero;
-  sp_io_read_file(env->dag.mem, entries[0].path, &content);
-  return content;
-}
-
 sp_test_each(dag_discover_exec, runs, discover_test_t, discover_tests) {
   discover_env_t env = sp_zero;
   dag_test_env_init(&env.dag, t, (dag_test_env_config_t) {
@@ -295,13 +284,13 @@ sp_test_each(dag_discover_exec, runs, discover_test_t, discover_tests) {
       }
     }
 
-    if (run->manifest_fresh) {
-      sp_str_t manifest = manifest_read(&env);
-      sp_expect(t, !sp_str_empty(manifest));
+    if (run->hint_fresh) {
+      sp_str_t hints = sp_zero;
+      sp_must_eq(t, SP_OK, sp_io_read_file(env.dag.mem, dag_test_env_path(&env.dag, sp_str_lit("files")), &hints));
       sp_sys_file_meta_t sys = sp_zero;
-      sp_must_eq(t, SPN_OK, spn_dag_file_cache_stat(&env.dag.files, dag_test_env_path(&env.dag, sp_str_view(run->manifest_fresh)), &sys));
+      sp_must_eq(t, SPN_OK, spn_dag_file_cache_stat(&env.dag.files, dag_test_env_path(&env.dag, sp_str_view(run->hint_fresh)), &sys));
       sp_str_t mtime = sp_fmt(env.dag.mem, " {} {} ", sp_fmt_int((s64)sys.mtime.tv_sec), sp_fmt_int((s64)sys.mtime.tv_nsec)).value;
-      sp_expect(t, sp_str_contains(manifest, mtime));
+      sp_expect(t, sp_str_contains(hints, mtime));
     }
   }
 
