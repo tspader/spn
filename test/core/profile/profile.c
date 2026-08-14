@@ -372,7 +372,7 @@ sp_test_each(profile, resolve, test_t, tests, .setup = spn_test_ctx_setup) {
   spn_err_t err = spn_profile_resolve(table, &overrides, it->host, it->shared_demand, &result);
   sp_must_eq(t, (u32)it->expect.err, (u32)err);
   if (it->expect.err) {
-    sp_da(spn_build_event_t) errs = spn_test_drain_errs(mem);
+    sp_da(spn_event_t) errs = spn_test_drain_errs(mem);
     sp_must_eq(t, 1, sp_da_size(errs));
     sp_expect_eq(t, errs[0].err.kind, it->expect.err);
     return SP_OK;

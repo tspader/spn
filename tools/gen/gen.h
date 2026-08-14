@@ -170,6 +170,7 @@ gen_type_t* gen_find(gen_t* g, sp_str_t name);
 gen_render_t gen_render_common(gen_t* g);
 gen_render_t gen_render_decls(gen_t* g);
 gen_render_t gen_render_impl(gen_t* g);
+gen_render_t gen_render_union_codes(gen_t* g);
 gen_render_t gen_render_union_decls(gen_t* g);
 gen_render_t gen_render_union_impl(gen_t* g);
 

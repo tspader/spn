@@ -3,7 +3,8 @@
 #include "spn_test.h"
 
 #include "ctx/types.h"
-#include "error/types.h"
+#include "sp.h"
+#include "spn/core.h"
 #include "external/git.h"
 #include "index/index.h"
 #include "index/json.h"

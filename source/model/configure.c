@@ -1,7 +1,7 @@
 #include "sp.h"
 #include "sp/macro.h"
 #include "ctx/types.h"
-#include "error/types.h"
+#include "spn/errors.h"
 #include "core/types.h"
 #include "pkg/types.h"
 #include "session/types.h"

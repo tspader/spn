@@ -1,5 +1,6 @@
 #include "fuzz.h"
-#include "error/types.h"
+#include "sp.h"
+#include "spn/core.h"
 #include "sp/io.h"
 
 void fz_journal_init(fz_journal_t* j, sp_mem_t mem) {

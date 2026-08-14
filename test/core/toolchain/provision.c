@@ -298,7 +298,7 @@ sp_test_each(provision, store, provision_test_t, tests, .setup = spn_test_ctx_se
     spn_err_t err = spn_toolchain_provision(&store, &toolchain, artifact, &roots[at]);
     sp_must_eq(t, (u32)it->expect.kind, (u32)err);
     if (err) {
-      sp_da(spn_build_event_t) errs = spn_test_drain_errs(mem);
+      sp_da(spn_event_t) errs = spn_test_drain_errs(mem);
       sp_must_eq(t, 1, sp_da_size(errs));
       payload = errs[0].err;
       sp_expect_eq(t, payload.kind, err);

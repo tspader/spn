@@ -1,7 +1,8 @@
 #ifndef SPN_TOOLCHAIN_SELECT_H
 #define SPN_TOOLCHAIN_SELECT_H
 
-#include "error/types.h"
+#include "sp.h"
+#include "spn/core.h"
 #include "toolchain/types.h"
 
 typedef struct {

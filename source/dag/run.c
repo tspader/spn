@@ -3,8 +3,8 @@
 #include "core/core.h"
 #include "thread_pool/thread_pool.h"
 #include "sha256/sha256.h"
-#include "error/types.h"
 #include "sp.h"
+#include "spn/core.h"
 #include "sp/fs.h"
 #include "sp/sp_glob.h"
 

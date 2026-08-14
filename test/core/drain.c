@@ -18,7 +18,7 @@ typedef enum {
 
 typedef struct {
   drain_op_kind_t kind;
-  spn_build_event_kind_t event;
+  spn_event_kind_t event;
   u32 fired;
 } drain_op_t;
 
@@ -99,7 +99,7 @@ sp_test_each(core, drain, drain_test_t, drain_tests) {
         break;
       }
       case DRAIN_OP_PUSH: {
-        spn_event_buffer_push(ctx.events, (spn_build_event_t) { .kind = op->event });
+        spn_event_buffer_push(ctx.events, (spn_event_t) { .kind = op->event });
         sp_expect_eq(t, op->fired, fired);
         break;
       }
@@ -109,7 +109,7 @@ sp_test_each(core, drain, drain_test_t, drain_tests) {
         break;
       }
       case DRAIN_OP_DRAIN: {
-        spn_build_event_t* event = spn_ctx_drain(&ctx);
+        spn_event_t* event = spn_ctx_drain(&ctx);
         sp_expect(t, event != SP_NULLPTR);
         sp_expect_eq(t, event->kind, op->event);
         sp_expect_eq(t, op->fired, fired);

@@ -1,7 +1,8 @@
 #ifndef SPN_PKG_MUTATE_H
 #define SPN_PKG_MUTATE_H
 
-#include "error/types.h"
+#include "sp.h"
+#include "spn/core.h"
 #include "pkg/types.h"
 #include "target/types.h"
 

@@ -5,7 +5,7 @@
 
 spn_err_t spn_err_emit(spn_ctx_t* ctx, spn_err_union_t err) {
   if (err.kind) {
-    spn_event_buffer_push(ctx->events, (spn_build_event_t) {
+    spn_event_buffer_push(ctx->events, (spn_event_t) {
       .kind = SPN_EVENT_ERR,
       .err = err,
     });

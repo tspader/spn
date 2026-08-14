@@ -2,7 +2,8 @@
 #define SPN_PROJECT_PROJECT_H
 
 #include "ctx/types.h"
-#include "error/types.h"
+#include "sp.h"
+#include "spn/core.h"
 #include "core/types.h"
 #include "project/types.h"
 #include "resolve/types.h"

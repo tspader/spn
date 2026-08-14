@@ -2,7 +2,8 @@
 
 #include "core/core.h"
 #include "ctx/ctx.h"
-#include "error/types.h"
+#include "sp.h"
+#include "spn/core.h"
 #include "event/event.h"
 #include "external/cc.h"
 #include "external/git.h"
@@ -28,7 +29,7 @@ void spn_pkg_unit_create_layout(spn_pkg_unit_t* unit) {
 typedef sp_str_ht(sp_str_t) staged_header_set_t;
 
 static spn_err_t header_collision(spn_pkg_unit_t* unit, sp_str_t path, sp_str_t first, sp_str_t second) {
-  spn_event_buffer_push(spn.events, (spn_build_event_t) {
+  spn_event_buffer_push(spn.events, (spn_event_t) {
     .kind = SPN_EVENT_ERR,
     .pkg = unit->info->name,
     .err = {
@@ -44,7 +45,7 @@ static spn_err_t header_collision(spn_pkg_unit_t* unit, sp_str_t path, sp_str_t 
 }
 
 static spn_err_t header_copy_failed(spn_pkg_unit_t* unit, sp_str_t path) {
-  spn_event_buffer_push(spn.events, (spn_build_event_t) {
+  spn_event_buffer_push(spn.events, (spn_event_t) {
     .kind = SPN_EVENT_NODE_FAILED,
     .pkg = unit->info->name,
     .node_failed = {
@@ -115,7 +116,7 @@ void spn_pkg_unit_write_stamp(spn_pkg_unit_t* unit, sp_str_t path) {
 void spn_pkg_unit_announce_compile(spn_pkg_unit_t* unit) {
   if (!sp_atomic_s32_cas(&unit->compile_announced, 0, 1, SP_ATOMIC_SEQ_CST)) return;
 
-  spn_event_buffer_push(spn.events, (spn_build_event_t) {
+  spn_event_buffer_push(spn.events, (spn_event_t) {
     .kind = SPN_EVENT_COMPILE_START,
     .pkg = unit->info->name,
     .compile_start = {

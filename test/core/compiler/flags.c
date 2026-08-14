@@ -164,7 +164,7 @@ sp_test_each(render_flags, resolve, flags_test_t, tests, .setup = spn_test_ctx_s
 
   if (it->expect.unsupported) {
     sp_expect_eq(t, err, it->expect.kind ? it->expect.kind : SPN_ERR_SANITIZER_UNSUPPORTED);
-    sp_da(spn_build_event_t) errs = spn_test_drain_errs(mem);
+    sp_da(spn_event_t) errs = spn_test_drain_errs(mem);
     sp_must_eq(t, 1, sp_da_size(errs));
     sp_expect_eq(t, errs[0].err.kind, err);
     sp_expect_eq(t, errs[0].err.sanitizer.unsupported, it->expect.unsupported);

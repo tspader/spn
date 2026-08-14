@@ -1,7 +1,8 @@
 #ifndef SPN_UNIT_UNIT_H
 #define SPN_UNIT_UNIT_H
 
-#include "error/types.h"
+#include "sp.h"
+#include "spn/core.h"
 #include "session/types.h"
 #include "target/types.h"
 #include "unit/types.h"

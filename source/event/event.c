@@ -42,7 +42,7 @@ spn_err_t spn_event_log_open(spn_event_buffer_t* events, sp_str_t path) {
   return err;
 }
 
-void spn_event_buffer_push(spn_event_buffer_t* events, spn_build_event_t event) {
+void spn_event_buffer_push(spn_event_buffer_t* events, spn_event_t event) {
   event.thread_id = current_thread_id();
   event.epoch = sp_tm_now_epoch();
 
@@ -66,7 +66,7 @@ void spn_event_buffer_push(spn_event_buffer_t* events, spn_build_event_t event) 
   }
 }
 
-spn_build_event_t* spn_ctx_drain(spn_ctx_t* ctx) {
+spn_event_t* spn_ctx_drain(spn_ctx_t* ctx) {
   spn_event_buffer_t* events = ctx->events;
 
   sp_mutex_lock(&events->mutex);
@@ -84,12 +84,12 @@ spn_build_event_t* spn_ctx_drain(spn_ctx_t* ctx) {
   return &events->current;
 }
 
-sp_da(spn_build_event_t) spn_event_buffer_drain(sp_mem_t mem, spn_event_buffer_t* events) {
+sp_da(spn_event_t) spn_event_buffer_drain(sp_mem_t mem, spn_event_buffer_t* events) {
   sp_mutex_lock(&events->mutex);
 
-  sp_da(spn_build_event_t) result = sp_da_new(mem, spn_build_event_t);
+  sp_da(spn_event_t) result = sp_da_new(mem, spn_event_t);
   sp_rb_for(events->buffer, it) {
-    spn_build_event_t* event = &sp_rb_at(events->buffer, it);
+    spn_event_t* event = &sp_rb_at(events->buffer, it);
     sp_da_push(result, *event);
   }
 

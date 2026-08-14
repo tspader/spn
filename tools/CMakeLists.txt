@@ -38,9 +38,10 @@ add_custom_command(
     ${EMBED_OBJ}
     ${CMAKE_SOURCE_DIR}/include/spn.h=include/spn.h
     ${CMAKE_SOURCE_DIR}/include/spn/core.h=include/spn/core.h
+    ${CMAKE_SOURCE_DIR}/include/spn/err.h=include/spn/err.h
     ${CMAKE_SOURCE_DIR}/source/toolchain/toolchains.json=toolchains.json
     ${CMAKE_SOURCE_DIR}/assets/init=init
-  DEPENDS embed ${CMAKE_SOURCE_DIR}/include/spn.h ${CMAKE_SOURCE_DIR}/include/spn/core.h ${CMAKE_SOURCE_DIR}/source/toolchain/toolchains.json ${SPN_INIT_TEMPLATES}
+  DEPENDS embed ${CMAKE_SOURCE_DIR}/include/spn.h ${CMAKE_SOURCE_DIR}/include/spn/core.h ${CMAKE_SOURCE_DIR}/include/spn/err.h ${CMAKE_SOURCE_DIR}/source/toolchain/toolchains.json ${SPN_INIT_TEMPLATES}
   COMMENT "spn.embed.o"
   VERBATIM)
 add_custom_target(spn_embed ALL DEPENDS ${EMBED_OBJ} ${EMBED_HDR})
@@ -55,6 +56,7 @@ set(GEN_DIR ${CMAKE_SOURCE_DIR}/source/codegen/gen)
 file(MAKE_DIRECTORY ${GEN_DIR})
 
 set(SCHEMA_DIR ${CMAKE_SOURCE_DIR}/source/codegen/schema)
+set(INCLUDE_DIR ${CMAKE_SOURCE_DIR}/include/spn)
 set(GEN_FILES
   ${GEN_DIR}/common.gen.h
   ${GEN_DIR}/config.gen.h
@@ -77,9 +79,10 @@ set(GEN_FILES
   ${GEN_DIR}/fuzz.gen.h
   ${GEN_DIR}/fuzz.gen.c
   ${GEN_DIR}/fuzz.jtd.json
-  ${GEN_DIR}/errors.gen.h
+  ${INCLUDE_DIR}/err.h
+  ${INCLUDE_DIR}/errors.h
   ${GEN_DIR}/errors.gen.c
-  ${GEN_DIR}/events.gen.h
+  ${INCLUDE_DIR}/events.h
   ${GEN_DIR}/events.gen.c)
 file(GLOB JTD_GEN_SCHEMAS CONFIGURE_DEPENDS ${SCHEMA_DIR}/*.json)
 file(GLOB_RECURSE JTD_GEN_TEMPLATES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/gen/templates/*.tmpl)
@@ -89,8 +92,9 @@ add_custom_command(
   COMMAND $<TARGET_FILE:jtd_gen>
     ${SCHEMA_DIR}
     ${GEN_DIR}
+    ${INCLUDE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/gen/templates
   DEPENDS jtd_gen ${JTD_GEN_SCHEMAS} ${JTD_GEN_TEMPLATES}
-  COMMENT "codegen: common.gen.h, {config,fuzz,manifest,release,toolchains,abi}.gen.{h,c}"
+  COMMENT "codegen: source/codegen/gen/*.gen.{h,c}, include/spn/{err,errors,events}.h"
   VERBATIM)
 add_custom_target(spn_codegen_gen ALL DEPENDS ${GEN_FILES})

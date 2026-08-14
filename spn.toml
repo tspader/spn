@@ -3,7 +3,7 @@ namespace = "spader"
 name = "spn"
 version = "0.2.0"
 repo = "tspader/spn"
-include = ["include", "source/codegen/gen"]
+include = ["include"]
 
 [package.configure]
 source = ["tools/spn/configure.c", "tools/spn/wasi.c"]

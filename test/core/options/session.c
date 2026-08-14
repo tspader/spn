@@ -137,7 +137,7 @@ sp_test_each(options_session, apply, session_test_t, tests, .setup = spn_test_ct
   sp_expect_eq(t, session.gates.resolves, it->expect.resolves);
   sp_expect_eq(t, reresolve, it->expect.reresolve);
 
-  sp_da(spn_build_event_t) errs = spn_test_drain_errs(mem);
+  sp_da(spn_event_t) errs = spn_test_drain_errs(mem);
   if (!it->expect.err) {
     sp_must_eq(t, sp_da_size(errs), 0);
     return SP_OK;

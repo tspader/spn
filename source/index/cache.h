@@ -1,7 +1,8 @@
 #ifndef SPN_INDEX_CACHE_H
 #define SPN_INDEX_CACHE_H
 
-#include "error/types.h"
+#include "sp.h"
+#include "spn/core.h"
 #include "index/types.h"
 
 void spn_index_cache_init(spn_index_cache_t* cache, sp_mem_t mem, sp_intern_t* intern, sp_da(spn_index_info_t)* indexes);

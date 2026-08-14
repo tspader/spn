@@ -1,12 +1,20 @@
-#ifndef SPN_CG_{{ .guard }}_H
-#define SPN_CG_{{ .guard }}_H
+// Generated from source/codegen/schema/events.jtd.json. Do not edit.
+#ifndef SPN_{{ .guard }}_H
+#define SPN_{{ .guard }}_H
 
 #include "sp.h"
-#include "spn/core.h"
-#include "errors.gen.h"
-{{ for .includes }}
-#include "{{ .name }}"
+#include "core.h"
+#include "errors.h"
+
+SP_BEGIN_EXTERN_C()
+
+typedef enum {
+  SPN_EVENT_NONE,
+{{ for .kinds }}
+  {{ .code }},
 {{ end }}
+  SPN_EVENT_COUNT,
+} spn_event_kind_t;
 
 typedef enum {
   SPN_VERBOSITY_QUIET,
@@ -30,8 +38,8 @@ typedef struct {
 extern const spn_event_info_t spn_event_info[SPN_EVENT_COUNT];
 
 {{ $types }}
-typedef struct spn_build_event_t {
-  spn_build_event_kind_t kind;
+typedef struct spn_event_t {
+  spn_event_kind_t kind;
   sp_str_t pkg;
   u64 thread_id;
   sp_tm_epoch_t epoch;
@@ -42,9 +50,11 @@ typedef struct spn_build_event_t {
     {{ .type }} {{ .name }};
 {{ end }}
   };
-} spn_build_event_t;
+} spn_event_t;
 
-const c8* spn_event_name(spn_build_event_kind_t kind);
-void spn_event_log_jsonl(sp_io_writer_t* json, spn_build_event_t* event);
+const c8* spn_event_name(spn_event_kind_t kind);
+void spn_event_log_jsonl(sp_io_writer_t* json, spn_event_t* event);
+
+SP_END_EXTERN_C()
 
 #endif

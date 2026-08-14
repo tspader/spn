@@ -1,7 +1,7 @@
 #include "sp.h"
 #include "sp/macro.h"
 #include "ctx/types.h"
-#include "error/types.h"
+#include "spn/errors.h"
 #include "codegen/lower.h"
 #include "error/error.h"
 #include "external/git.h"

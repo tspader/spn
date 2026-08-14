@@ -84,7 +84,7 @@ static void add_root(spn_session_t* session, spn_resolve_query_t* query) {
 
 static void emit_resolved(sp_mem_t mem, spn_resolve_query_t* query) {
   sp_ht_for_kv(query->result, it) {
-    spn_event_buffer_push(spn.events, (spn_build_event_t) {
+    spn_event_buffer_push(spn.events, (spn_event_t) {
       .kind = SPN_EVENT_RESOLVE_PACKAGE,
       .resolve_pkg = {
         .name = spn_intern_str(it.val->id.qualified),
@@ -93,7 +93,7 @@ static void emit_resolved(sp_mem_t mem, spn_resolve_query_t* query) {
     });
   }
 
-  spn_event_buffer_push(spn.events, (spn_build_event_t) {
+  spn_event_buffer_push(spn.events, (spn_event_t) {
     .kind = SPN_EVENT_RESOLVE_END,
     .resolve_end = {
       .num_resolved = sp_ht_size(query->result),
@@ -104,7 +104,7 @@ static void emit_resolved(sp_mem_t mem, spn_resolve_query_t* query) {
 
 spn_err_t resolve(spn_op_t* op) {
   spn_session_t* session = op->session;
-  spn_event_buffer_push(spn.events, (spn_build_event_t) {
+  spn_event_buffer_push(spn.events, (spn_event_t) {
     .kind = SPN_EVENT_RESOLVE_START,
     .pkg = session->pkg->name,
   });

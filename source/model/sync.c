@@ -4,7 +4,7 @@
 #include "ctx/types.h"
 #include "dag/dag.h"
 #include "error/error.h"
-#include "error/types.h"
+#include "spn/errors.h"
 #include "event/event.h"
 #include "core/core.h"
 #include "core/types.h"
@@ -59,7 +59,7 @@ static spn_err_t setup_toolchain_unit(spn_toolchain_store_t* store, spn_toolchai
   }
 
   if (!cached) {
-    spn_event_buffer_push(spn.events, (spn_build_event_t) {
+    spn_event_buffer_push(spn.events, (spn_event_t) {
       .kind = SPN_EVENT_SYNC,
       .sync = {
         .name = name,
@@ -69,7 +69,7 @@ static spn_err_t setup_toolchain_unit(spn_toolchain_store_t* store, spn_toolchai
 
   spn_try(spn_toolchain_provision(store, toolchain, unit->artifact, &unit->root));
 
-  spn_event_buffer_push(spn.events, (spn_build_event_t){
+  spn_event_buffer_push(spn.events, (spn_event_t){
     .kind = SPN_EVENT_SYNC_PACKAGE,
     .sync_pkg = {
       .name = name,
@@ -112,7 +112,7 @@ static spn_err_t materialize_tree(spn_session_t* session, sp_str_t name, spn_pkg
     }
     case SPN_PKG_ROOT_GIT: {
       if (!spn_git_cache_is_checkout_cached(&session->ctx->caches.git, tree.git)) {
-        spn_event_buffer_push(spn.events, (spn_build_event_t){
+        spn_event_buffer_push(spn.events, (spn_event_t){
           .kind = SPN_EVENT_SYNC,
           .sync = {
             .name = name,
@@ -127,7 +127,7 @@ static spn_err_t materialize_tree(spn_session_t* session, sp_str_t name, spn_pkg
         if (!sp_str_empty(checkout->error)) {
           error = checkout->error;
         }
-        spn_event_buffer_push(spn.events, (spn_build_event_t) {
+        spn_event_buffer_push(spn.events, (spn_event_t) {
           .kind = SPN_EVENT_SYNC_FAILED,
           .sync_failed = {
               .name = name,
@@ -277,7 +277,7 @@ static spn_err_t stamp_patches(spn_session_t* session, spn_resolved_pkg_t* pkg, 
     }
     case SPN_PKG_PATCH_STAMP_APPLIED: {
       if (!spn_git_cache_is_checkout_cached(&session->ctx->caches.git, pkg->origin.source.git)) {
-        spn_event_buffer_push(spn.events, (spn_build_event_t) {
+        spn_event_buffer_push(spn.events, (spn_event_t) {
           .kind = SPN_EVENT_SYNC_PATCH,
           .sync = {
             .name = qualified,
@@ -367,7 +367,7 @@ static spn_err_t load_package(spn_session_t* session, spn_resolved_pkg_t* pkg, s
 
   loaded->elapsed = sp_tm_read_timer(&timer);
 
-  spn_event_buffer_push(spn.events, (spn_build_event_t) {
+  spn_event_buffer_push(spn.events, (spn_event_t) {
     .kind = SPN_EVENT_SYNC_PACKAGE, .pkg = loaded->info->name,
     .sync_pkg = {
       .name = qualified,
@@ -460,7 +460,7 @@ spn_err_t sync_packages(spn_op_t* op, bool* reresolve) {
     sp_da_push(toolchains, job);
   }
 
-  spn_event_buffer_push(spn.events, (spn_build_event_t) {
+  spn_event_buffer_push(spn.events, (spn_event_t) {
     .kind = SPN_EVENT_SYNC_START,
     .sync_start = {
       .num_packages = sp_da_size(packages),
@@ -518,7 +518,7 @@ spn_err_t sync_packages(spn_op_t* op, bool* reresolve) {
   spn_try(spn_session_validate_flags(session));
   spn_try(check_unused_patches(session));
 
-  spn_event_buffer_push(spn.events, (spn_build_event_t) {
+  spn_event_buffer_push(spn.events, (spn_event_t) {
     .kind = SPN_EVENT_SYNC_END,
     .sync_end = {
       .num_synced = sp_da_size(packages),

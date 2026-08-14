@@ -1,13 +1,15 @@
 #include "gen.h"
 
 static void bind_kinds(gen_t* g, sp_template_scope_t* scope) {
+  sp_str_t code_prefix = sp_str_to_upper(g->mem, g->prefix);
+
   sp_template_list(scope, sp_str_lit("kinds"));
   sp_da_for(g->kinds, it) {
     gen_kind_t* kind = &g->kinds[it];
     sp_template_scope_t* child = sp_template_push(scope, sp_str_lit("kinds"));
     sp_template_set(child, sp_str_lit("tag"), kind->tag);
     sp_template_set(child, sp_str_lit("code"), sp_fmt(g->mem, "{}_{}",
-      sp_fmt_cstr(g->format == GEN_FORMAT_ERRORS ? "SPN_ERR" : "SPN_EVENT"),
+      sp_fmt_str(code_prefix),
       sp_fmt_str(sp_str_to_upper(g->mem, kind->tag))).value);
 
     if (kind->payload) {
@@ -38,9 +40,17 @@ static sp_template_scope_t* union_scope(gen_t* g) {
   return scope;
 }
 
+gen_render_t gen_render_union_codes(gen_t* g) {
+  sp_template_scope_t* scope = union_scope(g);
+  bind_kinds(g, scope);
+  return (gen_render_t) {
+    .template = sp_fmt(g->mem, "{}/codes.h", sp_fmt_cstr(gen_format_name(g->format))).value,
+    .scope = scope,
+  };
+}
+
 gen_render_t gen_render_union_decls(gen_t* g) {
   sp_template_scope_t* scope = union_scope(g);
-  gen_bind_includes(g, scope);
   gen_bind_types(g, scope);
   bind_kinds(g, scope);
   return (gen_render_t) {

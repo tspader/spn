@@ -22,21 +22,24 @@ spn build
   - spn/host.h -> (host, public)
   - spn/types.h -> (host, public), (host, private)
   - spn/core.h - (host, public), (host, private), (guest)
+  - spn/err.h -> (host, public), (host, private), (guest); generated from source/codegen/schema/errors.jtd.json, included by spn/core.h
+  - spn/errors.h -> (host, public); generated from source/codegen/schema/errors.jtd.json
+  - spn/events.h -> (host, public); generated from source/codegen/schema/events.jtd.json
   - spn.h -> (guest)
 - source/
   - cli/
 - `source/`
-  - `cli/` and `tui/` are the CLI: a consumer of the spn library like any other. `cli/main.c` is the entry point. `cli/*.c` files only include `spn/host.h` for library functions; `tui/` additionally renders the internal event protocol, per the transitional exception below.
+  - `cli/` and `tui/` are the CLI: a consumer of the spn library like any other. `cli/main.c` is the entry point. `cli/*.c` and `tui/*.c` files include only `spn/host.h` for library functionality; `tui/` renders the event stream from the public event types.
   - `op/` is the op layer: the worker thread and queue (`op.c`), plus the op bodies (build, add, clean, publish, index sync, run, scaffold)
   - `model/` establishes the session's model: the resolve/sync/configure stages plus the driver that runs them to a fixpoint. `model.h` declares its one entry point (`spn_model_establish`); `stage.h` is module-internal
   - `graph/` is all the code that sets up and runs inside the build graph; it serves both `model/` (the configure graph) and the build op (the target graph)
 - `include/`
-  - `spn/core.h` is the sp-free shared vocabulary (enums, `spn_triple_t`, `spn_err_t`) included by everything: guest scripts, host consumers, and library internals. Internal code includes `spn/core.h`, never `spn.h`.
+  - `spn/core.h` is the sp-free shared vocabulary (enums, `spn_triple_t`, `spn_err_t`) included by everything: guest scripts, host consumers, and library internals. Internal code includes `spn/core.h`, never `spn.h`. The `spn_err_t` enum is generated from the error schema into `spn/err.h`, which `spn/core.h` includes; both are sp-free and both ship in the guest sysroot.
   - `spn/types.h` is the sp-dependent shared vocabulary: the value types that describe work and results (`spn_session_config_t`, target selection, profile overrides, op requests and results, index descriptors). It declares no handles, no functions, and carries no `#error` guard, so it is safe in any TU; internal `types.h` headers include it directly, and `spn/host.h` re-exports it. If a type has identity (a handle) or behavior (a function), it is surface, not vocabulary, and does not belong here.
   - `spn.h` is the guest API included by build scripts in downstream packages. Inside the library, only the guest boundary (`source/api/`, `source/external/wasm/abi.h`, `wasm.c`, `guest.c`, `codegen/gen/abi.gen.*`) may include it; those TUs also include internal headers, and `spn.h` gives the compiler the public prototypes to check the implementations against.
   - `spn/host.h` is the host embedding API: opaque handles plus functions, nothing else. Every handle aliases the real internal tag (`spn_ctx_t`, `spn_session_t`, `spn_op_t`, and `spn_target_t` is `struct spn_target_unit`), so host-boundary TUs (`source/host/host.c`, the op verbs, `ctx/`, `triple/`, `enum/`) see the complete type and use handles with no casts, while embedders see pure forward declarations. If the CLI needs a library capability expressible in public types, that is an API gap to fix in `spn/host.h`, never a reason to widen its includes.
   - Tag ownership: typedef names belong to a world -- guest `spn_target_t` and host `spn_target_t` are different types on purpose -- and a struct tag belongs to whoever defines it. Guest handle tags (`struct spn`, `struct spn_config`, `struct spn_target`, `struct spn_profile`) are defined nowhere; the guest boundary puns them to internal types (`spn_t` to `spn_pkg_unit_t`, `spn_target_t` to `spn_target_info_t`). `struct spn_node` is the one guest handle with its own state; `source/api/types.h` defines it. Internal headers never mention guest names.
-  - One transitional exception is sanctioned until its publicization lands: the event/error protocol (`spn_build_event_t`, `spn_err_union_t`, their renderers) is not yet public, so `tui/` — the CLI's renderer of that protocol — includes internal library headers (`event/`, `ctx/`, `enum/`, `semver/`, `toml/`, `toolchain/`) and reaches the `spn` ctx global. This is a gap being closed by the event publicization work, not the pattern. The CLI command layer (`cli/*.c`) has no such exception: it consumes only `spn/host.h` plus its own `cli/` and `tui/` headers.
+  - `spn/errors.h` and `spn/events.h` are the event/error protocol: generated from the schemas in `source/codegen/schema/`, containing only `sp.h` and `spn/core.h` types. They are public because `spn_ctx_drain` returns `spn_event_t*`; `spn/host.h` includes `spn/events.h` so a host sees the full protocol from one include. The generator writes them to `include/spn/` directly (never hand-edit them) and rejects any schema that would pull a private header into them.
   - `spn.h` and `spn/host.h` cannot share a translation unit (both enforce this with `#error`). Because every internal header is reachable from both boundaries, this mechanically forbids internal headers from including either surface header: leaking `spn/host.h` into an internal header breaks every guest-boundary TU, and leaking `spn.h` breaks every host-boundary TU.
 - `spn.toml` is the package for spn itself; it's example of how a real downstream project would use spn
 - `test/integration/fixtures/` contains small, hermetic spn projects used in integration tests.
@@ -61,7 +64,7 @@ if you find that you are pulling in tons and tons of unrelated TUs for a unit te
 
 There are two error types:
 - `spn_err_t`: a plain code. It is the only error type that crosses function boundaries; every fallible function returns it.
-- `spn_err_union_t`: a code plus structured payload, for errors whose rendered message needs data. Payloads are generated: add a kind to `spn_err_t` in `include/spn/core.h`, a mapping entry in `source/codegen/schema/errors.jtd.json`, and a message in `spn_tui_render_event_detail`; `make` regenerates `source/codegen/gen/errors.gen.*`.
+- `spn_err_union_t`: a code plus structured payload, for errors whose rendered message needs data. The schema is the single source of truth: add a mapping entry to `source/codegen/schema/errors.jtd.json` and a message in `spn_tui_render_event_detail`; `make` regenerates the `spn_err_t` enum (`include/spn/err.h`), the payloads (`include/spn/errors.h`), and the writers (`source/codegen/gen/errors.gen.c`).
 
 Reporting is the event stream. A failure is detected exactly once, at the site with the context; that site constructs the union literal and reports it:
 

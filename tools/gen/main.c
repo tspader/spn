@@ -7,6 +7,7 @@
 typedef struct {
   const c8* schema;
   const c8* out;
+  const c8* include;
   const c8* templates;
 } args_t;
 
@@ -21,6 +22,7 @@ static sp_cli_result_t run_cli(sp_cli_t* cli) {
   sp_str_t err = codegen_run(mem, (codegen_paths_t) {
     .schema = sp_cstr_as_str(args->schema),
     .out = sp_cstr_as_str(args->out),
+    .include = sp_cstr_as_str(args->include),
     .templates = sp_cstr_as_str(args->templates),
   }, log_line, SP_NULLPTR);
 
@@ -46,6 +48,11 @@ s32 main(s32 num_args, const c8** args) {
         .name = "out",
         .summary = "Path to the generated output directory",
         .ptr = &parsed.out,
+      },
+      {
+        .name = "include",
+        .summary = "Path to the public include directory",
+        .ptr = &parsed.include,
       },
       {
         .name = "templates",
