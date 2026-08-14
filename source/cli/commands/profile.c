@@ -1,4 +1,4 @@
-#include "commands/util/util.h"
+#include "host/host.h"
 
 static sp_cli_result_t invalid(sp_cli_t* cli, sp_str_t value, const c8* flag, const c8* expected) {
   return spn_cli_error(cli, "invalid value {.red} for {.yellow}; expected {}",

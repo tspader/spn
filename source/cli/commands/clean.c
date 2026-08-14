@@ -1,4 +1,4 @@
-#include "commands/util/util.h"
+#include "host/host.h"
 
 static sp_cli_result_t clean(sp_cli_t* cli) {
   try(spn_cli_open(false));

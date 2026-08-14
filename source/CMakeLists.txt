@@ -14,7 +14,7 @@ set(SPN_SOURCES
   cli/commands/profile.c
   cli/commands/publish.c
   cli/commands/test.c
-  cli/commands/util/util.c
+  cli/host/host.c
   cli/main.c
   core/codegen/codegen.c
   core/codegen/loader.c
