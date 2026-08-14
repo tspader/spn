@@ -218,7 +218,7 @@ sp_test_each(link_plan, plan, plan_test_t, tests, .setup = spn_test_ctx_setup) {
 
   spn_pkg_unit_t* root = spn_session_find_pkg_unit(s, s->units.target, find_pkg_id(s, &it->graph, it->graph.pkgs[0].name));
   sp_must(t, root != SP_NULLPTR);
-  spn_target_unit_t* app = spn_session_find_target_in_pkg(s, root, sp_str_lit("app"));
+  spn_target_unit_t* app = spn_session_find_target_in_pkg(s, root, sp_str_lit("app"), it->target.kind);
   sp_must(t, app != SP_NULLPTR);
 
   spn_link_plan_t* plan = &app->link;

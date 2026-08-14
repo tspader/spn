@@ -55,6 +55,18 @@ sp_test(target, multiple_roots) {
   });
 }
 
+sp_test(target, same_name) {
+  return run_test(t, (test_t) {
+    .project = "test/integration/fixtures/target/same_name",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = static_lib("A") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = store_file("bin/A") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = test_exe("T") },
+    },
+  });
+}
+
 sp_test(target, selection_default) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/target/selection",

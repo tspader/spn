@@ -2,9 +2,8 @@
 name = "p"
 version = "1.0.0"
 
-[[lib]]
-name = "t"
-kinds = ["static"]
-
 [[bin]]
+name = "t"
+
+[[script]]
 name = "t"

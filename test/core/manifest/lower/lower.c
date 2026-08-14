@@ -393,7 +393,7 @@ static const test_t tests [] = {
     .name = "validate_duplicate_name",
     .manifest = "validate_duplicate_name",
     .issues = {
-      { SPN_ERR_CODEGEN_DUPLICATE_KEY, "bin[0]" }
+      { SPN_ERR_CODEGEN_DUPLICATE_KEY, "script[0]" }
     }
   },
   {
