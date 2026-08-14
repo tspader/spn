@@ -2,7 +2,7 @@
 #include "sp/macro.h"
 #include "cc.h"
 #include "ctx/types.h"
-#include "error/types.h"
+#include "spn/core.h"
 #include "event/types.h"
 #include "core/types.h"
 #include "unit/types.h"

@@ -1,4 +1,5 @@
-#include "error/types.h"
+#include "sp.h"
+#include "spn/core.h"
 #include "index/types.h"
 #include "pkg/types.h"
 #include "profile/types.h"

@@ -3,7 +3,8 @@
 
 #include "compiler/types.h"
 #include "dag/types.h"
-#include "error/types.h"
+#include "sp.h"
+#include "spn/core.h"
 #include "external/cc.h"
 #include "core/types.h"
 #include "unit/types.h"

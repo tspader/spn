@@ -154,7 +154,7 @@ static spn_err_t add(spn_ctx_t* ctx, spn_add_request_t request, spn_semver_range
     goto cleanup;
   }
 
-  spn_event_buffer_push(ctx->events, (spn_build_event_t) {
+  spn_event_buffer_push(ctx->events, (spn_event_t) {
     .kind = SPN_EVENT_ADDED,
     .added = {
       .name = sp_str_copy(ctx->heap, site.path[2]),

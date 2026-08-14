@@ -2,7 +2,8 @@
 #define spn_compiler_driver_h
 
 #include "compiler/types.h"
-#include "error/types.h"
+#include "sp.h"
+#include "spn/core.h"
 
 spn_err_t spn_cc_validate_profile(const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile);
 spn_err_t spn_cc_validate_link(const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, spn_cc_output_kind_t kind, bool frameworks);

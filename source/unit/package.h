@@ -1,7 +1,8 @@
 #ifndef SPN_UNIT_PACKAGE_H
 #define SPN_UNIT_PACKAGE_H
 
-#include "error/types.h"
+#include "sp.h"
+#include "spn/core.h"
 #include "unit/types.h"
 
 typedef struct {

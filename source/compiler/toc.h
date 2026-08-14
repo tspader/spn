@@ -4,8 +4,6 @@
 #include "sp.h"
 #include "spn/core.h"
 
-#include "error/types.h"
-
 #define SPN_TOC_SYMBOL_MAX 8192
 
 typedef enum {

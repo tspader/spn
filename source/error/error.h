@@ -1,7 +1,7 @@
 #ifndef SPN_ERROR_H
 #define SPN_ERROR_H
 
-#include "error/types.h"
+#include "spn/errors.h"
 
 typedef struct spn_ctx_t spn_ctx_t;
 

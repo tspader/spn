@@ -2,7 +2,8 @@
 #define SPN_PROFILE_PROFILE_H
 
 #include "core/types.h"
-#include "error/types.h"
+#include "sp.h"
+#include "spn/core.h"
 #include "profile/types.h"
 #include "spn/types.h"
 

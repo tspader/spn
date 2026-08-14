@@ -1,5 +1,6 @@
 #include "enum/enum.h"
-#include "error/types.h"
+#include "sp.h"
+#include "spn/core.h"
 #include "event/event.h"
 #include "external/tom.h"
 #include "index/types.h"
@@ -83,7 +84,7 @@ spn_lock_file_t spn_lock_file_parse(sp_mem_t mem, sp_str_t toml, spn_event_buffe
   sp_mem_end_scratch(scratch);
   if (!root) {
     if (events) {
-      spn_event_buffer_push(events, (spn_build_event_t) {
+      spn_event_buffer_push(events, (spn_event_t) {
         .kind = SPN_EVENT_ERR,
         .err = {
           .kind = SPN_ERR_MANIFEST_PARSE,

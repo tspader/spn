@@ -1,4 +1,4 @@
-#include "error/types.h"
+#include "spn/errors.h"
 #include "git/types.h"
 #include "index/types.h"
 #include "pkg/types.h"

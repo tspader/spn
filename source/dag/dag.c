@@ -1,8 +1,8 @@
 #include "dag/dag.h"
 #include "dag/types.h"
 #include "sha256/sha256.h"
-#include "error/types.h"
 #include "sp.h"
+#include "spn/core.h"
 
 
 static sp_atomic_s32_t spn_dag_next_id;

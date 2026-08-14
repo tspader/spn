@@ -3,7 +3,7 @@
 #include "project/project.h"
 #include "ctx/types.h"
 #include "error/error.h"
-#include "error/types.h"
+#include "spn/errors.h"
 #include "event/types.h"
 #include "core/types.h"
 #include "unit/types.h"
@@ -263,7 +263,7 @@ static s32 dag_user_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data
 
   spn_pkg_unit_announce_compile(pkg);
 
-  spn_event_buffer_push(spn.events, (spn_build_event_t) {
+  spn_event_buffer_push(spn.events, (spn_event_t) {
     .kind = SPN_EVENT_SCRIPT_USER_FN,
     .pkg = pkg->info->name,
     .script_user_fn = { .tag = node->tag }
@@ -283,7 +283,7 @@ static s32 dag_user_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data
       continue;
     }
     if (!sp_fs_exists(artifact->target)) {
-      spn_event_buffer_push(spn.events, (spn_build_event_t) {
+      spn_event_buffer_push(spn.events, (spn_event_t) {
         .kind = SPN_EVENT_NODE_FAILED,
         .pkg = pkg->info->name,
         .node_failed = {
@@ -294,7 +294,7 @@ static s32 dag_user_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data
       return 1;
     }
     if (sp_fs_copy(artifact->target, artifact->path)) {
-      spn_event_buffer_push(spn.events, (spn_build_event_t) {
+      spn_event_buffer_push(spn.events, (spn_event_t) {
         .kind = SPN_EVENT_NODE_FAILED,
         .pkg = pkg->info->name,
         .node_failed = {
@@ -347,7 +347,7 @@ spn_err_t spn_build_publish_copies(spn_pkg_unit_t* unit, sp_str_t root, spn_publ
 
     sp_mem_end_scratch(scratch);
     if (err) {
-      spn_event_buffer_push(spn.events, (spn_build_event_t) {
+      spn_event_buffer_push(spn.events, (spn_event_t) {
         .kind = SPN_EVENT_NODE_FAILED,
         .pkg = unit->info->name,
         .node_failed = {
@@ -377,7 +377,7 @@ static s32 dag_tree_copy_user_outputs(spn_dag_tree_ctx_t* ctx, sp_str_t root) {
       s32 err = sp_fs_copy(path, to);
       sp_mem_end_scratch(scratch);
       if (err) {
-        spn_event_buffer_push(spn.events, (spn_build_event_t) {
+        spn_event_buffer_push(spn.events, (spn_event_t) {
           .kind = SPN_EVENT_NODE_FAILED,
           .pkg = unit->info->name,
           .node_failed = {
@@ -450,7 +450,7 @@ static s32 dag_package_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_d
       spn_cache_dir_kind_from_str(to.first), to.second
     );
     if (err) {
-      spn_event_buffer_push(spn.events, (spn_build_event_t) {
+      spn_event_buffer_push(spn.events, (spn_event_t) {
         .kind = SPN_EVENT_NODE_FAILED,
         .pkg = unit->info->name,
         .node_failed = {
@@ -467,7 +467,7 @@ static s32 dag_package_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_d
     return 1;
   }
   if (script) {
-    spn_event_buffer_push(spn.events, (spn_build_event_t) {
+    spn_event_buffer_push(spn.events, (spn_event_t) {
       .kind = SPN_EVENT_SCRIPT_PACKAGE,
       .pkg = unit->info->name,
     });
@@ -478,7 +478,7 @@ static s32 dag_package_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_d
     }
     unit->time.package = sp_tm_read_timer(&timer);
 
-    spn_event_buffer_push(spn.events, (spn_build_event_t) {
+    spn_event_buffer_push(spn.events, (spn_event_t) {
       .kind = SPN_EVENT_PACKAGE_OK,
       .pkg = unit->info->name,
       .package_ok = {
@@ -1187,7 +1187,7 @@ static void dag_emit_reports(spn_dag_build_t* b, u64 elapsed) {
     spn_profile_info_t* profile = &build->profile;
 
     if (failed) {
-      spn_event_buffer_push(session->ctx->events, (spn_build_event_t) {
+      spn_event_buffer_push(session->ctx->events, (spn_event_t) {
         .kind = SPN_EVENT_BUILD_FAILED,
         .pkg = pkg->name,
         .build_failed = {
@@ -1199,7 +1199,7 @@ static void dag_emit_reports(spn_dag_build_t* b, u64 elapsed) {
       });
     }
     else {
-      spn_event_buffer_push(session->ctx->events, (spn_build_event_t) {
+      spn_event_buffer_push(session->ctx->events, (spn_event_t) {
         .kind = SPN_EVENT_BUILD_PASSED,
         .pkg = pkg->name,
         .build_passed = {
@@ -1211,7 +1211,7 @@ static void dag_emit_reports(spn_dag_build_t* b, u64 elapsed) {
       });
     }
 
-    spn_event_buffer_push(session->ctx->events, (spn_build_event_t) {
+    spn_event_buffer_push(session->ctx->events, (spn_event_t) {
       .kind = SPN_EVENT_BUILD_SUMMARY,
       .pkg = pkg->name,
       .build_summary = {
@@ -1304,7 +1304,7 @@ spn_err_t spn_dag_build_session(spn_op_t* op) {
   spn_try(prepare_graph(b));
 
   spn_triple_t target = { session->profile.arch, session->profile.os, session->profile.abi };
-  spn_event_buffer_push(spn.events, (spn_build_event_t) {
+  spn_event_buffer_push(spn.events, (spn_event_t) {
     .kind = SPN_EVENT_INIT_BUILD_GRAPH,
     .pkg = session->pkg->name,
     .graph_init = {

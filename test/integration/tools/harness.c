@@ -511,7 +511,7 @@ static bool event_matches(yyjson_val* line, const c8* event, const c8* key, cons
   return str && sp_cstr_equal(str, value);
 }
 
-static u32 count_events(fixture_t* fixture, spn_build_event_kind_t kind, const c8* key, const c8* value) {
+static u32 count_events(fixture_t* fixture, spn_event_kind_t kind, const c8* key, const c8* value) {
   const c8* event = spn_event_name(kind);
   sp_mem_t mem = fixture->mem;
 
@@ -531,7 +531,7 @@ static u32 count_events(fixture_t* fixture, spn_build_event_kind_t kind, const c
   return count;
 }
 
-static sp_err_t expect_event(sp_test_t* t, fixture_t* fixture, spn_build_event_kind_t kind, const c8* key, const c8* value, bool expected, const c8* file, u32 line) {
+static sp_err_t expect_event(sp_test_t* t, fixture_t* fixture, spn_event_kind_t kind, const c8* key, const c8* value, bool expected, const c8* file, u32 line) {
   const c8* event = spn_event_name(kind);
   sp_mem_t mem = fixture->mem;
 
@@ -1255,6 +1255,7 @@ sp_err_t prepare_test(sp_test_t* t, fixture_t* fixture, const c8* project, const
   sp_str_t include_spn = sp_fs_join_path(mem, fixture->paths.include, sp_str_lit("spn"));
   sp_fs_create_dir(include_spn);
   sp_fs_copy(sp_fs_join_path(mem, fixture->paths.root, sp_str_lit("include/spn/core.h")), include_spn);
+  sp_fs_copy(sp_fs_join_path(mem, fixture->paths.root, sp_str_lit("include/spn/err.h")), include_spn);
 
   if (project) {
     sp_str_t path = sp_fs_join_path(mem, fixture->paths.root, sp_str_view(project));

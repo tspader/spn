@@ -1,7 +1,8 @@
 #ifndef SPN_RESOLVE_RESOLVE_H
 #define SPN_RESOLVE_RESOLVE_H
 
-#include "error/types.h"
+#include "sp.h"
+#include "spn/core.h"
 #include "resolve/types.h"
 
 #define SPN_RESOLVE_DEFAULT_BUDGET 1000000

@@ -1,7 +1,8 @@
 #ifndef SPN_INDEX_H
 #define SPN_INDEX_H
 
-#include "error/types.h"
+#include "sp.h"
+#include "spn/core.h"
 #include "index/types.h"
 
 #define SPN_INDEX_DEFAULT_REFRESH 600

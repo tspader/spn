@@ -2,7 +2,8 @@
 #define SPN_CTX_CTX_H
 
 #include "ctx/types.h"
-#include "error/types.h"
+#include "sp.h"
+#include "spn/core.h"
 #include "intern/types.h"
 
 sp_intern_t* spn_ctx_get_intern();

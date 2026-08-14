@@ -14,7 +14,7 @@ static spn_err_t run_test(spn_session_t* session, spn_target_unit_t* unit, bool*
   spn_ctx_t* ctx = session->ctx;
   sp_str_t command = spn_target_unit_staged_path(session->mem, unit);
 
-  spn_event_buffer_push(ctx->events, (spn_build_event_t) {
+  spn_event_buffer_push(ctx->events, (spn_event_t) {
     .kind = SPN_EVENT_TARGET_RUN,
     .pkg = unit->pkg->info->name,
     .target_run = {
@@ -44,7 +44,7 @@ static spn_err_t run_test(spn_session_t* session, spn_target_unit_t* unit, bool*
 
   *passed = output.status.exit_code == 0;
   if (*passed) {
-    spn_event_buffer_push(ctx->events, (spn_build_event_t) {
+    spn_event_buffer_push(ctx->events, (spn_event_t) {
       .kind = SPN_EVENT_TEST_PASSED,
       .test_passed = {
         .name = unit->info->name,
@@ -53,7 +53,7 @@ static spn_err_t run_test(spn_session_t* session, spn_target_unit_t* unit, bool*
     });
   }
   else {
-    spn_event_buffer_push(ctx->events, (spn_build_event_t) {
+    spn_event_buffer_push(ctx->events, (spn_event_t) {
       .kind = SPN_EVENT_TEST_FAILED,
       .test_failed = {
         .name = unit->info->name,
@@ -93,7 +93,7 @@ spn_err_t spn_op_test(spn_op_t* op) {
     }
   }
 
-  spn_event_buffer_push(ctx->events, (spn_build_event_t) {
+  spn_event_buffer_push(ctx->events, (spn_event_t) {
     .kind = SPN_EVENT_TEST_SUMMARY,
     .test_summary = {
       .passed = result->passed,

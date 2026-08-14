@@ -60,10 +60,10 @@ typedef struct {
     struct { sp_str_t file; sp_str_t needle; } verify_file_not_contains;
     const c8* verify_cc_arg [4];
     struct { const c8* name; } verify_locked;
-    struct { spn_build_event_kind_t event; const c8* key; const c8* value; } verify_event;
+    struct { spn_event_kind_t event; const c8* key; const c8* value; } verify_event;
     struct { spn_err_t err; } verify_result;
     struct { const c8* dir; u32 count; } verify_dir_count;
-    struct { spn_build_event_kind_t event; const c8* key; const c8* value; u32 count; } verify_event_count;
+    struct { spn_event_kind_t event; const c8* key; const c8* value; u32 count; } verify_event_count;
     struct { const c8* cmd; const c8* args [8]; const c8* env [4]; s32 rc; } cli;
   };
 } action_t;
@@ -86,7 +86,7 @@ typedef struct {
 #define SPN_TEST_COMMAND_MAX_CC 4
 
 typedef struct {
-  spn_build_event_kind_t event;
+  spn_event_kind_t event;
   const c8* key;
   const c8* value;
   bool absent;

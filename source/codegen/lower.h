@@ -2,7 +2,8 @@
 #define SPN_CODEGEN_LOWER_H
 
 #include "codegen/codegen.h"
-#include "error/types.h"
+#include "sp.h"
+#include "spn/core.h"
 #include "index/types.h"
 #include "spn/types.h"
 #include "manifest.gen.h"

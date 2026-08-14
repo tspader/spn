@@ -5,7 +5,6 @@
 #include "spn/core.h"
 #include "spn/types.h"
 #include "compiler/types.h"
-#include "event/types.h"
 #include "index/types.h"
 #include "resolve/types.h"
 #include "pkg/types.h"

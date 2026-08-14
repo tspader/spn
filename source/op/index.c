@@ -4,7 +4,7 @@
 #include "ctx/ctx.h"
 #include "ctx/types.h"
 #include "error/error.h"
-#include "error/types.h"
+#include "spn/errors.h"
 #include "event/types.h"
 #include "core/types.h"
 #include "index/types.h"
@@ -51,7 +51,7 @@ static spn_err_t sync_indexes(spn_op_t* op) {
     }
 
     if (request.force || spn_index_needs_fetch(index)) {
-      spn_event_buffer_push(ctx->events, (spn_build_event_t) {
+      spn_event_buffer_push(ctx->events, (spn_event_t) {
         .kind = SPN_EVENT_SYNC,
         .sync = {
           .name = index->name,
@@ -92,7 +92,7 @@ static spn_err_t sync_indexes(spn_op_t* op) {
     }
 
     if (!job->force && sp_fs_exists(job->index->location)) {
-      spn_event_buffer_push(ctx->events, (spn_build_event_t) {
+      spn_event_buffer_push(ctx->events, (spn_event_t) {
         .kind = SPN_EVENT_SYNC_STALE,
         .sync = {
           .name = job->index->name,

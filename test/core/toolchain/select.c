@@ -253,7 +253,7 @@ sp_test_each(select, resolve, select_test_t, select_tests, .setup = spn_test_ctx
     sp_must_eq(t, (u32)query.expect.err, (u32)err);
 
     if (query.expect.err) {
-      sp_da(spn_build_event_t) errs = spn_test_drain_errs(mem);
+      sp_da(spn_event_t) errs = spn_test_drain_errs(mem);
       sp_must_eq(t, 1, sp_da_size(errs));
       spn_err_toolchain_t* toolchain = &errs[0].err.toolchain;
       sp_expect_eq(t, errs[0].err.kind, query.expect.err);

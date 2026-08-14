@@ -368,7 +368,7 @@ sp_test_each(cmd_publish, publish, case_t, cases, .setup = spn_test_ctx_setup) {
   sp_expect_eq(t, c.expect.kind, result);
 
   if (c.expect.path_dep.name) {
-    sp_da(spn_build_event_t) errs = spn_test_drain_errs(mem);
+    sp_da(spn_event_t) errs = spn_test_drain_errs(mem);
     sp_must_eq(t, 1, sp_da_size(errs));
     sp_expect_eq(t, errs[0].err.kind, SPN_ERR_INDEX_PATH_DEP);
     sp_expect_str_eq_c(t, errs[0].err.pkg.name, c.expect.path_dep.name);

@@ -13,7 +13,7 @@ s32 spn_run_ex(spn_t* ctx, spn_run_t run) {
 
   spn_event_buffer_push(
       spn.events,
-      (spn_build_event_t){
+      (spn_event_t){
           .kind = SPN_EVENT_API_CALL,
           .pkg = unit->info->name,
           .api_call = {

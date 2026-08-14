@@ -3,7 +3,7 @@
 
 #include "sp.h"
 
-#include "error/types.h"
+#include "spn/core.h"
 #include "core/types.h"
 #include "index/types.h"
 #include "intern/types.h"

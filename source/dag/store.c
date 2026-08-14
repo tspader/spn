@@ -1,7 +1,7 @@
 #include "dag/dag.h"
 #include "dag/types.h"
-#include "error/types.h"
 #include "sp.h"
+#include "spn/core.h"
 #include "sp/io.h"
 #include "sp/atomic_file.h"
 

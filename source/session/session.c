@@ -2,7 +2,7 @@
 
 #include "sp.h"
 #include "ctx/types.h"
-#include "error/types.h"
+#include "spn/errors.h"
 #include "core/types.h"
 #include "resolve/types.h"
 #include "session/types.h"

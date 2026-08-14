@@ -6,7 +6,7 @@
 #include "session/types.h"
 
 #include "error/error.h"
-#include "error/types.h"
+#include "spn/errors.h"
 #include "intern/intern.h"
 #include "pkg/id.h"
 #include "pkg/options.h"

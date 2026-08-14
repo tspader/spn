@@ -36,21 +36,21 @@ static spn_err_t publish_build(spn_ctx_t* ctx, spn_publish_request_t request, sp
 static spn_err_t publish(spn_ctx_t* ctx, spn_publish_request_t request, spn_index_release_t* release) {
   spn_index_info_t* index = spn_find_index(ctx, request.index);
 
-  spn_evt_publish_t evt = {
+  spn_event_publish_t evt = {
     .name = spn_pkg_name_to_qualified(release->id),
     .version = spn_semver_to_str(ctx->mem, release->version),
     .index = index->name,
     .url = spn_index_publish_target(index),
   };
 
-  spn_event_buffer_push(ctx->events, (spn_build_event_t) {
+  spn_event_buffer_push(ctx->events, (spn_event_t) {
     .kind = SPN_EVENT_PUBLISH,
     .publish = evt,
   });
 
   spn_try(spn_index_publish(index, ctx->mem, release));
 
-  spn_event_buffer_push(ctx->events, (spn_build_event_t) {
+  spn_event_buffer_push(ctx->events, (spn_event_t) {
     .kind = SPN_EVENT_PUBLISH_END,
     .publish = evt,
   });

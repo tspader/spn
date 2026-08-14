@@ -166,7 +166,7 @@ static spn_err_t open_ctx(spn_ctx_t* ctx, spn_open_request_t request) {
 
   spn_try(extract_runtime(ctx));
 
-  spn_event_buffer_push(ctx->events, (spn_build_event_t) {
+  spn_event_buffer_push(ctx->events, (spn_event_t) {
     .kind = SPN_EVENT_OPEN,
     .open = {
       .version = sp_cstr_as_str(SPN_VERSION),
@@ -277,7 +277,7 @@ void spn_ctx_close(spn_ctx_t* ctx, bool ok) {
     }
   }
 
-  spn_event_buffer_push(ctx->events, (spn_build_event_t) {
+  spn_event_buffer_push(ctx->events, (spn_event_t) {
     .kind = SPN_EVENT_RESULT,
     .result = {
       .ok = result == SPN_OK,

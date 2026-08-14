@@ -504,7 +504,7 @@ sp_test_each(render_link, render, link_test_t, tests, .setup = spn_test_ctx_setu
   spn_err_t err = spn_cc_render_link(mem, &toolchain, &it->profile, &link, &files, &invocation);
   sp_expect_eq(t, err, it->expect.err);
   if (it->expect.err) {
-    sp_da(spn_build_event_t) errs = spn_test_drain_errs(mem);
+    sp_da(spn_event_t) errs = spn_test_drain_errs(mem);
     sp_must_eq(t, 1, sp_da_size(errs));
     sp_expect_eq(t, errs[0].err.kind, it->expect.err);
     sp_expect_eq(t, errs[0].err.compiler.feature, it->expect.feature);

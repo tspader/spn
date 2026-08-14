@@ -22,6 +22,9 @@ compile_commands.json
 /PORT_CHANGELOG.md
 /build_errs.log
 /source/codegen/gen
+/include/spn/err.h
+/include/spn/errors.h
+/include/spn/events.h
 .claude
 .mcp.json
 /.clangd

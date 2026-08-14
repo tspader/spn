@@ -208,7 +208,7 @@ static sp_str_t get_contextual_path(spn_ctx_t* ctx, sp_mem_t mem, sp_str_t path)
   return path;
 }
 
-static sp_str_t render_event_detail(spn_ctx_t* ctx, sp_mem_t mem, spn_build_event_t* event) {
+static sp_str_t render_event_detail(spn_ctx_t* ctx, sp_mem_t mem, spn_event_t* event) {
   sp_io_dyn_mem_writer_t w = sp_zero;
   sp_io_dyn_mem_writer_init(mem, &w);
 
@@ -1340,7 +1340,7 @@ static void write_error(sp_io_writer_t* w, sp_mem_t mem, sp_str_t verb, sp_str_t
   sp_io_write_c8(w, '\n');
 }
 
-static sp_str_t event_subject(spn_build_event_t* event) {
+static sp_str_t event_subject(spn_event_t* event) {
   switch (event->kind) {
     case SPN_EVENT_SYNC_FAILED:               return event->sync_failed.name;
     case SPN_EVENT_ERR: {
@@ -1364,7 +1364,7 @@ static sp_str_t event_subject(spn_build_event_t* event) {
   }
 }
 
-static void render_event_extra(sp_io_writer_t* w, spn_build_event_t* event) {
+static void render_event_extra(sp_io_writer_t* w, spn_event_t* event) {
   switch (event->kind) {
     case SPN_EVENT_TARGET_BUILD_FAILED: {
       sp_io_write_str(w, event->target_failed.out, SP_NULLPTR);
@@ -1418,7 +1418,7 @@ static void render_event_extra(sp_io_writer_t* w, spn_build_event_t* event) {
   }
 }
 
-void spn_tui_log_event(spn_tui_t* tui, spn_build_event_t* event) {
+void spn_tui_log_event(spn_tui_t* tui, spn_event_t* event) {
   if (tui->mode == SPN_OUTPUT_MODE_JSON) {
     spn_event_log_jsonl(&tui->logger.out.base, event);
     return;
@@ -1638,7 +1638,7 @@ static u32 get_short_tid(spn_tui_t* tui, u64 thread_id) {
   return *sp_ht_getp(tui->thread_ids, thread_id);
 }
 
-static void emit_event(spn_tui_t* tui, spn_build_event_t* event) {
+static void emit_event(spn_tui_t* tui, spn_event_t* event) {
   event->thread_id = get_short_tid(tui, event->thread_id);
   spn_tui_log_event(tui, event);
 }
@@ -1649,7 +1649,7 @@ void spn_tui_flush(spn_tui_t* tui) {
   }
 
   while (true) {
-    spn_build_event_t* event = spn_ctx_drain(tui->ctx);
+    spn_event_t* event = spn_ctx_drain(tui->ctx);
     if (!event) {
       break;
     }

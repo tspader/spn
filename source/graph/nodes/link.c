@@ -1,5 +1,5 @@
 #include "ctx/types.h"
-#include "error/types.h"
+#include "spn/errors.h"
 #include "spn/core.h"
 #include "unit/types.h"
 #include "session/types.h"
@@ -48,7 +48,7 @@ spn_err_t spn_build_link_invocation(sp_mem_t mem, spn_target_unit_t* target, con
 
 
 static spn_err_t emit_link_passed(spn_target_unit_t* unit, spn_invocation_t* invocation, sp_str_t output, sp_str_t out, u64 elapsed) {
-  spn_event_buffer_push(spn.events, (spn_build_event_t) {
+  spn_event_buffer_push(spn.events, (spn_event_t) {
     .kind = SPN_EVENT_LINK_PASSED,
     .pkg = unit->pkg->info->name,
     .link_passed = {
@@ -63,7 +63,7 @@ static spn_err_t emit_link_passed(spn_target_unit_t* unit, spn_invocation_t* inv
 }
 
 static spn_err_t emit_link_failed(spn_target_unit_t* unit, spn_invocation_t* invocation, s32 rc, sp_str_t out, sp_str_t err) {
-  spn_event_buffer_push(spn.events, (spn_build_event_t) {
+  spn_event_buffer_push(spn.events, (spn_event_t) {
     .kind = SPN_EVENT_LINK_FAILED,
     .pkg = unit->pkg->info->name,
     .link_failed = {
@@ -224,7 +224,7 @@ static spn_err_t link_target_exec(sp_mem_t scratch, spn_target_unit_t* target, s
 spn_err_t spn_link_target_run(spn_target_unit_t* target, sp_str_t output, sp_da(sp_str_t) objects, sp_str_t exports) {
   spn_pkg_unit_announce_compile(target->pkg);
 
-  spn_event_buffer_push(spn.events, (spn_build_event_t) {
+  spn_event_buffer_push(spn.events, (spn_event_t) {
     .kind = SPN_EVENT_LINK_START,
     .pkg = target->pkg->info->name,
     .link_start = {

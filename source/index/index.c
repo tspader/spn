@@ -3,7 +3,7 @@
 #include "sp.h"
 
 #include "ctx/types.h"
-#include "error/types.h"
+#include "spn/errors.h"
 #include "index/types.h"
 
 #include "error/error.h"

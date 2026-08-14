@@ -2,7 +2,7 @@
 #define SPN_EXTERNAL_GIT_H
 
 #include "sp.h"
-#include "error/types.h"
+#include "spn/core.h"
 
 spn_err_t spn_git_clone(sp_str_t url, sp_str_t path);
 spn_err_t spn_git_fetch(sp_str_t repo);

@@ -3,7 +3,7 @@
 
 #include "sp.h"
 
-#include "error/types.h"
+#include "spn/core.h"
 #include "pkg/types.h"
 
 spn_pkg_info_t spn_pkg_new(sp_mem_t mem, sp_str_t name);
