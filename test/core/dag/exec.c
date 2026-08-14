@@ -278,6 +278,7 @@ static sp_err_t exec_remove_outputs(sp_test_t* t, exec_env_t* env, const exec_ac
     if (env->err) {
       return SP_OK;
     }
+    spn_dag_file_cache_invalidate(&env->dag.files, path);
     sp_expect(t, !sp_fs_exists(path));
   }
   return SP_OK;

@@ -196,7 +196,13 @@
         "misses": { "type": "uint32" },
         "total": { "type": "uint32" },
         "time_ns": { "type": "uint64", "metadata": { "field": "time" } },
-        "profile": { "type": "string" }
+        "profile": { "type": "string" },
+        "hashed_files": { "type": "uint32" },
+        "hashed_bytes": { "type": "uint64" },
+        "stats": { "type": "uint32" },
+        "obs_rows": { "type": "uint32" },
+        "cache_reads": { "type": "uint32" },
+        "cache_writes": { "type": "uint32" }
       }
     },
     "api_call": {

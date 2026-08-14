@@ -112,16 +112,30 @@ struct spn_dag_t {
   u32 id;
   sp_mem_arena_t* arena;
   sp_mem_t mem;
+  sp_mutex_t mutex;
   sp_da(spn_dag_artifact_t) artifacts;
   sp_da(spn_dag_action_t) actions;
   sp_ht(sp_str_t, spn_dag_id_t) paths;
 };
 
 typedef struct {
+  sp_atomic_u32_t hashed_files;
+  sp_atomic_u64_t hashed_bytes;
+  sp_atomic_u32_t stats;
+  sp_atomic_u32_t obs_rows;
+  sp_atomic_u32_t cache_reads;
+  sp_atomic_u32_t cache_writes;
+} spn_dag_stats_t;
+
+typedef struct {
   sp_mem_arena_t* arena;
   sp_mem_t mem;
+  sp_mutex_t mutex;
   sp_ht(spn_dag_file_id_t, spn_dag_file_meta_t) entries;
   sp_ht(sp_str_t, sp_sys_file_meta_t) metadata;
+  sp_ht(sp_str_t, spn_dag_file_meta_t) hints;
+  bool hints_dirty;
+  spn_dag_stats_t* stats;
 } spn_dag_file_cache_t;
 
 typedef struct {
@@ -136,8 +150,10 @@ typedef struct {
 typedef struct {
   sp_mem_arena_t* arena;
   sp_mem_t mem;
+  sp_mutex_t mutex;
   sp_str_t dir;
   sp_ht(spn_dag_digest_t, spn_dag_action_entry_t) entries;
+  spn_dag_stats_t* stats;
 } spn_dag_action_cache_t;
 
 typedef struct {
@@ -147,9 +163,11 @@ typedef struct {
 typedef struct {
   sp_mem_arena_t* arena;
   sp_mem_t mem;
+  sp_mutex_t mutex;
   sp_str_t dir;
   const spn_dag_roots_t* roots;
   sp_ht(spn_dag_digest_t, spn_dag_pathset_t) entries;
+  spn_dag_stats_t* stats;
 } spn_dag_obs_table_t;
 
 typedef enum {
@@ -170,6 +188,7 @@ typedef struct {
   sp_str_t dir;
   sp_mutex_t mutex;
   sp_ht(spn_dag_digest_t, sp_mem_slice_t) blobs;
+  spn_dag_stats_t* stats;
 } spn_dag_store_t;
 
 typedef struct {
@@ -199,7 +218,6 @@ typedef struct {
   spn_dag_id_t producer;
   bool present;
   bool hit;
-  bool changed;
 } spn_dag_trace_event_t;
 
 SP_TYPEDEF_FN(void, spn_dag_trace_fn_t, const spn_dag_trace_event_t*, void*);
@@ -215,8 +233,8 @@ typedef struct {
   spn_dag_action_cache_t* cache;
   spn_dag_store_t* store;
   spn_dag_obs_table_t* discovery;
-  spn_dag_obs_table_t* memos;
   const spn_dag_roots_t* roots;
+  spn_dag_stats_t* stats;
   spn_dag_progress_t* progress;
   spn_wake_t* wake;
   sp_atomic_s32_t* cancel;

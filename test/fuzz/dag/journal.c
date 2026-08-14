@@ -266,8 +266,8 @@ void fz_journal_trace_hook(const spn_dag_trace_event_t* event, void* user_data) 
       break;
     }
     case SPN_DAG_TRACE_RESOLVE: {
-      fz_journal_event(j, sp_fmt(mem, "\"ev\":\"dag.resolve\",\"action\":{},\"ok\":{},\"changed\":{},\"sys\":{}",
-        sp_fmt_uint(action), sp_fmt_str(fz_json_bool(event->hit)), sp_fmt_str(fz_json_bool(event->changed)), sp_fmt_uint(sys)).value);
+      fz_journal_event(j, sp_fmt(mem, "\"ev\":\"dag.resolve\",\"action\":{},\"ok\":{},\"sys\":{}",
+        sp_fmt_uint(action), sp_fmt_str(fz_json_bool(event->hit)), sp_fmt_uint(sys)).value);
       break;
     }
     case SPN_DAG_TRACE_STRONG: {

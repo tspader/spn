@@ -4,6 +4,7 @@
 #include "spn.h"
 
 #include "api/api.h"
+#include "core/core.h"
 #include "core/types.h"
 #include "ctx/types.h"
 #include "event/types.h"
@@ -131,10 +132,7 @@ void spn_write_file(spn_t* s, const c8* path, const c8* content) {
     sp_fs_create_dir(parent);
   }
 
-  sp_io_file_writer_t writer;
-  sp_io_file_writer_from_path(&writer, full_path);
-  sp_io_write_cstr(&writer.base, content, SP_NULLPTR);
-  sp_io_file_writer_close(&writer);
+  spn_fs_update_file_str(full_path, sp_str_view(content));
   sp_mem_end_scratch(scratch);
 }
 
@@ -164,7 +162,7 @@ s32 spn_api_copy(sp_str_t from, sp_str_t to) {
       sp_da(sp_fs_entry_t) entries = sp_fs_collect(scratch.mem, dir);
       sp_da_for(entries, it) {
         if (sp_glob_set_match(glob, entries[it].name)) {
-          sp_fs_copy(sp_fs_join_path(scratch.mem, dir, entries[it].name), to);
+          spn_fs_update_file(sp_fs_join_path(scratch.mem, dir, entries[it].name), to);
         }
       }
     }
@@ -184,7 +182,7 @@ s32 spn_api_copy(sp_str_t from, sp_str_t to) {
       sp_fs_create_dir(parent);
     }
 
-    err = sp_fs_copy(from, to);
+    err = spn_fs_update_file(from, to);
   }
 
   sp_mem_end_scratch(scratch);
