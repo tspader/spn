@@ -1,14 +1,20 @@
-#include "cli/cli.h"
+#include "commands/util/util.h"
 
 #include "sp/prompt.h"
+
 #include "tui/tui.h"
 
-static sp_str_t get_dir(sp_mem_t mem, spn_cli_init_t* command, sp_str_t project) {
+static struct {
+  bool bare;
+  sp_str_t path;
+} args;
+
+static sp_str_t get_dir(sp_mem_t mem, sp_str_t project) {
   sp_mem_arena_marker_t s = sp_mem_begin_scratch_for(mem);
 
   sp_str_t dir = project;
-  if (!sp_str_empty(command->path)) {
-    dir = sp_fs_is_absolute(command->path) ? command->path : sp_fs_join_path(s.mem, project, command->path);
+  if (!sp_str_empty(args.path)) {
+    dir = sp_fs_is_absolute(args.path) ? args.path : sp_fs_join_path(s.mem, project, args.path);
   }
 
   sp_str_t canonical = sp_fs_canonicalize_path(s.mem, dir);
@@ -39,7 +45,7 @@ static void on_render_prompt(sp_prompt_ctx_t* ctx) {
   }
 }
 
-static spn_err_t run_prompt(sp_mem_t mem, spn_cli_init_t* command, sp_str_t dir, sp_str_t name) {
+static spn_err_t run_prompt(sp_mem_t mem, sp_str_t dir, sp_str_t name) {
   sp_mem_arena_marker_t s = sp_mem_begin_scratch_for(mem);
   spn_err_t err = SPN_OK;
 
@@ -61,7 +67,7 @@ static spn_err_t run_prompt(sp_mem_t mem, spn_cli_init_t* command, sp_str_t dir,
   spn_op_t* op = spn_scaffold_project(host.ctx, (spn_scaffold_request_t) {
     .dir = dir,
     .name = name,
-    .bare = command->bare,
+    .bare = args.bare,
   });
   err = spn_cli_wait(op);
 
@@ -86,11 +92,11 @@ cleanup:
   return err;
 }
 
-static spn_err_t run_unattended(spn_cli_init_t* command, sp_str_t dir, sp_str_t name) {
+static spn_err_t run_unattended(sp_str_t dir, sp_str_t name) {
   spn_op_t* op = spn_scaffold_project(host.ctx, (spn_scaffold_request_t) {
     .dir = dir,
     .name = name,
-    .bare = command->bare,
+    .bare = args.bare,
   });
   spn_err_t err = spn_cli_wait(op);
   if (err) {
@@ -110,24 +116,47 @@ static spn_err_t run_unattended(spn_cli_init_t* command, sp_str_t dir, sp_str_t 
   return SPN_OK;
 }
 
-static spn_err_t run(sp_mem_t mem, spn_cli_init_t* command, sp_str_t project) {
-  sp_str_t dir = get_dir(mem, command, project);
+static spn_err_t scaffold(sp_mem_t mem, sp_str_t project) {
+  sp_str_t dir = get_dir(mem, project);
   spn_try(spn_scaffold_check(host.ctx, (spn_scaffold_request_t) {
     .dir = dir,
-    .bare = command->bare,
+    .bare = args.bare,
   }));
 
   sp_str_t name = sp_fs_get_name(dir);
-  if (tui.mode == SPN_OUTPUT_MODE_INTERACTIVE && sp_sys_is_tty(sp_sys_stdout) && sp_str_empty(command->path)) {
-    return run_prompt(mem, command, dir, name);
+  if (tui.mode == SPN_OUTPUT_MODE_INTERACTIVE && sp_sys_is_tty(sp_sys_stdout) && sp_str_empty(args.path)) {
+    return run_prompt(mem, dir, name);
   }
 
-  return run_unattended(command, dir, name);
+  return run_unattended(dir, name);
 }
 
-sp_cli_result_t spn_cli_init(sp_cli_t* cli) {
+static sp_cli_result_t init(sp_cli_t* cli) {
   try(spn_cli_open(true));
 
   spn_tui_handoff(&tui);
-  return run(host.mem, &args.init, spn_ctx_project_dir(host.ctx)) ? SP_CLI_ERR : SP_CLI_OK;
+  return scaffold(host.mem, spn_ctx_project_dir(host.ctx)) ? SP_CLI_ERR : SP_CLI_OK;
 }
+
+sp_cli_cmd_t spn_cmd_init = {
+  .name = "init",
+  .summary = "Scaffold a new project",
+  .opts = {
+    {
+      .name = "bare",
+      .summary = "Only write a manifest",
+      .kind = SP_CLI_OPT_BOOLEAN,
+      .ptr = &args.bare,
+    },
+  },
+  .args = {
+    {
+      .name = "path",
+      .arity = SP_CLI_ARG_OPTIONAL,
+      .kind = SP_CLI_OPT_STR,
+      .summary = "Directory to scaffold into",
+      .ptr = &args.path,
+    },
+  },
+  .handler = init,
+};

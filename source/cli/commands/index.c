@@ -1,12 +1,12 @@
-#include "cli/cli.h"
+#include "commands/util/util.h"
 
 #include "tui/tui.h"
 
-sp_cli_result_t spn_cli_index(sp_cli_t* cli) {
-  return SP_CLI_HELP;
-}
+static struct {
+  sp_str_t name;
+} args;
 
-static void index_list() {
+static void render_list() {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   spn_index_arr_t indexes = spn_get_indexes(scratch.mem, host.ctx);
 
@@ -45,20 +45,24 @@ static void index_list() {
   sp_mem_end_scratch(scratch);
 }
 
-sp_cli_result_t spn_cli_index_list(sp_cli_t* cli) {
+static sp_cli_result_t help(sp_cli_t* cli) {
+  return SP_CLI_HELP;
+}
+
+static sp_cli_result_t list(sp_cli_t* cli) {
   try(spn_cli_open(true));
 
   spn_tui_handoff(&tui);
-  index_list();
+  render_list();
   return SP_CLI_OK;
 }
 
-sp_cli_result_t spn_cli_index_path(sp_cli_t* cli) {
+static sp_cli_result_t path(sp_cli_t* cli) {
   try(spn_cli_open(true));
 
   spn_index_desc_t index = sp_zero;
-  if (!spn_get_index(host.ctx, args.index.name, &index)) {
-    return spn_cli_error(cli, "unknown index: {.cyan}", sp_fmt_str(args.index.name));
+  if (!spn_get_index(host.ctx, args.name, &index)) {
+    return spn_cli_error(cli, "unknown index: {.cyan}", sp_fmt_str(args.name));
   }
 
   spn_tui_handoff(&tui);
@@ -66,11 +70,58 @@ sp_cli_result_t spn_cli_index_path(sp_cli_t* cli) {
   return SP_CLI_OK;
 }
 
-sp_cli_result_t spn_cli_index_sync(sp_cli_t* cli) {
+static sp_cli_result_t refresh(sp_cli_t* cli) {
   try(spn_cli_open(true));
 
   return spn_cli_op(spn_sync_indexes(host.ctx, (spn_sync_request_t) {
     .force = true,
-    .only = args.index.name,
+    .only = args.name,
   }));
 }
+
+static sp_cli_cmd_t cmd_list = {
+  .name = "list",
+  .summary = "List configured indexes",
+  .handler = list,
+};
+
+static sp_cli_cmd_t cmd_path = {
+  .name = "path",
+  .summary = "Print the local checkout path of an index",
+  .args = {
+    {
+      .name = "name",
+      .arity = SP_CLI_ARG_OPTIONAL,
+      .kind = SP_CLI_OPT_STR,
+      .summary = "Index name (default: core)",
+      .ptr = &args.name,
+    },
+  },
+  .handler = path,
+};
+
+static sp_cli_cmd_t cmd_sync = {
+  .name = "sync",
+  .summary = "Refresh indexes, ignoring the staleness window",
+  .args = {
+    {
+      .name = "name",
+      .arity = SP_CLI_ARG_OPTIONAL,
+      .kind = SP_CLI_OPT_STR,
+      .summary = "Only sync this index",
+      .ptr = &args.name,
+    },
+  },
+  .handler = refresh,
+};
+
+sp_cli_cmd_t spn_cmd_index = {
+  .name = "index",
+  .summary = "Inspect and manage package indexes",
+  .commands = {
+    &cmd_list,
+    &cmd_path,
+    &cmd_sync,
+  },
+  .handler = help,
+};

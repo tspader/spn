@@ -57,7 +57,7 @@ static const builtins_test_t tests [] = {
 
 static sp_err_t builtins_catalog(sp_test_t* t, spn_toolchain_catalog_t* catalog) {
   sp_mem_t mem = sp_test_arena(t);
-  sp_str_t path = test_repo_path(mem, sp_str_lit("source/toolchain/toolchains.json"));
+  sp_str_t path = test_repo_path(mem, sp_str_lit("source/core/toolchain/toolchains.json"));
 
   sp_str_t json = sp_zero;
   sp_must_ok(t, sp_io_read_file(mem, path, &json));

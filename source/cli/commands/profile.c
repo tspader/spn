@@ -1,4 +1,4 @@
-#include "cli/cli.h"
+#include "commands/util/util.h"
 
 static sp_cli_result_t invalid(sp_cli_t* cli, sp_str_t value, const c8* flag, const c8* expected) {
   return spn_cli_error(cli, "invalid value {.red} for {.yellow}; expected {}",
@@ -8,7 +8,7 @@ static sp_cli_result_t invalid(sp_cli_t* cli, sp_str_t value, const c8* flag, co
 }
 
 sp_cli_result_t spn_cli_parse_profile(sp_cli_t* cli, spn_profile_override_t* profile) {
-  spn_cli_profile_t* cmd = &args.profile;
+  spn_cli_profile_t* cmd = &host.args.profile;
 
   spn_triple_t target = sp_zero;
   if (!sp_str_empty(cmd->target) && spn_triple_parse(cmd->target, &target)) {

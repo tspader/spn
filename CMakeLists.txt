@@ -66,7 +66,7 @@ if(SPN_SANITIZE)
   set(SPN_FLAVOR "-san")
 endif()
 
-set(SRC         ${CMAKE_SOURCE_DIR}/source)
+set(SRC         ${CMAKE_SOURCE_DIR}/source/core)
 set(SOURCE_ROOT ${CMAKE_SOURCE_DIR}/.build/source)
 set(STORE       ${CMAKE_SOURCE_DIR}/.build/store/${TRIPLE}${SPN_FLAVOR})
 
