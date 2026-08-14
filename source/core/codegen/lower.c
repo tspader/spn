@@ -966,7 +966,6 @@ static void validate_unique_targets(spn_toml_loader_t* ctx, spn_pkg_info_t* out)
     const c8* key;
     spn_target_map_t om;
   } groups[] = {
-    { "lib", out->libs },
     { "bin", out->exes },
     { "script", out->scripts },
     { "test", out->tests },

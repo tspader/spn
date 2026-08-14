@@ -28,6 +28,7 @@ static spn_target_unit_t* add_target(spn_session_t* s, spn_pkg_unit_t* pkg, spn_
   spn_target_unit_id_t id = {
     .pkg = pkg->id,
     .target = sp_intern_get_or_insert(s->ctx->intern, info->name),
+    .kind = info->kind,
   };
 
   sp_om_insert(s->units.targets, id, SP_ZERO_STRUCT(spn_target_unit_t));
@@ -120,7 +121,7 @@ static spn_err_t set_target_kind(spn_session_t* s, spn_target_unit_t* target) {
 }
 
 static spn_err_t ensure_target(spn_session_t* s, spn_pkg_unit_t* pkg, spn_target_info_t* info, spn_target_unit_t** result) {
-  spn_target_unit_t* target = spn_session_find_target_in_pkg(s, pkg, info->name);
+  spn_target_unit_t* target = spn_session_find_target_in_pkg(s, pkg, info->name, info->kind);
   if (target && target->info != info) {
     return spn_err_emit(s->ctx, (spn_err_union_t) {
       .kind = SPN_ERR_TARGET_DUPLICATE,
@@ -269,6 +270,19 @@ static object_name_t object_name(spn_tree_roots_t roots, spn_tree_path_t entry) 
   };
 }
 
+static sp_str_t target_kind_dir(spn_target_kind_t kind) {
+  switch (kind) {
+    case SPN_TARGET_KIND_LIB:                   return sp_str_lit("lib");
+    case SPN_TARGET_KIND_EXE:                   return sp_str_lit("exe");
+    case SPN_TARGET_KIND_SCRIPT:                return sp_str_lit("script");
+    case SPN_TARGET_KIND_TEST:                  return sp_str_lit("test");
+    case SPN_TARGET_KIND_EXAMPLE:               return sp_str_lit("example");
+    case SPN_TARGET_KIND_CONFIGURE_METAPROGRAM: return sp_str_lit("configure");
+    case SPN_TARGET_KIND_BUILD_METAPROGRAM:     return sp_str_lit("build");
+  }
+  sp_unreachable_return(sp_str_lit(""));
+}
+
 static void create_target_objects(spn_session_t* s, spn_target_unit_t* target) {
   spn_pkg_unit_t* pkg = target->pkg;
 
@@ -284,9 +298,11 @@ static void create_target_objects(spn_session_t* s, spn_target_unit_t* target) {
 
     // Object libs publish their objects as artifacts; everyone else keeps
     // them as intermediates.
-    sp_str_t object_dir = target->lib_kind == SPN_LIB_KIND_OBJECT ?
-      pkg->paths.lib :
-      sp_fs_join_path(s->mem, pkg->paths.object, target->info->name);
+    sp_str_t object_dir = pkg->paths.lib;
+    if (target->lib_kind != SPN_LIB_KIND_OBJECT) {
+      object_dir = sp_fs_join_path(s->mem, pkg->paths.object, target_kind_dir(target->info->kind));
+      object_dir = sp_fs_join_path(s->mem, object_dir, target->info->name);
+    }
     if (name.prefix.len) {
       object_dir = sp_fs_join_path(s->mem, object_dir, name.prefix);
     }
@@ -565,13 +581,14 @@ static spn_err_t ensure_sibling_targets(spn_session_t* s, sp_da(spn_target_unit_
       if (find_dep_unit(s, unit->pkg, qualified)) {
         continue;
       }
-      if (spn_session_find_target_in_pkg(s, unit->pkg, unit->info->deps[jt])) {
+      if (spn_session_find_target_in_pkg(s, unit->pkg, unit->info->deps[jt], SPN_TARGET_KIND_LIB)) {
         continue;
       }
-      spn_target_info_t* info = spn_pkg_get_target_ex(unit->pkg->info, unit->info->deps[jt]);
-      if (!info) {
+      sp_str_t name = spn_intern(unit->info->deps[jt]);
+      if (!sp_str_om_has(unit->pkg->info->libs, name)) {
         continue;
       }
+      spn_target_info_t* info = sp_str_om_get(unit->pkg->info->libs, name);
       spn_target_unit_t* target = SP_NULLPTR;
       spn_try(ensure_target(s, unit->pkg, info, &target));
       sp_da_push(*targets, target);
@@ -589,7 +606,7 @@ static spn_err_t resolve_target_deps(spn_session_t* s, sp_da(spn_target_unit_t*)
         continue;
       }
 
-      spn_target_unit_t* target = spn_session_find_target_in_pkg(s, unit->pkg, unit->info->deps[jt]);
+      spn_target_unit_t* target = spn_session_find_target_in_pkg(s, unit->pkg, unit->info->deps[jt], SPN_TARGET_KIND_LIB);
       if (!target) {
         return spn_err_emit(s->ctx, (spn_err_union_t) {
           .kind = SPN_ERR_TARGET_DEP,

@@ -1,0 +1,19 @@
+[package]
+name = "test"
+version = "0.1.0"
+
+[[lib]]
+name = "A"
+kinds = ["static"]
+source = ["main.c"]
+flags = ["-DLIB"]
+
+[[bin]]
+name = "A"
+source = ["main.c"]
+deps = ["A"]
+
+[[test]]
+name = "T"
+source = ["main.c"]
+deps = ["A"]
