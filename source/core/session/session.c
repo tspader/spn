@@ -18,7 +18,6 @@
 #include "pkg/pkg.h"
 #include "pkg/options.h"
 #include "profile/profile.h"
-#include "spn.embed.h"
 #include "toolchain/toolchain.h"
 #include "triple/triple.h"
 
@@ -110,12 +109,6 @@ spn_err_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem, spn_p
   s->paths.root = project->paths.root;
   s->paths.build = sp_fs_join_path(s->mem, s->paths.root, sp_str_lit("build"));
   spn_triple_t host = spn_triple_host();
-
-  sp_str_t builtins = sp_str((const c8*)toolchains_json, toolchains_json_size);
-  spn_try(spn_toolchain_catalog_init(&s->catalog, builtins, s->mem));
-  sp_str_om_for(root->toolchains, it) {
-    spn_toolchain_catalog_add(&s->catalog, *sp_str_om_at(root->toolchains, it));
-  }
 
   sp_str_ht_init(s->mem, s->profiles);
   spn_profile_populate(&s->profiles, root);

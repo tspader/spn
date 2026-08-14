@@ -27,6 +27,7 @@ sp_da(spn_link_lib_t)      spn_closure_get_linked_libs(sp_mem_t mem, sp_da(spn_c
 bool spn_dep_kind_applies(spn_dep_kind_t dep, spn_target_kind_t target);
 
 void spn_unit_paths_init(spn_pkg_unit_t* unit, spn_loaded_pkg_t* loaded);
+sp_str_t spn_target_unit_object_dir(sp_mem_t mem, spn_target_unit_t* target);
 
 // A script host exists in the metaprogram build only to compile its package's
 // scripts; it is not consumed there, so it configures and packages nothing

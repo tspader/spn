@@ -86,6 +86,9 @@ spn_target_info_t* spn_pkg_get_target_ex(spn_pkg_info_t* pkg, sp_str_t name) {
   // Target maps are keyed by interned names
   name = spn_intern(name);
 
+  if (sp_str_om_has(pkg->libs, name)) {
+    return sp_str_om_get(pkg->libs, name);
+  }
   if (sp_str_om_has(pkg->exes, name)) {
     return sp_str_om_get(pkg->exes, name);
   }
@@ -97,9 +100,6 @@ spn_target_info_t* spn_pkg_get_target_ex(spn_pkg_info_t* pkg, sp_str_t name) {
   }
   if (sp_str_om_has(pkg->examples, name)) {
     return sp_str_om_get(pkg->examples, name);
-  }
-  if (sp_str_om_has(pkg->libs, name)) {
-    return sp_str_om_get(pkg->libs, name);
   }
 
   return SP_NULLPTR;

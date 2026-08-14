@@ -63,7 +63,7 @@ static bool same_triple(spn_triple_t lhs, spn_triple_t rhs) {
 
 static spn_err_t bind_toolchain(spn_session_t* s, spn_toolchain_query_t query, spn_toolchain_unit_t** out) {
   spn_toolchain_resolution_t resolution = sp_zero;
-  spn_try(spn_toolchain_select(&s->catalog, query, s->mem, &resolution));
+  spn_try(spn_toolchain_select(&s->ctx->catalog, query, s->mem, &resolution));
 
   sp_da_for(s->units.toolchains, it) {
     spn_toolchain_unit_t* unit = s->units.toolchains[it];

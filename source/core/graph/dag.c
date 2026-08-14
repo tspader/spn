@@ -139,9 +139,10 @@ static spn_err_t dag_exports_identity(spn_dag_build_t* b, spn_dag_link_ctx_t* li
 static spn_dag_digest_t hash_embedding(spn_dag_build_t* b, spn_target_unit_t* target) {
   spn_sha256_ctx_t ctx = sp_zero;
   spn_sha256_init(&ctx);
-  spn_dag_hash_str(&ctx, sp_str_lit("spn.build.embed.v3"));
+  spn_dag_hash_str(&ctx, sp_str_lit("spn.build.embed.v4"));
   spn_dag_hash_str(&ctx, target->pkg->info->qualified);
   spn_dag_hash_str(&ctx, target->info->name);
+  spn_dag_hash_u8(&ctx, (u8)target->info->kind);
   spn_profile_info_t* profile = &target->pkg->build->profile;
   spn_dag_hash_u8(&ctx, (u8)profile->os);
   spn_dag_hash_u8(&ctx, (u8)profile->arch);
@@ -607,7 +608,7 @@ static spn_err_t add_object_compilation(spn_dag_build_t* b, spn_target_unit_t* t
 static sp_str_t embed_object_path(sp_mem_t mem, spn_target_unit_t* unit) {
   sp_mem_arena_marker_t s = sp_mem_begin_scratch_for(mem);
   sp_str_t name = sp_fmt(s.mem, "{}.embed.o", sp_fmt_str(unit->info->name)).value;
-  sp_str_t path = sp_fs_join_path(mem, unit->pkg->paths.generated, name);
+  sp_str_t path = sp_fs_join_path(mem, spn_target_unit_object_dir(s.mem, unit), name);
   sp_mem_end_scratch(s);
   return path;
 }
@@ -615,7 +616,7 @@ static sp_str_t embed_object_path(sp_mem_t mem, spn_target_unit_t* unit) {
 static sp_str_t embed_header_path(sp_mem_t mem, spn_target_unit_t* unit) {
   sp_mem_arena_marker_t s = sp_mem_begin_scratch_for(mem);
   sp_str_t name = sp_fmt(s.mem, "{}.embed.h", sp_fmt_str(unit->info->name)).value;
-  sp_str_t path = sp_fs_join_path(mem, unit->pkg->paths.generated, name);
+  sp_str_t path = sp_fs_join_path(mem, spn_target_unit_object_dir(s.mem, unit), name);
   sp_mem_end_scratch(s);
   return path;
 }
