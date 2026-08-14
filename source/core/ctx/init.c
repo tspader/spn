@@ -19,6 +19,7 @@
 #include "spn.embed.h"
 #include "toml/issue.h"
 #include "toml/loader.h"
+#include "toolchain/catalog.h"
 #include "toolchain/provision.h"
 #include "version.h"
 
@@ -201,6 +202,12 @@ static spn_err_t open_ctx(spn_ctx_t* ctx, spn_open_request_t request) {
     spn_try(spn_ctx_require_project(ctx));
   }
 
+  if (ctx->project) {
+    sp_str_om_for(ctx->project->package.toolchains, it) {
+      spn_toolchain_catalog_add(&ctx->catalog, *sp_str_om_at(ctx->project->package.toolchains, it));
+    }
+  }
+
   spn_index_assemble(ctx->heap, ctx->project ? &ctx->project->package.indexes : SP_NULLPTR, ctx->config.indexes, &ctx->indexes);
 
   sp_da_for(ctx->indexes, it) {
@@ -228,6 +235,9 @@ spn_ctx_t* spn_ctx_new(spn_wake_fn_t wake, void* wake_data) {
   *ctx->env = sp_env_capture(ctx->heap);
   ctx->events = spn_event_buffer_new(ctx->mem);
   ctx->events->wake = &ctx->wake;
+
+  sp_str_t builtins = sp_str((const c8*)toolchains_json, toolchains_json_size);
+  sp_assert(spn_toolchain_catalog_init(&ctx->catalog, builtins, ctx->heap) == SPN_OK);
 
   ctx->paths.cwd = sp_fs_get_cwd(ctx->heap);
   ctx->paths.patches = sp_env_get(ctx->env, sp_str_lit("SPN_PATCH_DIR"));

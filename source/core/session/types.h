@@ -37,7 +37,6 @@ struct spn_session_t {
 
   spn_session_config_t config;
   spn_profile_table_t profiles;
-  spn_toolchain_catalog_t catalog;
   spn_profile_info_t profile;
 
   spn_resolve_t resolve;

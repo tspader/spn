@@ -65,7 +65,7 @@ static spn_cc_compile_t spn_build_compile_desc(sp_mem_t mem, spn_compile_unit_t*
   }
 
   if (!sp_da_empty(unit->target->info->embed)) {
-    sp_da_push(compile.include, pkg->paths.generated);
+    sp_da_push(compile.include, spn_target_unit_object_dir(mem, unit->target));
   }
 
   return compile;

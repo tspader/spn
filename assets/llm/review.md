@@ -23,7 +23,7 @@ Don't evaluate this mechanically; the fact that the type literally says `bool` i
 
 # branching based on arguments is almost always wrong
 
-The worst form of this disease is when a function has a small number of callers, and it uses an argument as a proxy for which caller:
+Branches in general are the number one signal of poorly designed code. The worst form of this disease is when a function has a small number of callers, and it uses an argument as a proxy for which caller:
 
 ```c
 void do(bool all) {
@@ -42,5 +42,5 @@ void whatever() {
 
 You should task tracking to add a task checking every branch added for this. This should be flagged on site as an instant fail. If the author firmly believes this is the right shape, they can ask the human for permission to do this. This pattern shows up with strings, NULL checks, enums, all kinds of stuff. It is not limited to when the caller passes a constant.
 
-Be wary of conditional logic in *any* function; obviously, every program will branch. There's nothing wrong with branching, but every branch must be evaluated for this disease.
+Be wary of conditional logic in *any* function; obviously, every program will branch. There's nothing wrong with branching, but every branch must be evaluated for this disease. Do this. Really. Actually review every branch, and think about whether it conforms to the requirement that leaf functions are pure and conditional logic centralized.
 

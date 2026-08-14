@@ -63,11 +63,11 @@ target = [
   { arch = "x86_64", os = "windows", abi = "mingw" }
 ]
 
-[[bin]]
+[[lib]]
 name = "spn"
+kinds = ["static"]
 source = [
   "source/core/**/*.c",
-  "source/cli/**/*.c",
   "source/core/codegen/gen/abi.gen.c",
   "source/core/codegen/gen/config.gen.c",
   "source/core/codegen/gen/errors.gen.c",
@@ -77,7 +77,13 @@ source = [
   "source/core/codegen/gen/release.gen.c",
   "source/core/codegen/gen/toolchains.gen.c",
 ]
-include = ["include", "source/core", "source/cli", "source/core/external", "source/core/codegen/gen"]
+include = ["include", "source/core", "source/core/external", "source/core/codegen/gen"]
+
+[[bin]]
+name = "spn"
+source = ["source/cli/**/*.c"]
+include = ["include", "source/cli", "source/core"]
+deps = ["spn"]
 flags = []
 
 [[test]]

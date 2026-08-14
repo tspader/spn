@@ -270,24 +270,12 @@ static object_name_t object_name(spn_tree_roots_t roots, spn_tree_path_t entry) 
   };
 }
 
-static sp_str_t target_kind_dir(spn_target_kind_t kind) {
-  switch (kind) {
-    case SPN_TARGET_KIND_LIB:                   return sp_str_lit("lib");
-    case SPN_TARGET_KIND_EXE:                   return sp_str_lit("exe");
-    case SPN_TARGET_KIND_SCRIPT:                return sp_str_lit("script");
-    case SPN_TARGET_KIND_TEST:                  return sp_str_lit("test");
-    case SPN_TARGET_KIND_EXAMPLE:               return sp_str_lit("example");
-    case SPN_TARGET_KIND_CONFIGURE_METAPROGRAM: return sp_str_lit("configure");
-    case SPN_TARGET_KIND_BUILD_METAPROGRAM:     return sp_str_lit("build");
-  }
-  sp_unreachable_return(sp_str_lit(""));
-}
-
 static void create_target_objects(spn_session_t* s, spn_target_unit_t* target) {
   spn_pkg_unit_t* pkg = target->pkg;
 
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   sp_da(spn_tree_path_t) source = collect_target_source(scratch.mem, pkg, target);
+  sp_str_t target_dir = spn_target_unit_object_dir(s->mem, target);
 
   sp_da_for(source, it) {
     spn_tree_path_t entry = source[it];
@@ -296,13 +284,7 @@ static void create_target_objects(spn_session_t* s, spn_target_unit_t* target) {
 
     spn_lang_t lang = spn_lang_from_path(name.path);
 
-    // Object libs publish their objects as artifacts; everyone else keeps
-    // them as intermediates.
-    sp_str_t object_dir = pkg->paths.lib;
-    if (target->lib_kind != SPN_LIB_KIND_OBJECT) {
-      object_dir = sp_fs_join_path(s->mem, pkg->paths.object, target_kind_dir(target->info->kind));
-      object_dir = sp_fs_join_path(s->mem, object_dir, target->info->name);
-    }
+    sp_str_t object_dir = target_dir;
     if (name.prefix.len) {
       object_dir = sp_fs_join_path(s->mem, object_dir, name.prefix);
     }
