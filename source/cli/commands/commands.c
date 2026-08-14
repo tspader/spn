@@ -1,6 +1,6 @@
 #include "commands/commands.h"
 
-#include "commands/util/util.h"
+#include "host/host.h"
 
 extern sp_cli_cmd_t spn_cmd_init;
 extern sp_cli_cmd_t spn_cmd_add;

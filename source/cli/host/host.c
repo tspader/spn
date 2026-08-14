@@ -1,48 +1,8 @@
-#include "commands/util/util.h"
-
+#include "host.h"
 #include "tui/tui.h"
 
 spn_cli_host_t host;
 spn_tui_t tui;
-
-static void on_wake(void* user_data) {
-  u8 byte = 0;
-  sp_sys_write(host.doorbell.write, &byte, 1, SP_NULLPTR);
-}
-
-static void on_signal(sp_os_signal_t signal, void* userdata) {
-  switch (signal) {
-    case SP_OS_SIGNAL_INTERRUPT: {
-      sp_atomic_s32_store(&host.interrupted, 1, SP_ATOMIC_SEQ_CST);
-      on_wake(SP_NULLPTR);
-      break;
-    }
-    case SP_OS_SIGNAL_ABORT:
-    case SP_OS_SIGNAL_TERMINATE: {
-      break;
-    }
-  }
-}
-
-void spn_cli_boot() {
-  spn_verbosity_t verbosity = SPN_VERBOSITY_NORMAL;
-  if (host.args.quiet) {
-    verbosity = SPN_VERBOSITY_QUIET;
-  } else if (host.args.verbose) {
-    verbosity = SPN_VERBOSITY_VERBOSE;
-  }
-
-  spn_tui_mode_t mode = SPN_OUTPUT_MODE_INTERACTIVE;
-  if (!sp_str_empty(host.args.output)) {
-    mode = spn_output_mode_from_str(host.args.output);
-  }
-
-  host.mem = sp_mem_arena_as_allocator(sp_mem_arena_new(sp_mem_os_new()));
-  sp_sys_pipe(&host.doorbell.read, &host.doorbell.write);
-  host.ctx = spn_ctx_new(on_wake, SP_NULLPTR);
-  spn_tui_open(&tui, host.ctx, mode, verbosity, host.doorbell.read, host.doorbell.write);
-  sp_os_register_signal_handler(SP_OS_SIGNAL_INTERRUPT, on_signal, SP_NULLPTR);
-}
 
 s32 spn_cli_shutdown(bool ok) {
   spn_prompt_stop(&tui, ok ? SP_PROMPT_STATE_SUBMIT : SP_PROMPT_STATE_ERROR);

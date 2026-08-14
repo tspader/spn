@@ -1594,7 +1594,13 @@ static void detach_prompt(spn_tui_t* tui) {
   flush_writer(&tui->writer);
 }
 
-void spn_tui_init(spn_tui_t* tui) {
+void spn_tui_init(spn_tui_t* tui, spn_tui_desc_t desc) {
+  tui->ctx = desc.ctx;
+  tui->mode = desc.mode;
+  tui->logger.verbosity = desc.verbosity;
+  tui->wake.read = desc.wake.read;
+  tui->wake.write = desc.wake.write;
+
   tui->mem = sp_mem_arena_as_allocator(sp_mem_arena_new(sp_mem_os_new()));
 
   sp_io_stream_writer_from_fd(&tui->logger.out, sp_sys_stdout, SP_IO_CLOSE_MODE_NONE);
@@ -1620,14 +1626,6 @@ void spn_tui_init(spn_tui_t* tui) {
   sp_str_ht_init(tui->mem, tui->seen_url);
   sp_da_init(tui->mem, tui->buffered_logs);
   sp_ht_init(tui->mem, tui->thread_ids);
-}
-
-void spn_tui_open(spn_tui_t* tui, spn_ctx_t* ctx, spn_tui_mode_t mode, spn_verbosity_t verbosity, sp_sys_fd_t wake_read, sp_sys_fd_t wake_write) {
-  tui->ctx = ctx;
-  tui->mode = mode;
-  tui->logger.verbosity = verbosity;
-  tui->wake.read = wake_read;
-  tui->wake.write = wake_write;
 }
 
 static u32 get_short_tid(spn_tui_t* tui, u64 thread_id) {
