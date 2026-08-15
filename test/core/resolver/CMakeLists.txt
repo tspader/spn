@@ -33,6 +33,7 @@ add_executable(resolver
   ${SRC}/index/jsonl.c
   ${SRC}/index/json.c
   ${SRC}/sp/io.c
+  ${SRC}/paths/paths.c
   ${SRC}/pkg/id.c
   ${SRC}/pkg/pkg.c
   ${SRC}/pkg/mutate.c

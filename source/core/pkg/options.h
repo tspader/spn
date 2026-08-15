@@ -28,6 +28,11 @@ void spn_pkg_options_env(
   spn_option_requests_t requests,
   spn_when_env_t* env);
 
-void spn_pkg_apply_options(spn_pkg_info_t* info, spn_when_env_t* env);
+void spn_pkg_apply_options(
+  sp_mem_t mem,
+  spn_pkg_info_t* info,
+  const spn_path_roots_t* roots,
+  spn_tree_roots_t trees,
+  spn_when_env_t* env);
 
 #endif

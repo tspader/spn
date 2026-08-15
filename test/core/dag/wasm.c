@@ -77,6 +77,17 @@ static const wasm_test_t wasm_tests [] = {
     }
   },
   {
+    .name = "write_then_read_alias",
+    .calls = {
+      { .fn = "run",
+        .ops = {
+          { WASM_EMIT_OPEN_WRITE, "O" },
+          { WASM_EMIT_CLOSE },
+          { WASM_EMIT_OPEN_READ, "./O" },
+        } },
+    }
+  },
+  {
     .name = "stat_file",
     .files = { { "work/H" } },
     .calls = {
@@ -174,7 +185,7 @@ static sp_err_t wasm_runtime_bring_up(void* user) {
   return SP_OK;
 }
 
-static void expect_obs(sp_test_t* t, sp_mem_t mem, sp_str_t root, const wasm_expect_t* expect, sp_da(spn_dag_obs_t) obs) {
+static void expect_obs(sp_test_t* t, sp_mem_t mem, const spn_path_roots_t* roots, sp_str_t root, const wasm_expect_t* expect, sp_da(spn_dag_obs_t) obs) {
   u32 expected = 0;
   sp_carr_detect_len(expect->obs, expected, expect->obs[expected].path);
   sp_for(it, expected) {
@@ -182,7 +193,7 @@ static void expect_obs(sp_test_t* t, sp_mem_t mem, sp_str_t root, const wasm_exp
     sp_str_t host = sp_fs_join_path(mem, root, sp_str_view(e->path));
     bool found = false;
     sp_da_for(obs, ot) {
-      if (obs[ot].kind == e->kind && sp_str_equal(obs[ot].path, host)) {
+      if (obs[ot].kind == e->kind && sp_str_equal(spn_path_str(roots, mem, obs[ot].path), host)) {
         found = true;
         break;
       }
@@ -201,6 +212,9 @@ sp_test_each(dag_wasm, wasi, wasm_test_t, wasm_tests) {
 
   sp_mem_t mem = sp_test_arena(t);
   sp_str_t root = sp_test_dir(t);
+
+  spn_path_roots_t roots = sp_zero;
+  roots.dirs[SPN_PATH_ROOT_PROJECT] = root;
 
   spn_dag_wasi_mount_t mounts [] = {
     { .guest = "/work",   .host = sp_fs_join_path(mem, root, sp_str_lit("work")) },
@@ -252,7 +266,7 @@ sp_test_each(dag_wasm, wasi, wasm_test_t, wasm_tests) {
   wasm_module_inst_t instance = wasm_runtime_instantiate(module, DAG_WASM_STACK_SIZE, DAG_WASM_HEAP_SIZE, error, sizeof(error));
   sp_must(t, instance != SP_NULLPTR);
 
-  spn_dag_wasi_t* w = spn_dag_wasi_new(mem, mounts, sp_carr_len(mounts));
+  spn_dag_wasi_t* w = spn_dag_wasi_new(mem, &roots, mounts, sp_carr_len(mounts));
   spn_dag_wasi_bind(w, instance);
 
   wasm_exec_env_t env = wasm_runtime_create_exec_env(instance, DAG_WASM_STACK_SIZE);
@@ -276,7 +290,7 @@ sp_test_each(dag_wasm, wasi, wasm_test_t, wasm_tests) {
 
     sp_must(t, called);
     sp_expect_eq(t, call->expect.rc, results[0].of.i32);
-    expect_obs(t, mem, root, &call->expect, obs);
+    expect_obs(t, mem, &roots, root, &call->expect, obs);
   }
 
   wasm_runtime_destroy_exec_env(env);

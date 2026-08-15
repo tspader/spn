@@ -4,6 +4,7 @@
 #include "pkg/pkg.h"
 
 #include "intern/intern.h"
+#include "paths/paths.h"
 #include "pkg/mutate.h"
 #include "profile/types.h"
 #include "target/mutate.h"
@@ -20,7 +21,7 @@ sp_hash_t spn_pkg_hash_platform(spn_pkg_info_t* pkg, const spn_profile_info_t* p
 
   switch (profile->os) {
     case SPN_OS_MACOS: {
-      hash = hash_push(hash, sp_hash_str(profile->sysroot));
+      hash = hash_push(hash, spn_path_hash(profile->sysroot));
       hash = hash_push(hash, sp_hash_bytes(&pkg->macos.min_os, sizeof(pkg->macos.min_os), 0));
       sp_da_for(pkg->macos.frameworks, it) {
         hash = hash_push(hash, sp_hash_str(pkg->macos.frameworks[it]));

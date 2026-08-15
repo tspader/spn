@@ -9,11 +9,13 @@
 #include "unit/types.h"
 
 #include "cpu/cpu.h"
+#include "dag/dag.h"
 #include "error/error.h"
 #include "external/wasm/wasm.h"
 #include "graph/build.h"
 #include "graph/dag.h"
 #include "op/types.h"
+#include "paths/paths.h"
 #include "session/session.h"
 #include "unit/package.h"
 #include "unit/unit.h"
@@ -28,9 +30,10 @@ static s32 on_configure_package(spn_dag_t* g, spn_dag_action_t* action, void* us
       spn_try(spn_wasm_script_call(configure, unit, sp_str_lit("configure"), SPN_ABI_KIND_CONFIG, unit));
     }
   }
-  spn_try(spn_pkg_unit_publish_headers(unit, unit->paths.include, SPN_PUBLISH_EXISTING));
-  spn_try(spn_build_publish_copies(unit, unit->paths.include, SPN_PUBLISH_EXISTING, SP_NULLPTR));
-  spn_pkg_unit_write_stamp(unit, spn_dag_find_artifact(g, action->produces[0])->path);
+  sp_str_t include = spn_path_str(g->roots, spn.mem, unit->paths.include);
+  spn_try(spn_pkg_unit_publish_existing_headers(unit, include));
+  spn_try(spn_build_publish_existing_copies(unit, include));
+  spn_pkg_unit_write_stamp(unit, spn_dag_find_artifact(g, action->produces[0])->materialized);
   return SPN_OK;
 }
 
@@ -115,7 +118,10 @@ spn_err_t configure(spn_op_t* op) {
       continue;
     }
     if (add_configure_action(dag, unit)) {
-      return spn_err_emit(s->ctx, (spn_err_union_t) { .kind = SPN_ERR_BUILD_GRAPH, .build_graph = { .file = unit->paths.stamp.configure } });
+      return spn_err_emit(s->ctx, (spn_err_union_t) {
+        .kind = SPN_ERR_BUILD_GRAPH,
+        .build_graph = { .file = spn_path_str(&spn.roots, s->mem, unit->paths.stamp.configure) },
+      });
     }
   }
 

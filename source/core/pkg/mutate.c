@@ -71,12 +71,8 @@ void spn_pkg_set_maintainer_ex(spn_pkg_info_t* pkg, sp_str_t maintainer) {
   pkg->maintainer = sp_str_copy(spn_pkg_mem(pkg), maintainer);
 }
 
-void spn_pkg_add_include(spn_pkg_info_t* pkg, const c8* include) {
-  spn_pkg_add_include_ex(pkg, sp_str_view(include));
-}
-
-void spn_pkg_add_include_ex(spn_pkg_info_t* pkg, sp_str_t path) {
-  sp_da_push(pkg->include, ((spn_tree_path_t) { .path = sp_str_copy(spn_pkg_mem(pkg), path), .tree = SPN_TREE_SOURCE }));
+void spn_pkg_add_include(spn_pkg_info_t* pkg, spn_path_t path) {
+  sp_da_push(pkg->include, path);
 }
 
 void spn_pkg_add_define(spn_pkg_info_t* pkg, const c8* define) {

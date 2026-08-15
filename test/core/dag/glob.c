@@ -16,6 +16,7 @@ typedef struct {
   const c8* name;
   const c8* files [DAG_TEST_MAX_INPUTS];
   const c8* dirs [DAG_TEST_MAX_INPUTS];
+  const c8* nested_root;
   const c8* pattern;
   glob_expect_t expect;
 } glob_test_t;
@@ -89,11 +90,28 @@ static const glob_test_t glob_tests [] = {
       .enums = { { "B", "*.h" } },
     }
   },
+  {
+    .name = "obs_keep_dir_root_over_nested_root",
+    .files = { "A/X.h" },
+    .nested_root = "A",
+    .pattern = "A/*.h",
+    .expect = {
+      .enums = { { "A", "*.h" } },
+      .matches = { "A/X.h" },
+    }
+  },
 };
 
+typedef struct {
+  sp_str_t path;
+  sp_str_t filter;
+  spn_dag_obs_kind_t kind;
+  spn_path_root_t root;
+} glob_seen_t;
+
 static s32 glob_obs_order(const void* a, const void* b) {
-  const spn_dag_obs_t* oa = (const spn_dag_obs_t*)a;
-  const spn_dag_obs_t* ob = (const spn_dag_obs_t*)b;
+  const glob_seen_t* oa = (const glob_seen_t*)a;
+  const glob_seen_t* ob = (const glob_seen_t*)b;
   s32 order = sp_str_compare_alphabetical(oa->path, ob->path);
   if (order) {
     return order;
@@ -101,14 +119,14 @@ static s32 glob_obs_order(const void* a, const void* b) {
   return sp_str_compare_alphabetical(oa->filter, ob->filter);
 }
 
-static s32 glob_match_order(const void* a, const void* b) {
-  return sp_str_compare_alphabetical(((const spn_dag_match_t*)a)->relative, ((const spn_dag_match_t*)b)->relative);
-}
-
 sp_test_each(dag_glob, observe, glob_test_t, glob_tests) {
   sp_mem_t mem = sp_test_arena(t);
   sp_str_t root = sp_fs_join_path(mem, sp_test_dir(t), sp_str_lit("R"));
   sp_fs_create_dir(root);
+
+  spn_path_roots_t storage = sp_zero;
+  storage.dirs[SPN_PATH_ROOT_PROJECT] = root;
+  const spn_path_roots_t* roots = &storage;
 
   sp_carr_for(it->files, ft) {
     if (!it->files[ft]) {
@@ -122,29 +140,38 @@ sp_test_each(dag_glob, observe, glob_test_t, glob_tests) {
     }
     sp_fs_create_dir(sp_fs_join_path(mem, root, sp_cstr_as_str(it->dirs[dt])));
   }
+  if (it->nested_root) {
+    storage.dirs[SPN_PATH_ROOT_STORE] = sp_fs_join_path(mem, root, sp_cstr_as_str(it->nested_root));
+  }
 
   sp_da(spn_dag_obs_t) obs = sp_da_new(mem, spn_dag_obs_t);
-  sp_da(spn_dag_match_t) matches = sp_da_new(mem, spn_dag_match_t);
-  spn_err_t err = spn_dag_glob(mem, root, sp_str_view(it->pattern), &obs, &matches);
+  sp_da(spn_path_t) matches = sp_da_new(mem, spn_path_t);
+  spn_path_t pattern = { .root = SPN_PATH_ROOT_PROJECT, .sub = sp_str_view(it->pattern) };
+  spn_err_t err = spn_dag_glob(mem, roots, pattern, &obs, &matches);
   sp_expect_eq(t, it->expect.err, err);
   if (err) {
     return SP_OK;
   }
 
-  sp_da(spn_dag_obs_t) enums = sp_da_new(mem, spn_dag_obs_t);
-  sp_da(spn_dag_obs_t) file_obs = sp_da_new(mem, spn_dag_obs_t);
-  sp_da(spn_dag_obs_t) absent_obs = sp_da_new(mem, spn_dag_obs_t);
+  sp_da(glob_seen_t) enums = sp_da_new(mem, glob_seen_t);
+  sp_da(glob_seen_t) file_obs = sp_da_new(mem, glob_seen_t);
+  sp_da(glob_seen_t) absent_obs = sp_da_new(mem, glob_seen_t);
   sp_da_for(obs, ot) {
+    glob_seen_t seen = {
+      .path = spn_path_str(roots, mem, obs[ot].path),
+      .filter = obs[ot].filter,
+      .kind = obs[ot].kind,
+      .root = obs[ot].path.root,
+    };
     switch (obs[ot].kind) {
-      case SPN_DAG_OBS_ENUMERATION: sp_da_push(enums, obs[ot]);      break;
-      case SPN_DAG_OBS_FILE:        sp_da_push(file_obs, obs[ot]);   break;
-      case SPN_DAG_OBS_ABSENT:      sp_da_push(absent_obs, obs[ot]); break;
+      case SPN_DAG_OBS_ENUMERATION: sp_da_push(enums, seen);      break;
+      case SPN_DAG_OBS_FILE:        sp_da_push(file_obs, seen);   break;
+      case SPN_DAG_OBS_ABSENT:      sp_da_push(absent_obs, seen); break;
     }
   }
   sp_da_sort(enums, glob_obs_order);
   sp_da_sort(file_obs, glob_obs_order);
   sp_da_sort(absent_obs, glob_obs_order);
-  sp_da_sort(matches, glob_match_order);
 
   u32 expect_enums = 0;
   sp_carr_for(it->expect.enums, et) {
@@ -161,6 +188,7 @@ sp_test_each(dag_glob, observe, glob_test_t, glob_tests) {
     sp_str_t filter = it->expect.enums[et].filter ? sp_str_view(it->expect.enums[et].filter) : sp_str_lit("");
     sp_expect_str_eq(t, enums[et].path, dir);
     sp_expect_str_eq(t, enums[et].filter, filter);
+    sp_expect_eq(t, SPN_PATH_ROOT_PROJECT, enums[et].root);
   }
 
   u32 expect_matches = 0;
@@ -173,11 +201,11 @@ sp_test_each(dag_glob, observe, glob_test_t, glob_tests) {
   sp_must_eq(t, expect_matches, (u32)sp_da_size(matches));
   sp_must_eq(t, expect_matches, (u32)sp_da_size(file_obs));
   sp_for(mt, expect_matches) {
-    sp_str_t relative = sp_str_view(it->expect.matches[mt]);
-    sp_str_t path = sp_fs_join_path(mem, root, relative);
-    sp_expect_str_eq(t, matches[mt].relative, relative);
-    sp_expect_str_eq(t, matches[mt].path, path);
-    sp_expect_str_eq(t, file_obs[mt].path, path);
+    sp_str_t sub = sp_str_view(it->expect.matches[mt]);
+    sp_expect_str_eq(t, matches[mt].sub, sub);
+    sp_expect_eq(t, SPN_PATH_ROOT_PROJECT, matches[mt].root);
+    sp_expect_str_eq(t, file_obs[mt].path, sp_fs_join_path(mem, root, sub));
+    sp_expect_eq(t, SPN_PATH_ROOT_PROJECT, file_obs[mt].root);
   }
 
   u32 expect_absent = 0;
@@ -190,6 +218,7 @@ sp_test_each(dag_glob, observe, glob_test_t, glob_tests) {
   sp_must_eq(t, expect_absent, (u32)sp_da_size(absent_obs));
   sp_for(at, expect_absent) {
     sp_expect_str_eq(t, absent_obs[at].path, sp_fs_join_path(mem, root, sp_cstr_as_str(it->expect.absent[at])));
+    sp_expect_eq(t, SPN_PATH_ROOT_PROJECT, absent_obs[at].root);
   }
 
   return SP_OK;
@@ -214,7 +243,7 @@ typedef struct {
 typedef struct {
   dag_test_env_t dag;
   sp_str_t root;
-  const c8* pattern;
+  spn_path_t pattern;
 } glob_exec_env_t;
 
 static const glob_exec_test_t glob_exec_tests [] = {
@@ -230,9 +259,9 @@ static const glob_exec_test_t glob_exec_tests [] = {
   },
 };
 
-static spn_err_t glob_exec_discover(spn_dag_t* g, spn_dag_action_t* action, void* user_data, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
+static spn_err_t glob_exec_discover(spn_dag_t* g, spn_dag_action_t* action, void* user_data, spn_dag_env_t* dag_env, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
   glob_exec_env_t* env = (glob_exec_env_t*)user_data;
-  return spn_dag_glob(mem, env->root, sp_str_view(env->pattern), out, SP_NULLPTR);
+  return spn_dag_glob(mem, g->roots, env->pattern, out, SP_NULLPTR);
 }
 
 sp_test_each(dag_glob, exec, glob_exec_test_t, glob_exec_tests) {
@@ -242,7 +271,7 @@ sp_test_each(dag_glob, exec, glob_exec_test_t, glob_exec_tests) {
     .discovery = true
   });
   env.root = dag_test_env_path(&env.dag, sp_str_lit("R"));
-  env.pattern = it->pattern;
+  env.pattern = spn_path_join(env.dag.mem, dag_test_env_rooted(&env.dag, sp_str_lit("R")), sp_str_view(it->pattern));
   sp_fs_create_dir(env.root);
 
   sp_carr_for(it->runs, r) {

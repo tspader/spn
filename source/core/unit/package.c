@@ -8,22 +8,31 @@
 #include "external/cc.h"
 #include "external/git.h"
 #include "external/tom.h"
+#include "paths/paths.h"
 #include "pkg/pkg.h"
 #include "semver/convert.h"
 #include "session/session.h"
 #include "target/target.h"
 #include "unit/types.h"
+#include "unit/unit.h"
 
-sp_str_t spn_pkg_unit_get_node_stamp_file(spn_pkg_unit_t* ctx, spn_user_node_t* node) {
-  return sp_fs_join_path(spn.mem, ctx->paths.stamp.dir, node->tag);
+spn_path_t spn_pkg_unit_get_node_stamp_file(spn_pkg_unit_t* ctx, spn_user_node_t* node) {
+  return spn_path_join(spn.mem, ctx->paths.stamp.dir, node->tag);
 }
 
 void spn_pkg_unit_create_layout(spn_pkg_unit_t* unit) {
-  sp_fs_create_dir(unit->paths.work);
-  sp_fs_create_dir(unit->paths.include);
-  sp_fs_create_dir(unit->paths.lib);
-  sp_fs_create_dir(unit->paths.bin);
-  sp_fs_create_dir(unit->paths.vendor);
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  spn_path_t dirs [] = {
+    unit->paths.work,
+    unit->paths.include,
+    unit->paths.lib,
+    unit->paths.bin,
+    unit->paths.vendor,
+  };
+  sp_carr_for(dirs, it) {
+    sp_fs_create_dir(spn_path_str(&spn.roots, scratch.mem, dirs[it]));
+  }
+  sp_mem_end_scratch(scratch);
 }
 
 typedef sp_str_ht(sp_str_t) staged_header_set_t;
@@ -56,58 +65,93 @@ static spn_err_t header_copy_failed(spn_pkg_unit_t* unit, sp_str_t path) {
   return SPN_ERROR;
 }
 
-static spn_err_t publish_target_headers(spn_pkg_unit_t* unit, sp_str_t root, spn_target_map_t targets, spn_publish_t publish, sp_mem_t mem, staged_header_set_t* staged) {
+typedef struct {
+  sp_str_t from;
+  sp_str_t to;
+  sp_str_t name;
+} staged_header_t;
+
+static spn_err_t stage_target_headers(spn_pkg_unit_t* unit, sp_str_t root, spn_target_map_t targets, sp_mem_t mem, staged_header_set_t* seen, sp_da(staged_header_t)* staged) {
+  const spn_path_roots_t* roots = &spn.roots;
   sp_om_for(targets, it) {
     spn_target_info_t* target = sp_str_om_at(targets, it);
 
     sp_da_for(target->headers, ht) {
-      spn_tree_path_t header = target->headers[ht];
+      spn_path_t header = target->headers[ht];
 
-      sp_str_t from = spn_tree_path_resolve(mem, unit->paths.roots, header);
-      sp_str_t to = sp_fs_join_path(mem, root, header.path);
+      sp_str_t sub = spn_tree_rel(unit->paths.roots, header).sub;
+      sp_str_t from = spn_path_str(roots, mem, header);
+      sp_str_t to = sp_fs_join_path(mem, root, sub);
 
-      sp_str_t* seen = sp_str_ht_get(*staged, to);
-      if (seen) {
-        if (!sp_str_equal(*seen, from)) {
-          return header_collision(unit, header.path, *seen, from);
+      sp_str_t* first = sp_str_ht_get(*seen, to);
+      if (first) {
+        if (!sp_str_equal(*first, from)) {
+          return header_collision(unit, sub, *first, from);
         }
         continue;
       }
-      sp_str_ht_insert(*staged, to, from);
-
-      if (publish == SPN_PUBLISH_EXISTING && !sp_fs_exists(from)) {
-        continue;
-      }
-      sp_fs_create_dir(sp_fs_parent_path(to));
-      if (spn_fs_update_file(from, to)) {
-        return header_copy_failed(unit, header.path);
-      }
+      sp_str_ht_insert(*seen, to, from);
+      sp_da_push(*staged, ((staged_header_t) { .from = from, .to = to, .name = sub }));
     }
   }
 
   return SPN_OK;
 }
 
-spn_err_t spn_pkg_unit_publish_headers(spn_pkg_unit_t* unit, sp_str_t root, spn_publish_t publish) {
-  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  staged_header_set_t staged;
-  sp_str_ht_init(scratch.mem, staged);
+static spn_err_t stage_headers(spn_pkg_unit_t* unit, sp_str_t root, sp_mem_t mem, sp_da(staged_header_t)* staged) {
+  staged_header_set_t seen;
+  sp_str_ht_init(mem, seen);
 
-  spn_err_t err = SPN_OK;
   spn_pkg_unit_header_maps_t published = spn_pkg_unit_header_maps(unit);
   sp_for(it, published.count) {
-    err = publish_target_headers(unit, root, published.maps[it], publish, scratch.mem, &staged);
+    spn_try(stage_target_headers(unit, root, published.maps[it], mem, &seen, staged));
+  }
+  return SPN_OK;
+}
+
+static spn_err_t copy_header(spn_pkg_unit_t* unit, const staged_header_t* header) {
+  sp_fs_create_dir(sp_fs_parent_path(header->to));
+  if (spn_fs_update_file(header->from, header->to)) {
+    return header_copy_failed(unit, header->name);
+  }
+  return SPN_OK;
+}
+
+spn_err_t spn_pkg_unit_publish_headers(spn_pkg_unit_t* unit, sp_str_t root) {
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_da(staged_header_t) staged = sp_da_new(scratch.mem, staged_header_t);
+  spn_err_t err = stage_headers(unit, root, scratch.mem, &staged);
+  sp_da_for(staged, it) {
     if (err) {
       break;
     }
+    err = copy_header(unit, &staged[it]);
   }
-
   sp_mem_end_scratch(scratch);
   return err;
 }
 
-void spn_pkg_unit_write_stamp(spn_pkg_unit_t* unit, sp_str_t path) {
-  sp_fs_create_file_str(path, unit->info->name);
+spn_err_t spn_pkg_unit_publish_existing_headers(spn_pkg_unit_t* unit, sp_str_t root) {
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_da(staged_header_t) staged = sp_da_new(scratch.mem, staged_header_t);
+  spn_err_t err = stage_headers(unit, root, scratch.mem, &staged);
+  sp_da_for(staged, it) {
+    if (err) {
+      break;
+    }
+    if (!sp_fs_exists(staged[it].from)) {
+      continue;
+    }
+    err = copy_header(unit, &staged[it]);
+  }
+  sp_mem_end_scratch(scratch);
+  return err;
+}
+
+void spn_pkg_unit_write_stamp(spn_pkg_unit_t* unit, spn_path_t path) {
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+  sp_fs_create_file_str(spn_path_str(&spn.roots, s.mem, path), unit->info->name);
+  sp_mem_end_scratch(s);
 }
 
 // @spader I think this is wrong; it's called in four places and deduplicated with an atomic,

@@ -121,10 +121,10 @@ sp_hash_t spn_unit_fingerprint(spn_session_t* session, spn_build_unit_t* build, 
   fingerprint.abi = build->profile.abi;
   fingerprint.platform = spn_pkg_hash_platform(pkg, &build->profile);
   fingerprint.toolchain.name = sp_hash_str(toolchain->name);
-  fingerprint.toolchain.cc = sp_hash_str(toolchain->compiler.program);
-  fingerprint.toolchain.ld = sp_hash_str(toolchain->linker.program);
-  fingerprint.toolchain.ar = sp_hash_str(toolchain->archiver.program);
-  fingerprint.toolchain.cxx = sp_hash_str(toolchain->cxx.program);
+  fingerprint.toolchain.cc = sp_hash_str(toolchain->compiler.program.prefix);
+  fingerprint.toolchain.ld = sp_hash_str(toolchain->linker.program.prefix);
+  fingerprint.toolchain.ar = sp_hash_str(toolchain->archiver.program.prefix);
+  fingerprint.toolchain.cxx = sp_hash_str(toolchain->cxx.program.prefix);
   fingerprint.toolchain.identity = build->toolchain->identity;
   if (!sp_opt_is_null(build->toolchain->artifact)) {
     fingerprint.toolchain.url = sp_hash_str(sp_opt_get(build->toolchain->artifact).sha256);

@@ -19,10 +19,6 @@ typedef struct {
   spn_pkg_source_t source;
   spn_pkg_info_t* info;
   spn_tree_roots_t roots;
-  struct {
-    sp_str_t manifest;
-    sp_str_t script;
-  } paths;
   spn_target_info_t configure;
   spn_target_info_t build;
   u64 elapsed;
@@ -62,8 +58,8 @@ struct spn_session_t {
   } units;
 
   struct {
-    sp_str_t root;
-    sp_str_t build;
+    spn_path_t root;
+    spn_path_t build;
   } paths;
 
   struct {

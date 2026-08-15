@@ -182,22 +182,22 @@ static const plan_test_t tests [] = {
   },
 };
 
-static spn_target_info_t target_info(sp_mem_t mem, const plan_target_t* spec) {
+static spn_target_info_t target_info(sp_mem_t mem, spn_tree_roots_t trees, const plan_target_t* spec) {
   spn_target_info_t info = sp_zero;
   info.name = sp_str_lit("app");
   info.kind = spec->kind;
   info.linkages = spec->linkages;
-  info.source = test_tree_path_list(mem, spec->source, UNIT_TEST_MAX_STRS);
+  info.source = test_path_list(mem, trees, spec->source, UNIT_TEST_MAX_STRS);
   info.deps = test_str_list(mem, spec->deps, UNIT_TEST_MAX_STRS);
   info.macos.frameworks = test_str_list(mem, spec->frameworks, UNIT_TEST_MAX_STRS);
   info.macos.min_os = spec->min_os;
   return info;
 }
 
-static sp_err_t expect_str_suffixes(sp_test_t* t, sp_da(sp_str_t) actual, const c8* const* expect, u32 count) {
+static sp_err_t expect_path_suffixes(sp_test_t* t, sp_da(spn_path_t) actual, const c8* const* expect, u32 count) {
   sp_must_eq(t, count, sp_da_size(actual));
   sp_for(it, count) {
-    sp_expect(t, sp_str_ends_with(actual[it], sp_str_view(expect[it])));
+    sp_expect(t, sp_str_ends_with(actual[it].sub, sp_str_view(expect[it])));
   }
   return SP_OK;
 }
@@ -206,7 +206,8 @@ sp_test_each(link_plan, plan, plan_test_t, tests, .setup = spn_test_ctx_setup) {
   sp_mem_t mem = sp_test_arena(t);
   spn_session_t* s = build_session(mem, &it->graph);
 
-  spn_target_info_t target = target_info(mem, &it->target);
+  spn_loaded_pkg_t* loaded = sp_ht_getp(s->packages, find_pkg_id(s, &it->graph, it->graph.pkgs[0].name));
+  spn_target_info_t target = target_info(mem, loaded->roots, &it->target);
   switch (it->target.kind) {
     case SPN_TARGET_KIND_LIB:  sp_str_om_insert(s->pkg->libs, target.name, target); break;
     case SPN_TARGET_KIND_TEST: sp_str_om_insert(s->pkg->tests, target.name, target); break;
@@ -225,7 +226,7 @@ sp_test_each(link_plan, plan, plan_test_t, tests, .setup = spn_test_ctx_setup) {
   sp_must_strs_eq(t, plan->cc.libs, sp_da_size(plan->cc.libs), it->expect.libs);
   u32 num_whole_archives = 0;
   sp_carr_detect_len(it->expect.whole_archives, num_whole_archives, it->expect.whole_archives[num_whole_archives]);
-  sp_try(expect_str_suffixes(t, plan->cc.whole_archives, it->expect.whole_archives, num_whole_archives));
+  sp_try(expect_path_suffixes(t, plan->archives, it->expect.whole_archives, num_whole_archives));
   sp_must_strs_eq(t, plan->cc.private_libs, sp_da_size(plan->cc.private_libs), it->expect.private_libs);
   sp_must_strs_eq(t, plan->cc.system_libs, sp_da_size(plan->cc.system_libs), it->expect.system_libs);
   sp_must_strs_eq(t, plan->cc.frameworks, sp_da_size(plan->cc.frameworks), it->expect.frameworks);

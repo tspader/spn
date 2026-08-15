@@ -161,7 +161,7 @@ static const compile_test_t tests [] = {
       .arch = SPN_ARCH_ARM64,
       .os = SPN_OS_MACOS,
       .standard = SPN_C99,
-      .sysroot = sp_str_lit("/sdk"),
+      .sysroot = { .sub = sp_str_lit("/sdk") },
     },
     .min_os = { 13 },
     .expect = {
@@ -252,7 +252,7 @@ static const compile_test_t tests [] = {
       .os = SPN_OS_LINUX,
       .abi = SPN_ABI_GNU,
       .standard = SPN_C99,
-      .sysroot = sp_str_lit("/sdk"),
+      .sysroot = { .sub = sp_str_lit("/sdk") },
     },
     .min_os = { 13 },
     .expect = {
@@ -278,7 +278,7 @@ sp_test_each(render_compile, render, compile_test_t, tests, .setup = spn_test_ct
     sp_da_push(compile.args, sp_str_from_cstr(mem, it->arg));
   }
   if (it->include) {
-    sp_da_push(compile.include, sp_str_from_cstr(mem, it->include));
+    sp_da_push(compile.include, test_arg_path(it->include));
   }
   if (it->define) {
     sp_da_push(compile.define, sp_str_from_cstr(mem, it->define));
@@ -296,9 +296,9 @@ sp_test_each(render_compile, render, compile_test_t, tests, .setup = spn_test_ct
   }
 
   spn_cc_compile_files_t files = {
-    .source = sp_str_lit("main.c"),
-    .output = sp_str_lit("main.o"),
-    .depfile = it->depfile ? sp_str_from_cstr(mem, it->depfile) : sp_str_lit(""),
+    .source = test_arg_path("main.c"),
+    .output = test_arg_path("main.o"),
+    .depfile = it->depfile ? test_arg_path(it->depfile) : sp_zero_s(spn_path_t),
   };
   spn_invocation_t invocation = spn_cc_render_compile_command(mem, &toolchain, &base, &files);
   return expect_args(t, &invocation, it->expect);
@@ -326,13 +326,13 @@ sp_test(render_compile, base_shared_across_commands, .setup = spn_test_ctx_setup
   u64 args = sp_da_size(base.args);
 
   spn_cc_compile_files_t first = {
-    .source = sp_str_lit("main.c"),
-    .output = sp_str_lit("a.o"),
+    .source = test_arg_path("main.c"),
+    .output = test_arg_path("a.o"),
   };
   spn_cc_compile_files_t second = {
-    .source = sp_str_lit("main.c"),
-    .output = sp_str_lit("b.o"),
-    .depfile = sp_str_lit("b.o.d"),
+    .source = test_arg_path("main.c"),
+    .output = test_arg_path("b.o"),
+    .depfile = test_arg_path("b.o.d"),
   };
   spn_invocation_t a = spn_cc_render_compile_command(mem, &toolchain, &base, &first);
   spn_invocation_t b = spn_cc_render_compile_command(mem, &toolchain, &base, &second);

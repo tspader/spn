@@ -1,5 +1,6 @@
 #include "fuzz.h"
 #include "sp_sim.h"
+#include "paths/paths.h"
 #include "sp/io.h"
 
 typedef struct {
@@ -14,9 +15,9 @@ typedef struct {
   spn_dag_file_cache_t files;
   spn_dag_action_cache_t cache;
   spn_dag_obs_table_t discovery;
-  spn_dag_roots_t roots;
   sp_str_t disco_dir;
   sp_str_t cache_dir;
+  spn_path_roots_t roots;
   spn_dag_env_t env;
   fz_executor_t ex;
   sp_ht(spn_dag_digest_t, fz_cached_t) mirror;
@@ -118,7 +119,7 @@ static u64 fz_action_requeues(fz_universe_t* u, fz_world_t* w, sp_mem_t mem, u64
 }
 
 static void reset_discovery(fz_world_t* w) {
-  spn_dag_obs_table_init(&w->discovery, w->mem, w->disco_dir, &w->roots);
+  spn_dag_obs_table_init(&w->discovery, w->mem, w->disco_dir);
   if (sp_str_empty(w->disco_dir)) {
     sp_ht_clear(w->pathsets);
   }
@@ -128,9 +129,10 @@ static void reboot_world(fz_world_t* w, fz_universe_t* u) {
   spn_dag_store_init(&w->store, (spn_dag_store_config_t) {
     .kind = u->profile.store_fs ? SPN_DAG_STORE_FILESYSTEM : SPN_DAG_STORE_MEM,
     .mem = w->mem,
-    .dir = sp_str_lit("/store"),
+    .roots = &w->roots,
+    .dir = { .root = SPN_PATH_ROOT_NONE, .sub = sp_str_lit("/store") },
   });
-  spn_dag_file_cache_init(&w->files, w->mem);
+  spn_dag_file_cache_init(&w->files, w->mem, &w->roots);
   spn_dag_action_cache_init(&w->cache, w->mem, w->cache_dir);
   reset_discovery(w);
 
@@ -149,6 +151,7 @@ static void init_world(fz_world_t* w, sp_mem_t mem, sp_sim_t* sim, fz_universe_t
 
   w->mem = mem;
   w->sim = sim;
+  fz_roots_init(&w->roots);
   w->cache_dir = u->profile.cache_fs ? sp_str_lit("/cache") : sp_str_lit("");
   w->disco_dir = u->profile.disco_fs ? sp_str_lit("/manifests") : sp_str_lit("");
   sp_ht_init(mem, w->mirror);
@@ -174,8 +177,7 @@ static void init_world(fz_world_t* w, sp_mem_t mem, sp_sim_t* sim, fz_universe_t
     .cache = &w->cache,
     .store = &w->store,
     .discovery = &w->discovery,
-    .roots = &w->roots,
-    .scratch = sp_str_lit("/scratch"),
+    .scratch = { .root = SPN_PATH_ROOT_NONE, .sub = sp_str_lit("/scratch") },
   };
   w->j = j;
   if (j) {
@@ -283,7 +285,7 @@ static fz_err_t fz_trace_check_run(sp_mem_t mem, fz_universe_t* u, fz_world_t* w
   }
 
   fz_lowered_t low = sp_zero;
-  fz_lower(&low, mem, u);
+  fz_lower(&low, mem, u, &w->roots);
   low.state = &w->state;
   low.ex = &w->ex;
   low.journal = w->j;
@@ -425,9 +427,9 @@ static fz_err_t fz_trace_check_run(sp_mem_t mem, fz_universe_t* u, fz_world_t* w
       }
     }
     spn_dag_digest_t want = spn_dag_digest(disk_bytes[id].data, disk_bytes[id].len);
-    sp_str_t blob = spn_dag_store_path(&w->store, mem, want, path);
+    spn_path_t blob = spn_dag_store_path(&w->store, mem, want, path);
     sp_str_t blob_bytes = sp_zero;
-    bool blob_read = !sp_str_empty(blob) && !sp_io_read_file(mem, blob, &blob_bytes);
+    bool blob_read = !spn_path_empty(blob) && !sp_io_read_file(mem, spn_path_str(&w->roots, mem, blob), &blob_bytes);
     fz_journal_blob(w->j, id, disk_bytes[id], blob_read ? blob_bytes : sp_str_lit("missing"));
   }
 
@@ -462,7 +464,7 @@ static fz_err_t fz_trace_body(sp_mem_t mem, sp_sim_t* sim, fz_universe_t* u, fz_
 
   if (u->cyclic || u->obs_cyclic) {
     fz_lowered_t low = sp_zero;
-    fz_lower(&low, mem, u);
+    fz_lower(&low, mem, u, &w.roots);
     low.state = &w.state;
     low.ex = &w.ex;
     low.journal = w.j;

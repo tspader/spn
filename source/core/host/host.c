@@ -4,6 +4,7 @@
 #include "ctx/types.h"
 #include "index/index.h"
 #include "index/types.h"
+#include "paths/paths.h"
 
 static spn_index_desc_t describe_index(spn_index_info_t* index) {
   return (spn_index_desc_t) {
@@ -21,6 +22,13 @@ sp_str_t spn_ctx_project_dir(spn_ctx_t* ctx) {
 
 sp_str_t spn_ctx_cache_dir(spn_ctx_t* ctx) {
   return ctx->paths.caches.dir;
+}
+
+spn_path_t spn_ctx_collapse_path(spn_ctx_t* ctx, sp_str_t path) {
+  if (!sp_fs_is_absolute(path) || !spn_path_normal(path)) {
+    return (spn_path_t) { .sub = path };
+  }
+  return spn_path_make(&ctx->roots, path);
 }
 
 spn_index_arr_t spn_get_indexes(sp_mem_t mem, spn_ctx_t* ctx) {

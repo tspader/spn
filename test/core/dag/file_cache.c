@@ -102,11 +102,9 @@ static const file_cache_test_t file_cache_tests [] = {
 };
 
 sp_test_each(dag_file_cache, ops, file_cache_test_t, file_cache_tests) {
-  sp_mem_t mem = sp_test_arena(t);
-  sp_str_t root = sp_test_dir(t);
-
-  spn_dag_file_cache_t c = sp_zero;
-  spn_dag_file_cache_init(&c, mem);
+  dag_test_env_t env;
+  dag_test_env_init(&env, t, (dag_test_env_config_t) sp_zero);
+  spn_dag_file_cache_t* c = &env.files;
 
   sp_carr_for(it->ops, ot) {
     file_cache_op_t op = it->ops[ot];
@@ -114,34 +112,36 @@ sp_test_each(dag_file_cache, ops, file_cache_test_t, file_cache_tests) {
       break;
     }
 
+    spn_path_t path = dag_test_env_rooted(&env, sp_cstr_as_str(op.path));
+
     switch (op.kind) {
       case FILE_CACHE_OP_DONE: {
         break;
       }
       case FILE_CACHE_OP_FILE: {
-        dag_test_create(sp_fs_join_path(mem, root, sp_cstr_as_str(op.path)), sp_cstr_as_str(op.blob));
-        spn_dag_file_cache_invalidate_all(&c);
+        dag_test_create(dag_test_render(&env, path), sp_cstr_as_str(op.blob));
+        spn_dag_file_cache_invalidate_all(c);
         break;
       }
       case FILE_CACHE_OP_WRITE: {
-        dag_test_create(sp_fs_join_path(mem, root, sp_cstr_as_str(op.path)), sp_cstr_as_str(op.blob));
+        dag_test_create(dag_test_render(&env, path), sp_cstr_as_str(op.blob));
         break;
       }
       case FILE_CACHE_OP_REFRESH: {
-        spn_dag_file_cache_invalidate_all(&c);
+        spn_dag_file_cache_invalidate_all(c);
         break;
       }
       case FILE_CACHE_OP_INVALIDATE: {
-        spn_dag_file_cache_invalidate(&c, sp_fs_join_path(mem, root, sp_cstr_as_str(op.path)));
+        spn_dag_file_cache_invalidate(c, path);
         break;
       }
       case FILE_CACHE_OP_INVALIDATE_DIR: {
-        spn_dag_file_cache_invalidate_dir(&c, sp_fs_join_path(mem, root, sp_cstr_as_str(op.path)));
+        spn_dag_file_cache_invalidate_dir(c, path);
         break;
       }
       case FILE_CACHE_OP_DIGEST: {
         spn_dag_digest_t digest = sp_zero;
-        sp_expect_eq(t, op.expect.err, spn_dag_file_cache_digest(&c, sp_fs_join_path(mem, root, sp_cstr_as_str(op.path)), &digest));
+        sp_expect_eq(t, op.expect.err, spn_dag_file_cache_digest(c, path, &digest));
         if (!op.expect.err) {
           sp_expect(t, spn_dag_digest_equal(digest, dag_test_digest(op.blob)));
         }
@@ -149,8 +149,8 @@ sp_test_each(dag_file_cache, ops, file_cache_test_t, file_cache_tests) {
       }
       case FILE_CACHE_OP_SEED: {
         sp_sys_file_meta_t sys = sp_zero;
-        sp_must_eq(t, SPN_OK, spn_dag_file_cache_stat(&c, sp_fs_join_path(mem, root, sp_cstr_as_str(op.path)), &sys));
-        spn_dag_file_cache_seed(&c, (spn_dag_file_meta_t) {
+        sp_must_eq(t, SPN_OK, spn_dag_file_cache_stat(c, path, &sys));
+        spn_dag_file_cache_seed(c, (spn_dag_file_meta_t) {
           .id = { .device = sys.device, .inode = sys.id },
           .mtime = sys.mtime,
           .size = sys.size,

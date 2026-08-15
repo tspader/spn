@@ -36,6 +36,7 @@ set(SPN_SOURCES
   core/dag/glob.c
   core/dag/occ.c
   core/dag/wasi.c
+  core/dag/wasi/canonicalize.c
   core/enum/enum.c
   core/error/error.c
   core/error/json.c
@@ -81,6 +82,7 @@ set(SPN_SOURCES
   core/op/test.c
   core/op/scaffold.c
   core/op/publish.c
+  core/paths/paths.c
   core/pkg/id.c
   core/pkg/mutate.c
   core/pkg/patch.c

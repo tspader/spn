@@ -11,7 +11,9 @@
 #include "wasm_export.h"
 
 #include "external/wasm/abi.h"
+#include "dag/dag.h"
 #include "dag/wasi.h"
+#include "paths/paths.h"
 
 #define SPN_WASM_STACK_SIZE (8 * 1024 * 1024)
 #define SPN_WASM_HEAP_SIZE  (16 * 1024 * 1024)
@@ -94,11 +96,16 @@ static spn_err_t script_open(spn_wasm_script_t* script, spn_pkg_unit_t* unit) {
   }
 
   spn_pkg_unit_create_layout(unit);
+  const spn_path_roots_t* roots = &spn.roots;
+  sp_str_t work = spn_path_str(roots, spn.mem, unit->paths.work);
+  sp_str_t store = spn_path_str(roots, spn.mem, unit->paths.store);
+  sp_str_t source = spn_path_str(roots, spn.mem, unit->paths.roots.source);
+  sp_str_t manifest = spn_path_str(roots, spn.mem, unit->paths.roots.recipe);
   script->preopens = (spn_wasm_preopens_t) {
-    .work = preopen("/work", unit->paths.work),
-    .source = preopen("/source", unit->paths.roots.source),
-    .manifest = preopen("/manifest", unit->paths.roots.recipe),
-    .store = preopen("/store", unit->paths.store),
+    .work = preopen("/work", work),
+    .source = preopen("/source", source),
+    .manifest = preopen("/manifest", manifest),
+    .store = preopen("/store", store),
   };
   wasm_runtime_set_wasi_args(
     script->module,
@@ -134,12 +141,12 @@ static spn_err_t script_open(spn_wasm_script_t* script, spn_pkg_unit_t* unit) {
   wasm_runtime_set_user_data(script->env, script->handles);
 
   spn_dag_wasi_mount_t mounts [] = {
-    { .guest = "/work",     .host = unit->paths.work },
-    { .guest = "/source",   .host = unit->paths.roots.source },
-    { .guest = "/manifest", .host = unit->paths.roots.recipe },
-    { .guest = "/store",    .host = unit->paths.store },
+    { .guest = "/work",     .host = work },
+    { .guest = "/source",   .host = source },
+    { .guest = "/manifest", .host = manifest },
+    { .guest = "/store",    .host = store },
   };
-  script->wasi = spn_dag_wasi_new(spn.mem, mounts, sp_carr_len(mounts));
+  script->wasi = spn_dag_wasi_new(spn.mem, roots, mounts, sp_carr_len(mounts));
   spn_dag_wasi_bind(script->wasi, script->instance);
 
   return SPN_OK;
@@ -247,7 +254,10 @@ spn_err_t spn_wasm_script_call_ex(spn_wasm_script_t* script, spn_pkg_unit_t* uni
     if (obs.out) {
       spn_dag_wasi_begin(script->wasi, obs.mem, obs.out);
     }
+    spn_wasm_script_t* previous = unit->wasm.active;
+    unit->wasm.active = script;
     err = script_call_invoke(script, unit, fn, kind, arg);
+    unit->wasm.active = previous;
     if (obs.out) {
       spn_dag_wasi_end(script->wasi);
     }
@@ -259,6 +269,17 @@ spn_err_t spn_wasm_script_call_ex(spn_wasm_script_t* script, spn_pkg_unit_t* uni
 
 spn_err_t spn_wasm_script_call(spn_wasm_script_t* script, spn_pkg_unit_t* unit, sp_str_t name, spn_abi_kind_t kind, void* arg) {
   return spn_wasm_script_call_ex(script, unit, name, kind, arg, sp_zero_s(spn_wasm_obs_t));
+}
+
+bool spn_wasm_trap_active(spn_pkg_unit_t* unit, sp_str_t message) {
+  spn_wasm_script_t* script = unit->wasm.active;
+  if (!script) {
+    return false;
+  }
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+  wasm_runtime_set_exception(script->instance, sp_str_to_cstr(s.mem, message));
+  sp_mem_end_scratch(s);
+  return true;
 }
 
 spn_err_t spn_wasm_find_export(spn_pkg_unit_t* unit, sp_str_t name, spn_wasm_script_t** script) {

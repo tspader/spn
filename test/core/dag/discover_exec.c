@@ -162,7 +162,7 @@ static const discover_test_t discover_tests [] = {
   },
 };
 
-static spn_err_t discover_exec_on_discover(spn_dag_t* g, spn_dag_action_t* action, void* user_data, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
+static spn_err_t discover_exec_on_discover(spn_dag_t* g, spn_dag_action_t* action, void* user_data, spn_dag_env_t* dag_env, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
   discover_env_t* env = (discover_env_t*)user_data;
   if (env->run->discover_fails) {
     return SPN_ERROR;
@@ -173,7 +173,7 @@ static spn_err_t discover_exec_on_discover(spn_dag_t* g, spn_dag_action_t* actio
     }
     sp_da_push(*out, ((spn_dag_obs_t) {
       .kind = SPN_DAG_OBS_FILE,
-      .path = dag_test_env_path(&env->dag, sp_str_view(env->run->headers[it].path))
+      .path = spn_path_make(g->roots, dag_test_env_path(&env->dag, sp_str_view(env->run->headers[it].path)))
     }));
   }
   sp_carr_for(env->run->missing, it) {
@@ -182,7 +182,7 @@ static spn_err_t discover_exec_on_discover(spn_dag_t* g, spn_dag_action_t* actio
     }
     sp_da_push(*out, ((spn_dag_obs_t) {
       .kind = SPN_DAG_OBS_FILE,
-      .path = dag_test_env_path(&env->dag, sp_str_view(env->run->missing[it]))
+      .path = spn_path_make(g->roots, dag_test_env_path(&env->dag, sp_str_view(env->run->missing[it])))
     }));
   }
   sp_carr_for(env->run->probes, it) {
@@ -191,7 +191,7 @@ static spn_err_t discover_exec_on_discover(spn_dag_t* g, spn_dag_action_t* actio
     }
     sp_da_push(*out, ((spn_dag_obs_t) {
       .kind = SPN_DAG_OBS_ABSENT,
-      .path = dag_test_env_path(&env->dag, sp_str_view(env->run->probes[it]))
+      .path = spn_path_make(g->roots, dag_test_env_path(&env->dag, sp_str_view(env->run->probes[it])))
     }));
   }
   return SPN_OK;
@@ -256,7 +256,7 @@ sp_test_each(dag_discover_exec, runs, discover_test_t, discover_tests) {
       .user_data = &env
     });
     spn_dag_action_add_input(g, action, spn_dag_add_value(g, it->input, sp_cstr_len(it->input)));
-    spn_dag_id_t obj = spn_dag_add_file(g, dag_test_env_path(&env.dag, sp_str_lit("O")));
+    spn_dag_id_t obj = spn_dag_add_file(g, dag_test_env_rooted(&env.dag, sp_str_lit("O")));
     sp_must_eq(t, SPN_OK, spn_dag_action_add_output(g, action, obj));
 
     sp_sys_file_meta_t before = sp_zero;
@@ -288,7 +288,7 @@ sp_test_each(dag_discover_exec, runs, discover_test_t, discover_tests) {
       sp_str_t hints = sp_zero;
       sp_must_eq(t, SP_OK, sp_io_read_file(env.dag.mem, dag_test_env_path(&env.dag, sp_str_lit("files")), &hints));
       sp_sys_file_meta_t sys = sp_zero;
-      sp_must_eq(t, SPN_OK, spn_dag_file_cache_stat(&env.dag.files, dag_test_env_path(&env.dag, sp_str_view(run->hint_fresh)), &sys));
+      sp_must_eq(t, SPN_OK, spn_dag_file_cache_stat(&env.dag.files, dag_test_env_rooted(&env.dag, sp_str_view(run->hint_fresh)), &sys));
       sp_str_t mtime = sp_fmt(env.dag.mem, " {} {} ", sp_fmt_int((s64)sys.mtime.tv_sec), sp_fmt_int((s64)sys.mtime.tv_nsec)).value;
       sp_expect(t, sp_str_contains(hints, mtime));
     }

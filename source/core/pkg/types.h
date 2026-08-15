@@ -6,6 +6,7 @@
 #include "core/types.h"
 #include "git/types.h"
 #include "intern/types.h"
+#include "paths/types.h"
 #include "sp/macro.h"
 #include "sp/sp_om.h"
 #include "semver/types.h"
@@ -173,7 +174,7 @@ struct spn_pkg_info {
   sp_da(spn_pkg_config_entry_t) config;
   sp_da(spn_pkg_patch_t) patches;
   spn_option_map_t options;
-  sp_da(spn_tree_path_t) include;
+  sp_da(spn_path_t) include;
   sp_da(sp_str_t) define;
   sp_da(sp_str_t) public_define;
   sp_da(sp_str_t) system_deps;

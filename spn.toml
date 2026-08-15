@@ -53,16 +53,6 @@ abi = "musl"
 linkage = "shared"
 sanitize = ["address", "undefined"]
 
-[[toolchain]]
-name = "mingw"
-compiler = "x86_64-w64-mingw32-gcc"
-linker = "x86_64-w64-mingw32-ld"
-archiver = "x86_64-w64-mingw32-ar"
-driver = "gcc"
-target = [
-  { arch = "x86_64", os = "windows", abi = "mingw" }
-]
-
 [[lib]]
 name = "spn"
 kinds = ["static"]
@@ -102,6 +92,7 @@ source = [
   "test/core/manifest/gen/gen.c",
   "test/core/manifest/lower/lower.c",
   "test/core/options/*.c",
+  "test/core/paths/*.c",
   "test/core/pkg/pkg.c",
   "test/core/profile/profile.c",
   "test/core/publish/publish.c",
@@ -137,6 +128,7 @@ source = [
   "source/core/dag/run.c",
   "source/core/dag/store.c",
   "source/core/dag/wasi.c",
+  "source/core/dag/wasi/canonicalize.c",
   "source/core/enum/enum.c",
   "source/core/error/error.c",
   "source/core/error/json.c",
@@ -161,6 +153,7 @@ source = [
   "source/core/log/lazy/lazy.c",
   "source/core/graph/build.c",
   "source/core/graph/identity.c",
+  "source/core/paths/paths.c",
   "source/core/pkg/id.c",
   "source/core/pkg/load.c",
   "source/core/pkg/mutate.c",
@@ -198,7 +191,7 @@ source = [
   "test/tools/sp_sim.c",
   "test/tools/toml.c",
 ]
-include = ["include", "source/core", "source/core/codegen/gen", "source/core/external", "test/core/tools", "test/tools", "tools", "tools/gen"]
+include = ["include", "source/core", "source/core/codegen/gen", "source/core/external", "test/core", "test/core/tools", "test/tools", "tools", "tools/gen"]
 flags = [
   '-DSCHEMA_GEN_DIR="source/core/codegen/gen"',
   '-DSCHEMA_DIR="source/core/codegen/schema"',
@@ -244,6 +237,7 @@ source = [
   "source/core/index/jsonl.c",
   "source/core/index/release.c",
   "source/core/sp/io.c",
+  "source/core/paths/paths.c",
   "source/core/pkg/id.c",
   "source/core/pkg/load.c",
   "source/core/pkg/mutate.c",
@@ -287,6 +281,7 @@ source = [
   "source/core/error/json.c",
   "source/core/external/tom.c",
   "source/core/intern/intern.c",
+  "source/core/paths/paths.c",
   "source/core/sp/io.c",
   "source/core/sp/str.c",
   "source/core/triple/triple.c",
@@ -316,6 +311,7 @@ source = [
   "source/core/sp/fs.c",
   "source/core/sp/io.c",
   "source/core/intern/intern.c",
+  "source/core/paths/paths.c",
   "test/fuzz/dag/main.c",
   "test/fuzz/dag/cli.c",
   "test/fuzz/dag/generator.c",
@@ -367,6 +363,7 @@ source = [
   "source/core/index/jsonl.c",
   "source/core/index/release.c",
   "source/core/sp/io.c",
+  "source/core/paths/paths.c",
   "source/core/pkg/id.c",
   "source/core/pkg/load.c",
   "source/core/pkg/mutate.c",

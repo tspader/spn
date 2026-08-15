@@ -1,5 +1,6 @@
 #include "pkg/options.h"
 
+#include "paths/paths.h"
 #include "resolve/types.h"
 #include "when/when.h"
 
@@ -226,48 +227,63 @@ void spn_pkg_options_env(
   spn_when_env_add_options(env, &merged.options);
 }
 
-static void apply_gated(sp_da(sp_str_t)* plain, spn_gated_list_t gated, spn_when_env_t* env) {
+typedef struct {
+  sp_mem_t mem;
+  const spn_path_roots_t* roots;
+  spn_tree_roots_t trees;
+  spn_when_env_t* env;
+} apply_ctx_t;
+
+static void apply_gated(apply_ctx_t* ctx, sp_da(sp_str_t)* plain, spn_gated_list_t gated) {
   sp_da_for(gated, it) {
-    if (!spn_when_eval(&gated[it].when, env)) {
+    if (!spn_when_eval(&gated[it].when, ctx->env)) {
       continue;
     }
     sp_da_push(*plain, gated[it].value);
   }
 }
 
-static void apply_gated_paths(sp_da(spn_tree_path_t)* plain, spn_gated_path_list_t gated, spn_when_env_t* env) {
+static void apply_gated_paths(apply_ctx_t* ctx, sp_da(spn_path_t)* plain, spn_gated_path_list_t gated) {
   sp_da_for(gated, it) {
-    if (!spn_when_eval(&gated[it].when, env)) {
+    if (!spn_when_eval(&gated[it].when, ctx->env)) {
       continue;
     }
-    sp_da_push(*plain, ((spn_tree_path_t) { .path = gated[it].path, .tree = gated[it].tree }));
+    spn_path_t path = spn_tree_path(ctx->mem, ctx->roots, ctx->trees, gated[it].tree, gated[it].path);
+    sp_da_push(*plain, spn_path_canonicalize(ctx->mem, ctx->roots, path));
   }
 }
 
-static void apply_target(spn_target_info_t* target, spn_when_env_t* env) {
-  apply_gated_paths(&target->source, target->gated.source, env);
-  apply_gated_paths(&target->headers, target->gated.headers, env);
-  apply_gated_paths(&target->include, target->gated.include, env);
-  apply_gated(&target->define, target->gated.define, env);
-  apply_gated(&target->flags, target->gated.flags, env);
-  apply_gated(&target->system_deps, target->gated.system_deps, env);
-  apply_gated(&target->deps, target->gated.deps, env);
+static void apply_target(apply_ctx_t* ctx, spn_target_info_t* target) {
+  apply_gated_paths(ctx, &target->source, target->gated.source);
+  apply_gated_paths(ctx, &target->headers, target->gated.headers);
+  apply_gated_paths(ctx, &target->include, target->gated.include);
+  apply_gated(ctx, &target->define, target->gated.define);
+  apply_gated(ctx, &target->flags, target->gated.flags);
+  apply_gated(ctx, &target->system_deps, target->gated.system_deps);
+  apply_gated(ctx, &target->deps, target->gated.deps);
 }
 
-void spn_pkg_apply_options(spn_pkg_info_t* info, spn_when_env_t* env) {
+void spn_pkg_apply_options(
+  sp_mem_t mem,
+  spn_pkg_info_t* info,
+  const spn_path_roots_t* roots,
+  spn_tree_roots_t trees,
+  spn_when_env_t* env
+) {
   if (info->applied) {
     return;
   }
   info->applied = true;
 
-  sp_str_om_for(info->libs, it) apply_target(sp_str_om_at(info->libs, it), env);
-  sp_str_om_for(info->exes, it) apply_target(sp_str_om_at(info->exes, it), env);
-  sp_str_om_for(info->scripts, it) apply_target(sp_str_om_at(info->scripts, it), env);
-  sp_str_om_for(info->tests, it) apply_target(sp_str_om_at(info->tests, it), env);
-  sp_str_om_for(info->examples, it) apply_target(sp_str_om_at(info->examples, it), env);
+  apply_ctx_t ctx = { .mem = mem, .roots = roots, .trees = trees, .env = env };
+  sp_str_om_for(info->libs, it) apply_target(&ctx, sp_str_om_at(info->libs, it));
+  sp_str_om_for(info->exes, it) apply_target(&ctx, sp_str_om_at(info->exes, it));
+  sp_str_om_for(info->scripts, it) apply_target(&ctx, sp_str_om_at(info->scripts, it));
+  sp_str_om_for(info->tests, it) apply_target(&ctx, sp_str_om_at(info->tests, it));
+  sp_str_om_for(info->examples, it) apply_target(&ctx, sp_str_om_at(info->examples, it));
 
-  apply_gated(&info->system_deps, info->gated.system_deps, env);
-  apply_gated_paths(&info->include, info->gated.include, env);
+  apply_gated(&ctx, &info->system_deps, info->gated.system_deps);
+  apply_gated_paths(&ctx, &info->include, info->gated.include);
 
   sp_str_om_for(info->options, it) {
     spn_option_info_t* option = sp_str_om_at(info->options, it);

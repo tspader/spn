@@ -1,5 +1,6 @@
 #include "dag/dag.h"
 #include "dag/types.h"
+#include "paths/paths.h"
 #include "sp.h"
 #include "spn/core.h"
 #include "sp/io.h"
@@ -178,14 +179,13 @@ static bool parse_outputs(sp_str_t content, sp_da(spn_dag_action_output_t)* outp
   return true;
 }
 
-static spn_err_t write_obs_row(sp_io_writer_t* io, const spn_dag_roots_t* roots, const spn_dag_obs_t* obs) {
-  spn_dag_prefixed_t prefixed = spn_dag_root_collapse(roots, obs->path);
-  if (sp_str_contains(prefixed.sub, sp_str_lit("\n"))) {
+static spn_err_t write_obs_row(sp_io_writer_t* io, const spn_dag_obs_t* obs) {
+  if (sp_str_contains(obs->path.sub, sp_str_lit("\n"))) {
     return SPN_ERR_DAG_STORE_WRITE;
   }
   if (sp_fmt_io(io, "{} {} ",
     sp_fmt_str(format_obs_kind(obs->kind)),
-    sp_fmt_uint(prefixed.root)
+    sp_fmt_uint(obs->path.root)
   )) {
     return SPN_ERR_DAG_STORE_WRITE;
   }
@@ -193,46 +193,45 @@ static spn_err_t write_obs_row(sp_io_writer_t* io, const spn_dag_roots_t* roots,
     spn_try(write_row_str(io, obs->filter));
     spn_try(write_bytes(io, " ", 1));
   }
-  spn_try(write_bytes(io, prefixed.sub.data, prefixed.sub.len));
+  spn_try(write_bytes(io, obs->path.sub.data, obs->path.sub.len));
   return write_bytes(io, "\n", 1);
 }
 
-static bool parse_obs_row(sp_str_t* cursor, const spn_dag_roots_t* roots, sp_mem_t mem, spn_dag_obs_t* out) {
+static bool parse_obs_row(sp_str_t* cursor, spn_dag_obs_t* out) {
   sp_str_t kind = sp_zero;
   u64 root = 0;
   sp_str_t sub = sp_zero;
   if (!row_word(cursor, &kind) || !parse_obs_kind(kind, &out->kind)) return false;
   if (!row_lit(cursor, ' ')) return false;
-  if (!row_u64(cursor, &root) || root >= SPN_DAG_ROOT_COUNT) return false;
+  if (!row_u64(cursor, &root) || root >= SPN_PATH_ROOT_COUNT) return false;
   if (!row_lit(cursor, ' ')) return false;
   if (out->kind == SPN_DAG_OBS_ENUMERATION) {
     if (!row_str(cursor, &out->filter)) return false;
     if (!row_lit(cursor, ' ')) return false;
   }
   if (!row_line(cursor, &sub)) return false;
+  if (root == SPN_PATH_ROOT_NONE && !sp_fs_is_absolute(sub)) return false;
 
-  spn_dag_prefixed_t prefixed = { .root = (spn_dag_root_t)root, .sub = sub };
-  if (!spn_dag_root_expand(roots, prefixed, mem, &out->path)) return false;
-  if (sp_str_empty(out->path)) return false;
+  out->path = (spn_path_t) { .root = (spn_path_root_t)root, .sub = sub };
   return true;
 }
 
-static spn_err_t write_obs(sp_io_writer_t* io, const spn_dag_roots_t* roots, const spn_dag_obs_t* obs, u64 count) {
-  spn_try(write_header(io, '3'));
+static spn_err_t write_obs(sp_io_writer_t* io, const spn_dag_obs_t* obs, u64 count) {
+  spn_try(write_header(io, '5'));
   sp_for(it, count) {
-    spn_try(write_obs_row(io, roots, obs + it));
+    spn_try(write_obs_row(io, obs + it));
   }
   return SPN_OK;
 }
 
-static bool parse_obs(sp_str_t content, const spn_dag_roots_t* roots, sp_mem_t mem, sp_da(spn_dag_obs_t)* set) {
+static bool parse_obs(sp_str_t content, sp_da(spn_dag_obs_t)* set) {
   sp_str_t cursor = content;
-  if (!row_header(&cursor, '3')) {
+  if (!row_header(&cursor, '5')) {
     return false;
   }
   while (cursor.len) {
     spn_dag_obs_t obs = sp_zero;
-    if (!parse_obs_row(&cursor, roots, mem, &obs)) {
+    if (!parse_obs_row(&cursor, &obs)) {
       return false;
     }
     sp_da_push(*set, obs);
@@ -276,7 +275,7 @@ static bool load_obs(spn_dag_obs_table_t* d, spn_dag_digest_t key, sp_da(spn_dag
   sp_str_t content = sp_zero;
   bool ok = false;
   if (!sp_io_read_file(d->mem, path, &content)) {
-    ok = parse_obs(content, d->roots, d->mem, set);
+    ok = parse_obs(content, set);
     if (!ok) {
       sp_fs_remove_file(path);
     }
@@ -291,7 +290,7 @@ static void save_obs(spn_dag_obs_table_t* d, spn_dag_digest_t key, const spn_dag
 
   sp_io_dyn_mem_writer_t sink = sp_zero;
   sp_io_dyn_mem_writer_init(s.mem, &sink);
-  if (!write_obs(&sink.base, d->roots, obs, count)) {
+  if (!write_obs(&sink.base, obs, count)) {
     sp_fs_write_atomic(entry_path(d->dir, s.mem, key), sp_io_dyn_mem_writer_as_str(&sink));
     if (d->stats) {
       sp_atomic_u32_add(&d->stats->cache_writes, 1, SP_ATOMIC_RELAXED);
@@ -386,11 +385,10 @@ bool spn_dag_action_cache_remove(spn_dag_action_cache_t* c, spn_dag_digest_t key
   return removed;
 }
 
-void spn_dag_obs_table_init(spn_dag_obs_table_t* d, sp_mem_t mem, sp_str_t dir, const spn_dag_roots_t* roots) {
+void spn_dag_obs_table_init(spn_dag_obs_table_t* d, sp_mem_t mem, sp_str_t dir) {
   d->arena = sp_mem_arena_new(mem);
   d->mem = sp_mem_arena_as_allocator(d->arena);
   d->dir = sp_str_copy(d->mem, dir);
-  d->roots = roots;
   sp_ht_init(d->mem, d->entries);
 
   if (!sp_str_empty(d->dir)) {
@@ -398,11 +396,23 @@ void spn_dag_obs_table_init(spn_dag_obs_table_t* d, sp_mem_t mem, sp_str_t dir, 
   }
 }
 
-bool spn_dag_obs_table_get(spn_dag_obs_table_t* d, spn_dag_digest_t weak, spn_dag_pathset_t* out) {
+static spn_dag_pathset_t copy_pathset(sp_mem_t mem, spn_dag_pathset_t set) {
+  spn_dag_pathset_t copy = sp_zero;
+  sp_da_init(mem, copy.obs);
+  sp_da_for(set.obs, it) {
+    spn_dag_obs_t obs = set.obs[it];
+    obs.path.sub = sp_str_copy(mem, set.obs[it].path.sub);
+    obs.filter = sp_str_copy(mem, set.obs[it].filter);
+    sp_da_push(copy.obs, obs);
+  }
+  return copy;
+}
+
+bool spn_dag_obs_table_get(spn_dag_obs_table_t* d, spn_dag_digest_t weak, sp_mem_t mem, spn_dag_pathset_t* set) {
   sp_mutex_lock(&d->mutex);
   spn_dag_pathset_t* cached = sp_ht_getp(d->entries, weak);
   if (cached) {
-    *out = *cached;
+    *set = copy_pathset(mem, *cached);
     sp_mutex_unlock(&d->mutex);
     return true;
   }
@@ -412,19 +422,19 @@ bool spn_dag_obs_table_get(spn_dag_obs_table_t* d, spn_dag_digest_t weak, spn_da
     return false;
   }
 
-  spn_dag_pathset_t set = sp_zero;
-  sp_da_init(d->mem, set.obs);
-  if (!load_obs(d, weak, &set.obs)) {
+  spn_dag_pathset_t loaded = sp_zero;
+  sp_da_init(d->mem, loaded.obs);
+  if (!load_obs(d, weak, &loaded.obs)) {
     sp_mutex_unlock(&d->mutex);
     return false;
   }
   if (d->stats) {
     sp_atomic_u32_add(&d->stats->cache_reads, 1, SP_ATOMIC_RELAXED);
-    sp_atomic_u32_add(&d->stats->obs_rows, (u32)sp_da_size(set.obs), SP_ATOMIC_RELAXED);
+    sp_atomic_u32_add(&d->stats->obs_rows, (u32)sp_da_size(loaded.obs), SP_ATOMIC_RELAXED);
   }
 
-  sp_ht_insert(d->entries, weak, set);
-  *out = set;
+  sp_ht_insert(d->entries, weak, loaded);
+  *set = copy_pathset(mem, loaded);
   sp_mutex_unlock(&d->mutex);
   return true;
 }
@@ -435,7 +445,7 @@ void spn_dag_obs_table_put(spn_dag_obs_table_t* d, spn_dag_digest_t weak, const 
   sp_da_init(d->mem, set.obs);
   sp_for(it, count) {
     spn_dag_obs_t copy = obs[it];
-    copy.path = sp_str_copy(d->mem, obs[it].path);
+    copy.path.sub = sp_str_copy(d->mem, obs[it].path.sub);
     copy.filter = sp_str_copy(d->mem, obs[it].filter);
     sp_da_push(set.obs, copy);
   }
@@ -447,22 +457,22 @@ void spn_dag_obs_table_put(spn_dag_obs_table_t* d, spn_dag_digest_t weak, const 
   sp_mutex_unlock(&d->mutex);
 }
 
-static spn_err_t write_hint_row(sp_io_writer_t* io, sp_mem_t mem, spn_dag_prefixed_t prefixed, const spn_dag_file_meta_t* meta) {
+static spn_err_t write_hint_row(sp_io_writer_t* io, sp_mem_t mem, spn_path_t path, const spn_dag_file_meta_t* meta) {
   if (sp_fmt_io(io, "{} {} {} {} {} {} ",
     sp_fmt_uint(meta->id.inode),
     sp_fmt_int((s64)meta->mtime.tv_sec),
     sp_fmt_int((s64)meta->mtime.tv_nsec),
     sp_fmt_int(meta->size),
     sp_fmt_str(spn_dag_digest_hex(mem, meta->digest)),
-    sp_fmt_uint(prefixed.root)
+    sp_fmt_uint(path.root)
   )) {
     return SPN_ERR_DAG_STORE_WRITE;
   }
-  spn_try(write_bytes(io, prefixed.sub.data, prefixed.sub.len));
+  spn_try(write_bytes(io, path.sub.data, path.sub.len));
   return write_bytes(io, "\n", 1);
 }
 
-static bool parse_hint_row(sp_str_t* cursor, const spn_dag_roots_t* roots, sp_mem_t mem, sp_str_t* path, spn_dag_file_meta_t* meta) {
+static bool parse_hint_row(sp_str_t* cursor, spn_path_t* path, spn_dag_file_meta_t* meta) {
   s64 mtime_s = 0;
   s64 mtime_ns = 0;
   u64 root = 0;
@@ -477,20 +487,19 @@ static bool parse_hint_row(sp_str_t* cursor, const spn_dag_roots_t* roots, sp_me
   if (!row_lit(cursor, ' ')) return false;
   if (!row_digest(cursor, &meta->digest)) return false;
   if (!row_lit(cursor, ' ')) return false;
-  if (!row_u64(cursor, &root) || root >= SPN_DAG_ROOT_COUNT) return false;
+  if (!row_u64(cursor, &root) || root >= SPN_PATH_ROOT_COUNT) return false;
   if (!row_lit(cursor, ' ')) return false;
   if (!row_line(cursor, &sub)) return false;
+  if (root == SPN_PATH_ROOT_NONE && !sp_fs_is_absolute(sub)) return false;
 
-  spn_dag_prefixed_t prefixed = { .root = (spn_dag_root_t)root, .sub = sub };
-  if (!spn_dag_root_expand(roots, prefixed, mem, path)) return false;
-  if (sp_str_empty(*path)) return false;
+  *path = (spn_path_t) { .root = (spn_path_root_t)root, .sub = sub };
 
   meta->mtime.tv_sec = mtime_s;
   meta->mtime.tv_nsec = mtime_ns;
   return true;
 }
 
-void spn_dag_file_cache_load(spn_dag_file_cache_t* c, sp_str_t path, const spn_dag_roots_t* roots) {
+void spn_dag_file_cache_load(spn_dag_file_cache_t* c, sp_str_t path) {
   sp_str_t content = sp_zero;
   if (sp_io_read_file(c->mem, path, &content)) {
     return;
@@ -500,14 +509,14 @@ void spn_dag_file_cache_load(spn_dag_file_cache_t* c, sp_str_t path, const spn_d
   }
 
   sp_str_t cursor = content;
-  if (!row_header(&cursor, '1')) {
+  if (!row_header(&cursor, '3')) {
     sp_fs_remove_file(path);
     return;
   }
   while (cursor.len) {
-    sp_str_t row_path = sp_zero;
+    spn_path_t row_path = sp_zero;
     spn_dag_file_meta_t meta = sp_zero;
-    if (!parse_hint_row(&cursor, roots, c->mem, &row_path, &meta)) {
+    if (!parse_hint_row(&cursor, &row_path, &meta)) {
       sp_fs_remove_file(path);
       return;
     }
@@ -515,7 +524,7 @@ void spn_dag_file_cache_load(spn_dag_file_cache_t* c, sp_str_t path, const spn_d
   }
 }
 
-void spn_dag_file_cache_flush(spn_dag_file_cache_t* c, sp_str_t path, const spn_dag_roots_t* roots) {
+void spn_dag_file_cache_flush(spn_dag_file_cache_t* c, sp_str_t path) {
   if (!c->hints_dirty) {
     return;
   }
@@ -523,16 +532,15 @@ void spn_dag_file_cache_flush(spn_dag_file_cache_t* c, sp_str_t path, const spn_
 
   sp_io_dyn_mem_writer_t sink = sp_zero;
   sp_io_dyn_mem_writer_init(s.mem, &sink);
-  spn_err_t err = write_header(&sink.base, '1');
+  spn_err_t err = write_header(&sink.base, '3');
   sp_ht_for_kv(c->hints, it) {
     if (err) {
       break;
     }
-    spn_dag_prefixed_t prefixed = spn_dag_root_collapse(roots, *it.key);
-    if (sp_str_contains(prefixed.sub, sp_str_lit("\n"))) {
+    if (sp_str_contains(it.key->sub, sp_str_lit("\n"))) {
       continue;
     }
-    err = write_hint_row(&sink.base, s.mem, prefixed, it.val);
+    err = write_hint_row(&sink.base, s.mem, *it.key, it.val);
   }
   if (!err) {
     sp_fs_write_atomic(path, sp_io_dyn_mem_writer_as_str(&sink));
@@ -550,16 +558,20 @@ static sp_str_t get_blob_name(sp_str_t name) {
   return sp_str_empty(base) ? sp_str_lit("blob") : base;
 }
 
-static sp_str_t get_blob_dir(spn_dag_store_t* store, sp_mem_t mem, spn_dag_digest_t digest) {
-  return sp_fs_join_path(mem, store->dir, spn_dag_digest_hex(mem, digest));
+static spn_path_t get_blob_dir(spn_dag_store_t* store, sp_mem_t mem, spn_dag_digest_t digest) {
+  return spn_path_join(mem, store->dir, spn_dag_digest_hex(mem, digest));
+}
+
+static spn_path_t get_blob(spn_dag_store_t* store, sp_mem_t mem, spn_dag_digest_t digest, sp_str_t name) {
+  return spn_path_join(mem, get_blob_dir(store, mem, digest), get_blob_name(name));
 }
 
 static sp_str_t get_blob_path(spn_dag_store_t* store, sp_mem_t mem, spn_dag_digest_t digest, sp_str_t name) {
-  return sp_fs_join_path(mem, get_blob_dir(store, mem, digest), get_blob_name(name));
+  return spn_path_str(store->roots, mem, get_blob(store, mem, digest, name));
 }
 
 static sp_str_t get_staging_dir(spn_dag_store_t* store, sp_mem_t mem) {
-  return sp_fs_join_path(mem, store->dir, sp_str_lit(".staging"));
+  return spn_path_str(store->roots, mem, spn_path_join(mem, store->dir, sp_str_lit(".staging")));
 }
 
 static spn_err_t copy_blob(sp_str_t source, sp_str_t target, sp_str_t staging) {
@@ -620,6 +632,8 @@ void spn_dag_store_init(spn_dag_store_t* store, spn_dag_store_config_t config) {
   store->kind = config.kind;
   store->arena = sp_mem_arena_new(config.mem);
   store->mem = sp_mem_arena_as_allocator(store->arena);
+  store->roots = config.roots;
+  store->dir = spn_path_copy(store->mem, config.dir);
 
   switch (store->kind) {
     case SPN_DAG_STORE_MEM: {
@@ -627,8 +641,9 @@ void spn_dag_store_init(spn_dag_store_t* store, spn_dag_store_config_t config) {
       break;
     }
     case SPN_DAG_STORE_FILESYSTEM: {
-      store->dir = sp_str_copy(store->mem, config.dir);
-      sp_fs_create_dir(store->dir);
+      sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+      sp_fs_create_dir(spn_path_str(store->roots, s.mem, store->dir));
+      sp_mem_end_scratch(s);
       break;
     }
   }
@@ -656,7 +671,7 @@ spn_err_t spn_dag_store_put(spn_dag_store_t* store, const void* data, u64 len, s
       spn_err_t err = SPN_OK;
       sp_str_t blob = get_blob_path(store, s.mem, *digest, name);
       if (!sp_fs_is_file(blob)) {
-        sp_fs_create_dir(get_blob_dir(store, s.mem, *digest));
+        sp_fs_create_dir(spn_path_str(store->roots, s.mem, get_blob_dir(store, s.mem, *digest)));
         if (sp_fs_write_atomic_slice_staged(blob, get_staging_dir(store, s.mem), sp_mem_slice((u8*)data, len))) {
           err = SPN_ERR_DAG_STORE_WRITE;
         }
@@ -696,7 +711,7 @@ spn_err_t spn_dag_store_put_file(spn_dag_store_t* store, sp_str_t path, sp_str_t
       spn_err_t err = SPN_OK;
       sp_str_t blob = get_blob_path(store, s.mem, *digest, name);
       if (!sp_fs_is_file(blob)) {
-        sp_fs_create_dir(get_blob_dir(store, s.mem, *digest));
+        sp_fs_create_dir(spn_path_str(store->roots, s.mem, get_blob_dir(store, s.mem, *digest)));
         err = link_into_store(path, blob, get_staging_dir(store, s.mem));
       }
       sp_mem_end_scratch(s);
@@ -707,18 +722,21 @@ spn_err_t spn_dag_store_put_file(spn_dag_store_t* store, sp_str_t path, sp_str_t
   SP_UNREACHABLE_RETURN(SPN_ERROR);
 }
 
-sp_str_t spn_dag_store_path(spn_dag_store_t* store, sp_mem_t mem, spn_dag_digest_t digest, sp_str_t name) {
+spn_path_t spn_dag_store_path(spn_dag_store_t* store, sp_mem_t mem, spn_dag_digest_t digest, sp_str_t name) {
   switch (store->kind) {
     case SPN_DAG_STORE_MEM: {
-      return sp_str_lit("");
+      return (spn_path_t) sp_zero;
     }
     case SPN_DAG_STORE_FILESYSTEM: {
-      sp_str_t blob = get_blob_path(store, mem, digest, name);
-      return sp_fs_is_file(blob) ? blob : sp_str_lit("");
+      sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+      spn_path_t blob = get_blob(store, mem, digest, name);
+      bool present = sp_fs_is_file(spn_path_str(store->roots, s.mem, blob));
+      sp_mem_end_scratch(s);
+      return present ? blob : (spn_path_t) sp_zero;
     }
   }
 
-  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+  SP_UNREACHABLE_RETURN((spn_path_t) sp_zero);
 }
 
 bool spn_dag_store_has(spn_dag_store_t* store, spn_dag_digest_t digest, sp_str_t name) {

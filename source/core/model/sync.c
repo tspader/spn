@@ -7,12 +7,12 @@
 #include "error/error.h"
 #include "spn/errors.h"
 #include "event/event.h"
-#include "core/core.h"
 #include "core/types.h"
 #include "git/cache.h"
 #include "intern/intern.h"
 #include "log/lazy/lazy.h"
 #include "op/op.h"
+#include "paths/paths.h"
 #include "pkg/id.h"
 #include "pkg/load.h"
 #include "pkg/options.h"
@@ -28,6 +28,7 @@
 #include "toolchain/toolchain.h"
 #include "toolchain/types.h"
 #include "unit/types.h"
+#include "unit/unit.h"
 #include "when/when.h"
 #include "external/wasm/wasm.h"
 
@@ -92,23 +93,31 @@ static spn_err_t setup_toolchain_unit(spn_toolchain_store_t* store, spn_toolchai
     unit->cc.linker = toolchain->linker;
     unit->cc.archiver = toolchain->archiver;
   } else {
-    unit->cc.compiler = spn_toolchain_launcher_with_root(spn.mem, toolchain->compiler, unit->root);
-    unit->cc.cxx = spn_toolchain_launcher_with_root(spn.mem, toolchain->cxx, unit->root);
-    unit->cc.linker = spn_toolchain_launcher_with_root(spn.mem, toolchain->linker, unit->root);
-    unit->cc.archiver = spn_toolchain_launcher_with_root(spn.mem, toolchain->archiver, unit->root);
+    spn_path_t root = spn_path_make(&spn.roots, unit->root);
+    unit->cc.compiler = spn_toolchain_launcher_with_root(spn.mem, toolchain->compiler, root);
+    unit->cc.cxx = spn_toolchain_launcher_with_root(spn.mem, toolchain->cxx, root);
+    unit->cc.linker = spn_toolchain_launcher_with_root(spn.mem, toolchain->linker, root);
+    unit->cc.archiver = spn_toolchain_launcher_with_root(spn.mem, toolchain->archiver, root);
   }
 
   if (toolchain->source == SPN_TOOLCHAIN_SOURCE_LOCAL) {
-    unit->identity = sp_hash_str(unit->cc.compiler.program);
+    unit->identity = sp_hash_str(unit->cc.compiler.program.prefix);
   }
 
   return SPN_OK;
 }
 
-static spn_err_t materialize_tree(spn_session_t* session, sp_str_t name, spn_pkg_root_t tree, sp_str_t* root, bool* fetched) {
+static spn_err_t materialize_tree(spn_session_t* session, sp_str_t name, spn_pkg_root_t tree, spn_path_t* root, bool* fetched) {
   switch (tree.kind) {
     case SPN_PKG_ROOT_LOCAL: {
-      *root = tree.local;
+      sp_str_t canonical = sp_fs_canonicalize_path(spn.mem, tree.local);
+      if (sp_str_empty(canonical)) {
+        return spn_err_emit(session->ctx, (spn_err_union_t) {
+          .kind = SPN_ERR_NO_MANIFEST,
+          .no_manifest = { .path = tree.local },
+        });
+      }
+      *root = spn_path_make(&spn.roots, canonical);
       return SPN_OK;
     }
     case SPN_PKG_ROOT_GIT: {
@@ -139,12 +148,12 @@ static spn_err_t materialize_tree(spn_session_t* session, sp_str_t name, spn_pkg
         return SPN_ERROR;
       }
 
-      *root = checkout->path;
+      *root = spn_path_make(&spn.roots, checkout->path);
       *fetched |= checkout->fetched;
       return SPN_OK;
     }
     case SPN_PKG_ROOT_NONE: {
-      *root = sp_str_lit("");
+      *root = sp_zero_struct(spn_path_t);
       return SPN_OK;
     }
   }
@@ -152,69 +161,63 @@ static spn_err_t materialize_tree(spn_session_t* session, sp_str_t name, spn_pkg
   sp_unreachable_return(SPN_ERROR);
 }
 
-static sp_da(spn_tree_path_t) resolve_paths(spn_gated_path_list_t entries, spn_loaded_pkg_t* loaded, spn_when_env_t* env) {
-  sp_da(spn_tree_path_t) resolved = sp_da_new(spn.mem, spn_tree_path_t);
+static sp_da(spn_path_t) resolve_paths(const spn_path_roots_t* roots, spn_gated_path_list_t entries, spn_loaded_pkg_t* loaded, spn_when_env_t* env) {
+  sp_da(spn_path_t) resolved = sp_da_new(spn.mem, spn_path_t);
   sp_da_for(entries, it) {
     if (!spn_when_eval(&entries[it].when, env)) {
       continue;
     }
-    spn_tree_path_t entry = { .path = entries[it].path, .tree = entries[it].tree };
-    sp_da_push(resolved, ((spn_tree_path_t) {
-      .path = spn_tree_path_resolve(spn.mem, loaded->roots, entry),
-      .tree = entry.tree,
-    }));
+    spn_path_t path = spn_tree_path(spn.mem, roots, loaded->roots, entries[it].tree, entries[it].path);
+    sp_da_push(resolved, spn_path_canonicalize(spn.mem, roots, path));
   }
   return resolved;
 }
 
-static spn_err_t resolve_configure_source(spn_ctx_t* ctx, sp_str_t name, spn_gated_path_list_t declared, spn_loaded_pkg_t* loaded, spn_when_env_t* env, sp_da(spn_tree_path_t)* source) {
-  sp_da(spn_tree_path_t) resolved = sp_da_new(spn.mem, spn_tree_path_t);
+static spn_err_t resolve_configure_source(spn_ctx_t* ctx, sp_str_t name, spn_gated_path_list_t declared, spn_loaded_pkg_t* loaded, spn_when_env_t* env, sp_da(spn_path_t)* source) {
+  sp_da(spn_path_t) resolved = sp_da_new(spn.mem, spn_path_t);
   sp_da_for(declared, it) {
     if (!spn_when_eval(&declared[it].when, env)) {
       continue;
     }
-    spn_tree_path_t entry = { .path = declared[it].path, .tree = declared[it].tree };
-    sp_str_t root = spn_tree_root(loaded->roots, entry.tree);
-    if (!sp_fs_is_glob(entry.path)) {
-      sp_str_t path = spn_tree_path_resolve(spn.mem, loaded->roots, entry);
-      if (!sp_fs_is_target_file(path)) {
+    spn_path_t path = spn_tree_path(spn.mem, &ctx->roots, loaded->roots, declared[it].tree, declared[it].path);
+    spn_tree_rel_t rel = spn_tree_rel(loaded->roots, path);
+    if (rel.tree == SPN_TREE_NONE || !sp_fs_is_glob(rel.sub)) {
+      if (!sp_fs_is_target_file(spn_path_str(&ctx->roots, spn.mem, path))) {
         return spn_err_emit(ctx, (spn_err_union_t) {
           .kind = SPN_ERR_CONFIGURE_SOURCE_MISSING,
           .configure_source = {
             .name = name,
-            .source = entry.path,
+            .source = declared[it].path,
           }});
       }
-      sp_da_push(resolved, ((spn_tree_path_t) { .path = path, .tree = entry.tree }));
+      sp_da_push(resolved, spn_path_canonicalize(spn.mem, &ctx->roots, path));
       continue;
     }
 
-    sp_da(spn_dag_match_t) matches = sp_da_new(spn.mem, spn_dag_match_t);
-    if (spn_dag_glob(spn.mem, root, entry.path, SP_NULLPTR, &matches) || sp_da_empty(matches)) {
+    sp_da(spn_path_t) matches = sp_da_new(spn.mem, spn_path_t);
+    if (spn_dag_glob(spn.mem, &ctx->roots, path, SP_NULLPTR, &matches) || sp_da_empty(matches)) {
       return spn_err_emit(ctx, (spn_err_union_t) {
         .kind = SPN_ERR_CONFIGURE_SOURCE_GLOB,
         .configure_source = {
           .name = name,
-          .source = entry.path,
+          .source = declared[it].path,
         }});
     }
     sp_da_for(matches, jt) {
-      sp_da_push(resolved, ((spn_tree_path_t) { .path = matches[jt].path, .tree = entry.tree }));
+      sp_da_push(resolved, spn_path_canonicalize(spn.mem, &ctx->roots, matches[jt]));
     }
   }
   *source = resolved;
   return SPN_OK;
 }
 
-static sp_da(spn_tree_path_t) detect_configure_source(spn_loaded_pkg_t* loaded) {
-  sp_da(spn_tree_path_t) source = sp_da_new(spn.mem, spn_tree_path_t);
-  sp_str_t candidates [] = {
-    sp_fs_join_path(spn.mem, loaded->roots.recipe, sp_str_lit("configure.c")),
-    loaded->paths.script,
-  };
+static sp_da(spn_path_t) detect_configure_source(const spn_path_roots_t* roots, spn_loaded_pkg_t* loaded, sp_str_t script) {
+  sp_da(spn_path_t) source = sp_da_new(spn.mem, spn_path_t);
+  sp_str_t candidates [] = { sp_str_lit("configure.c"), script };
   sp_carr_for(candidates, it) {
-    if (sp_fs_is_target_file(candidates[it])) {
-      sp_da_push(source, ((spn_tree_path_t) { .path = candidates[it], .tree = SPN_TREE_MANIFEST }));
+    spn_path_t path = spn_tree_path(spn.mem, roots, loaded->roots, SPN_TREE_MANIFEST, candidates[it]);
+    if (sp_fs_is_target_file(spn_path_str(roots, spn.mem, path))) {
+      sp_da_push(source, spn_path_canonicalize(spn.mem, roots, path));
       break;
     }
   }
@@ -309,12 +312,11 @@ static spn_err_t load_package(spn_session_t* session, spn_resolved_pkg_t* pkg, s
 
   spn_try(materialize_tree(session, qualified, pkg->origin.recipe, &loaded->roots.recipe, &fetched));
 
-  loaded->paths.manifest = sp_fs_join_path(spn.mem, loaded->roots.recipe, pkg->origin.paths.manifest);
-  loaded->paths.script = sp_fs_join_path(spn.mem, loaded->roots.recipe, pkg->origin.paths.script);
-
+  const spn_path_roots_t* roots = &spn.roots;
   loaded->info = pkg->origin.info;
   if (!loaded->info) {
-    spn_try(load_manifest(session, qualified, loaded->paths.manifest, &loaded->info));
+    spn_path_t manifest = spn_path_join(spn.mem, loaded->roots.recipe, pkg->origin.paths.manifest);
+    spn_try(load_manifest(session, qualified, spn_path_str(roots, spn.mem, manifest), &loaded->info));
   }
 
   if (pkg->origin.source.kind == SPN_PKG_ROOT_NONE) {
@@ -327,11 +329,11 @@ static spn_err_t load_package(spn_session_t* session, spn_resolved_pkg_t* pkg, s
   spn_when_env_from_profile(spn.mem, &session->profile, &facts);
 
   loaded->build = loaded->info->build;
-  loaded->build.source = resolve_paths(loaded->info->build.gated.source, loaded, &facts);
-  loaded->build.include = resolve_paths(loaded->info->build.gated.include, loaded, &facts);
+  loaded->build.source = resolve_paths(roots, loaded->info->build.gated.source, loaded, &facts);
+  loaded->build.include = resolve_paths(roots, loaded->info->build.gated.include, loaded, &facts);
 
   loaded->configure = loaded->info->configure;
-  loaded->configure.include = resolve_paths(loaded->info->configure.gated.include, loaded, &facts);
+  loaded->configure.include = resolve_paths(roots, loaded->info->configure.gated.include, loaded, &facts);
 
   // @spader This is a weird case. Normally, a manifest is validated when we
   // actually load the TOML, mechanically. No real context needed. But lists
@@ -351,18 +353,19 @@ static spn_err_t load_package(spn_session_t* session, spn_resolved_pkg_t* pkg, s
     // @spader We need to stop doing this and force people to be explicit.
     // Instead of this weird detection, just make if so if you don't have
     // [package.configure] then you don't have a configure script. Simple.
-    loaded->configure.source = detect_configure_source(loaded);
+    loaded->configure.source = detect_configure_source(roots, loaded, pkg->origin.paths.script);
   } else {
     spn_try(resolve_configure_source(session->ctx, qualified, loaded->info->configure.gated.source, loaded, &facts, &loaded->configure.source));
   }
 
   if (sp_da_empty(loaded->build.source)) {
-    sp_str_t candidate = sp_fs_join_path(spn.mem, loaded->roots.recipe, sp_str_lit("build.c"));
-    if (sp_fs_is_target_file(candidate)) {
-      sp_da_push(loaded->build.source, ((spn_tree_path_t) { .path = candidate, .tree = SPN_TREE_MANIFEST }));
+    spn_path_t candidate = spn_tree_path(spn.mem, roots, loaded->roots, SPN_TREE_MANIFEST, sp_str_lit("build.c"));
+    spn_path_t script = spn_tree_path(spn.mem, roots, loaded->roots, SPN_TREE_MANIFEST, pkg->origin.paths.script);
+    if (sp_fs_is_target_file(spn_path_str(roots, spn.mem, candidate))) {
+      sp_da_push(loaded->build.source, spn_path_canonicalize(spn.mem, roots, candidate));
     }
-    else if (package_has_build_deps(pkg) && sp_fs_is_target_file(loaded->paths.script)) {
-      sp_da_push(loaded->build.source, ((spn_tree_path_t) { .path = loaded->paths.script, .tree = SPN_TREE_MANIFEST }));
+    else if (package_has_build_deps(pkg) && sp_fs_is_target_file(spn_path_str(roots, spn.mem, script))) {
+      sp_da_push(loaded->build.source, spn_path_canonicalize(spn.mem, roots, script));
     }
   }
 
@@ -373,7 +376,7 @@ static spn_err_t load_package(spn_session_t* session, spn_resolved_pkg_t* pkg, s
     .sync_pkg = {
       .name = qualified,
       .url = sync_url(pkg->origin.recipe, pkg->origin.source),
-      .source_path = loaded->roots.source,
+      .source_path = spn_path_str(roots, spn.mem, loaded->roots.source),
       .time = loaded->elapsed,
       .fetched = fetched,
     }});

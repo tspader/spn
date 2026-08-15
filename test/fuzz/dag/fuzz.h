@@ -180,6 +180,7 @@ typedef struct {
   sp_mem_t mem;
   fz_executor_t* ex;
   fz_journal_t* journal;
+  const spn_path_roots_t* roots;
   sp_da(spn_dag_id_t) ids;
   sp_da(u64) execs;
 } fz_lowered_t;
@@ -201,7 +202,8 @@ fz_profile_t  fz_gen_profile(sp_fuzz_prng_t* prng, fz_limits_t limits);
 fz_universe_t fz_gen_universe(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_profile_t profile);
 fz_trace_t    fz_gen_trace(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u);
 
-void             fz_lower(fz_lowered_t* low, sp_mem_t mem, fz_universe_t* u);
+void             fz_roots_init(spn_path_roots_t* roots);
+void             fz_lower(fz_lowered_t* low, sp_mem_t mem, fz_universe_t* u, const spn_path_roots_t* roots);
 sp_str_t         fz_output_content(sp_mem_t mem, u64 identity, const sp_str_t* inputs, u64 count, sp_str_t name);
 void             fz_expect(sp_mem_t mem, fz_universe_t* u, const fz_state_t* state, sp_str_t* bytes);
 u64              fz_action_inputs(sp_mem_t mem, fz_universe_t* u, const fz_state_t* state, u64 action, const sp_str_t* bytes, sp_str_t** inputs);

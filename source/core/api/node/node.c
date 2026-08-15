@@ -10,6 +10,8 @@
 #include "unit/types.h"
 
 #include "event/event.h"
+#include "paths/paths.h"
+#include "unit/unit.h"
 #include "intern/intern.h"
 
 spn_node_t* spn_add_node(spn_config_t* config, const c8* tag) {
@@ -41,13 +43,21 @@ spn_node_t* spn_add_node(spn_config_t* config, const c8* tag) {
 void spn_node_add_input(spn_node_t* node, const c8* input) {
   spn_user_node_t* info = spn_node_deref(node->ref);
   SPN_API_LOG(node->ref.pkg, "spn_node_add_input", "{}, {}", SP_FMT_STR(info->tag), SP_FMT_CSTR(input));
-  sp_da_push(info->inputs, spn_intern_cstr(input));
+  spn_path_t made = spn_api_tree_path(node->ref.pkg, "spn_node_add_input", input);
+  if (spn_path_empty(made)) {
+    return;
+  }
+  sp_da_push(info->inputs, made);
 }
 
 void spn_node_add_output(spn_node_t* node, const c8* output) {
   spn_user_node_t* info = spn_node_deref(node->ref);
   SPN_API_LOG(node->ref.pkg, "spn_node_add_output", "{}, {}", SP_FMT_STR(info->tag), SP_FMT_CSTR(output));
-  sp_da_push(info->outputs, spn_intern_cstr(output));
+  spn_path_t made = spn_api_tree_path(node->ref.pkg, "spn_node_add_output", output);
+  if (spn_path_empty(made)) {
+    return;
+  }
+  sp_da_push(info->outputs, made);
 }
 
 void spn_node_link(spn_node_t* from, spn_node_t* to) {

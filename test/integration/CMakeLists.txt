@@ -16,6 +16,7 @@ add_executable(integration
   ${SRC}/log/lazy/lazy.c
   ${SRC}/external/tom.c
   ${SRC}/intern/intern.c
+  ${SRC}/paths/paths.c
   ${SRC}/sp/str.c
   ${SRC}/triple/triple.c
   main.c

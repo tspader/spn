@@ -77,7 +77,7 @@ sp_test_each(pkg, hash_platform, hash_platform_test_t, hash_platform_tests, .set
       break;
     }
     case PKG_EDIT_PROFILE_SYSROOT: {
-      it->profile.sysroot = sp_str_lit("/A");
+      it->profile.sysroot = (spn_path_t) { .sub = sp_str_lit("/A") };
       break;
     }
   }

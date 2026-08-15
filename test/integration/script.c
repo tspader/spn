@@ -53,6 +53,16 @@ sp_test(script, abi_discovery) {
   });
 }
 
+sp_test(script, relative_path_rejected) {
+  return run_test(t, (test_t) {
+    .project = "test/integration/fixtures/script/relative_path",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_ERR, .key = "kind", .value = "wasm_module_call_failed" } },
+    },
+  });
+}
+
 sp_test(script, chained_nodes) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/script/chained_nodes",
@@ -111,9 +121,9 @@ sp_test(script, object_lib) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
       // object libs publish their objects to lib/, preserving source-relative paths
-      { .kind = ACTION_VERIFY_EXISTS, .exists = store_file("lib/source/rt/extra.c.o") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = store_file("lib/manifest/rt/extra.c.o") },
       // ditto for an object lib declared from the build script instead of the manifest
-      { .kind = ACTION_VERIFY_EXISTS, .exists = store_file("lib/source/rt/extra2.c.o") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = store_file("lib/manifest/rt/extra2.c.o") },
       // an unlinked archive still builds and installs
       { .kind = ACTION_VERIFY_EXISTS, .exists = static_lib("blob") },
       { .kind = ACTION_RUN_BIN, .bin.name = "object_lib" },

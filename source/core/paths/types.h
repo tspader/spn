@@ -2,6 +2,33 @@
 #define SPN_PATHS_TYPES_H
 
 #include "sp.h"
+#include "spn/core.h"
+#include "spn/types.h"
+
+typedef struct {
+  sp_str_t dirs [SPN_PATH_ROOT_COUNT];
+  sp_str_t storage;
+} spn_path_roots_t;
+
+typedef struct {
+  bool within;
+  sp_str_t sub;
+} spn_path_rel_t;
+
+typedef struct {
+  spn_path_t recipe;
+  spn_path_t source;
+} spn_tree_roots_t;
+
+typedef struct {
+  spn_tree_t tree;
+  sp_str_t sub;
+} spn_tree_rel_t;
+
+typedef struct {
+  sp_str_t prefix;
+  spn_path_t path;
+} spn_arg_t;
 
 typedef struct {
   sp_str_t dir;
@@ -29,7 +56,6 @@ typedef struct {
   sp_str_t index;
   sp_str_t runtime;
   sp_str_t version;
-  sp_str_t include;
   sp_str_t toolchain;
   sp_str_t patches;
   sp_str_t storage;

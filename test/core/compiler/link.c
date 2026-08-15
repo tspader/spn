@@ -172,7 +172,7 @@ static const link_test_t tests [] = {
     .profile = {
       .arch = SPN_ARCH_ARM64,
       .os = SPN_OS_MACOS,
-      .sysroot = sp_str_lit("/sdk"),
+      .sysroot = { .sub = sp_str_lit("/sdk") },
     },
     .kind = SPN_CC_OUTPUT_EXE,
     .framework = "Cocoa",
@@ -438,7 +438,7 @@ static const link_test_t tests [] = {
       .arch = SPN_ARCH_X64,
       .os = SPN_OS_LINUX,
       .abi = SPN_ABI_GNU,
-      .sysroot = sp_str_lit("/sdk"),
+      .sysroot = { .sub = sp_str_lit("/sdk") },
     },
     .kind = SPN_CC_OUTPUT_EXE,
     .framework = "Cocoa",
@@ -462,20 +462,20 @@ sp_test_each(render_link, render, link_test_t, tests, .setup = spn_test_ctx_setu
     .subsystem = it->subsystem,
   };
   sp_da_init(mem, link.libs);
-  sp_da_init(mem, link.whole_archives);
   sp_da_init(mem, link.private_libs);
   sp_da_init(mem, link.system_libs);
   sp_da_init(mem, link.lib_dirs);
   sp_da_init(mem, link.frameworks);
 
   spn_cc_link_files_t files = {
-    .output = sp_str_lit("main"),
+    .output = test_arg_path("main"),
   };
   sp_da_init(mem, files.objects);
+  sp_da_init(mem, files.whole_archives);
   sp_da_init(mem, files.exports.symbols);
-  sp_da_push(files.objects, sp_str_lit("main.o"));
+  sp_da_push(files.objects, test_arg_path("main.o"));
   if (it->exports) {
-    files.exports.path = sp_str_from_cstr(mem, it->exports);
+    files.exports.path = test_arg_path(it->exports);
   }
   sp_carr_for(it->export_symbols, s) {
     if (!it->export_symbols[s]) break;
@@ -485,7 +485,7 @@ sp_test_each(render_link, render, link_test_t, tests, .setup = spn_test_ctx_setu
     sp_da_push(link.libs, sp_str_from_cstr(mem, it->lib));
   }
   if (it->whole_archive) {
-    sp_da_push(link.whole_archives, sp_str_from_cstr(mem, it->whole_archive));
+    sp_da_push(files.whole_archives, test_arg_path(it->whole_archive));
   }
   if (it->private_lib) {
     sp_da_push(link.private_libs, sp_str_from_cstr(mem, it->private_lib));
@@ -497,7 +497,7 @@ sp_test_each(render_link, render, link_test_t, tests, .setup = spn_test_ctx_setu
     sp_da_push(link.frameworks, sp_str_from_cstr(mem, it->framework));
   }
   if (it->lib_dir) {
-    sp_da_push(link.lib_dirs, sp_str_from_cstr(mem, it->lib_dir));
+    sp_da_push(link.lib_dirs, test_arg_path(it->lib_dir));
   }
 
   spn_invocation_t invocation = sp_zero;

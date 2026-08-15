@@ -3,6 +3,7 @@
 
 #include "core/types.h"
 #include "compiler/types.h"
+#include "paths/types.h"
 #include "sp.h"
 #include "spn/core.h"
 #include "spn/types.h"
@@ -12,11 +13,6 @@
 #include "profile/types.h"
 #include "target/types.h"
 #include "external/wasm/types.h"
-
-typedef enum {
-  SPN_PUBLISH_EXISTING,
-  SPN_PUBLISH_ALL,
-} spn_publish_t;
 
 typedef struct {
   spn_triple_t host;
@@ -28,10 +24,10 @@ struct spn_build_unit_t {
   spn_build_id_t id;
   spn_profile_info_t profile;
   spn_toolchain_unit_t* toolchain;
-  sp_da(sp_str_t) include;
+  sp_da(spn_path_t) include;
   sp_da(spn_pkg_unit_t*) packages;
   struct {
-    sp_str_t root;
+    spn_path_t root;
   } paths;
 };
 
@@ -89,8 +85,8 @@ struct spn_user_node_t {
   spn_pkg_unit_t* pkg;
   sp_str_t tag;
   sp_str_t fn;
-  sp_da(sp_str_t) inputs;
-  sp_da(sp_str_t) outputs;
+  sp_da(spn_path_t) inputs;
+  sp_da(spn_path_t) outputs;
   sp_da(spn_node_ref_t) deps;
 };
 
@@ -101,14 +97,14 @@ typedef struct {
   spn_invocation_t invocation;
 
   struct {
-    sp_str_t file;
-    sp_str_t object;
-    sp_str_t source;
+    spn_path_t file;
+    spn_path_t object;
   } paths;
 } spn_compile_unit_t;
 
 typedef struct {
   spn_cc_link_t cc;
+  sp_da(spn_path_t) archives;
   sp_da(spn_link_lib_t) libs;
 } spn_link_plan_t;
 
@@ -148,22 +144,19 @@ struct spn_pkg_unit_t {
 
   struct {
     struct {
-      sp_str_t dir;
-      sp_str_t configure;
-      sp_str_t package;
+      spn_path_t dir;
+      spn_path_t configure;
+      spn_path_t package;
     } stamp;
 
-    sp_str_t manifest;
-    sp_str_t script;
     spn_tree_roots_t roots;
-    sp_str_t work;
-    sp_str_t generated;
-    sp_str_t object;
-    sp_str_t store;
-    sp_str_t include;
-    sp_str_t lib;
-    sp_str_t bin;
-    sp_str_t vendor;
+    spn_path_t work;
+    spn_path_t object;
+    spn_path_t store;
+    spn_path_t include;
+    spn_path_t lib;
+    spn_path_t bin;
+    spn_path_t vendor;
   } paths;
 
   struct {
@@ -177,6 +170,7 @@ struct spn_pkg_unit_t {
   struct {
     spn_wasm_script_t configure;
     spn_wasm_script_t build;
+    spn_wasm_script_t* active;
   } wasm;
 
   sp_atomic_s32_t compile_announced;

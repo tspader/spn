@@ -11,41 +11,14 @@
 #include "error/error.h"
 #include "event/event.h"
 #include "intern/intern.h"
+#include "paths/paths.h"
 #include "session/invocation.h"
 #include "sp/io.h"
 #include "sp/os.h"
 #include "graph/build.h"
 #include "graph/nodes/nodes.h"
 #include "unit/package.h"
-
-spn_err_t spn_build_link_invocation(sp_mem_t mem, spn_target_unit_t* target, const spn_cc_link_files_t* files, spn_invocation_t* invocation) {
-  spn_profile_info_t* profile = &target->pkg->build->profile;
-  spn_cc_toolchain_t* toolchain = &target->pkg->build->toolchain->cc;
-
-  switch (target->kind) {
-    case SPN_CC_OUTPUT_STATIC_LIB: {
-      spn_cc_archive_files_t archive_files = {
-        .output = files->output,
-        .objects = files->objects,
-      };
-      spn_try(spn_cc_render_archive(mem, toolchain, profile, &archive_files, invocation));
-      break;
-    }
-    case SPN_CC_OUTPUT_EXE:
-    case SPN_CC_OUTPUT_SHARED_LIB:
-    case SPN_CC_OUTPUT_REACTOR: {
-      spn_try(spn_cc_render_link(mem, toolchain, profile, &target->link.cc, files, invocation));
-      break;
-    }
-    case SPN_CC_OUTPUT_OBJECT: {
-      sp_unreachable_case();
-    }
-  }
-
-  invocation->cwd = target->pkg->paths.work;
-  return SPN_OK;
-}
-
+#include "unit/unit.h"
 
 static spn_err_t emit_link_passed(spn_target_unit_t* unit, spn_invocation_t* invocation, sp_str_t output, sp_str_t out, u64 elapsed) {
   spn_event_buffer_push(spn.events, (spn_event_t) {
@@ -109,13 +82,13 @@ static spn_err_t read_archive_symbols(sp_str_t path, sp_da(sp_str_t)* symbols, s
   return SPN_OK;
 }
 
-static spn_err_t link_exports_exec(sp_mem_t scratch, spn_target_unit_t* target, sp_da(sp_str_t) objects, sp_str_t output) {
+static spn_err_t link_exports_exec(sp_mem_t scratch, spn_target_unit_t* target, sp_da(spn_path_t) objects, spn_path_t output) {
   spn_pkg_unit_t* pkg = target->pkg;
   spn_profile_info_t* profile = &pkg->build->profile;
   spn_cc_toolchain_t* toolchain = &pkg->build->toolchain->cc;
 
   spn_cc_archive_files_t files = {
-    .output = sp_fmt(spn.mem, "{}.a", SP_FMT_STR(output)).value,
+    .output = spn_target_exports_archive(spn.mem, output),
     .objects = objects,
   };
   spn_invocation_t* invocation = sp_alloc_type(spn.mem, spn_invocation_t);
@@ -130,14 +103,15 @@ static spn_err_t link_exports_exec(sp_mem_t scratch, spn_target_unit_t* target, 
   spn_symbol_set_t seen;
   sp_str_ht_init(scratch, seen);
   sp_da(sp_str_t) symbols = sp_da_new(scratch, sp_str_t);
-  spn_try(read_archive_symbols(files.output, &symbols, &seen));
-  sp_da_for(target->link.cc.whole_archives, it) {
-    spn_try(read_archive_symbols(target->link.cc.whole_archives[it], &symbols, &seen));
+  spn_try(read_archive_symbols(spn_path_str(&spn.roots, scratch, files.output), &symbols, &seen));
+  sp_da_for(target->link.archives, it) {
+    spn_try(read_archive_symbols(spn_path_str(&spn.roots, scratch, target->link.archives[it]), &symbols, &seen));
   }
 
+  sp_str_t path = spn_path_str(&spn.roots, scratch, output);
   sp_io_file_writer_t writer = sp_zero;
-  if (sp_io_file_writer_from_path(&writer, output) != SP_OK) {
-    return spn_err_emit(&spn, (spn_err_union_t) { .kind = SPN_ERR_FS_WRITE, .fs.path = output });
+  if (sp_io_file_writer_from_path(&writer, path) != SP_OK) {
+    return spn_err_emit(&spn, (spn_err_union_t) { .kind = SPN_ERR_FS_WRITE, .fs.path = path });
   }
 
   switch (spn_cc_exports_format(target->kind, profile->os)) {
@@ -160,7 +134,7 @@ static spn_err_t link_exports_exec(sp_mem_t scratch, spn_target_unit_t* target, 
   return SPN_OK;
 }
 
-spn_err_t spn_link_exports_run(spn_target_unit_t* target, sp_da(sp_str_t) objects, sp_str_t output) {
+spn_err_t spn_link_exports_run(spn_target_unit_t* target, sp_da(spn_path_t) objects, spn_path_t output) {
   spn_pkg_unit_announce_compile(target->pkg);
 
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
@@ -184,7 +158,7 @@ static spn_err_t read_export_symbols(sp_mem_t mem, sp_str_t path, sp_da(sp_str_t
   return SPN_OK;
 }
 
-static spn_err_t link_target_exec(sp_mem_t scratch, spn_target_unit_t* target, sp_str_t output, sp_da(sp_str_t) objects, sp_str_t exports) {
+static spn_err_t link_target_exec(sp_mem_t scratch, spn_target_unit_t* target, spn_path_t output, sp_da(spn_path_t) objects, spn_path_t exports) {
   spn_cc_link_files_t files = {
     .output = output,
     .objects = objects,
@@ -192,7 +166,7 @@ static spn_err_t link_target_exec(sp_mem_t scratch, spn_target_unit_t* target, s
   switch (target->kind) {
     case SPN_CC_OUTPUT_REACTOR: {
       sp_da_init(scratch, files.exports.symbols);
-      spn_try(read_export_symbols(scratch, exports, &files.exports.symbols));
+      spn_try(read_export_symbols(scratch, spn_path_str(&spn.roots, scratch, exports), &files.exports.symbols));
       break;
     }
     case SPN_CC_OUTPUT_SHARED_LIB: {
@@ -201,7 +175,7 @@ static spn_err_t link_target_exec(sp_mem_t scratch, spn_target_unit_t* target, s
     }
     case SPN_CC_OUTPUT_EXE:
     case SPN_CC_OUTPUT_STATIC_LIB: {
-      sp_assert(sp_str_empty(exports));
+      sp_assert(spn_path_empty(exports));
       break;
     }
     case SPN_CC_OUTPUT_OBJECT: {
@@ -210,7 +184,7 @@ static spn_err_t link_target_exec(sp_mem_t scratch, spn_target_unit_t* target, s
   }
 
   spn_invocation_t* invocation = sp_alloc_type(spn.mem, spn_invocation_t);
-  spn_try(spn_build_link_invocation(spn.mem, target, &files, invocation));
+  spn_try(spn_target_link_invocation(spn.mem, target, &files, invocation));
 
   spn_invocation_result_t run = spn_invocation_run(invocation);
 
@@ -218,10 +192,11 @@ static spn_err_t link_target_exec(sp_mem_t scratch, spn_target_unit_t* target, s
     return emit_link_failed(target, invocation, run.result.status.exit_code, run.result.out, run.result.err);
   }
 
-  return emit_link_passed(target, invocation, spn_target_output_path(spn.mem, target), run.result.out, run.elapsed);
+  sp_str_t destination = spn_path_str(&spn.roots, spn.mem, spn_target_output_path(spn.mem, target));
+  return emit_link_passed(target, invocation, destination, run.result.out, run.elapsed);
 }
 
-spn_err_t spn_link_target_run(spn_target_unit_t* target, sp_str_t output, sp_da(sp_str_t) objects, sp_str_t exports) {
+spn_err_t spn_link_target_run(spn_target_unit_t* target, spn_path_t output, sp_da(spn_path_t) objects, spn_path_t exports) {
   spn_pkg_unit_announce_compile(target->pkg);
 
   spn_event_buffer_push(spn.events, (spn_event_t) {

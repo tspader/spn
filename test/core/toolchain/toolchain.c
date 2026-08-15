@@ -45,8 +45,9 @@ static const launcher_test_t tests [] = {
 
 sp_test_each(launcher, resolve, launcher_test_t, tests) {
   sp_mem_t mem = sp_test_arena(t);
+  spn_path_roots_t roots = sp_zero;
 
-  spn_toolchain_launcher_t launcher = { .program = sp_str_view(it->launcher.program) };
+  spn_toolchain_launcher_t launcher = { .program = spn_arg_lit(sp_str_view(it->launcher.program)) };
   launcher.args = sp_da_new(mem, sp_str_t);
   sp_carr_for(it->launcher.args, at) {
     if (!it->launcher.args[at]) {
@@ -62,12 +63,13 @@ sp_test_each(launcher, resolve, launcher_test_t, tests) {
       program = it->expect.program_win;
     }
 #endif
-    spn_toolchain_launcher_t rooted = spn_toolchain_launcher_with_root(mem, launcher, sp_str_view(it->root ? it->root : ""));
-    sp_expect_str_eq_c(t, rooted.program, program);
+    spn_path_t root = { .sub = sp_str_view(it->root ? it->root : "") };
+    spn_toolchain_launcher_t rooted = spn_toolchain_launcher_with_root(mem, launcher, root);
+    sp_expect_str_eq_c(t, spn_arg_str(&roots, mem, rooted.program), program);
   }
 
   if (it->expect.str) {
-    sp_expect_str_eq_c(t, spn_toolchain_launcher_to_str(mem, launcher), it->expect.str);
+    sp_expect_str_eq_c(t, spn_toolchain_launcher_to_str(&roots, mem, launcher), it->expect.str);
   }
 
   return SP_OK;
@@ -76,7 +78,7 @@ sp_test_each(launcher, resolve, launcher_test_t, tests) {
 sp_test(launcher, has_cxx_requires_program) {
   spn_toolchain_info_t toolchain = sp_zero;
   sp_expect(t, !spn_toolchain_has_cxx(&toolchain));
-  toolchain.cxx.program = sp_str_view("A");
+  toolchain.cxx.program = spn_arg_lit(sp_str_view("A"));
   sp_expect(t, spn_toolchain_has_cxx(&toolchain));
   return SP_OK;
 }

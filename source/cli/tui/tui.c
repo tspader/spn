@@ -189,23 +189,28 @@ static sp_str_t setter_to_str(spn_err_setter_t setter) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
+static sp_str_t root_label(spn_path_root_t root) {
+  switch (root) {
+    case SPN_PATH_ROOT_PROJECT:   return sp_str_lit(".");
+    case SPN_PATH_ROOT_STORE:     return sp_str_lit("$SPN_STORE");
+    case SPN_PATH_ROOT_BUILD:     return sp_str_lit("$SPN_BUILD");
+    case SPN_PATH_ROOT_CHECKOUT:  return sp_str_lit("$SPN_CHECKOUTS");
+    case SPN_PATH_ROOT_TOOLCHAIN: return sp_str_lit("$SPN_TOOLCHAIN");
+    case SPN_PATH_ROOT_INDEX:     return sp_str_lit("$SPN_INDEX");
+    case SPN_PATH_ROOT_RUNTIME:   return sp_str_lit("$SPN_RUNTIME");
+    case SPN_PATH_ROOT_CACHE:     return sp_str_lit("$SPN_CACHE");
+    case SPN_PATH_ROOT_NONE:
+    case SPN_PATH_ROOT_COUNT:     break;
+  }
+  return sp_str_lit("");
+}
+
 static sp_str_t get_contextual_path(spn_ctx_t* ctx, sp_mem_t mem, sp_str_t path) {
-  sp_str_t cache = spn_ctx_cache_dir(ctx);
-  if (!sp_str_empty(cache) && sp_str_starts_with(path, cache)) {
-    sp_str_t rel = sp_str_strip_left(path, cache);
-    rel = sp_str_strip_left(rel, sp_str_lit("/"));
-    return sp_fmt(mem, "$SPN_CACHE/{}", sp_fmt_str(rel)).value;
+  spn_path_t collapsed = spn_ctx_collapse_path(ctx, path);
+  if (collapsed.root == SPN_PATH_ROOT_NONE) {
+    return collapsed.sub;
   }
-
-  sp_str_t project = spn_ctx_project_dir(ctx);
-  if (!sp_str_empty(project) && sp_str_starts_with(path, project)) {
-    sp_str_t rel = sp_str_strip_left(path, project);
-    rel = sp_str_strip_left(rel, sp_str_lit("/"));
-    rel = sp_str_strip_left(rel, sp_str_lit("./"));
-    return sp_fmt(mem, "./{}", sp_fmt_str(rel)).value;
-  }
-
-  return path;
+  return sp_fmt(mem, "{}/{}", sp_fmt_str(root_label(collapsed.root)), sp_fmt_str(collapsed.sub)).value;
 }
 
 static sp_str_t render_event_detail(spn_ctx_t* ctx, sp_mem_t mem, spn_event_t* event) {
@@ -830,6 +835,14 @@ static sp_str_t render_event_detail(spn_ctx_t* ctx, sp_mem_t mem, spn_event_t* e
             &w.base,
             "failed to write {.cyan}",
             sp_fmt_str(get_contextual_path(ctx, mem, event->err.fs.path))
+          );
+          break;
+        }
+        case SPN_ERR_PATH_COMPONENT: {
+          sp_fmt_io(
+            &w.base,
+            "path {.yellow} must not contain '.', '..', or empty components",
+            sp_fmt_str(event->err.fs.path)
           );
           break;
         }

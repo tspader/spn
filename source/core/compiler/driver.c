@@ -1,8 +1,60 @@
 #include "compiler/driver.h"
+#include "compiler/push.h"
 #include "compiler/types.h"
 #include "ctx/types.h"
 
 #include "error/error.h"
+#include "paths/paths.h"
+
+void spn_cc_push(sp_mem_t mem, spn_invocation_t* invocation, spn_arg_t arg) {
+  if (!invocation->args) sp_da_init(mem, invocation->args);
+  if (!spn_arg_empty(arg)) {
+    sp_da_push(invocation->args, arg);
+  }
+}
+
+void spn_cc_push_c(sp_mem_t mem, spn_invocation_t* invocation, const c8* value) {
+  spn_cc_push(mem, invocation, spn_arg_lit(sp_cstr_as_str(value)));
+}
+
+void spn_cc_push_str(sp_mem_t mem, spn_invocation_t* invocation, sp_str_t value) {
+  spn_cc_push(mem, invocation, spn_arg_lit(value));
+}
+
+void spn_cc_push_fmt(sp_mem_t mem, spn_invocation_t* invocation, const c8* fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  sp_str_r str = sp_fmt_mem_v(mem, sp_cstr_as_str(fmt), args);
+  va_end(args);
+
+  spn_cc_push(mem, invocation, spn_arg_lit(str.value));
+}
+
+void spn_cc_push_path(sp_mem_t mem, spn_invocation_t* invocation, spn_path_t path) {
+  spn_cc_push(mem, invocation, spn_arg_path(path));
+}
+
+void spn_cc_push_glued(sp_mem_t mem, spn_invocation_t* invocation, const c8* prefix, spn_path_t path) {
+  spn_cc_push(mem, invocation, spn_arg_glue(sp_cstr_as_str(prefix), path));
+}
+
+void spn_cc_push_strs(sp_mem_t mem, spn_invocation_t* invocation, sp_da(sp_str_t) values) {
+  sp_da_for(values, it) {
+    spn_cc_push(mem, invocation, spn_arg_lit(values[it]));
+  }
+}
+
+void spn_cc_push_paths(sp_mem_t mem, spn_invocation_t* invocation, sp_da(spn_path_t) paths) {
+  sp_da_for(paths, it) {
+    spn_cc_push(mem, invocation, spn_arg_path(paths[it]));
+  }
+}
+
+void spn_cc_push_args(sp_mem_t mem, spn_invocation_t* invocation, sp_da(spn_arg_t) args) {
+  sp_da_for(args, it) {
+    spn_cc_push(mem, invocation, args[it]);
+  }
+}
 
 spn_sanitizer_set_t get_supported_sanitizers(const spn_cc_toolchain_t* toolchain, spn_triple_t target) {
   spn_sanitizer_set_t set = sp_zero;
@@ -91,9 +143,9 @@ spn_err_t spn_cc_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchai
 }
 
 spn_invocation_t spn_cc_render_compile_command(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_invocation_t* base, const spn_cc_compile_files_t* files) {
-  sp_assert(!sp_str_empty(base->program));
-  sp_assert(!sp_str_empty(files->source));
-  sp_assert(!sp_str_empty(files->output));
+  sp_assert(!spn_arg_empty(base->program));
+  sp_assert(!spn_path_empty(files->source));
+  sp_assert(!spn_path_empty(files->output));
 
   spn_invocation_t invocation = {
     .program = base->program,
@@ -156,7 +208,7 @@ spn_err_t spn_cc_validate_link(const spn_cc_toolchain_t* toolchain, const spn_pr
   if (kind == SPN_CC_OUTPUT_SHARED_LIB && profile->os == SPN_OS_WASI) {
     return feature_unsupported(toolchain, profile, feature);
   }
-  if (profile->os == SPN_OS_MACOS && frameworks && sp_str_empty(profile->sysroot)) {
+  if (profile->os == SPN_OS_MACOS && frameworks && spn_path_empty(profile->sysroot)) {
     return feature_unsupported(toolchain, profile, SPN_CC_FEATURE_FRAMEWORKS);
   }
   if (toolchain->driver == SPN_CC_DRIVER_MSVC) {
@@ -168,8 +220,8 @@ spn_err_t spn_cc_validate_link(const spn_cc_toolchain_t* toolchain, const spn_pr
 }
 
 spn_err_t spn_cc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_link_t* link, const spn_cc_link_files_t* files, spn_invocation_t* invocation) {
-  sp_assert(!sp_str_empty(files->output));
-  if (!sp_str_empty(files->exports.path)) sp_assert(sp_da_empty(files->exports.symbols));
+  sp_assert(!spn_path_empty(files->output));
+  if (!spn_path_empty(files->exports.path)) sp_assert(sp_da_empty(files->exports.symbols));
   spn_try(spn_cc_validate_link(toolchain, profile, link->kind, !sp_da_empty(link->frameworks)));
   *invocation = sp_zero_s(spn_invocation_t);
   switch (toolchain->driver) {
@@ -194,7 +246,7 @@ spn_err_t spn_cc_validate_archive(const spn_cc_toolchain_t* toolchain, const spn
 }
 
 spn_err_t spn_cc_render_archive(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_archive_files_t* files, spn_invocation_t* invocation) {
-  sp_assert(!sp_str_empty(files->output));
+  sp_assert(!spn_path_empty(files->output));
   spn_try(spn_cc_validate_archive(toolchain, profile));
   *invocation = sp_zero_s(spn_invocation_t);
 

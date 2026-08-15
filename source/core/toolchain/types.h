@@ -5,6 +5,7 @@
 #include "spn/core.h"
 
 #include "core/types.h"
+#include "paths/types.h"
 #include "sp/sp_om.h"
 
 typedef enum {
@@ -20,7 +21,7 @@ typedef enum {
 } spn_toolchain_role_t;
 
 typedef struct {
-  sp_str_t program;
+  spn_arg_t program;
   sp_da(sp_str_t) args;
 } spn_toolchain_launcher_t;
 

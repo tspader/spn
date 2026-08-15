@@ -4,14 +4,14 @@
 
 #include "codegen/codegen.h"
 #include "compiler/driver.h"
-#include "core/core.h"
 #include "external/cc.h"
+#include "paths/paths.h"
 #include "session/invocation.h"
 #include "session/session.h"
 #include "unit/unit.h"
 #include "graph/build.h"
 
-static spn_cc_compile_t spn_build_compile_desc(sp_mem_t mem, spn_compile_unit_t* unit) {
+static spn_cc_compile_t compile_desc(sp_mem_t mem, spn_compile_unit_t* unit) {
   spn_pkg_unit_t* pkg = unit->target->pkg;
   spn_build_unit_t* build = pkg->build;
 
@@ -32,14 +32,14 @@ static spn_cc_compile_t spn_build_compile_desc(sp_mem_t mem, spn_compile_unit_t*
   }
 
   sp_da_for(pkg->info->include, it) {
-    sp_da_push(compile.include, spn_tree_path_resolve(mem, pkg->paths.roots, pkg->info->include[it]));
+    sp_da_push(compile.include, pkg->info->include[it]);
   }
   sp_da_for(pkg->info->define, it) {
     sp_da_push(compile.define, pkg->info->define[it]);
   }
 
   sp_da_for(unit->target->info->include, it) {
-    sp_da_push(compile.include, spn_tree_path_resolve(mem, pkg->paths.roots, unit->target->info->include[it]));
+    sp_da_push(compile.include, unit->target->info->include[it]);
   }
   sp_da_for(unit->target->info->define, it) {
     sp_da_push(compile.define, unit->target->info->define[it]);
@@ -75,7 +75,7 @@ spn_err_t spn_build_render_compile(sp_mem_t mem, spn_compile_unit_t* unit, spn_i
   spn_pkg_unit_t* pkg = unit->target->pkg;
   spn_build_unit_t* build = pkg->build;
 
-  spn_cc_compile_t compile = spn_build_compile_desc(mem, unit);
+  spn_cc_compile_t compile = compile_desc(mem, unit);
   spn_try(spn_cc_render_compile(mem, &build->toolchain->cc, &build->profile, &compile, invocation));
   invocation->cwd = pkg->paths.work;
   return SPN_OK;
@@ -89,30 +89,31 @@ spn_err_t spn_session_write_compile_commands(spn_session_t* session, sp_str_t pa
   sp_io_writer_t* io = &buf.base;
 
   sp_io_write_cstr(io, "[", SP_NULLPTR);
+  const spn_path_roots_t* roots = &spn.roots;
   u32 count = 0;
   sp_om_for(session->units.objects, it) {
     spn_compile_unit_t* unit = sp_om_at(session->units.objects, it);
     spn_cc_compile_files_t files = {
       .source = unit->paths.file,
       .output = unit->paths.object,
-      .depfile = sp_str_lit(""),
     };
     spn_invocation_t invocation = spn_cc_render_compile_command(scratch.mem, &unit->target->pkg->build->toolchain->cc, &unit->invocation, &files);
+    sp_da(sp_str_t) args = spn_invocation_args(roots, scratch.mem, &invocation);
 
     if (count++) {
       sp_io_write_c8(io, ',');
     }
     sp_io_write_cstr(io, "\n  { \"directory\": ", SP_NULLPTR);
-    spn_codegen_json_str(io, invocation.cwd);
+    spn_codegen_json_str(io, spn_path_str(roots, scratch.mem, invocation.cwd));
     sp_io_write_cstr(io, ", \"file\": ", SP_NULLPTR);
-    spn_codegen_json_str(io, unit->paths.file);
+    spn_codegen_json_str(io, spn_path_str(roots, scratch.mem, files.source));
     sp_io_write_cstr(io, ", \"output\": ", SP_NULLPTR);
-    spn_codegen_json_str(io, unit->paths.object);
+    spn_codegen_json_str(io, spn_path_str(roots, scratch.mem, files.output));
     sp_io_write_cstr(io, ", \"arguments\": [", SP_NULLPTR);
-    spn_codegen_json_str(io, invocation.program);
-    sp_da_for(invocation.args, arg) {
+    spn_codegen_json_str(io, spn_arg_str(roots, scratch.mem, invocation.program));
+    sp_da_for(args, arg) {
       sp_io_write_cstr(io, ", ", SP_NULLPTR);
-      spn_codegen_json_str(io, invocation.args[arg]);
+      spn_codegen_json_str(io, args[arg]);
     }
     sp_io_write_cstr(io, "] }", SP_NULLPTR);
   }
@@ -133,15 +134,25 @@ spn_err_t spn_session_write_compile_commands(spn_session_t* session, sp_str_t pa
 }
 
 sp_str_t spn_session_compile_commands_path(spn_session_t* session) {
-  return sp_fs_join_path(session->mem, session->paths.root, sp_str_lit("compile_commands.json"));
+  spn_path_t path = spn_path_join(session->mem, session->paths.root, sp_str_lit("compile_commands.json"));
+  return spn_path_str(&spn.roots, session->mem, path);
+}
+
+sp_da(sp_str_t) spn_invocation_args(const spn_path_roots_t* roots, sp_mem_t mem, const spn_invocation_t* invocation) {
+  sp_da(sp_str_t) args = sp_da_new(mem, sp_str_t);
+  sp_da_reserve(args, sp_da_size(invocation->args));
+  sp_da_for(invocation->args, it) {
+    sp_da_push(args, spn_arg_str(roots, mem, invocation->args[it]));
+  }
+  return args;
 }
 
 sp_str_t spn_invocation_to_str(sp_mem_t mem, const spn_invocation_t* invocation) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch_for(mem);
   sp_da(sp_str_t) parts = sp_da_new(scratch.mem, sp_str_t);
-  sp_da_push(parts, invocation->program);
+  sp_da_push(parts, spn_arg_str(&spn.roots, scratch.mem, invocation->program));
   sp_da_for(invocation->args, it) {
-    sp_da_push(parts, invocation->args[it]);
+    sp_da_push(parts, spn_arg_str(&spn.roots, scratch.mem, invocation->args[it]));
   }
 
   sp_str_t command = sp_str_join_n(mem, parts, sp_da_size(parts), sp_str_lit(" "));
@@ -150,12 +161,16 @@ sp_str_t spn_invocation_to_str(sp_mem_t mem, const spn_invocation_t* invocation)
 }
 
 spn_invocation_result_t spn_invocation_run(spn_invocation_t* invocation) {
-  sp_fs_create_dir(invocation->cwd);
+  const spn_path_roots_t* roots = &spn.roots;
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+
+  sp_str_t cwd = spn_path_str(roots, scratch.mem, invocation->cwd);
+  sp_fs_create_dir(cwd);
 
   sp_ps_config_t ps = {
-    .command = invocation->program,
-    .dyn_args = invocation->args,
-    .cwd = invocation->cwd,
+    .command = spn_arg_str(roots, scratch.mem, invocation->program),
+    .dyn_args = spn_invocation_args(roots, scratch.mem, invocation),
+    .cwd = cwd,
     .io = {
       .in.mode = SP_PS_IO_MODE_NULL,
       .err.mode = SP_PS_IO_MODE_REDIRECT,
@@ -165,6 +180,7 @@ spn_invocation_result_t spn_invocation_run(spn_invocation_t* invocation) {
   sp_tm_timer_t timer = sp_tm_start_timer();
   sp_ps_output_t result = sp_ps_run(spn.mem, ps);
   u64 elapsed = sp_tm_read_timer(&timer);
+  sp_mem_end_scratch(scratch);
 
   return (spn_invocation_result_t) {
     .result = result,

@@ -56,7 +56,8 @@ static const key_test_t key_tests [] = {
   },
 };
 
-static sp_err_t build_action_key(sp_test_t* t, spn_dag_t* g, const key_action_t* spec, spn_dag_digest_t* key) {
+static sp_err_t build_action_key(sp_test_t* t, sp_mem_t mem, const spn_path_roots_t* roots, const key_action_t* spec, spn_dag_digest_t* key) {
+  spn_dag_t* g = spn_dag_new(mem, roots);
   spn_dag_id_t action = spn_dag_add_action(g, (spn_dag_action_config_t) {
     .identity = dag_test_digest(spec->identity)
   });
@@ -74,7 +75,8 @@ static sp_err_t build_action_key(sp_test_t* t, spn_dag_t* g, const key_action_t*
     if (!spec->outputs[it]) {
       break;
     }
-    spn_dag_id_t file = spn_dag_add_file(g, sp_cstr_as_str(spec->outputs[it]));
+    sp_str_t path = sp_fmt(mem, "/R/{}", sp_fmt_cstr(spec->outputs[it])).value;
+    spn_dag_id_t file = spn_dag_add_file(g, spn_path_make(roots, path));
     sp_must_eq(t, SPN_OK, spn_dag_action_add_output(g, action, file));
   }
 
@@ -84,13 +86,15 @@ static sp_err_t build_action_key(sp_test_t* t, spn_dag_t* g, const key_action_t*
 
 sp_test_each(dag_key, weak, key_test_t, key_tests) {
   sp_mem_t mem = sp_test_arena(t);
+  spn_path_roots_t storage = sp_zero;
+  const spn_path_roots_t* roots = paths_test_roots_build((paths_test_roots_t) { .project = "/R" }, &storage);
   spn_dag_digest_t a = sp_zero;
   spn_dag_digest_t b = sp_zero;
-  sp_err_t err = build_action_key(t, spn_dag_new(mem), &it->a, &a);
+  sp_err_t err = build_action_key(t, mem, roots, &it->a, &a);
   if (err) {
     return err;
   }
-  err = build_action_key(t, spn_dag_new(mem), &it->b, &b);
+  err = build_action_key(t, mem, roots, &it->b, &b);
   if (err) {
     return err;
   }
