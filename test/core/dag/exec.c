@@ -165,7 +165,7 @@ static s32 exec_test_fn(spn_dag_t* g, spn_dag_action_t* action, void* user_data)
     }
     spn_dag_artifact_t* artifact = spn_dag_find_artifact(ctx->g, action->produces[it]);
     sp_str_t content = sp_fmt(ctx->env->dag.mem, "{}{}", sp_fmt_cstr(ctx->spec->write[it]), sp_fmt_uint(ctx->env->dag.runs)).value;
-    if (sp_fs_create_file_str(artifact->path, content)) {
+    if (sp_fs_create_file_str(dag_test_render(&ctx->env->dag, artifact->materialized), content)) {
       return 1;
     }
   }
@@ -216,7 +216,7 @@ static sp_err_t exec_action_run(sp_test_t* t, exec_env_t* env, const exec_action
     if (!spec->outputs[it]) {
       break;
     }
-    spn_dag_id_t file = spn_dag_add_file(g, dag_test_env_path(&env->dag, sp_str_view(spec->outputs[it])));
+    spn_dag_id_t file = spn_dag_add_file(g, dag_test_env_rooted(&env->dag, sp_str_view(spec->outputs[it])));
     sp_must_eq(t, SPN_OK, spn_dag_action_add_output(g, action, file));
   }
 
@@ -272,13 +272,14 @@ static sp_err_t exec_remove_outputs(sp_test_t* t, exec_env_t* env, const exec_ac
     if (!action->outputs[it]) {
       break;
     }
-    sp_str_t path = dag_test_env_path(&env->dag, sp_str_view(action->outputs[it]));
+    spn_path_t rooted = dag_test_env_rooted(&env->dag, sp_str_view(action->outputs[it]));
+    sp_str_t path = dag_test_render(&env->dag, rooted);
     env->err = sp_fs_remove_file(path) ? SPN_ERROR : SPN_OK;
     sp_expect_eq(t, SPN_OK, env->err);
     if (env->err) {
       return SP_OK;
     }
-    spn_dag_file_cache_invalidate(&env->dag.files, path);
+    spn_dag_file_cache_invalidate(&env->dag.files, rooted);
     sp_expect(t, !sp_fs_exists(path));
   }
   return SP_OK;

@@ -3,6 +3,7 @@
 
 #include "spn_test.h"
 #include "sha256/sha256.h"
+#include "paths/paths.h"
 #include "toolchain/toolchain.h"
 
 #define FIXTURE_MAX_ARGS 2
@@ -63,7 +64,7 @@ static sp_err_t fixture_check_launcher(sp_test_t* t, spn_toolchain_launcher_t la
     return SP_OK;
   }
 
-  sp_expect_str_eq_c(t, launcher.program, expect.program);
+  sp_expect_str_eq_c(t, launcher.program.prefix, expect.program);
   sp_must_strs_eq(t, launcher.args, sp_da_size(launcher.args), expect.args);
   return SP_OK;
 }
@@ -147,9 +148,9 @@ static spn_toolchain_info_t fixture_local_toolchain(const c8* name, const c8* co
   return (spn_toolchain_info_t) {
     .name = sp_str_view(name),
     .driver = SPN_CC_DRIVER_GCC,
-    .compiler = { .program = sp_str_view(compiler) },
-    .linker = { .program = sp_str_view(compiler) },
-    .archiver = { .program = sp_str_view("ar") },
+    .compiler = { .program = spn_arg_lit(sp_str_view(compiler)) },
+    .linker = { .program = spn_arg_lit(sp_str_view(compiler)) },
+    .archiver = { .program = spn_arg_lit(sp_str_view("ar")) },
   };
 }
 

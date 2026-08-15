@@ -160,9 +160,13 @@ static s32 par_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
   if (ctx->spec->fails) {
     return 1;
   }
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+  const spn_path_roots_t* roots = &ctx->env->dag.roots;
+
   sp_da_for(action->consumes, it) {
     spn_dag_artifact_t* in = spn_dag_find_artifact(ctx->g, action->consumes[it]);
-    if (in->kind == SPN_DAG_ARTIFACT_KIND_FILE && !sp_fs_exists(in->path)) {
+    if (in->kind == SPN_DAG_ARTIFACT_KIND_FILE && !sp_fs_exists(spn_path_str(roots, s.mem, in->materialized))) {
+      sp_mem_end_scratch(s);
       return 1;
     }
   }
@@ -170,16 +174,15 @@ static s32 par_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
   sp_atomic_s32_add(&ctx->env->runs, 1, SP_ATOMIC_SEQ_CST);
   spn_dag_artifact_t* out = spn_dag_find_artifact(ctx->g, action->produces[0]);
   sp_str_t content = sp_str_view(ctx->spec->identity);
-  if (out->kind == SPN_DAG_ARTIFACT_KIND_TREE) {
-    sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-    sp_err_t err = sp_fs_create_file_str(sp_fs_join_path(s.mem, out->path, sp_str_lit("H")), content);
-    sp_mem_end_scratch(s);
-    return err ? 1 : 0;
-  }
-  return sp_fs_create_file_str(out->path, content) ? 1 : 0;
+  spn_path_t target = out->kind == SPN_DAG_ARTIFACT_KIND_TREE
+    ? spn_path_join(s.mem, out->materialized, sp_str_lit("H"))
+    : out->materialized;
+  sp_err_t err = sp_fs_create_file_str(spn_path_str(roots, s.mem, target), content);
+  sp_mem_end_scratch(s);
+  return err ? 1 : 0;
 }
 
-static spn_err_t par_discover(spn_dag_t* g, spn_dag_action_t* action, void* user_data, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
+static spn_err_t par_discover(spn_dag_t* g, spn_dag_action_t* action, void* user_data, spn_dag_env_t* env, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
   par_ctx_t* ctx = (par_ctx_t*)user_data;
   sp_carr_for(ctx->spec->discovers, it) {
     if (!ctx->spec->discovers[it]) {
@@ -187,7 +190,7 @@ static spn_err_t par_discover(spn_dag_t* g, spn_dag_action_t* action, void* user
     }
     sp_da_push(*out, ((spn_dag_obs_t) {
       .kind = SPN_DAG_OBS_FILE,
-      .path = sp_fs_join_path(mem, ctx->env->dag.root, sp_str_view(ctx->spec->discovers[it]))
+      .path = spn_path_make(g->roots, sp_fs_join_path(mem, ctx->env->dag.root, sp_str_view(ctx->spec->discovers[it])))
     }));
   }
   return SPN_OK;
@@ -215,9 +218,9 @@ static sp_err_t par_build_graph(sp_test_t* t, par_env_t* env, spn_dag_t* g, cons
       if (!spec->inputs[ii]) {
         break;
       }
-      spn_dag_action_add_input(g, action, spn_dag_add_file(g, dag_test_env_path(&env->dag, sp_str_view(spec->inputs[ii]))));
+      spn_dag_action_add_input(g, action, spn_dag_add_file(g, dag_test_env_rooted(&env->dag, sp_str_view(spec->inputs[ii]))));
     }
-    sp_str_t output = dag_test_env_path(&env->dag, sp_str_view(spec->output));
+    spn_path_t output = dag_test_env_rooted(&env->dag, sp_str_view(spec->output));
     spn_dag_id_t out = spec->tree ? spn_dag_add_tree(g, output) : spn_dag_add_file(g, output);
     sp_must_eq(t, SPN_OK, spn_dag_action_add_output(g, action, out));
   }

@@ -9,7 +9,6 @@
 
 struct spn_project_t {
   struct {
-    sp_str_t root;
     sp_str_t manifest;
     sp_str_t lock;
   } paths;

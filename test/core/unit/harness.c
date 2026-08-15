@@ -1,5 +1,7 @@
 #include "unit.h"
 
+#include "paths/paths.h"
+
 void spn_wasm_script_init(spn_wasm_script_t* script, sp_str_t module) {
   *script = (spn_wasm_script_t) { .path = module };
 }
@@ -15,13 +17,13 @@ sp_da(sp_str_t) test_str_list(sp_mem_t mem, const c8* const* items, u32 max) {
   return list;
 }
 
-sp_da(spn_tree_path_t) test_tree_path_list(sp_mem_t mem, const c8* const* items, u32 max) {
-  sp_da(spn_tree_path_t) list = sp_da_new(mem, spn_tree_path_t);
+sp_da(spn_path_t) test_path_list(sp_mem_t mem, spn_tree_roots_t trees, const c8* const* items, u32 max) {
+  sp_da(spn_path_t) list = sp_da_new(mem, spn_path_t);
   sp_for(it, max) {
     if (!items[it]) {
       break;
     }
-    sp_da_push(list, ((spn_tree_path_t) { .path = sp_cstr_as_str(items[it]), .tree = SPN_TREE_SOURCE }));
+    sp_da_push(list, spn_tree_path(mem, &spn.roots, trees, SPN_TREE_SOURCE, sp_cstr_as_str(items[it])));
   }
   return list;
 }
@@ -41,13 +43,13 @@ spn_pkg_id_t find_pkg_id(spn_session_t* s, unit_graph_test_t* g, const c8* name)
   return sp_zero_struct(spn_pkg_id_t);
 }
 
-static spn_target_info_t lib_info(sp_mem_t mem, const unit_lib_t* spec) {
+static spn_target_info_t lib_info(sp_mem_t mem, spn_tree_roots_t trees, const unit_lib_t* spec) {
   spn_target_info_t info = sp_zero;
   info.name = sp_str_view(spec->name);
   info.kind = SPN_TARGET_KIND_LIB;
   info.linkages = spec->linkages;
   info.no_link = spec->no_link;
-  info.source = test_tree_path_list(mem, spec->source, UNIT_TEST_MAX_STRS);
+  info.source = test_path_list(mem, trees, spec->source, UNIT_TEST_MAX_STRS);
   info.deps = test_str_list(mem, spec->deps, UNIT_TEST_MAX_STRS);
   info.macos.frameworks = test_str_list(mem, spec->frameworks, UNIT_TEST_MAX_STRS);
   info.macos.min_os = spec->min_os;
@@ -59,17 +61,17 @@ static spn_build_unit_t* add_build(spn_session_t* s, spn_build_id_t id, const c8
   spn_build_unit_t* build = sp_om_back(s->units.builds);
   build->id = id;
   build->profile = profile;
-  build->paths.root = sp_str_view(root);
+  build->paths.root = spn_path_make(&spn.roots, sp_str_view(root));
   sp_da_init(s->mem, build->include);
   sp_da_init(s->mem, build->packages);
 
   spn_toolchain_info_t* info = sp_alloc_type(s->mem, spn_toolchain_info_t);
   info->name = sp_str_lit("test");
   info->driver = SPN_CC_DRIVER_GCC;
-  info->compiler.program = sp_str_lit("cc");
-  info->cxx.program = sp_str_lit("c++");
-  info->linker.program = sp_str_lit("cc");
-  info->archiver.program = sp_str_lit("ar");
+  info->compiler.program = spn_arg_lit(sp_str_lit("cc"));
+  info->cxx.program = spn_arg_lit(sp_str_lit("c++"));
+  info->linker.program = spn_arg_lit(sp_str_lit("cc"));
+  info->archiver.program = spn_arg_lit(sp_str_lit("ar"));
 
   spn_toolchain_unit_t* toolchain = sp_alloc_type(s->mem, spn_toolchain_unit_t);
   toolchain->info = info;
@@ -108,7 +110,7 @@ spn_session_t* build_session(sp_mem_t mem, unit_graph_test_t* g) {
     .os = g->os ? g->os : SPN_OS_LINUX,
     .arch = SPN_ARCH_X64,
     .abi = g->os == SPN_OS_MACOS ? SPN_ABI_NONE : SPN_ABI_GNU,
-    .sysroot = g->sysroot ? sp_str_view(g->sysroot) : sp_str_lit(""),
+    .sysroot = { .sub = g->sysroot ? sp_str_view(g->sysroot) : sp_str_lit("") },
   };
 
   s->units.target = add_build(s, 1, "/build/debug", profile);
@@ -128,11 +130,14 @@ spn_session_t* build_session(sp_mem_t mem, unit_graph_test_t* g) {
     info->macos.frameworks = test_str_list(mem, pkg->frameworks, UNIT_TEST_MAX_STRS);
     info->macos.min_os = pkg->min_os;
 
+    spn_path_t tree = spn_path_make(&spn.roots, sp_fmt(mem, "/pkg/{}", sp_fmt_cstr(pkg->name)).value);
+    spn_tree_roots_t trees = { .recipe = tree, .source = tree };
+
     sp_carr_for(pkg->libs, lt) {
       if (!pkg->libs[lt].name) {
         break;
       }
-      spn_target_info_t lib = lib_info(mem, &pkg->libs[lt]);
+      spn_target_info_t lib = lib_info(mem, trees, &pkg->libs[lt]);
       sp_str_om_insert(info->libs, lib.name, lib);
     }
 
@@ -143,10 +148,11 @@ spn_session_t* build_session(sp_mem_t mem, unit_graph_test_t* g) {
     spn_loaded_pkg_t loaded = {
       .source = it == 0 ? SPN_PKG_SOURCE_ROOT : SPN_PKG_SOURCE_FILE,
       .info = info,
+      .roots = trees,
     };
     if (pkg->scripts) {
       sp_da_init(mem, loaded.configure.source);
-      sp_da_push(loaded.configure.source, ((spn_tree_path_t) { .path = sp_str_lit("configure.c"), .tree = SPN_TREE_MANIFEST }));
+      sp_da_push(loaded.configure.source, spn_tree_path(mem, &spn.roots, trees, SPN_TREE_MANIFEST, sp_str_lit("configure.c")));
     }
     sp_ht_insert(s->packages, id, loaded);
 

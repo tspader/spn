@@ -211,12 +211,12 @@ static s32 tree_exec_fn(spn_dag_t* g, spn_dag_action_t* action, void* user_data)
   tree_exec_env_t* env = (tree_exec_env_t*)user_data;
   env->dag.runs++;
   spn_dag_artifact_t* out = spn_dag_find_artifact(env->dag.g, action->produces[0]);
-  sp_fs_create_dir(out->path);
+  sp_fs_create_dir(dag_test_render(&env->dag, out->materialized));
   sp_carr_for(env->run->files, it) {
     if (!env->run->files[it].path) {
       break;
     }
-    sp_str_t path = sp_fs_join_path(env->dag.mem, out->path, sp_str_view(env->run->files[it].path));
+    sp_str_t path = dag_test_render(&env->dag, spn_path_join(env->dag.mem, out->materialized, sp_str_view(env->run->files[it].path)));
     sp_fs_create_dir(sp_fs_parent_path(path));
     if (sp_fs_create_file_str(path, sp_str_view(env->run->files[it].content))) {
       return 1;
@@ -229,6 +229,7 @@ sp_test_each(dag_tree, exec, tree_exec_test_t, tree_exec_tests) {
   tree_exec_env_t env = sp_zero;
   dag_test_env_init(&env.dag, t, (dag_test_env_config_t) { .store = SPN_DAG_STORE_FILESYSTEM });
   sp_str_t target = dag_test_env_path(&env.dag, sp_str_lit("install"));
+  spn_path_t tree = dag_test_env_rooted(&env.dag, sp_str_lit("install"));
 
   sp_carr_for(it->runs, r) {
     const tree_exec_run_t* run = &it->runs[r];
@@ -253,7 +254,7 @@ sp_test_each(dag_tree, exec, tree_exec_test_t, tree_exec_tests) {
       .execute = tree_exec_fn,
       .user_data = &env
     });
-    sp_must_eq(t, SPN_OK, spn_dag_action_add_output(g, action, spn_dag_add_tree(g, target)));
+    sp_must_eq(t, SPN_OK, spn_dag_action_add_output(g, action, spn_dag_add_tree(g, tree)));
 
     sp_expect_eq(t, SPN_OK, spn_dag_execute(g, action, &env.dag.env));
     sp_expect_eq(t, run->expect_runs, env.dag.runs);

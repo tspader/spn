@@ -14,6 +14,7 @@
 #include "error/error.h"
 #include "event/event.h"
 #include "intern/intern.h"
+#include "paths/paths.h"
 #include "project/types.h"
 #include "pkg/pkg.h"
 #include "pkg/options.h"
@@ -106,8 +107,8 @@ spn_err_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem, spn_p
   s->pkg = root;
   config = copy_config(mem, config);
   s->config = config;
-  s->paths.root = project->paths.root;
-  s->paths.build = sp_fs_join_path(s->mem, s->paths.root, sp_str_lit("build"));
+  s->paths.root = spn_path_from_root(SPN_PATH_ROOT_PROJECT);
+  s->paths.build = spn_path_join(s->mem, s->paths.root, sp_str_lit("build"));
   spn_triple_t host = spn_triple_host();
 
   sp_str_ht_init(s->mem, s->profiles);
@@ -128,7 +129,7 @@ spn_err_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem, spn_p
 
   switch (s->profile.os) {
     case SPN_OS_MACOS: {
-      s->profile.sysroot = resolve_macos_sdk(s->mem, ctx->env);
+      s->profile.sysroot = spn_path_canonicalize(s->mem, &ctx->roots, spn_path_join(s->mem, spn_path_from_root(SPN_PATH_ROOT_NONE), resolve_macos_sdk(s->mem, ctx->env)));
       break;
     }
     default: {
@@ -138,9 +139,10 @@ spn_err_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem, spn_p
 
   spn_try(spn_build_add(s, spn_build_config_target(host, s->profile), &s->units.target));
   spn_try(spn_build_add(s, spn_build_config_metaprogram(host), &s->units.metaprogram));
-  sp_da_push(s->units.metaprogram->include, ctx->paths.include);
+  sp_da_push(s->units.metaprogram->include, spn_path_join(s->mem, spn_path_from_root(SPN_PATH_ROOT_RUNTIME), sp_str_lit("include")));
 
-  sp_str_t log = sp_fs_join_path(s->mem, s->units.target->paths.root, sp_str_lit(".spn/build.jsonl"));
+  spn_path_t log_path = spn_path_join(s->mem, s->units.target->paths.root, sp_str_lit(".spn/build.jsonl"));
+  sp_str_t log = spn_path_str(&ctx->roots, s->mem, log_path);
   if (spn_event_log_open(ctx->events, log)) {
     return spn_err_emit(ctx, (spn_err_union_t) {
       .kind = SPN_ERR_FS_WRITE,
@@ -172,11 +174,11 @@ sp_opt_spn_linkage_t spn_session_config_kind(spn_session_t* session, sp_str_t pk
 void spn_session_export_toolchain_env(spn_session_t* s) {
   sp_env_init(s->mem, &s->env);
   spn_toolchain_unit_t* toolchain = s->units.target->toolchain;
-  sp_env_insert(&s->env, sp_str_lit("CC"), spn_toolchain_launcher_to_str(s->mem, toolchain->cc.compiler));
-  sp_env_insert(&s->env, sp_str_lit("AR"), spn_toolchain_launcher_to_str(s->mem, toolchain->cc.archiver));
-  sp_env_insert(&s->env, sp_str_lit("LD"), spn_toolchain_launcher_to_str(s->mem, toolchain->cc.linker));
+  sp_env_insert(&s->env, sp_str_lit("CC"), spn_toolchain_launcher_to_str(&spn.roots, s->mem, toolchain->cc.compiler));
+  sp_env_insert(&s->env, sp_str_lit("AR"), spn_toolchain_launcher_to_str(&spn.roots, s->mem, toolchain->cc.archiver));
+  sp_env_insert(&s->env, sp_str_lit("LD"), spn_toolchain_launcher_to_str(&spn.roots, s->mem, toolchain->cc.linker));
   if (spn_toolchain_has_cxx(toolchain->info)) {
-    sp_env_insert(&s->env, sp_str_lit("CXX"), spn_toolchain_launcher_to_str(s->mem, toolchain->cc.cxx));
+    sp_env_insert(&s->env, sp_str_lit("CXX"), spn_toolchain_launcher_to_str(&spn.roots, s->mem, toolchain->cc.cxx));
   }
 }
 

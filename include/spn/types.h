@@ -12,6 +12,24 @@ typedef struct {
 SP_TYPEDEF_FN(void, spn_wake_fn_t, void*);
 
 typedef enum {
+  SPN_PATH_ROOT_NONE = 0,
+  SPN_PATH_ROOT_PROJECT,
+  SPN_PATH_ROOT_STORE,
+  SPN_PATH_ROOT_BUILD,
+  SPN_PATH_ROOT_CHECKOUT,
+  SPN_PATH_ROOT_TOOLCHAIN,
+  SPN_PATH_ROOT_INDEX,
+  SPN_PATH_ROOT_RUNTIME,
+  SPN_PATH_ROOT_CACHE,
+  SPN_PATH_ROOT_COUNT,
+} spn_path_root_t;
+
+typedef struct {
+  spn_path_root_t root;
+  sp_str_t sub;
+} spn_path_t;
+
+typedef enum {
   SPN_INDEX_KIND_WORKSPACE,
   SPN_INDEX_KIND_BUILTIN,
   SPN_INDEX_KIND_USER,

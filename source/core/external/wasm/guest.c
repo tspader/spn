@@ -1,5 +1,7 @@
 #include "sp.h"
+#include "dag/dag.h"
 #include "dag/wasi.h"
+#include "paths/paths.h"
 #include "external/wasm/abi.h"
 #include "unit/types.h"
 #include "api/api.h"
@@ -14,11 +16,17 @@ static spn_pkg_unit_t* guest_unit(spn_wasm_ctx_t* abi) {
 }
 
 static sp_str_t guest_path(spn_wasm_ctx_t* abi, sp_mem_t mem, spn_pkg_unit_t* unit, const c8* path) {
+  if (!spn_path_normal(sp_str_view(path))) {
+    wasm_runtime_set_exception(abi->instance, sp_fmt_mem_cstr(mem, "{} must not contain '.', '..', or empty components", sp_fmt_cstr(path)));
+    return sp_str_lit("");
+  }
+
+  const spn_path_roots_t* roots = &spn.roots;
   struct { sp_str_t guest; sp_str_t host; } dirs [] = {
-    { sp_str_lit("/work"),     unit->paths.work },
-    { sp_str_lit("/source"),   unit->paths.roots.source },
-    { sp_str_lit("/manifest"), unit->paths.roots.recipe },
-    { sp_str_lit("/store"),    unit->paths.store },
+    { sp_str_lit("/work"),     spn_path_str(roots, mem, unit->paths.work) },
+    { sp_str_lit("/source"),   spn_path_str(roots, mem, unit->paths.roots.source) },
+    { sp_str_lit("/manifest"), spn_path_str(roots, mem, unit->paths.roots.recipe) },
+    { sp_str_lit("/store"),    spn_path_str(roots, mem, unit->paths.store) },
   };
 
   sp_str_t str = sp_str_view(path);

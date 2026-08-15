@@ -18,7 +18,7 @@ struct spn_profile_info {
   bool sanitizers_set;
   spn_when_t options;
   bool targeted;
-  sp_str_t sysroot;
+  spn_path_t sysroot;
 };
 
 typedef sp_str_ht(spn_profile_info_t) spn_profile_table_t;

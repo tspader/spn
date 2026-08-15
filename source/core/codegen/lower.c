@@ -1,6 +1,7 @@
 #include "codegen/lower.h"
 
 #include "manifest.gen.h"
+#include "paths/paths.h"
 #include "enum/enum.h"
 #include "git/patch.h"
 #include "semver/convert.h"
@@ -37,14 +38,14 @@ static spn_toolchain_launcher_t lower_launcher(spn_toml_loader_t* ctx, sp_str_t 
     launcher.args = sp_da_new(ctx->mem, sp_str_t);
     for (u32 i = 0; i < sp_da_size(parts); i++) {
       if (sp_str_empty(parts[i])) continue;
-      if (sp_str_empty(launcher.program)) {
-        launcher.program = spn_toml_loader_intern(ctx, parts[i]);
+      if (spn_arg_empty(launcher.program)) {
+        launcher.program = spn_arg_lit(spn_toml_loader_intern(ctx, parts[i]));
         continue;
       }
       sp_da_push(launcher.args, spn_toml_loader_intern(ctx, parts[i]));
     }
   } else {
-    launcher.program = spn_toml_loader_intern(ctx, str);
+    launcher.program = spn_arg_lit(spn_toml_loader_intern(ctx, str));
   }
 
   return launcher;
@@ -84,9 +85,20 @@ static spn_cxx_options_t lower_cxx_options(const spn_cg_cxx_options_t* cg) {
   };
 }
 
+static bool lower_path_ok(spn_toml_loader_t* ctx, sp_str_t path) {
+  if (spn_path_normal(path)) {
+    return true;
+  }
+  spn_toml_loader_issue_at(ctx, SPN_ERR_CODEGEN_PATH, path);
+  return false;
+}
+
 static spn_gated_path_list_t lower_gated_sources(spn_toml_loader_t* ctx, sp_da(spn_cg_source_entry_t) entries) {
   spn_gated_path_list_t values = sp_da_new(ctx->mem, spn_gated_path_t);
   sp_da_for(entries, it) {
+    if (!lower_path_ok(ctx, entries[it].path)) {
+      continue;
+    }
     sp_da_push(values, ((spn_gated_path_t) {
       .path = entries[it].path,
       .tree = sp_opt_is_null(entries[it].tree) ? SPN_TREE_SOURCE : sp_opt_get(entries[it].tree),
@@ -178,6 +190,10 @@ static void lower_dep(spn_toml_loader_t* ctx, sp_str_t name, const spn_cg_dep_t*
     if (!is_path_absolute(path)) {
       path = sp_fs_join_path(ctx->mem, ctx->dir, path);
     }
+    sp_str_t canonical = sp_fs_canonicalize_path(ctx->mem, path);
+    if (!sp_str_empty(canonical)) {
+      path = canonical;
+    }
     req.source = SPN_PKG_SOURCE_FILE;
     req.file.path = sp_fs_normalize_path(ctx->mem, sp_fs_join_path(ctx->mem, path, sp_str_lit("spn.toml")));
   } else {
@@ -208,7 +224,7 @@ static void lower_package(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, s
     spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "version");
     spn_toml_loader_pop(ctx);
   }
-  info->include = sp_da_new(ctx->mem, spn_tree_path_t);
+  info->include = sp_da_new(ctx->mem, spn_path_t);
   info->gated.include = lower_gated_sources(ctx, p->include);
   info->define = p->define ? p->define : sp_da_new(ctx->mem, sp_str_t);
   info->public_define = sp_da_new(ctx->mem, sp_str_t);
@@ -240,6 +256,9 @@ static void lower_publish(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, s
       .from = cg->publish.copy[it].from,
       .to = cg->publish.copy[it].to,
     };
+    if (!lower_path_ok(ctx, copy.from) || !lower_path_ok(ctx, copy.to)) {
+      continue;
+    }
     if (!publish_mount_ok(copy.from) || !publish_mount_ok(copy.to)) {
       spn_toml_loader_push_index(ctx, it);
       spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "copy");

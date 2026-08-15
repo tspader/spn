@@ -13,6 +13,7 @@ add_executable(fuzz_dag
   ${SRC}/sp/fs.c
   ${SRC}/sp/io.c
   ${SRC}/intern/intern.c
+  ${SRC}/paths/paths.c
   main.c
   cli.c
   generator.c

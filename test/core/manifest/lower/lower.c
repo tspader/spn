@@ -325,6 +325,20 @@ static const test_t tests [] = {
     }
   },
   {
+    .name = "validate_relative_path",
+    .manifest = "validate_relative_path",
+    .issues = {
+      { SPN_ERR_CODEGEN_PATH },
+      { SPN_ERR_CODEGEN_PATH },
+    },
+    .exes = {
+      {
+        .name = "t",
+        .source = { { "c.c" } },
+      }
+    }
+  },
+  {
     .name = "validate_cxx_source_on_build_script",
     .manifest = "validate_cxx_source_on_build_script",
     .build_source = { { "tools/build.cpp" } },
@@ -1066,10 +1080,10 @@ sp_test_each(lower, cases, test_t, tests) {
     if (expected.url)      sp_expect_str_eq_c(t, tc->hosts[0].artifact.url, expected.url);
     if (expected.sha256)   sp_expect_str_eq_c(t, tc->hosts[0].artifact.sha256, expected.sha256);
     if (expected.mirrors)  sp_expect_str_eq_c(t, tc->hosts[0].artifact.mirror_list, expected.mirrors);
-    if (expected.compiler) sp_expect_str_eq_c(t, tc->compiler.program, expected.compiler);
-    if (expected.linker)   sp_expect_str_eq_c(t, tc->linker.program, expected.linker);
-    if (expected.archiver) sp_expect_str_eq_c(t, tc->archiver.program, expected.archiver);
-    if (expected.cxx)      sp_expect_str_eq_c(t, tc->cxx.program, expected.cxx);
+    if (expected.compiler) sp_expect_str_eq_c(t, tc->compiler.program.prefix, expected.compiler);
+    if (expected.linker)   sp_expect_str_eq_c(t, tc->linker.program.prefix, expected.linker);
+    if (expected.archiver) sp_expect_str_eq_c(t, tc->archiver.program.prefix, expected.archiver);
+    if (expected.cxx)      sp_expect_str_eq_c(t, tc->cxx.program.prefix, expected.cxx);
     if (expected.driver)   sp_expect_eq(t, (u32)expected.driver, (u32)tc->driver);
 
     sp_must_strs_eq(t, tc->compiler.args, sp_da_size(tc->compiler.args), expected.args);

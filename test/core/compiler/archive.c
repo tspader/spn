@@ -38,10 +38,10 @@ sp_test_each(render_archive, render, archive_test_t, tests, .setup = spn_test_ct
     .abi = SPN_ABI_GNU,
   };
   spn_cc_archive_files_t files = {
-    .output = sp_str_lit("libmain.a"),
+    .output = test_arg_path("libmain.a"),
   };
   sp_da_init(mem, files.objects);
-  sp_da_push(files.objects, sp_str_lit("main.o"));
+  sp_da_push(files.objects, test_arg_path("main.o"));
 
   spn_invocation_t invocation = sp_zero;
   spn_err_t err = spn_cc_render_archive(mem, &toolchain, &profile, &files, &invocation);

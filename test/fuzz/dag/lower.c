@@ -1,4 +1,6 @@
 #include "fuzz.h"
+
+#include "paths/paths.h"
 #include "sp/io.h"
 
 typedef struct {
@@ -31,7 +33,7 @@ static s32 fz_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
         break;
       }
       case SPN_DAG_ARTIFACT_KIND_FILE: {
-        if (sp_io_read_file(mem, in->path, &inputs[it])) {
+        if (sp_io_read_file(mem, spn_path_str(low->roots, mem, in->materialized), &inputs[it])) {
           return 1;
         }
         break;
@@ -66,14 +68,14 @@ static s32 fz_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
   sp_da_for(action->produces, it) {
     spn_dag_artifact_t* out = spn_dag_find_artifact(low->g, action->produces[it]);
     sp_str_t content = fz_output_content(mem, low->u->actions[ctx->action].identity, inputs, count, out->name);
-    if (sp_fs_create_file_str(out->path, content)) {
+    if (sp_fs_create_file_str(spn_path_str(low->roots, mem, out->materialized), content)) {
       return 1;
     }
   }
   return 0;
 }
 
-static spn_err_t fz_discover(spn_dag_t* g, spn_dag_action_t* action, void* user_data, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
+static spn_err_t fz_discover(spn_dag_t* g, spn_dag_action_t* action, void* user_data, spn_dag_env_t* env, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
   fz_exec_ctx_t* ctx = (fz_exec_ctx_t*)user_data;
   fz_lowered_t* low = ctx->low;
 
@@ -83,23 +85,29 @@ static spn_err_t fz_discover(spn_dag_t* g, spn_dag_action_t* action, void* user_
       sp_str_t path = fz_phantom_sim_path(mem, obs.phantom);
       sp_da_push(*out, ((spn_dag_obs_t) {
         .kind = sp_fs_is_file(path) ? SPN_DAG_OBS_FILE : SPN_DAG_OBS_ABSENT,
-        .path = path,
+        .path = spn_path_make(g->roots, path),
       }));
     }
     else {
       sp_da_push(*out, ((spn_dag_obs_t) {
         .kind = SPN_DAG_OBS_FILE,
-        .path = fz_artifact_sim_path(mem, low->u, obs.artifact),
+        .path = spn_path_make(g->roots, fz_artifact_sim_path(mem, low->u, obs.artifact)),
       }));
     }
   }
   return SPN_OK;
 }
 
-void fz_lower(fz_lowered_t* low, sp_mem_t mem, fz_universe_t* u) {
+void fz_roots_init(spn_path_roots_t* roots) {
+  roots->dirs[SPN_PATH_ROOT_PROJECT] = sp_str_lit("/out");
+  roots->dirs[SPN_PATH_ROOT_STORE] = sp_str_lit("/src");
+}
+
+void fz_lower(fz_lowered_t* low, sp_mem_t mem, fz_universe_t* u, const spn_path_roots_t* roots) {
   low->u = u;
   low->mem = mem;
-  low->g = spn_dag_new(mem);
+  low->roots = roots;
+  low->g = spn_dag_new(mem, roots);
   sp_da_init(mem, low->ids);
   sp_da_init(mem, low->execs);
 
@@ -114,7 +122,7 @@ void fz_lower(fz_lowered_t* low, sp_mem_t mem, fz_universe_t* u) {
       }
       case FZ_ARTIFACT_SOURCE:
       case FZ_ARTIFACT_OUTPUT: {
-        id = spn_dag_add_file(low->g, fz_artifact_sim_path(mem, u, it));
+        id = spn_dag_add_file(low->g, spn_path_make(roots, fz_artifact_sim_path(mem, u, it)));
         break;
       }
     }

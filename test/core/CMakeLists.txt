@@ -27,6 +27,7 @@ add_executable(core
   compiler/toc.c
   dag/harness.c
   dag/action_cache.c
+  dag/canonicalize.c
   dag/digest.c
   dag/discovery.c
   dag/discover_exec.c
@@ -35,10 +36,9 @@ add_executable(core
   dag/file_cache.c
   dag/glob.c
   dag/graph.c
+  dag/hints.c
   dag/key.c
-  dag/masked.c
   dag/parallel.c
-  dag/roots.c
   dag/run.c
   dag/store.c
   dag/strong_key.c
@@ -76,6 +76,15 @@ add_executable(core
   options/merge.c
   options/apply.c
   options/session.c
+  paths/harness.c
+  paths/anchor.c
+  paths/canonicalize.c
+  paths/label.c
+  paths/normal.c
+  paths/path.c
+  paths/roots.c
+  paths/tree_path.c
+  paths/tree_rel.c
   pkg/pkg.c
   profile/profile.c
   publish/publish.c
@@ -99,6 +108,8 @@ add_executable(core
   unit/harness.c
   unit/walk.c
   unit/link_plan.c
+  unit/objects.c
+  unit/paths.c
   ${CMAKE_SOURCE_DIR}/tools/jtd.c
   ${CMAKE_SOURCE_DIR}/tools/gen/lower.c
   ${SRC}/codegen/codegen.c
@@ -125,6 +136,7 @@ add_executable(core
   ${SRC}/dag/run.c
   ${SRC}/dag/store.c
   ${SRC}/dag/wasi.c
+  ${SRC}/dag/wasi/canonicalize.c
   ${SRC}/enum/enum.c
   ${SRC}/error/error.c
   ${SRC}/error/json.c
@@ -148,6 +160,7 @@ add_executable(core
   ${SRC}/log/lazy/lazy.c
   ${SRC}/graph/build.c
   ${SRC}/graph/identity.c
+  ${SRC}/paths/paths.c
   ${SRC}/pkg/id.c
   ${SRC}/pkg/mutate.c
   ${SRC}/pkg/options.c
@@ -190,6 +203,7 @@ add_executable(core
 set_source_files_properties(${EMBED_OBJ} PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)
 spn_test_binary(core)
 target_include_directories(core PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}/tools
   ${SRC}/codegen/gen
   ${SRC}/external

@@ -6,6 +6,7 @@
 
 #include "core/types.h"
 #include "compiler/types.h"
+#include "paths/types.h"
 #include "when/types.h"
 
 #define SP_EMBED_DEFAULT_SYMBOL_S sp_str_lit("")
@@ -27,8 +28,8 @@ typedef struct {
   sp_str_t symbol;
   spn_embed_types_t types;
   union {
-    struct { sp_str_t path; } file;
-    struct { sp_str_t path; sp_str_t dest; } dir;
+    struct { spn_path_t path; } file;
+    struct { spn_path_t path; sp_str_t dest; } dir;
   };
 } spn_embed_t;
 
@@ -62,9 +63,9 @@ struct spn_target_info {
   spn_target_kind_t kind;
   spn_linkage_set_t linkages;
   bool no_link; // @spader A hack for libtcc1.a (building an unlinked library)
-  sp_da(spn_tree_path_t) source;
-  sp_da(spn_tree_path_t) headers;
-  sp_da(spn_tree_path_t) include;
+  sp_da(spn_path_t) source;
+  sp_da(spn_path_t) headers;
+  sp_da(spn_path_t) include;
   sp_da(sp_str_t) define;
   sp_da(sp_str_t) flags;
   sp_da(sp_str_t) system_deps;

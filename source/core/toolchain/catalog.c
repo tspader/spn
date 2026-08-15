@@ -1,11 +1,12 @@
 #include "toolchain/catalog.h"
 
+#include "paths/paths.h"
 #include "toolchains.gen.h"
 #include "triple/triple.h"
 
 SP_PRIVATE spn_toolchain_launcher_t spn_toolchain_catalog_load_launcher(const spn_cg_launcher_t* in) {
   return (spn_toolchain_launcher_t) {
-    .program = in->program,
+    .program = spn_arg_lit(in->program),
     .args = in->args,
   };
 }

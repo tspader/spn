@@ -20,7 +20,6 @@ spn_err_t spn_project_load(spn_ctx_t* ctx, sp_str_t root, spn_project_t** projec
   }
 
   spn_project_t* loaded = sp_alloc_type(ctx->heap, spn_project_t);
-  loaded->paths.root = root;
   loaded->paths.manifest = manifest;
   loaded->paths.lock = sp_fs_join_path(ctx->heap, root, sp_str_lit("spn.lock"));
 

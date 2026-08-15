@@ -117,10 +117,10 @@ static void make_list(
 static void make_path_list(
   sp_mem_t mem,
   apply_list_t test,
-  sp_da(spn_tree_path_t)* plain,
+  sp_da(spn_path_t)* plain,
   spn_gated_path_list_t* gated
 ) {
-  *plain = sp_da_new(mem, spn_tree_path_t);
+  *plain = sp_da_new(mem, spn_path_t);
   *gated = sp_da_new(mem, spn_gated_path_t);
 
   sp_carr_for(test.values, it) {
@@ -129,7 +129,7 @@ static void make_path_list(
       break;
     }
     if (value->plain) {
-      sp_da_push(*plain, ((spn_tree_path_t) { .path = sp_cstr_as_str(value->value), .tree = SPN_TREE_SOURCE }));
+      sp_da_push(*plain, ((spn_path_t) { .sub = sp_cstr_as_str(value->value) }));
       continue;
     }
     sp_da_push(*gated, ((spn_gated_path_t) {
@@ -154,7 +154,7 @@ static sp_err_t expect_list(sp_test_t* t, sp_da(sp_str_t) actual, const c8** exp
   return SP_OK;
 }
 
-static sp_err_t expect_path_list(sp_test_t* t, sp_da(spn_tree_path_t) actual, const c8** expected) {
+static sp_err_t expect_path_list(sp_test_t* t, sp_da(spn_path_t) actual, const c8** expected) {
   sp_for(et, 4) {
     if (!expected[et]) {
       sp_must_eq(t, sp_da_size(actual), et);
@@ -162,7 +162,7 @@ static sp_err_t expect_path_list(sp_test_t* t, sp_da(spn_tree_path_t) actual, co
     }
     sp_test_kv_c(t, "value", expected[et]);
     sp_must(t, et < sp_da_size(actual));
-    sp_expect_str_eq_c(t, actual[et].path, expected[et]);
+    sp_expect_str_eq_c(t, actual[et].sub, expected[et]);
   }
   sp_must_eq(t, sp_da_size(actual), 4);
   return SP_OK;
@@ -333,7 +333,7 @@ sp_test_each(options_apply, lists, apply_test_t, list_tests) {
 
   struct {
     apply_list_t test;
-    sp_da(spn_tree_path_t)* plain;
+    sp_da(spn_path_t)* plain;
     spn_gated_path_list_t* gated;
     const c8** expected;
   } path_lists [] = {
@@ -365,12 +365,14 @@ sp_test_each(options_apply, lists, apply_test_t, list_tests) {
   spn_when_env_t env = sp_zero;
   spn_when_env_init(mem, &env);
   spn_when_env_set_facts(&env, it->facts);
-  spn_pkg_apply_options(&info, &env);
+  spn_path_roots_t roots = sp_zero;
+  spn_tree_roots_t trees = sp_zero;
+  spn_pkg_apply_options(mem, &info, &roots, trees, &env);
   if (it->reapply) {
     spn_when_env_t reapply = sp_zero;
     spn_when_env_init(mem, &reapply);
     spn_when_env_set_facts(&reapply, it->reapply_facts);
-    spn_pkg_apply_options(&info, &reapply);
+    spn_pkg_apply_options(mem, &info, &roots, trees, &reapply);
   }
 
   sp_expect(t, info.applied);
@@ -505,7 +507,9 @@ sp_test_each(options_apply, option_defines, apply_option_test_t, option_tests) {
     spn_when_env_set(&env, sp_cstr_as_str(it->env[et].name), value);
   }
 
-  spn_pkg_apply_options(&info, &env);
+  spn_path_roots_t roots = sp_zero;
+  spn_tree_roots_t trees = sp_zero;
+  spn_pkg_apply_options(mem, &info, &roots, trees, &env);
 
   sp_expect(t, info.applied);
   sp_err_t err = expect_list(t, info.define, it->expect.define);

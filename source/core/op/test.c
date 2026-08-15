@@ -6,13 +6,14 @@
 #include "event/event.h"
 #include "graph/build.h"
 #include "op/op.h"
+#include "paths/paths.h"
 #include "session/session.h"
 #include "session/types.h"
 #include "unit/types.h"
 
 static spn_err_t run_test(spn_session_t* session, spn_target_unit_t* unit, bool* passed) {
   spn_ctx_t* ctx = session->ctx;
-  sp_str_t command = spn_target_unit_staged_path(session->mem, unit);
+  sp_str_t command = spn_path_str(&ctx->roots, session->mem, spn_target_unit_staged_path(session->mem, unit));
 
   spn_event_buffer_push(ctx->events, (spn_event_t) {
     .kind = SPN_EVENT_TARGET_RUN,
@@ -33,7 +34,7 @@ static spn_err_t run_test(spn_session_t* session, spn_target_unit_t* unit, bool*
   sp_tm_timer_t timer = sp_tm_start_timer();
   sp_ps_output_t output = sp_ps_run(session->mem, (sp_ps_config_t) {
     .command = command,
-    .cwd = unit->pkg->paths.roots.source,
+    .cwd = spn_path_str(&ctx->roots, session->mem, unit->pkg->paths.roots.source),
     .io = {
       .in =  { .mode = SP_PS_IO_MODE_NULL },
       .out = { .mode = SP_PS_IO_MODE_CREATE },

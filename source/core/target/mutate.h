@@ -22,9 +22,6 @@ static inline void spn_target_info_init(sp_mem_t mem, spn_target_info_t* target)
   if (!target->gated.system_deps) sp_da_init(mem, target->gated.system_deps);
   if (!target->gated.deps)        sp_da_init(mem, target->gated.deps);
 }
-void spn_target_add_source_ex(spn_target_info_t* target, sp_str_t source);
-void spn_target_add_header_ex(spn_target_info_t* target, sp_str_t header);
-void spn_target_add_include_ex(spn_target_info_t* target, sp_str_t include);
 void spn_target_add_define_ex(spn_target_info_t* target, sp_str_t define);
 void spn_target_add_flag_ex(spn_target_info_t* target, sp_str_t flag);
 void spn_target_add_dep(spn_target_info_t* target, const c8* dep);

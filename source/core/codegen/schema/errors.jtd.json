@@ -31,6 +31,7 @@
     "codegen_file_missing": { "properties": {} },
     "codegen_invalid": { "properties": {} },
     "codegen_root_only": { "properties": {} },
+    "codegen_path": { "properties": {} },
     "wasm_init_failed": { "ref": "wasm" },
     "wasm_register_failed": { "ref": "wasm" },
     "wasm_module_load_failed": { "ref": "wasm" },
@@ -113,7 +114,8 @@
     "cancelled": { "properties": {} },
     "patch_unused": { "ref": "patch" },
     "patch_not_git": { "ref": "patch" },
-    "header_collision": { "ref": "header_collision" }
+    "header_collision": { "ref": "header_collision" },
+    "path_component": { "ref": "fs" }
   },
   "definitions": {
     "manifest_parse": {

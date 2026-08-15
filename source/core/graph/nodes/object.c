@@ -5,13 +5,14 @@
 #include "unit/types.h"
 
 #include "compiler/driver.h"
+#include "paths/paths.h"
 #include "session/invocation.h"
 #include "session/session.h"
 #include "graph/build.h"
 #include "graph/nodes/nodes.h"
 #include "unit/package.h"
 
-s32 spn_compile_object_run(spn_compile_unit_t* unit, sp_str_t object, sp_str_t depfile) {
+s32 spn_compile_object_run(spn_compile_unit_t* unit, spn_path_t object, spn_path_t depfile) {
   spn_pkg_unit_t* pkg = unit->target->pkg;
   spn_session_t* session = pkg->session;
 
@@ -23,6 +24,8 @@ s32 spn_compile_object_run(spn_compile_unit_t* unit, sp_str_t object, sp_str_t d
     .depfile = depfile,
   };
   spn_invocation_t invocation = spn_cc_render_compile_command(spn.mem, &pkg->build->toolchain->cc, &unit->invocation, &files);
+  sp_str_t source = spn_path_str(&spn.roots, spn.mem, files.source);
+  sp_str_t output = spn_path_str(&spn.roots, spn.mem, files.output);
   spn_invocation_result_t run = spn_invocation_run(&invocation);
   sp_str_t command = spn_invocation_to_str(spn.mem, &invocation);
 
@@ -32,8 +35,8 @@ s32 spn_compile_object_run(spn_compile_unit_t* unit, sp_str_t object, sp_str_t d
       .pkg = pkg->info->name,
       .target_failed = {
         .target = unit->target->info->name,
-        .source_file = unit->paths.file,
-        .object_file = object,
+        .source_file = source,
+        .object_file = output,
         .rc = run.result.status.exit_code,
         .out = run.result.out,
         .command = command,
@@ -46,8 +49,8 @@ s32 spn_compile_object_run(spn_compile_unit_t* unit, sp_str_t object, sp_str_t d
       .pkg = pkg->info->name,
       .target_passed = {
         .target = unit->target->info->name,
-        .source_file = unit->paths.file,
-        .object_file = object,
+        .source_file = source,
+        .object_file = output,
         .command = command,
         .out = run.result.out,
         .time = run.elapsed,

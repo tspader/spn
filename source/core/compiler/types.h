@@ -40,7 +40,7 @@ typedef struct {
 
 typedef struct {
   spn_lang_t lang;
-  sp_da(sp_str_t) include;
+  sp_da(spn_path_t) include;
   sp_da(sp_str_t) define;
   sp_da(sp_str_t) args;
   spn_cxx_options_t cxx;
@@ -49,13 +49,13 @@ typedef struct {
 } spn_cc_compile_t;
 
 typedef struct {
-  sp_str_t source;
-  sp_str_t output;
-  sp_str_t depfile;
+  spn_path_t source;
+  spn_path_t output;
+  spn_path_t depfile;
 } spn_cc_compile_files_t;
 
 typedef struct {
-  sp_str_t path;
+  spn_path_t path;
   sp_da(sp_str_t) symbols;
 } spn_cc_exports_t;
 
@@ -63,10 +63,9 @@ typedef struct {
   spn_lang_t lang;
   spn_cc_output_kind_t kind;
   sp_da(sp_str_t) libs;
-  sp_da(sp_str_t) whole_archives;
   sp_da(sp_str_t) private_libs;
   sp_da(sp_str_t) system_libs;
-  sp_da(sp_str_t) lib_dirs;
+  sp_da(spn_path_t) lib_dirs;
   sp_da(sp_str_t) frameworks;
   spn_os_version_t min_os;
   spn_win_subsystem_t subsystem;
@@ -74,14 +73,15 @@ typedef struct {
 } spn_cc_link_t;
 
 typedef struct {
-  sp_str_t output;
-  sp_da(sp_str_t) objects;
+  spn_path_t output;
+  sp_da(spn_path_t) objects;
+  sp_da(spn_path_t) whole_archives;
   spn_cc_exports_t exports;
 } spn_cc_link_files_t;
 
 typedef struct {
-  sp_str_t output;
-  sp_da(sp_str_t) objects;
+  spn_path_t output;
+  sp_da(spn_path_t) objects;
 } spn_cc_archive_files_t;
 
 typedef enum {
@@ -92,9 +92,9 @@ typedef enum {
 } spn_cc_exports_format_t;
 
 typedef struct {
-  sp_str_t program;
-  sp_da(sp_str_t) args;
-  sp_str_t cwd;
+  spn_arg_t program;
+  sp_da(spn_arg_t) args;
+  spn_path_t cwd;
 } spn_invocation_t;
 
 #endif

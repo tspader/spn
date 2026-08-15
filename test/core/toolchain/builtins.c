@@ -117,9 +117,9 @@ sp_test(builtins, well_formed) {
     sp_expect(t, spn_toolchain_catalog_get(&catalog, info->name) == info);
     sp_expect(t, !sp_str_empty(info->name));
     sp_expect_ne(t, (u32)SPN_CC_DRIVER_NONE, (u32)info->driver);
-    sp_expect(t, !sp_str_empty(info->compiler.program));
-    sp_expect(t, !sp_str_empty(info->linker.program));
-    sp_expect(t, !sp_str_empty(info->archiver.program));
+    sp_expect(t, !spn_arg_empty(info->compiler.program));
+    sp_expect(t, !spn_arg_empty(info->linker.program));
+    sp_expect(t, !spn_arg_empty(info->archiver.program));
     sp_expect(t, spn_toolchain_has_cxx(info));
 
     if (info->source == SPN_TOOLCHAIN_SOURCE_DISTRIBUTION) {

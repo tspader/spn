@@ -26,5 +26,6 @@ sp_err_t sp_fs_lock_release(sp_fs_lock_t* lock);
 sp_str_t sp_fs_staging_path(sp_mem_t mem, sp_str_t path, sp_str_t extension);
 
 sp_err_t sp_fs_staging_dir(sp_mem_t mem, sp_str_t path, sp_str_t extension, sp_str_t* dir);
+sp_err_t sp_fs_staging_dir_name(sp_mem_t mem, sp_str_t path, sp_str_t extension, sp_str_t* name);
 
 #endif

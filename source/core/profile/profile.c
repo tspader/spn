@@ -8,12 +8,12 @@
 #include "spn/core.h"
 #include "triple/triple.h"
 
-sp_str_t spn_profile_build_path(sp_mem_t mem, sp_str_t build, const spn_profile_info_t* profile) {
-  if (profile->targeted) {
-    spn_triple_t target = { profile->arch, profile->os, profile->abi };
-    build = sp_fs_join_path(mem, build, spn_triple_to_str(mem, target));
+sp_str_t spn_profile_build_dir(sp_mem_t mem, const spn_profile_info_t* profile) {
+  if (!profile->targeted) {
+    return profile->name;
   }
-  return sp_fs_join_path(mem, build, profile->name);
+  spn_triple_t target = { profile->arch, profile->os, profile->abi };
+  return sp_fs_join_path(mem, spn_triple_to_str(mem, target), profile->name);
 }
 
 void overlay_profile(spn_profile_info_t* to, spn_profile_info_t* from) {

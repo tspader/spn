@@ -2,18 +2,18 @@
 
 #include "sp.h"
 #include "sp/macro.h"
-#include "sp/sp_glob.h"
 #include "sp/str.h"
 
 #include "ctx/types.h"
 
 #include "compiler/driver.h"
-#include "core/core.h"
+#include "dag/dag.h"
 #include "error/error.h"
 #include "enum/enum.h"
 #include "external/wasm/wasm.h"
 #include "filter/filter.h"
 #include "intern/intern.h"
+#include "paths/paths.h"
 #include "pkg/id.h"
 #include "target/mutate.h"
 #include "pkg/pkg.h"
@@ -139,73 +139,21 @@ static spn_err_t ensure_target(spn_session_t* s, spn_pkg_unit_t* pkg, spn_target
   return SPN_OK;
 }
 
-static bool tree_path_equal(spn_tree_path_t a, spn_tree_path_t b) {
-  if (!sp_str_equal(a.path, b.path)) {
-    return false;
-  }
-  return sp_fs_is_absolute(a.path) || a.tree == b.tree;
-}
-
-static bool has_source_file(sp_da(spn_tree_path_t) source, spn_tree_path_t entry) {
+static bool has_source_file(sp_da(spn_path_t) source, spn_path_t path) {
   sp_da_for(source, it) {
-    if (tree_path_equal(source[it], entry)) {
+    if (spn_path_equal(source[it], path)) {
       return true;
     }
   }
   return false;
 }
 
-static sp_str_t glob_literal_dir(sp_str_t pattern) {
-  u32 cut = 0;
-  for (u32 i = 0; i < pattern.len; i++) {
-    c8 c = pattern.data[i];
-    if (c == '*' || c == '?' || c == '[' || c == '{') break;
-    if (c == '/') cut = i;
-  }
-  return sp_str_sub(pattern, 0, cut);
-}
-
-static void collect_source_glob(sp_mem_t mem, sp_str_t root, spn_tree_path_t pattern, sp_da(spn_tree_path_t)* source) {
-  sp_glob_t* glob = sp_glob_new_str(mem, pattern.path);
-  if (!glob) {
-    return;
-  }
-
-  sp_str_t sub = glob_literal_dir(pattern.path);
-  sp_str_t scan = sp_str_empty(sub) ? root : sp_fs_join_path(mem, root, sub);
-  sp_da(sp_fs_entry_t) entries = sp_fs_collect_recursive(mem, scan);
-  sp_da(sp_str_t) matches = sp_da_new(mem, sp_str_t);
-
-  sp_da_for(entries, it) {
-    sp_fs_entry_t* entry = &entries[it];
-    if (!sp_fs_is_file(entry->path)) {
-      continue;
-    }
-
-    sp_str_t relative = sp_str_strip_left(entry->path, root);
-    relative = sp_str_strip_left(relative, sp_str_lit("/"));
-    if (!sp_glob_match(glob, relative)) {
-      continue;
-    }
-
-    bool seen = false;
-    sp_da_for(matches, jt) {
-      if (sp_str_equal(matches[jt], relative)) {
-        seen = true;
-        break;
-      }
-    }
-    if (seen) {
-      continue;
-    }
-
-    sp_da_push(matches, relative);
-  }
-
-  sp_da_sort(matches, sp_str_sort_kernel_alphabetical);
+static void collect_source_glob(sp_mem_t mem, spn_path_t pattern, sp_da(spn_path_t)* source) {
+  sp_da(spn_path_t) matches = sp_da_new(mem, spn_path_t);
+  spn_dag_glob(mem, &spn.roots, pattern, SP_NULLPTR, &matches);
 
   sp_da_for(matches, it) {
-    spn_tree_path_t match = { .path = matches[it], .tree = pattern.tree };
+    spn_path_t match = spn_path_canonicalize(mem, &spn.roots, matches[it]);
     if (has_source_file(*source, match)) {
       continue;
     }
@@ -213,19 +161,20 @@ static void collect_source_glob(sp_mem_t mem, sp_str_t root, spn_tree_path_t pat
   }
 }
 
-static sp_da(spn_tree_path_t) collect_target_source(sp_mem_t mem, spn_pkg_unit_t* pkg, spn_target_unit_t* target) {
-  sp_da(spn_tree_path_t) source = sp_da_new(mem, spn_tree_path_t);
+static sp_da(spn_path_t) collect_target_source(sp_mem_t mem, spn_pkg_unit_t* pkg, spn_target_unit_t* target) {
+  sp_da(spn_path_t) source = sp_da_new(mem, spn_path_t);
 
   sp_da_for(target->info->source, it) {
-    spn_tree_path_t entry = target->info->source[it];
-    if (sp_fs_is_glob(entry.path)) {
-      collect_source_glob(mem, spn_tree_root(pkg->paths.roots, entry.tree), entry, &source);
+    spn_path_t path = target->info->source[it];
+    spn_tree_rel_t rel = spn_tree_rel(pkg->paths.roots, path);
+    if (rel.tree != SPN_TREE_NONE && sp_fs_is_glob(rel.sub)) {
+      collect_source_glob(mem, path, &source);
       continue;
     }
-    if (has_source_file(source, entry)) {
+    if (has_source_file(source, path)) {
       continue;
     }
-    sp_da_push(source, entry);
+    sp_da_push(source, path);
   }
 
   return source;
@@ -236,62 +185,35 @@ typedef struct {
   sp_str_t path;
 } object_name_t;
 
-static bool is_path_within(sp_str_t path, sp_str_t dir) {
-  if (path.len <= dir.len + 1 || !sp_str_starts_with(path, dir)) {
-    return false;
-  }
-  return path.data[dir.len] == '/';
-}
-
-static object_name_t object_name(spn_tree_roots_t roots, spn_tree_path_t entry) {
-  if (!sp_fs_is_absolute(entry.path)) {
-    return (object_name_t) {
-      .prefix = entry.tree == SPN_TREE_MANIFEST ? sp_str_lit("manifest") : sp_str_lit("source"),
-      .path = entry.path,
-    };
+static object_name_t object_name(spn_tree_roots_t roots, spn_path_t path) {
+  spn_tree_rel_t rel = spn_tree_rel(roots, path);
+  switch (rel.tree) {
+    case SPN_TREE_MANIFEST: return (object_name_t) { .prefix = sp_str_lit("manifest"), .path = rel.sub };
+    case SPN_TREE_SOURCE:   return (object_name_t) { .prefix = sp_str_lit("source"), .path = rel.sub };
+    case SPN_TREE_NONE:     return (object_name_t) { .prefix = spn_path_root_label(path.root), .path = rel.sub };
   }
 
-  if (is_path_within(entry.path, roots.recipe)) {
-    return (object_name_t) {
-      .prefix = sp_str_lit("manifest"),
-      .path = sp_str_sub(entry.path, (s32)roots.recipe.len + 1, (s32)(entry.path.len - roots.recipe.len - 1)),
-    };
-  }
-
-  if (is_path_within(entry.path, roots.source)) {
-    return (object_name_t) {
-      .prefix = sp_str_lit("source"),
-      .path = sp_str_sub(entry.path, (s32)roots.source.len + 1, (s32)(entry.path.len - roots.source.len - 1)),
-    };
-  }
-
-  return (object_name_t) {
-    .path = sp_str_strip_left(entry.path, sp_str_lit("/")),
-  };
+  sp_unreachable_return(sp_zero_struct(object_name_t));
 }
 
 static void create_target_objects(spn_session_t* s, spn_target_unit_t* target) {
   spn_pkg_unit_t* pkg = target->pkg;
 
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  sp_da(spn_tree_path_t) source = collect_target_source(scratch.mem, pkg, target);
-  sp_str_t target_dir = spn_target_unit_object_dir(s->mem, target);
+  sp_da(spn_path_t) source = collect_target_source(scratch.mem, pkg, target);
+  spn_path_t target_dir = spn_target_unit_object_dir(s->mem, target);
 
   sp_da_for(source, it) {
-    spn_tree_path_t entry = source[it];
-    object_name_t name = object_name(pkg->paths.roots, entry);
-    sp_str_t file = spn_tree_path_resolve(s->mem, pkg->paths.roots, entry);
+    spn_path_t file = spn_path_copy(s->mem, source[it]);
+    object_name_t name = object_name(pkg->paths.roots, file);
 
     spn_lang_t lang = spn_lang_from_path(name.path);
 
-    sp_str_t object_dir = target_dir;
-    if (name.prefix.len) {
-      object_dir = sp_fs_join_path(s->mem, object_dir, name.prefix);
-    }
-    sp_str_t object_path = sp_fs_join_path(s->mem, object_dir, sp_fmt(scratch.mem, "{}.o", SP_FMT_STR(name.path)).value);
+    spn_path_t object_dir = spn_path_join(s->mem, target_dir, name.prefix);
+    spn_path_t object_path = spn_path_join(s->mem, object_dir, sp_fmt(scratch.mem, "{}.o", SP_FMT_STR(name.path)).value);
     spn_compile_unit_id_t id = {
       .target = target->id,
-      .source = sp_intern_get_or_insert(s->ctx->intern, file),
+      .source = sp_intern_get_or_insert(s->ctx->intern, spn_path_str(&spn.roots, scratch.mem, file)),
     };
 
     if (!sp_om_has(s->units.objects, id)) {
@@ -334,12 +256,12 @@ static bool is_target_dynamic(spn_target_unit_t* target) {
   return target->kind == SPN_CC_OUTPUT_SHARED_LIB || target->kind == SPN_CC_OUTPUT_REACTOR;
 }
 
-static sp_str_t static_archive_path(sp_mem_t mem, spn_target_unit_t* lib) {
+static spn_path_t static_archive_path(sp_mem_t mem, spn_target_unit_t* lib) {
   spn_profile_info_t* profile = &lib->pkg->build->profile;
   spn_triple_t triple = { profile->arch, profile->os, profile->abi };
   sp_mem_arena_marker_t s = sp_mem_begin_scratch_for(mem);
   sp_str_t file_name = spn_triple_lib_file_name(s.mem, triple, lib->info->name, SP_OS_LIB_STATIC);
-  sp_str_t path = sp_fs_join_path(mem, lib->pkg->paths.lib, file_name);
+  spn_path_t path = spn_path_join(mem, lib->pkg->paths.lib, file_name);
   sp_mem_end_scratch(s);
   return path;
 }
@@ -464,7 +386,7 @@ static spn_link_plan_t link_plan(spn_target_unit_t* target) {
   sp_da_init(mem, plan.cc.libs);
   sp_da_init(mem, plan.cc.lib_dirs);
   sp_da_init(mem, plan.cc.system_libs);
-  sp_da_init(mem, plan.cc.whole_archives);
+  sp_da_init(mem, plan.archives);
   sp_da_init(mem, plan.cc.private_libs);
   sp_da_init(mem, plan.cc.frameworks);
 
@@ -487,7 +409,7 @@ static spn_link_plan_t link_plan(spn_target_unit_t* target) {
         break;
       }
       case LINK_PLACE_WHOLE_ARCHIVE: {
-        sp_da_push(plan.cc.whole_archives, static_archive_path(mem, lib->lib));
+        sp_da_push(plan.archives, static_archive_path(mem, lib->lib));
         break;
       }
     }
@@ -499,12 +421,38 @@ static spn_link_plan_t link_plan(spn_target_unit_t* target) {
     }
   }
 
-  sp_da_for(plan.cc.whole_archives, it) {
-    sp_assert(sp_fs_is_absolute(plan.cc.whole_archives[it]));
-  }
-
   sp_mem_end_scratch(s);
   return plan;
+}
+
+spn_err_t spn_target_link_invocation(sp_mem_t mem, spn_target_unit_t* target, const spn_cc_link_files_t* files, spn_invocation_t* invocation) {
+  spn_profile_info_t* profile = &target->pkg->build->profile;
+  spn_cc_toolchain_t* toolchain = &target->pkg->build->toolchain->cc;
+
+  switch (target->kind) {
+    case SPN_CC_OUTPUT_STATIC_LIB: {
+      spn_cc_archive_files_t archive_files = {
+        .output = files->output,
+        .objects = files->objects,
+      };
+      spn_try(spn_cc_render_archive(mem, toolchain, profile, &archive_files, invocation));
+      break;
+    }
+    case SPN_CC_OUTPUT_EXE:
+    case SPN_CC_OUTPUT_SHARED_LIB:
+    case SPN_CC_OUTPUT_REACTOR: {
+      spn_cc_link_files_t linked = *files;
+      linked.whole_archives = target->link.archives;
+      spn_try(spn_cc_render_link(mem, toolchain, profile, &target->link.cc, &linked, invocation));
+      break;
+    }
+    case SPN_CC_OUTPUT_OBJECT: {
+      sp_unreachable_case();
+    }
+  }
+
+  invocation->cwd = target->pkg->paths.work;
+  return SPN_OK;
 }
 
 static spn_err_t build_target_plan(spn_target_unit_t* target) {
@@ -607,11 +555,12 @@ static void init_wasm_scripts(spn_session_t* s) {
     if (!unit->metaprogram) {
       continue;
     }
+    const spn_path_roots_t* roots = &spn.roots;
     if (unit->metaprogram->scripts.configure) {
-      spn_wasm_script_init(&unit->wasm.configure, spn_target_output_path(s->mem, unit->metaprogram->scripts.configure));
+      spn_wasm_script_init(&unit->wasm.configure, spn_path_str(roots, s->mem, spn_target_output_path(s->mem, unit->metaprogram->scripts.configure)));
     }
     if (unit->metaprogram->scripts.build) {
-      spn_wasm_script_init(&unit->wasm.build, spn_target_output_path(s->mem, unit->metaprogram->scripts.build));
+      spn_wasm_script_init(&unit->wasm.build, spn_path_str(roots, s->mem, spn_target_output_path(s->mem, unit->metaprogram->scripts.build)));
     }
   }
 }

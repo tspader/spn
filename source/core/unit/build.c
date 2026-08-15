@@ -1,6 +1,7 @@
 #include "unit/unit.h"
 
 #include "ctx/types.h"
+#include "paths/paths.h"
 #include "profile/profile.h"
 #include "sp/str.h"
 #include "spn/core.h"
@@ -39,7 +40,7 @@ spn_build_id_t spn_build_id(const spn_build_config_t* config) {
   sp_hash_t parts [] = {
     sp_hash_str(profile->name),
     sp_hash_str(profile->toolchain),
-    sp_hash_str(profile->sysroot),
+    spn_path_hash(profile->sysroot),
     (sp_hash_t)profile->os,
     (sp_hash_t)profile->arch,
     (sp_hash_t)profile->abi,
@@ -84,17 +85,17 @@ static spn_err_t bind_toolchain(spn_session_t* s, spn_toolchain_query_t query, s
   return SPN_OK;
 }
 
-static sp_str_t build_root(spn_session_t* s, const spn_build_config_t* config) {
+static spn_path_t build_root(spn_session_t* s, const spn_build_config_t* config) {
   switch (config->role) {
     case SPN_TOOLCHAIN_ROLE_BUILD: {
-      return spn_profile_build_path(s->mem, s->paths.build, &config->profile);
+      return spn_path_join(s->mem, s->paths.build, spn_profile_build_dir(s->mem, &config->profile));
     }
     case SPN_TOOLCHAIN_ROLE_SCRIPT: {
       spn_triple_t triple = { config->profile.arch, config->profile.os, config->profile.abi };
-      return sp_fs_join_path(s->mem, s->paths.build, spn_triple_to_str(s->mem, triple));
+      return spn_path_join(s->mem, s->paths.build, spn_triple_to_str(s->mem, triple));
     }
   }
-  sp_unreachable_return(sp_str_lit(""));
+  sp_unreachable_return(sp_zero_struct(spn_path_t));
 }
 
 spn_err_t spn_build_add(spn_session_t* s, spn_build_config_t config, spn_build_unit_t** out) {

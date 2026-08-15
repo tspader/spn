@@ -1,5 +1,7 @@
 #include "unit/unit.h"
 
+#include "ctx/types.h"
+#include "paths/paths.h"
 #include "pkg/options.h"
 #include "pkg/pkg.h"
 #include "session/session.h"
@@ -21,19 +23,19 @@ static sp_da(spn_embed_t) clone_embed_list(sp_mem_t mem, sp_da(spn_embed_t) sour
   return result;
 }
 
-static sp_da(spn_tree_path_t) clone_tree_path_list(sp_mem_t mem, sp_da(spn_tree_path_t) source) {
-  sp_da(spn_tree_path_t) result = sp_da_new(mem, spn_tree_path_t);
+static sp_da(spn_path_t) clone_path_list(sp_mem_t mem, sp_da(spn_path_t) source) {
+  sp_da(spn_path_t) result = sp_da_new(mem, spn_path_t);
   sp_da_for(source, it) {
-    sp_da_push(result, source[it]);
+    sp_da_push(result, spn_path_copy(mem, source[it]));
   }
   return result;
 }
 
 static spn_target_info_t clone_target_info(sp_mem_t mem, spn_target_info_t* source) {
   spn_target_info_t target = *source;
-  target.source = clone_tree_path_list(mem, source->source);
-  target.headers = clone_tree_path_list(mem, source->headers);
-  target.include = clone_tree_path_list(mem, source->include);
+  target.source = clone_path_list(mem, source->source);
+  target.headers = clone_path_list(mem, source->headers);
+  target.include = clone_path_list(mem, source->include);
   target.define = clone_str_list(mem, source->define);
   target.flags = clone_str_list(mem, source->flags);
   target.system_deps = clone_str_list(mem, source->system_deps);
@@ -52,7 +54,8 @@ static void clone_target_map(spn_target_map_t* result, spn_target_map_t source, 
 
 // Each unit owns a clone of its package's info: configure scripts mutate it,
 // and option values differ per build
-static spn_pkg_info_t* clone_pkg_info(spn_session_t* s, spn_pkg_id_t id, spn_build_unit_t* build, spn_pkg_info_t* source) {
+static spn_pkg_info_t* clone_pkg_info(spn_session_t* s, spn_pkg_id_t id, spn_build_unit_t* build, spn_loaded_pkg_t* loaded) {
+  spn_pkg_info_t* source = loaded->info;
   spn_pkg_info_t* info = sp_alloc_type(s->mem, spn_pkg_info_t);
   *info = *source;
   info->arena = sp_mem_arena_new(s->mem);
@@ -64,7 +67,7 @@ static spn_pkg_info_t* clone_pkg_info(spn_session_t* s, spn_pkg_id_t id, spn_bui
   clone_target_map(&info->scripts, source->scripts, mem);
   clone_target_map(&info->tests, source->tests, mem);
   clone_target_map(&info->examples, source->examples, mem);
-  info->include = clone_tree_path_list(mem, source->include);
+  info->include = clone_path_list(mem, source->include);
   info->define = clone_str_list(mem, source->define);
   info->public_define = clone_str_list(mem, source->public_define);
   info->system_deps = clone_str_list(mem, source->system_deps);
@@ -75,7 +78,7 @@ static spn_pkg_info_t* clone_pkg_info(spn_session_t* s, spn_pkg_id_t id, spn_bui
   if (options) {
     spn_when_env_add_options(&env, options);
   }
-  spn_pkg_apply_options(info, &env);
+  spn_pkg_apply_options(mem, info, &spn.roots, loaded->roots, &env);
   return info;
 }
 
@@ -107,7 +110,7 @@ static spn_pkg_unit_t* add_unit(spn_session_t* s, spn_build_unit_t* build, spn_p
   unit->session = s;
   unit->source = loaded->source;
   unit->kinds = kinds;
-  unit->info = clone_pkg_info(s, pid, build, loaded->info);
+  unit->info = clone_pkg_info(s, pid, build, loaded);
   sp_da_init(s->mem, unit->deps);
   sp_da_init(s->mem, unit->libs);
   sp_da_init(s->mem, unit->targets);
