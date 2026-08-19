@@ -52,6 +52,7 @@ set(SPN_SOURCES
   core/filter/filter.c
   core/git/cache.c
   core/git/key.c
+  core/git/url.c
   core/git/patch.c
   core/index/cache.c
   core/index/dir.c

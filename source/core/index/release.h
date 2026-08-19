@@ -5,6 +5,6 @@
 #include "spn/core.h"
 #include "index/types.h"
 
-spn_err_t spn_index_release_from_pkg(sp_mem_t mem, spn_pkg_info_t* info, spn_index_release_t* release, sp_str_t* dep);
+spn_err_t spn_index_release_from_pkg(sp_mem_t mem, spn_pkg_info_t* info, spn_pkg_root_t published, spn_index_release_t* release, sp_str_t* dep);
 
 #endif

@@ -25,9 +25,6 @@ typedef enum {
   SPN_MANIFEST_DEP,
 } spn_manifest_role_t;
 
-// A tree spn can place on disk: a path that already exists, or a git repo to
-// check out. Manifests and source code are each one of these, materialized
-// independently, so "local recipe + remote source" is just LOCAL + GIT.
 typedef enum {
   SPN_PKG_ROOT_NONE,
   SPN_PKG_ROOT_LOCAL,

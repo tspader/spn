@@ -1,25 +1,7 @@
 #include "sp.h"
 #include "sp/macro.h"
 #include "git/key.h"
-
-sp_str_t spn_git_url_name(sp_str_t url) {
-  if (sp_str_ends_with(url, SP_LIT("/"))) {
-    url = sp_str_prefix(url, url.len - 1);
-  }
-
-  if (sp_str_ends_with(url, SP_LIT(".git"))) {
-    url = sp_str_prefix(url, url.len - 4);
-  }
-
-  u64 last_sep = 0;
-  sp_for(it, url.len) {
-    if (url.data[it] == '/' || url.data[it] == ':') {
-      last_sep = it + 1;
-    }
-  }
-
-  return sp_str_suffix(url, url.len - last_sep);
-}
+#include "git/url.h"
 
 sp_str_t spn_git_db_key(sp_mem_t mem, sp_str_t url) {
   sp_str_t name = spn_git_url_name(url);

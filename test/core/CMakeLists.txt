@@ -50,8 +50,10 @@ add_executable(core
   git/cache.c
   git/key.c
   git/patch.c
+  git/url.c
   index/cache.c
   index/dir.c
+  index/package.c
   index/query.c
   index/publish.c
   index/release.c
@@ -146,6 +148,7 @@ add_executable(core
   ${SRC}/filter/filter.c
   ${SRC}/git/cache.c
   ${SRC}/git/key.c
+  ${SRC}/git/url.c
   ${SRC}/git/patch.c
   ${SRC}/index/cache.c
   ${SRC}/index/dir.c

@@ -101,6 +101,21 @@ static const release_test_t tests [] = {
     },
   },
   {
+    .name = "urls_verbatim",
+    .expect = {
+      .releases = {
+        {
+          .namespace = "core",
+          .name = "spum",
+          .version = "1.0.0",
+          .source = { .url = "git@github.com:A/B.git", .rev = "abc123" },
+          .manifest = { .url = "ssh://git@github.com/C/D.git", .rev = "def456", .dir = "E" },
+          .paths = { .manifest = "spn.toml", .script = "spn.c" },
+        },
+      },
+    },
+  },
+  {
     .name = "unknown_linkage",
     .expect = {
       .releases = {

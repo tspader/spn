@@ -5,10 +5,18 @@
 #include "codegen/lower.h"
 #include "error/error.h"
 #include "external/git.h"
+#include "git/url.h"
 #include "index/release.h"
 #include "index/publish.h"
 #include "pkg/load.h"
 #include "toml/issue.h"
+
+static spn_pkg_root_t web_root(sp_mem_t mem, spn_pkg_root_t root) {
+  if (root.kind == SPN_PKG_ROOT_GIT) {
+    root.git.url = spn_git_url_web(mem, root.git.url);
+  }
+  return root;
+}
 
 spn_err_t spn_publish_build(spn_publish_opts_t* opts, spn_index_release_t* built) {
   sp_str_t manifest_path = sp_fs_join_path(opts->mem, opts->cwd, sp_str_lit("spn.toml"));
@@ -74,24 +82,22 @@ spn_err_t spn_publish_build(spn_publish_opts_t* opts, spn_index_release_t* built
     subdir = sp_str_suffix(opts->cwd, opts->cwd.len - repo.len - 1);
   }
 
+  spn_pkg_root_t published = {
+    .kind = SPN_PKG_ROOT_GIT,
+    .git = { .url = url, .rev = revision, .dir = subdir },
+  };
+
   spn_index_release_t release = sp_zero;
   sp_str_t dep = sp_zero;
-  if (spn_index_release_from_pkg(opts->mem, &info, &release, &dep)) {
+  if (spn_index_release_from_pkg(opts->mem, &info, published, &release, &dep)) {
     return spn_err_emit(&spn, (spn_err_union_t) {
       .kind = SPN_ERR_INDEX_PATH_DEP,
       .pkg = { .name = info.qualified, .requested = dep },
     });
   }
 
-  spn_pkg_root_t published = {
-    .kind = SPN_PKG_ROOT_GIT,
-    .git = { .url = url, .rev = revision, .dir = subdir },
-  };
-  if (release.source.kind == SPN_PKG_ROOT_NONE) {
-    release.source = published;
-  } else {
-    release.manifest = published;
-  }
+  release.source = web_root(opts->mem, release.source);
+  release.manifest = web_root(opts->mem, release.manifest);
 
   *built = release;
   return SPN_OK;

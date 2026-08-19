@@ -5,3 +5,4 @@
 #include "git/cache.h"
 #include "git/key.h"
 #include "git/patch.h"
+#include "git/url.h"
