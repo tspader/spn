@@ -154,7 +154,7 @@ sp_test_each(thread_pool, ops, pool_test_t, pool_tests) {
         sp_must(t, job.fn);
         sp_expect(t, ((pool_probe_t*)job.data)->ran);
         if (op->poll.probe) {
-          sp_expect_eq(t, (void*)&probes[op->poll.probe - 1], job.data);
+          sp_expect(t, (void*)&probes[op->poll.probe - 1] == job.data);
         }
         break;
       }

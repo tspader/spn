@@ -109,7 +109,7 @@ sp_test_each(queue, stress, stress_test_t, stress_tests) {
     sp_thread_join(&threads[p]);
   }
 
-  sp_expect_eq(t, (void*)SP_NULLPTR, (void*)sp_queue_pop(&queue));
+  sp_expect(t, (void*)sp_queue_pop(&queue) == SP_NULLPTR);
   return SP_OK;
 }
 
@@ -139,7 +139,7 @@ sp_test(queue, ping_pong) {
   sp_queue_node_t node = sp_zero;
   sp_for(it, SMOKE_PING_ROUNDS) {
     sp_queue_push(&ping, &node);
-    sp_must_eq(t, (void*)&node, (void*)smoke_wait(&pong));
+    sp_must(t, (void*)&node == (void*)smoke_wait(&pong));
   }
 
   sp_thread_join(&thread);
@@ -211,7 +211,7 @@ sp_test(queue, node_recycle_stress) {
     sp_thread_join(&threads[it]);
   }
 
-  sp_expect_eq(t, (void*)SP_NULLPTR, (void*)sp_queue_pop(&queue));
+  sp_expect(t, (void*)sp_queue_pop(&queue) == SP_NULLPTR);
   return SP_OK;
 }
 
@@ -299,6 +299,6 @@ sp_test(queue, single_wake_unblocks_empty_wait) {
   sp_queue_wake(&queue);
   sp_thread_join(&thread);
 
-  sp_expect_eq(t, (void*)SP_NULLPTR, (void*)consumer.received);
+  sp_expect(t, (void*)consumer.received == SP_NULLPTR);
   return SP_OK;
 }

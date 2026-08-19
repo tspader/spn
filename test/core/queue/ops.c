@@ -159,20 +159,20 @@ sp_test_each(queue, ops, queue_test_t, queue_tests) {
       case QUEUE_OP_POP: {
         sp_queue_node_t* node = sp_queue_pop(&queue);
         if (op->pop.empty) {
-          sp_expect_eq(t, (void*)SP_NULLPTR, (void*)node);
+          sp_expect(t, (void*)node == SP_NULLPTR);
         }
         else {
-          sp_expect_eq(t, (void*)&nodes[op->pop.node - 1], (void*)node);
+          sp_expect(t, (void*)&nodes[op->pop.node - 1] == (void*)node);
         }
         break;
       }
       case QUEUE_OP_WAIT: {
         sp_queue_node_t* node = sp_queue_wait(&queue);
         if (op->wait.empty) {
-          sp_expect_eq(t, (void*)SP_NULLPTR, (void*)node);
+          sp_expect(t, (void*)node == SP_NULLPTR);
         }
         else {
-          sp_expect_eq(t, (void*)&nodes[op->wait.node - 1], (void*)node);
+          sp_expect(t, (void*)&nodes[op->wait.node - 1] == (void*)node);
         }
         break;
       }
