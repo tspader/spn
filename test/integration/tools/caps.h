@@ -22,6 +22,7 @@ typedef struct {
   spn_sanitizer_set_t sanitize;
   spn_os_t os;
   const c8* target;
+  bool exports;
 } test_when_t;
 
 typedef struct {
