@@ -23,7 +23,7 @@ s32 spn_compile_object_run(spn_compile_unit_t* unit, spn_path_t object, spn_path
     .output = object,
     .depfile = depfile,
   };
-  spn_invocation_t invocation = spn_cc_render_compile_command(spn.mem, &pkg->build->toolchain->cc, &unit->invocation, &files);
+  spn_invocation_t invocation = spn_cc_render_compile_command(spn.mem, &pkg->build->toolchain->cc, &pkg->build->profile, &unit->invocation, &files);
   sp_str_t source = spn_path_str(&spn.roots, spn.mem, files.source);
   sp_str_t output = spn_path_str(&spn.roots, spn.mem, files.output);
   spn_invocation_result_t run = spn_invocation_run(&invocation);

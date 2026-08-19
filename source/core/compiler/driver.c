@@ -142,7 +142,7 @@ spn_err_t spn_cc_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchai
   SP_UNREACHABLE_RETURN(SPN_ERROR);
 }
 
-spn_invocation_t spn_cc_render_compile_command(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_invocation_t* base, const spn_cc_compile_files_t* files) {
+spn_invocation_t spn_cc_render_compile_command(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_invocation_t* base, const spn_cc_compile_files_t* files) {
   sp_assert(!spn_arg_empty(base->program));
   sp_assert(!spn_path_empty(files->source));
   sp_assert(!spn_path_empty(files->output));
@@ -160,11 +160,11 @@ spn_invocation_t spn_cc_render_compile_command(sp_mem_t mem, const spn_cc_toolch
   switch (toolchain->driver) {
     case SPN_CC_DRIVER_GCC:
     case SPN_CC_DRIVER_CLANG: {
-      spn_gnu_render_compile_files(mem, files, &invocation);
+      spn_gnu_render_compile_files(mem, toolchain, profile, files, &invocation);
       break;
     }
     case SPN_CC_DRIVER_MSVC: {
-      spn_msvc_render_compile_files(mem, files, &invocation);
+      spn_msvc_render_compile_files(mem, toolchain, profile, files, &invocation);
       break;
     }
     case SPN_CC_DRIVER_NONE: {
