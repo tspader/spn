@@ -98,3 +98,4 @@ add_custom_command(
   COMMENT "codegen: source/core/codegen/gen/*.gen.{h,c}, include/spn/{err,errors,events}.h"
   VERBATIM)
 add_custom_target(spn_codegen_gen ALL DEPENDS ${GEN_FILES})
+add_dependencies(spn_embed spn_codegen_gen)

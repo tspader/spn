@@ -104,11 +104,11 @@ sp_test(sm_s32, getp_and_missing_key) {
   sp_om_insert(map, 5, 42);
 
   s32** pp = sp_om_getp(map, 5);
-  sp_must_ne(t, pp, SP_NULLPTR);
+  sp_must(t, pp != SP_NULLPTR);
   sp_must_eq(t, **pp, 42);
 
   s32** missing_pp = sp_om_getp(map, 999);
-  sp_must_eq(t, missing_pp, SP_NULLPTR);
+  sp_must(t, missing_pp == SP_NULLPTR);
 
   sp_om_free(map);
   return SP_OK;
@@ -119,7 +119,7 @@ sp_test(sm_s32, null_map_operations) {
 
   sp_must_eq(t, sp_om_size(map), 0);
   sp_must(t, sp_om_empty(map));
-  sp_must_eq(t, sp_om_getp(map, 1), SP_NULLPTR);
+  sp_must(t, sp_om_getp(map, 1) == SP_NULLPTR);
   sp_must(t, !sp_om_has(map, 1));
 
   sp_om_free(map);
@@ -386,7 +386,7 @@ sp_test(sm_pkg, same_name_different_version_and_triple) {
 
   for (s32 i = 0; i < 4; i++) {
     pkg_value_t* v = sp_om_get(map, keys[i]);
-    sp_must_ne(t, v, SP_NULLPTR);
+    sp_must(t, v != SP_NULLPTR);
     sp_must_eq(t, v->priority, i);
   }
 
@@ -469,7 +469,7 @@ sp_test(sm_u64, u64_key_struct_value) {
   sp_om_insert(map, (u64)2000, ((vec3_t){ .x = 4.0, .y = 5.0, .z = 6.0 }));
 
   vec3_t* v = sp_om_get(map, (u64)1000);
-  sp_must_ne(t, v, SP_NULLPTR);
+  sp_must(t, v != SP_NULLPTR);
   sp_must_eq(t, v->x, 1.0);
   sp_must_eq(t, v->y, 2.0);
   sp_must_eq(t, v->z, 3.0);
@@ -491,7 +491,7 @@ sp_test(sm_u64, many_entries) {
 
   for (u64 i = 0; i < 200; i++) {
     vec3_t* v = sp_om_get(map, i);
-    sp_must_ne(t, v, SP_NULLPTR);
+    sp_must(t, v != SP_NULLPTR);
     sp_must_eq(t, v->x, (f64)i);
   }
 
