@@ -12,6 +12,7 @@ static const test_toolchain_t toolchains [] = {
   {
     .name = "zig",
     .driver = SPN_CC_DRIVER_CLANG,
+    .abi = SPN_ABI_MINGW,
     .targets = {
       "wasm32-wasi-musl",
       "x86_64-linux-gnu",
