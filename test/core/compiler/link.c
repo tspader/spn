@@ -380,7 +380,7 @@ static const link_test_t tests [] = {
       .command = "cc",
       .args = {
         "--target=aarch64-macos",
-        "-shared", "-Wl,-exported_symbols_list,S.exp",
+        "-shared", "-Wl,-install_name,@rpath/main", "-Wl,-exported_symbols_list,S.exp",
         "main.o",
         "-Wl,-force_load,libD.a",
         "-lP",
