@@ -183,6 +183,8 @@ static const link_test_t tests [] = {
         "--target=aarch64-macos",
         "main.o",
         "-isysroot", "/sdk",
+        "-F/sdk/System/Library/Frameworks",
+        "-L/sdk/usr/lib",
         "-mmacosx-version-min=13.0",
         "-framework", "Cocoa",
         "-o", "main"

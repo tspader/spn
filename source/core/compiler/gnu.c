@@ -156,6 +156,8 @@ void spn_gnu_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, c
     if (!spn_path_empty(profile->sysroot)) {
       spn_cc_push_c(mem, invocation, "-isysroot");
       spn_cc_push_path(mem, invocation, profile->sysroot);
+      spn_cc_push_c(mem, invocation, "-iframework");
+      spn_cc_push_path(mem, invocation, spn_path_join(mem, profile->sysroot, sp_str_lit("System/Library/Frameworks")));
     }
     if (is_os_version_present(compile->min_os)) {
       spn_cc_push_fmt(mem, invocation, "-mmacosx-version-min={}.{}", sp_fmt_uint(compile->min_os.major), sp_fmt_uint(compile->min_os.minor));
@@ -267,6 +269,8 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
     if (!spn_path_empty(profile->sysroot)) {
       spn_cc_push_c(mem, invocation, "-isysroot");
       spn_cc_push_path(mem, invocation, profile->sysroot);
+      spn_cc_push_glued(mem, invocation, "-F", spn_path_join(mem, profile->sysroot, sp_str_lit("System/Library/Frameworks")));
+      spn_cc_push_glued(mem, invocation, "-L", spn_path_join(mem, profile->sysroot, sp_str_lit("usr/lib")));
     }
     if (is_os_version_present(link->min_os)) {
       spn_cc_push_fmt(mem, invocation, "-mmacosx-version-min={}.{}", sp_fmt_uint(link->min_os.major), sp_fmt_uint(link->min_os.minor));
