@@ -31,15 +31,15 @@ spn_err_t spn_index_dir_get_package(spn_index_info_t* index, sp_mem_t mem, sp_in
     return SPN_OK;
   }
 
+  spn_pkg_root_t published = { .kind = SPN_PKG_ROOT_LOCAL, .local = dir };
+
   spn_index_release_t release = sp_zero;
   sp_str_t dep = sp_zero;
-  spn_err_t built = spn_index_release_from_pkg(mem, info, &release, &dep);
+  spn_err_t built = spn_index_release_from_pkg(mem, info, published, &release, &dep);
   if (built) {
     diag->dep = dep;
     return built;
   }
-
-  release.manifest = (spn_pkg_root_t) { .kind = SPN_PKG_ROOT_LOCAL, .local = dir };
 
   spn_index_pkg_t* package = sp_alloc_type(mem, spn_index_pkg_t);
   *package = (spn_index_pkg_t) { .id = id };

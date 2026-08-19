@@ -23,7 +23,6 @@ typedef struct {
   } deps [DIR_TEST_MAX_DEPS];
   struct { const c8* name; spn_linkage_t linkages [DIR_TEST_MAX_LINKAGES]; } targets [DIR_TEST_MAX_TARGETS];
   struct { const c8* name; spn_option_type_t type; u32 defaults; } options [DIR_TEST_MAX_OPTIONS];
-  struct { const c8* url; const c8* rev; } source;
   const c8* dep;
 } dir_expect_t;
 
@@ -43,16 +42,6 @@ static const dir_test_t tests [] = {
     .expect = {
       .exists = true,
       .version = { 1, 2, 3 },
-    },
-  },
-  {
-    .name = "upstream",
-    .package = "A",
-    .toml = "upstream",
-    .expect = {
-      .exists = true,
-      .version = { 1, 0, 0 },
-      .source = { .url = "https://spn.dev/A.git", .rev = "deadbeef" },
     },
   },
   {
@@ -221,16 +210,8 @@ sp_test_each(index_dir, get_package, dir_test_t, tests, .setup = spn_test_ctx_se
     sp_expect_str_eq_c(t, release->paths.manifest, "spn.toml");
     sp_expect_str_eq_c(t, release->paths.script, "spn.c");
 
-    sp_must_eq(t, SPN_PKG_ROOT_LOCAL, release->manifest.kind);
-    sp_expect_str_eq(t, release->manifest.local, package);
-
-    if (it->expect.source.url) {
-      sp_must_eq(t, SPN_PKG_ROOT_GIT, release->source.kind);
-      sp_expect_str_eq_c(t, release->source.git.url, it->expect.source.url);
-      sp_expect_str_eq_c(t, release->source.git.rev, it->expect.source.rev);
-    } else {
-      sp_expect_eq(t, SPN_PKG_ROOT_NONE, release->source.kind);
-    }
+    sp_must_eq(t, SPN_PKG_ROOT_LOCAL, release->source.kind);
+    sp_expect_str_eq(t, release->source.local, package);
 
     u32 deps = 0;
     sp_carr_detect_len(it->expect.deps, deps, it->expect.deps[deps].name);

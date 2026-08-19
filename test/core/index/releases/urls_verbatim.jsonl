@@ -1,0 +1,1 @@
+{"namespace":"core","name":"spum","version":"1.0.0","yanked":false,"source":{"url":"git@github.com:A/B.git","rev":"abc123"},"manifest":{"url":"ssh://git@github.com/C/D.git","rev":"def456","dir":"E"},"paths":{"manifest":"spn.toml","script":"spn.c"}}

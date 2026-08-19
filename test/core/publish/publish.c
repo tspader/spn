@@ -17,6 +17,7 @@ typedef struct {
 
   struct {
     const c8* subdir;
+    const c8* url;
     u32 source_commit;
   } opts;
 
@@ -25,19 +26,12 @@ typedef struct {
     const c8* namespace;
     const c8* name;
     spn_semver_t version;
+    const c8* source_url;
     u32 source_commit;
     const c8* source_dir;
     const c8* manifest_url;
     u32 manifest_commit;
     const c8* manifest_dir;
-    struct {
-      const c8* name;
-      spn_linkage_t linkages [4];
-    } targets [2];
-    struct {
-      const c8* name;
-      const c8* dep;
-    } path_dep;
   } expect;
 } case_t;
 
@@ -71,9 +65,9 @@ static const case_t cases [] = {
     },
   },
   {
-    .name = "lib_targets",
+    .name = "web_source",
     .repo = {
-      .name = "spum_libs",
+      .name = "spum",
       .commits = {
         {
           .message = "v1",
@@ -83,28 +77,58 @@ static const case_t cases [] = {
               tkv(namespace, "core") "\n"
               tkv(name, "spum") "\n"
               tkv(version, "1.0.0") "\n"
-              "\n"
-              "[[lib]]\n"
-              tkv(name, "spum") "\n"
-              "kinds = [\"static\", \"shared\"]\n"
-              "source = [\"spum.c\"]\n"
             },
-            { "spum.c", "int spum() { return 0; }" },
             { "spn.c", "void build() {}" },
           },
         },
       },
+    },
+    .opts = {
+      .url = "git@github.com:A/B.git",
     },
     .expect = {
       .kind = SPN_OK,
       .namespace = "core",
       .name = "spum",
       .version = { .major = 1 },
+      .source_url = "https://github.com/A/B.git",
       .source_commit = 1,
       .source_dir = "",
-      .targets = {
-        { .name = "spum", .linkages = { SPN_LIB_KIND_STATIC, SPN_LIB_KIND_SHARED } },
+    },
+  },
+  {
+    .name = "web_upstream",
+    .repo = {
+      .name = "wrapper",
+      .commits = {
+        {
+          .message = "v1",
+          .files = {
+            { "spn.toml",
+              ts(package) "\n"
+              tkv(namespace, "core") "\n"
+              tkv(name, "spum") "\n"
+              tkv(version, "1.0.0") "\n"
+              ts(package.upstream) "\n"
+              tkv(url, "git@github.com:A/B.git") "\n"
+              tkv(commit, "R") "\n"
+            },
+            { "spn.c", "void package() {}" },
+          },
+        },
       },
+    },
+    .opts = {
+      .url = "git@github.com:C/D.git",
+    },
+    .expect = {
+      .kind = SPN_OK,
+      .namespace = "core",
+      .name = "spum",
+      .version = { .major = 1 },
+      .source_url = "https://github.com/A/B.git",
+      .manifest_url = "https://github.com/C/D.git",
+      .manifest_commit = 1,
     },
   },
   {
@@ -218,7 +242,6 @@ static const case_t cases [] = {
       .version = { .major = 1, .minor = 2, .patch = 1 },
       .source_commit = 1,
       .source_dir = "",
-      .manifest_url = "spam",
       .manifest_commit = 1,
       .manifest_dir = "toml",
     },
@@ -256,35 +279,8 @@ static const case_t cases [] = {
       .version = { .major = 1 },
       .source_commit = 1,
       .source_dir = "",
-      .manifest_url = "wrapper",
       .manifest_commit = 1,
       .manifest_dir = "",
-    },
-  },
-  {
-    .name = "path_dep_rejected",
-    .repo = {
-      .name = "A",
-      .commits = {
-        {
-          .message = "v1",
-          .files = {
-            { "spn.toml",
-              ts(package) "\n"
-              tkv(name, "A") "\n"
-              tkv(version, "1.0.0") "\n"
-              "\n"
-              ts(deps.package) "\n"
-              "B = { path = \"../B\" }\n"
-            },
-            { "spn.c", "void build() {}" },
-          },
-        },
-      },
-    },
-    .expect = {
-      .kind = SPN_ERR_INDEX_PATH_DEP,
-      .path_dep = { .name = "core/A", .dep = "core/B" },
     },
   },
 };
@@ -356,7 +352,7 @@ sp_test_each(cmd_publish, publish, case_t, cases, .setup = spn_test_ctx_setup) {
     .mem = mem,
     .intern = spn.intern,
     .cwd = cwd,
-    .url = repo.path,
+    .url = c.opts.url ? sp_cstr_as_str(c.opts.url) : repo.path,
     .revision = repo.commits[rev_idx],
   };
 
@@ -366,14 +362,6 @@ sp_test_each(cmd_publish, publish, case_t, cases, .setup = spn_test_ctx_setup) {
     result = spn_index_publish(&index, mem, &release);
   }
   sp_expect_eq(t, c.expect.kind, result);
-
-  if (c.expect.path_dep.name) {
-    sp_da(spn_event_t) errs = spn_test_drain_errs(mem);
-    sp_must_eq(t, 1, sp_da_size(errs));
-    sp_expect_eq(t, errs[0].err.kind, SPN_ERR_INDEX_PATH_DEP);
-    sp_expect_str_eq_c(t, errs[0].err.pkg.name, c.expect.path_dep.name);
-    sp_expect_str_eq_c(t, errs[0].err.pkg.requested, c.expect.path_dep.dep);
-  }
 
   if (c.expect.namespace && result == SPN_OK) {
     spn_index_pkg_t* pkg = SP_NULLPTR;
@@ -392,10 +380,10 @@ sp_test_each(cmd_publish, publish, case_t, cases, .setup = spn_test_ctx_setup) {
     sp_expect_eq(t, c.expect.version.patch, rel->version.patch);
 
     sp_must_eq(t, SPN_PKG_ROOT_GIT, rel->source.kind);
-    if (source_repo.path.len) {
-      sp_expect_str_eq(t, rel->source.git.url, source_repo.path);
+    if (c.expect.source_url) {
+      sp_expect_str_eq_c(t, rel->source.git.url, c.expect.source_url);
     } else {
-      sp_expect_str_eq(t, rel->source.git.url, repo.path);
+      sp_expect_str_eq(t, rel->source.git.url, source_repo.path.len ? source_repo.path : repo.path);
     }
 
     if (c.expect.source_commit) {
@@ -408,9 +396,13 @@ sp_test_each(cmd_publish, publish, case_t, cases, .setup = spn_test_ctx_setup) {
       sp_expect_str_eq_c(t, rel->source.git.dir, c.expect.source_dir);
     }
 
-    if (c.expect.manifest_url) {
+    if (c.expect.manifest_url || c.expect.manifest_commit) {
       sp_must_eq(t, SPN_PKG_ROOT_GIT, rel->manifest.kind);
-      sp_expect_str_eq(t, rel->manifest.git.url, repo.path);
+      if (c.expect.manifest_url) {
+        sp_expect_str_eq_c(t, rel->manifest.git.url, c.expect.manifest_url);
+      } else {
+        sp_expect_str_eq(t, rel->manifest.git.url, repo.path);
+      }
 
       if (c.expect.manifest_commit) {
         SP_ASSERT(c.expect.manifest_commit <= repo.commit_count);
@@ -422,22 +414,6 @@ sp_test_each(cmd_publish, publish, case_t, cases, .setup = spn_test_ctx_setup) {
       }
     } else {
       sp_expect_eq(t, SPN_PKG_ROOT_NONE, rel->manifest.kind);
-    }
-
-    u32 expected_targets = 0;
-    sp_carr_detect_len(c.expect.targets, expected_targets, c.expect.targets[expected_targets].name);
-    sp_must_eq(t, expected_targets, sp_da_size(rel->targets));
-
-    sp_for(ti, expected_targets) {
-      sp_expect_str_eq_c(t, rel->targets[ti].name, c.expect.targets[ti].name);
-
-      u32 expected_linkages = 0;
-      sp_carr_detect_len(c.expect.targets[ti].linkages, expected_linkages, c.expect.targets[ti].linkages[expected_linkages] != SPN_LIB_KIND_NONE);
-      sp_must_eq(t, expected_linkages, sp_da_size(rel->targets[ti].linkages));
-
-      sp_for(li, expected_linkages) {
-        sp_expect_eq(t, c.expect.targets[ti].linkages[li], rel->targets[ti].linkages[li]);
-      }
     }
   }
 

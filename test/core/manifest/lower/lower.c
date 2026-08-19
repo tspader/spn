@@ -487,6 +487,11 @@ static const test_t tests [] = {
     .system_deps = { { "z" } },
   },
   {
+    .name = "upstream_url_verbatim",
+    .manifest = "upstream_url",
+    .url = "git@github.com:A/B.git",
+  },
+  {
     .name = "package_include_tree",
     .manifest = "package_include_tree",
     .include = { { "inc", .tree = SPN_TREE_MANIFEST }, { "src" }, { "gen", .when = "os = \"linux\"" } },
