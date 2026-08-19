@@ -13,6 +13,23 @@ sp_err_t expect_args(sp_test_t* t, spn_invocation_t* invocation, render_expect_t
   return SP_OK;
 }
 
+spn_profile_info_t test_profile(test_profile_t desc) {
+  spn_profile_info_t profile = {
+    .arch = desc.arch,
+    .os = desc.os,
+    .abi = desc.abi,
+    .linkage = desc.linkage,
+    .standard = desc.standard,
+    .mode = desc.mode,
+    .opt = desc.opt,
+    .sanitizers = desc.sanitizers,
+  };
+  if (desc.sysroot) {
+    profile.sysroot.sub = sp_cstr_as_str(desc.sysroot);
+  }
+  return profile;
+}
+
 spn_cc_toolchain_t test_toolchain(spn_cc_driver_t driver) {
   return (spn_cc_toolchain_t) {
     .name = sp_str_lit("test"),

@@ -100,9 +100,6 @@ test: build
 fuzz: build
 	@ctest --test-dir $(WORK) -C $(CONFIG) --output-on-failure -R "^fuzz"
 
-# Everything CI runs, runnable on any dev machine. Bootstrap and test each
-# triple, then the bootstrapped spn builds and tests spn: keeps spn.toml honest
-# against CMakeLists.txt and covers the fuzz targets `make test` excludes.
 CI_TRIPLES ?= $(HOST_TRIPLE)
 ifeq ($(HOST_TRIPLE),x86_64-linux-gnu)
   CI_TRIPLES := x86_64-linux-gnu x86_64-linux-musl

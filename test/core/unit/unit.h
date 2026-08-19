@@ -15,10 +15,10 @@
 #define UNIT_TEST_MAX_LIBS 4
 #define UNIT_TEST_MAX_STRS 8
 
-#define STATIC_ONLY ((spn_linkage_set_t) { .static_lib = true })
-#define SHARED_ONLY ((spn_linkage_set_t) { .shared = true })
-#define OBJECT_ONLY ((spn_linkage_set_t) { .object = true })
-#define SOURCE_ONLY ((spn_linkage_set_t) { .source = true })
+#define STATIC_ONLY { .static_lib = true }
+#define SHARED_ONLY { .shared = true }
+#define OBJECT_ONLY { .object = true }
+#define SOURCE_ONLY { .source = true }
 
 typedef struct {
   const c8* to;

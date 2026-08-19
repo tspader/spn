@@ -20,7 +20,7 @@ sp_test(intern, dedupe) {
   sp_str_t b = sp_intern_get_or_insert_str(intern, sp_str_lit("A"));
 
   sp_expect_eq(t, 2, sp_intern_size(intern));
-  sp_expect_eq(t, (void*)a.data, (void*)b.data);
+  sp_expect(t, (void*)a.data == (void*)b.data);
   sp_expect_eq(t, a.len, b.len);
   sp_expect_eq(t, bytes, sp_intern_bytes_used(intern));
 
@@ -60,7 +60,7 @@ sp_test(intern, stable_under_growth) {
   u64 bytes = sp_intern_bytes_used(intern);
   sp_for(it, INTERN_TEST_ENTRIES) {
     sp_str_t again = sp_intern_get_or_insert_str(intern, sp_fmt(mem, "E{}", sp_fmt_uint(it)).value);
-    sp_must_eq(t, (void*)first[it].data, (void*)again.data);
+    sp_must(t, (void*)first[it].data == (void*)again.data);
   }
   sp_expect_eq(t, 1 + INTERN_TEST_ENTRIES, sp_intern_size(intern));
   sp_expect_eq(t, bytes, sp_intern_bytes_used(intern));

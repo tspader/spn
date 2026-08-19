@@ -3,7 +3,7 @@
 typedef struct {
   const c8* name;
   spn_cc_driver_t driver;
-  spn_profile_info_t profile;
+  test_profile_t profile;
   spn_lang_t lang;
   spn_cxx_options_t cxx;
   bool pic;
@@ -161,7 +161,7 @@ static const compile_test_t tests [] = {
       .arch = SPN_ARCH_ARM64,
       .os = SPN_OS_MACOS,
       .standard = SPN_C99,
-      .sysroot = { .sub = sp_str_lit("/sdk") },
+      .sysroot = "/sdk",
     },
     .min_os = { 13 },
     .expect = {
@@ -252,7 +252,7 @@ static const compile_test_t tests [] = {
       .os = SPN_OS_LINUX,
       .abi = SPN_ABI_GNU,
       .standard = SPN_C99,
-      .sysroot = { .sub = sp_str_lit("/sdk") },
+      .sysroot = "/sdk",
     },
     .min_os = { 13 },
     .expect = {
@@ -284,8 +284,9 @@ sp_test_each(render_compile, render, compile_test_t, tests, .setup = spn_test_ct
     sp_da_push(compile.define, sp_str_from_cstr(mem, it->define));
   }
 
+  spn_profile_info_t profile = test_profile(it->profile);
   spn_invocation_t base = sp_zero;
-  spn_err_t err = spn_cc_render_compile(mem, &toolchain, &it->profile, &compile, &base);
+  spn_err_t err = spn_cc_render_compile(mem, &toolchain, &profile, &compile, &base);
   sp_expect_eq(t, err, it->expect.err);
   if (it->expect.err) {
     sp_da(spn_event_t) errs = spn_test_drain_errs(mem);

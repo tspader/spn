@@ -3,7 +3,7 @@
 typedef struct {
   const c8* name;
   spn_cc_driver_t driver;
-  spn_profile_info_t profile;
+  test_profile_t profile;
   spn_cc_output_kind_t kind;
   const c8* exports;
   const c8* export_symbols [2];
@@ -172,7 +172,7 @@ static const link_test_t tests [] = {
     .profile = {
       .arch = SPN_ARCH_ARM64,
       .os = SPN_OS_MACOS,
-      .sysroot = { .sub = sp_str_lit("/sdk") },
+      .sysroot = "/sdk",
     },
     .kind = SPN_CC_OUTPUT_EXE,
     .framework = "Cocoa",
@@ -438,7 +438,7 @@ static const link_test_t tests [] = {
       .arch = SPN_ARCH_X64,
       .os = SPN_OS_LINUX,
       .abi = SPN_ABI_GNU,
-      .sysroot = { .sub = sp_str_lit("/sdk") },
+      .sysroot = "/sdk",
     },
     .kind = SPN_CC_OUTPUT_EXE,
     .framework = "Cocoa",
@@ -500,8 +500,9 @@ sp_test_each(render_link, render, link_test_t, tests, .setup = spn_test_ctx_setu
     sp_da_push(link.lib_dirs, test_arg_path(it->lib_dir));
   }
 
+  spn_profile_info_t profile = test_profile(it->profile);
   spn_invocation_t invocation = sp_zero;
-  spn_err_t err = spn_cc_render_link(mem, &toolchain, &it->profile, &link, &files, &invocation);
+  spn_err_t err = spn_cc_render_link(mem, &toolchain, &profile, &link, &files, &invocation);
   sp_expect_eq(t, err, it->expect.err);
   if (it->expect.err) {
     sp_da(spn_event_t) errs = spn_test_drain_errs(mem);
