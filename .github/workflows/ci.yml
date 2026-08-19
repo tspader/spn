@@ -1,0 +1,57 @@
+
+name: ci
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  ZIG_LOCAL_CACHE_DIR: ${{ github.workspace }}/.cache/zig
+  ZIG_GLOBAL_CACHE_DIR: ${{ github.workspace }}/.cache/zig
+  SPN_STORAGE_DIR: ${{ github.workspace }}/.cache/spn
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { id: x86_64-linux, os: ubuntu-latest }
+          - { id: aarch64-macos, os: macos-latest }
+          - { id: x86_64-windows, os: windows-latest }
+    name: ${{ matrix.id }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/cache@v4
+        with:
+          path: |
+            .cache
+            .build/source
+            ~/.cache/spn/toolchain
+          key: ci-${{ matrix.id }}-${{ github.sha }}
+          restore-keys: ci-${{ matrix.id }}-
+
+      - run: make ci
+
+  ci:
+    name: ci
+    if: ${{ !cancelled() }}
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - run: jq --exit-status 'all(.result == "success")' <<< '${{ toJson(needs) }}'
