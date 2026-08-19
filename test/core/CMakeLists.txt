@@ -232,8 +232,8 @@ set_source_files_properties(
   PROPERTIES COMPILE_DEFINITIONS "TOOLCHAINS_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/toolchain/toolchains\"")
 target_link_libraries(core PRIVATE yyjson vmlib)
 add_dependencies(core spn_embed spn_codegen_gen)
-add_test(NAME core COMMAND "$<TARGET_FILE:core>")
-add_test(NAME core_sim COMMAND "$<TARGET_FILE:core>" --filter "dag_*")
+add_test(NAME core COMMAND "$<TARGET_FILE:core>" WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+add_test(NAME core_sim COMMAND "$<TARGET_FILE:core>" --filter "dag_*" WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 set_tests_properties(core_sim PROPERTIES ENVIRONMENT "SPN_TEST_SIM=1")
 
 add_subdirectory(resolver)
