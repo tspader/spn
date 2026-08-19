@@ -166,7 +166,7 @@ static const compile_test_t tests [] = {
     .min_os = { 13 },
     .expect = {
       .command = "cc",
-      .args = { "--target=aarch64-macos", "-std=c99", "-c", "-isysroot", "/sdk", "-mmacosx-version-min=13.0", "-Werror=return-type", "main.c", "-o", "main.o" },
+      .args = { "--target=aarch64-macos", "-std=c99", "-c", "-isysroot", "/sdk", "-iframework", "/sdk/System/Library/Frameworks", "-mmacosx-version-min=13.0", "-Werror=return-type", "main.c", "-o", "main.o" },
     },
   },
   {
