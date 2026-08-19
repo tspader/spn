@@ -13,6 +13,7 @@ sp_test(exports, own_exported) {
 sp_test(exports, private_hidden) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/exports/private_hidden",
+    .when.exports = true,
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
       { .kind = ACTION_RUN_BIN, .bin = { .name = "main", .rc = 0 } },
