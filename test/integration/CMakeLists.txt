@@ -58,4 +58,4 @@ target_compile_definitions(integration PRIVATE
 )
 target_link_libraries(integration PRIVATE yyjson)
 add_dependencies(integration spn spn_codegen_gen)
-add_test(NAME integration COMMAND "$<TARGET_FILE:integration>")
+add_test(NAME integration COMMAND "$<TARGET_FILE:integration>" WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
