@@ -11,6 +11,7 @@ spn_err_t spn_pkg_load(sp_mem_t mem, sp_intern_t* intern, sp_str_t path, spn_man
 
   spn_toml_loader_t t = sp_zero;
   spn_toml_loader_init(&t, mem, intern);
+  t.strict = true;
 
   spn_err_t err = spn_codegen_load_pkg(&t, path, pkg);
   if (!err) {
