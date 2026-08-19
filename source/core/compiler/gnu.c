@@ -163,16 +163,23 @@ void spn_gnu_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, c
       spn_cc_push_fmt(mem, invocation, "-mmacosx-version-min={}.{}", sp_fmt_uint(compile->min_os.major), sp_fmt_uint(compile->min_os.minor));
     }
   }
+  if (profile->os == SPN_OS_WINDOWS && toolchain->driver == SPN_CC_DRIVER_CLANG) {
+    spn_cc_push_c(mem, invocation, "-gno-codeview-command-line");
+  }
   spn_cc_push_strs(mem, invocation, compile->args);
   spn_cc_push_c(mem, invocation, "-Werror=return-type");
 }
 
-void spn_gnu_render_compile_files(sp_mem_t mem, const spn_cc_compile_files_t* files, spn_invocation_t* invocation) {
+void spn_gnu_render_compile_files(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_compile_files_t* files, spn_invocation_t* invocation) {
   spn_cc_push_path(mem, invocation, files->source);
   if (!spn_path_empty(files->depfile)) {
     spn_cc_push_c(mem, invocation, "-MD");
     spn_cc_push_c(mem, invocation, "-MF");
     spn_cc_push_path(mem, invocation, files->depfile);
+  }
+  if (profile->os == SPN_OS_WINDOWS && toolchain->driver == SPN_CC_DRIVER_CLANG) {
+    spn_cc_push_c(mem, invocation, "-Xclang");
+    spn_cc_push_fmt(mem, invocation, "-object-file-name={}", sp_fmt_str(sp_fs_get_name(files->output.sub)));
   }
   spn_cc_push_c(mem, invocation, "-o");
   spn_cc_push_path(mem, invocation, files->output);

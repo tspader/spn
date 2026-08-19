@@ -121,7 +121,7 @@ void spn_msvc_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, 
   spn_cc_push_c(mem, invocation, "/we4715");
 }
 
-void spn_msvc_render_compile_files(sp_mem_t mem, const spn_cc_compile_files_t* files, spn_invocation_t* invocation) {
+void spn_msvc_render_compile_files(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_compile_files_t* files, spn_invocation_t* invocation) {
   sp_assert(spn_path_empty(files->depfile));
   spn_cc_push_glued(mem, invocation, "/Fo", files->output);
   spn_cc_push_path(mem, invocation, files->source);

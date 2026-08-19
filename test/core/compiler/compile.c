@@ -62,6 +62,20 @@ static const compile_test_t tests [] = {
     },
   },
   {
+    .name = "clang_windows_deterministic_codeview",
+    .driver = SPN_CC_DRIVER_CLANG,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_MINGW,
+      .standard = SPN_C11,
+    },
+    .expect = {
+      .command = "cc",
+      .args = { "--target=x86_64-windows-gnu", "-std=c11", "-c", "-gno-codeview-command-line", "-Werror=return-type", "main.c", "-Xclang", "-object-file-name=main.o", "-o", "main.o" },
+    },
+  },
+  {
     .name = "msvc_windows",
     .driver = SPN_CC_DRIVER_MSVC,
     .profile = {
@@ -301,7 +315,7 @@ sp_test_each(render_compile, render, compile_test_t, tests, .setup = spn_test_ct
     .output = test_arg_path("main.o"),
     .depfile = it->depfile ? test_arg_path(it->depfile) : sp_zero_s(spn_path_t),
   };
-  spn_invocation_t invocation = spn_cc_render_compile_command(mem, &toolchain, &base, &files);
+  spn_invocation_t invocation = spn_cc_render_compile_command(mem, &toolchain, &profile, &base, &files);
   return expect_args(t, &invocation, it->expect);
 }
 
@@ -335,8 +349,8 @@ sp_test(render_compile, base_shared_across_commands, .setup = spn_test_ctx_setup
     .output = test_arg_path("b.o"),
     .depfile = test_arg_path("b.o.d"),
   };
-  spn_invocation_t a = spn_cc_render_compile_command(mem, &toolchain, &base, &first);
-  spn_invocation_t b = spn_cc_render_compile_command(mem, &toolchain, &base, &second);
+  spn_invocation_t a = spn_cc_render_compile_command(mem, &toolchain, &profile, &base, &first);
+  spn_invocation_t b = spn_cc_render_compile_command(mem, &toolchain, &profile, &base, &second);
 
   sp_expect_eq(t, sp_da_size(base.args), args);
   if (expect_args(t, &a, (render_expect_t) {

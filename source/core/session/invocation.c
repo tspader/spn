@@ -97,7 +97,7 @@ spn_err_t spn_session_write_compile_commands(spn_session_t* session, sp_str_t pa
       .source = unit->paths.file,
       .output = unit->paths.object,
     };
-    spn_invocation_t invocation = spn_cc_render_compile_command(scratch.mem, &unit->target->pkg->build->toolchain->cc, &unit->invocation, &files);
+    spn_invocation_t invocation = spn_cc_render_compile_command(scratch.mem, &unit->target->pkg->build->toolchain->cc, &unit->target->pkg->build->profile, &unit->invocation, &files);
     sp_da(sp_str_t) args = spn_invocation_args(roots, scratch.mem, &invocation);
 
     if (count++) {
