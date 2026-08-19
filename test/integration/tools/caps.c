@@ -116,6 +116,13 @@ const c8* test_target_alternate(void) {
 
 spn_sanitizer_set_t get_supported_sanitizers(const spn_cc_toolchain_t* toolchain, spn_triple_t target);
 
+static bool toolchain_enforces_exports(const test_toolchain_t* toolchain, spn_triple_t target) {
+  if (sp_cstr_equal(toolchain->name, "zig") && target.os == SPN_OS_MACOS) {
+    return false;
+  }
+  return true;
+}
+
 sp_str_t test_when_blocked(const test_when_t* when) {
   sp_mem_t mem = sp_mem_os_new();
   const test_toolchain_t* toolchain = test_toolchain();
@@ -144,6 +151,12 @@ sp_str_t test_when_blocked(const test_when_t* when) {
         sp_fmt_str(spn_triple_to_str(mem, target)),
         sp_fmt_str(spn_sanitizer_set_to_str(mem, when->sanitize))).value;
     }
+  }
+
+  if (when->exports && !toolchain_enforces_exports(toolchain, target)) {
+    return sp_fmt(mem, "{} targeting {} accepts an export list but does not enforce it",
+      sp_fmt_cstr(toolchain->name),
+      sp_fmt_str(spn_triple_to_str(mem, target))).value;
   }
 
   return sp_str_lit("");
