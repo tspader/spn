@@ -196,6 +196,9 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
     }
     case SPN_CC_OUTPUT_SHARED_LIB: {
       spn_cc_push_c(mem, invocation, "-shared");
+      if (profile->os == SPN_OS_MACOS) {
+        spn_cc_push_fmt(mem, invocation, "-Wl,-install_name,@rpath/{}", sp_fmt_str(sp_fs_get_name(files->output.sub)));
+      }
       if (!spn_path_empty(files->exports.path)) {
         switch (spn_cc_exports_format(link->kind, profile->os)) {
           case SPN_CC_EXPORTS_SYMBOL_LIST: {
