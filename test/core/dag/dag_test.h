@@ -4,6 +4,7 @@
 
 #include "sp/atomic_file.h"
 #include "dag/dag.h"
+#include "dag/stamp.h"
 #include "paths/paths_test.h"
 
 #define DAG_TEST_MAX_INPUTS 4

@@ -7,6 +7,10 @@ render = "foo"
 [profile.smoke]
 iterations = 32
 
+[profile.racy]
+seed = 0xdecafbad
+iteration = 75
+
 [profile.big]
 graph = { max_actions = 1024, max_obs = 64 }
 iterations = 64

@@ -33,7 +33,7 @@ or, equivalently, `ctest --test-dir .build/work/$TRIPLE --output-on-failure`.
 - Use `sp_carr_detect_len(arr, it, expr)` from `sp/macro.h` to detect a zero sentinel terminated C array; length increments until `!expr`
 - Use a separate struct for `.expect`
 - Never explicitly initialize fields which are zero initialized (e.g. do not set `.err = SP_OK`)
-- When test cases need multistep, ordered setup, used a tagged union of actions (see: `fs_setup_t`)
+- When test cases need multistep, ordered setup, used a tagged union of actions
 - One class of tests per C file. If a suite has multiple, write the individual C files in `test/$module/`, and then have `test/module.c` `#include` all the C files (see: `test/fs.c`)
 - Always use single capital letters as IDs and content when needed. For example, don't name a test package "mathlib"; name it "A".
 
@@ -58,7 +58,7 @@ The script suite is rewritten from first principles into five case tables, one p
 
 # example
 
-Follow this structure when adding new tests.
+Follow this structure when adding new tests. Never prefix the names of types or functions (e.g. `foo_expect_t` is wrong). Never put more than one suite per file.
 
 ```c
 #include "spn_test.h"

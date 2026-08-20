@@ -62,6 +62,7 @@ bool                spn_dag_obs_table_get(spn_dag_obs_table_t* t, spn_dag_digest
 void                spn_dag_obs_table_put(spn_dag_obs_table_t* t, spn_dag_digest_t key, const spn_dag_obs_t* obs, u32 count);
 
 void                spn_dag_file_cache_init(spn_dag_file_cache_t* c, sp_mem_t mem, const spn_path_roots_t* roots);
+void                spn_dag_file_cache_fence(spn_dag_file_cache_t* c, sp_sys_timespec_t fence);
 void                spn_dag_file_cache_load(spn_dag_file_cache_t* c, sp_str_t path);
 void                spn_dag_file_cache_flush(spn_dag_file_cache_t* c, sp_str_t path);
 void                spn_dag_file_cache_seed(spn_dag_file_cache_t* c, spn_dag_file_meta_t meta);
@@ -70,6 +71,7 @@ void                spn_dag_file_cache_invalidate_dir(spn_dag_file_cache_t* c, s
 void                spn_dag_file_cache_invalidate_all(spn_dag_file_cache_t* c);
 spn_err_t           spn_dag_file_cache_stat(spn_dag_file_cache_t* c, spn_path_t path, sp_sys_file_meta_t* meta);
 spn_err_t           spn_dag_file_cache_digest(spn_dag_file_cache_t* c, spn_path_t path, spn_dag_digest_t* digest);
+bool                spn_dag_file_cache_recorded(spn_dag_file_cache_t* c, spn_path_t path);
 sp_str_t            spn_dag_file_cache_canonical(spn_dag_file_cache_t* c, sp_str_t path);
 
 spn_err_t           spn_dag_execute(spn_dag_t* g, spn_dag_id_t action, spn_dag_env_t* env);

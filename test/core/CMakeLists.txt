@@ -33,6 +33,7 @@ add_executable(core
   dag/discover_exec.c
   dag/enumeration.c
   dag/exec.c
+  dag/fence.c
   dag/file_cache.c
   dag/glob.c
   dag/graph.c
@@ -40,6 +41,7 @@ add_executable(core
   dag/key.c
   dag/parallel.c
   dag/run.c
+  dag/stamp.c
   dag/store.c
   dag/strong_key.c
   dag/tree.c
@@ -136,6 +138,7 @@ add_executable(core
   ${SRC}/dag/dag.c
   ${SRC}/dag/glob.c
   ${SRC}/dag/run.c
+  ${SRC}/dag/stamp.c
   ${SRC}/dag/store.c
   ${SRC}/dag/wasi.c
   ${SRC}/dag/wasi/canonicalize.c

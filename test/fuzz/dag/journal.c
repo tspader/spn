@@ -76,12 +76,12 @@ void fz_journal_universe(fz_journal_t* j, fz_universe_t* u, fz_trace_t* trace, u
   fz_profile_t* profile = &u->profile;
 
   fz_journal_event(j, sp_fmt(mem,
-    "\"ev\":\"meta\",\"iter\":{},\"seed\":\"0x{:x}\",\"cyclic\":{},\"obs_cyclic\":{},\"run_ex\":{},\"store_fs\":{},\"disco_fs\":{},\"cache_fs\":{},\"big\":{}",
+    "\"ev\":\"meta\",\"iter\":{},\"seed\":\"0x{:x}\",\"cyclic\":{},\"obs_cyclic\":{},\"run_ex\":{},\"store_fs\":{},\"disco_fs\":{},\"cache_fs\":{},\"big\":{},\"granularity\":{}",
     sp_fmt_uint(iter), sp_fmt_uint(sp_fuzz_seed_get()),
     sp_fmt_str(fz_json_bool(u->cyclic)), sp_fmt_str(fz_json_bool(u->obs_cyclic)),
     sp_fmt_str(fz_json_bool(profile->run_ex)), sp_fmt_str(fz_json_bool(profile->store_fs)),
     sp_fmt_str(fz_json_bool(profile->disco_fs)), sp_fmt_str(fz_json_bool(profile->cache_fs)),
-    sp_fmt_str(fz_json_bool(profile->big))).value);
+    sp_fmt_str(fz_json_bool(profile->big)), sp_fmt_uint(profile->granularity)).value);
 
   sp_da_for(u->artifacts, it) {
     fz_artifact_t* artifact = &u->artifacts[it];

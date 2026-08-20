@@ -95,7 +95,10 @@ static void sp_sim_stamp(sp_sim_inode_t* node) {
     sim->clock.tv_sec += 1;
     sim->clock.tv_nsec -= 1000000000;
   }
-  node->mtime = sim->clock;
+  u64 total = (u64)sim->clock.tv_sec * 1000000000ull + (u64)sim->clock.tv_nsec;
+  total -= total % sim->granularity;
+  node->mtime.tv_sec = (s64)(total / 1000000000ull);
+  node->mtime.tv_nsec = (s64)(total % 1000000000ull);
 }
 
 static sp_str_t sp_sim_norm(const c8* path, u32 len, c8* buf) {
@@ -929,6 +932,7 @@ void sp_sim_init(sp_sim_t* sim, sp_mem_t mem) {
     .events = sp_da_new(mem, sp_sim_event_t),
     .fault_log = sp_da_new(mem, u64),
     .clock = { .tv_sec = 1 },
+    .granularity = 1,
     .ids = 1,
   };
   sp_str_ht_init(mem, sim->nodes);
@@ -953,8 +957,9 @@ bool sp_sim_touch(sp_sim_t* sim, sp_str_t path) {
   if (!node || node->kind != SP_FS_KIND_FILE) {
     return false;
   }
+  sp_sys_timespec_t before = node->mtime;
   sp_sim_stamp(node);
-  return true;
+  return node->mtime.tv_sec != before.tv_sec || node->mtime.tv_nsec != before.tv_nsec;
 }
 
 bool sp_sim_stealth_write(sp_sim_t* sim, sp_str_t path, sp_str_t bytes) {
