@@ -30,6 +30,7 @@ void dag_test_env_init(dag_test_env_t* env, sp_test_t* t, dag_test_env_config_t 
     .dir = dag_test_env_rooted(env, sp_str_lit("store"))
   });
   spn_dag_file_cache_init(&env->files, env->mem, &env->roots);
+  spn_dag_file_cache_fence(&env->files, SPN_DAG_STAMP_TRUST_ALL);
   spn_dag_file_cache_load(&env->files, dag_test_env_path(env, sp_str_lit("files")));
   spn_dag_action_cache_init(&env->cache, env->mem, sp_str_lit(""));
   spn_dag_obs_table_init(&env->discovery, env->mem, dag_test_env_path(env, sp_str_lit("manifests")));
@@ -45,6 +46,7 @@ void dag_test_env_init(dag_test_env_t* env, sp_test_t* t, dag_test_env_config_t 
 void dag_test_env_cold(dag_test_env_t* env) {
   spn_dag_file_cache_flush(&env->files, dag_test_env_path(env, sp_str_lit("files")));
   spn_dag_file_cache_init(&env->files, env->mem, &env->roots);
+  spn_dag_file_cache_fence(&env->files, SPN_DAG_STAMP_TRUST_ALL);
   spn_dag_file_cache_load(&env->files, dag_test_env_path(env, sp_str_lit("files")));
   spn_dag_obs_table_init(&env->discovery, env->mem, dag_test_env_path(env, sp_str_lit("manifests")));
 }

@@ -136,6 +136,7 @@ typedef struct {
   u64 obs_output_pct;
   u64 back_density;
   u64 steps;
+  u64 granularity;
   u64 step_weights [FZ_STEP_COUNT];
   bool store_fs;
   bool disco_fs;
