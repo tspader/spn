@@ -24,6 +24,32 @@ sp_test(layout, staged_test) {
   });
 }
 
+// macOS dyld resolves a hardlinked main executable to an arbitrary one of the
+// inode's link names, so @loader_path is only well-defined when a staged exe
+// is its inode's sole name.
+sp_test(layout, staged_identity) {
+  sp_try(test_when(t, (test_when_t) { .os = SPN_OS_MACOS }));
+
+  fixture_t fixture = sp_zero;
+  sp_try(fixture_init(t, &fixture));
+  sp_try(run_command(t, &fixture, (command_test_t) {
+    .project = "test/integration/fixtures/layout/test_shared",
+    .copy = { "check.c", "packages/*" },
+    .args = { "build" },
+    .expect.exists = { exe("main"), test_exe("check") },
+  }));
+
+  sp_str_t staged[] = { exe("main"), test_exe("check") };
+  sp_carr_for(staged, it) {
+    sp_str_t path = fixture_path(&fixture, staged[it]);
+    sp_sys_file_meta_t meta = sp_zero;
+    sp_sys_get_path_metadata_s(sp_sys_get_root(0), path, &meta);
+    sp_test_kv(t, "path", path);
+    sp_expect_eq(t, (u64)1, meta.nlink);
+  }
+  return SP_OK;
+}
+
 sp_test(layout, staged_script) {
   return run_command_test(t, (command_test_t) {
     .project = "test/integration/fixtures/script/staged",
