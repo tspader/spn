@@ -123,15 +123,15 @@ static bool toolchain_enforces_exports(const test_toolchain_t* toolchain, spn_tr
   return true;
 }
 
-sp_str_t test_when_blocked(const test_when_t* when) {
+sp_str_t test_when_blocked(test_when_t when) {
   sp_mem_t mem = sp_mem_os_new();
   const test_toolchain_t* toolchain = test_toolchain();
-  spn_triple_t target = when_target(when);
+  spn_triple_t target = when_target(&when);
 
-  if (when->os && when->os != target.os) {
+  if (when.os && when.os != target.os) {
     return sp_fmt(mem, "target os is {}, test needs {}",
       sp_fmt_str(spn_os_to_str(target.os)),
-      sp_fmt_str(spn_os_to_str(when->os))).value;
+      sp_fmt_str(spn_os_to_str(when.os))).value;
   }
 
   if (!toolchain_targets(toolchain, target)) {
@@ -140,20 +140,20 @@ sp_str_t test_when_blocked(const test_when_t* when) {
       sp_fmt_str(spn_triple_to_str(mem, target))).value;
   }
 
-  if (when->sanitize) {
+  if (when.sanitize) {
     spn_cc_toolchain_t cc = {
       .name = sp_str_view(toolchain->name),
       .driver = toolchain->driver,
     };
-    if (when->sanitize & ~get_supported_sanitizers(&cc, target)) {
+    if (when.sanitize & ~get_supported_sanitizers(&cc, target)) {
       return sp_fmt(mem, "{} targeting {} can't build sanitize={}",
         sp_fmt_cstr(toolchain->name),
         sp_fmt_str(spn_triple_to_str(mem, target)),
-        sp_fmt_str(spn_sanitizer_set_to_str(mem, when->sanitize))).value;
+        sp_fmt_str(spn_sanitizer_set_to_str(mem, when.sanitize))).value;
     }
   }
 
-  if (when->exports && !toolchain_enforces_exports(toolchain, target)) {
+  if (when.exports && !toolchain_enforces_exports(toolchain, target)) {
     return sp_fmt(mem, "{} targeting {} accepts an export list but does not enforce it",
       sp_fmt_cstr(toolchain->name),
       sp_fmt_str(spn_triple_to_str(mem, target))).value;
