@@ -25,8 +25,8 @@ include = ["include", "source/core", "tools", "tools/gen"]
 [deps.package]
 "spader/sp" = { path = "vendor/sp" }
 wamr = { path = "vendor/wamr" }
-toml = "1.4.0"
-yyjson = "0.13.0"
+toml = "1.6.0"
+yyjson = "0.14.0"
 
 [deps.build]
 "spader/sp" = { path = "vendor/sp" }
