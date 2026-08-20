@@ -30,7 +30,7 @@ yyjson = "0.14.0"
 
 [deps.build]
 "spader/sp" = { path = "vendor/sp" }
-yyjson = "0.13.0"
+yyjson = "0.14.0"
 
 [patch."spader/sp"]
 files = ["tools/patches/sp-test-num-cpus.patch"]
