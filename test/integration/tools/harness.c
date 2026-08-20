@@ -886,6 +886,14 @@ static void expect_command_lock(sp_test_t* t, fixture_t* fixture, command_expect
   }
 }
 
+sp_err_t test_when(sp_test_t* t, test_when_t when) {
+  sp_str_t blocked = test_when_blocked(when);
+  if (blocked.len) {
+    return sp_test_skip(t, "{}", sp_fmt_str(blocked));
+  }
+  return SP_OK;
+}
+
 sp_err_t run_command(sp_test_t* t, fixture_t* fixture, command_test_t test) {
   if (test.project) {
     sp_try(prepare_test(t, fixture, test.project, test.copy));
@@ -1277,10 +1285,7 @@ sp_err_t run_test(sp_test_t* t, test_t test) {
   fixture_t fixture = sp_zero;
   sp_try(fixture_init(t, &fixture));
 
-  sp_str_t blocked = test_when_blocked(&test.when);
-  if (blocked.len) {
-    return sp_test_skip(t, "{}", sp_fmt_str(blocked));
-  }
+  sp_try(test_when(t, test.when));
 
   if (!test_when_runs(&test.when)) {
     u32 kept = 0;
@@ -1320,15 +1325,13 @@ sp_err_t run_opt_test(sp_test_t* t, opt_test_t test) {
   fixture_t fixture = sp_zero;
   sp_try(fixture_init(t, &fixture));
 
-  sp_str_t blocked = test_when_blocked(&test.when);
-  if (blocked.len) {
-    return sp_test_skip(t, "{}", sp_fmt_str(blocked));
-  }
+  sp_try(test_when(t, test.when));
 
   sp_try(prepare_test(t, &fixture, test.project, test.copy));
 
   const test_toolchain_t* toolchain = test_toolchain();
   u32 ran = 0;
+  sp_str_t blocked = sp_zero;
   sp_carr_for(test.builds, it) {
     const opt_build_t* build = &test.builds[it];
     if (!opt_build_present(build)) {
@@ -1348,7 +1351,7 @@ sp_err_t run_opt_test(sp_test_t* t, opt_test_t test) {
     if (!when.target) {
       when.target = target;
     }
-    blocked = test_when_blocked(&when);
+    blocked = test_when_blocked(when);
     if (blocked.len) {
       continue;
     }

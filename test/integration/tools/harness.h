@@ -237,6 +237,7 @@ sp_str_t target_store_file(const c8* rest, const c8* triple);
 sp_err_t expect_exists(sp_test_t* t, fixture_t* fixture, sp_str_t path, bool expected, const c8* file, u32 line);
 
 sp_err_t prepare_test(sp_test_t* t, fixture_t* fixture, const c8* project, const c8* const* copy);
+sp_err_t test_when(sp_test_t* t, test_when_t when);
 sp_err_t run_command(sp_test_t* t, fixture_t* fixture, command_test_t test);
 sp_err_t run_command_test(sp_test_t* t, command_test_t test);
 sp_err_t run_rebuild_test(sp_test_t* t, rebuild_test_t test);
