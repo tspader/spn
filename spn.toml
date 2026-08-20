@@ -32,6 +32,9 @@ yyjson = "0.14.0"
 "spader/sp" = { path = "vendor/sp" }
 yyjson = "0.13.0"
 
+[patch."spader/sp"]
+files = ["tools/patches/sp-test-num-cpus.patch"]
+
 [patch.wamr]
 files = [
   "tools/patches/wamr-wasi-hook.patch",
