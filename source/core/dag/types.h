@@ -116,6 +116,7 @@ typedef struct {
   sp_ht(spn_path_t, spn_dag_file_meta_t) hints;
   sp_ht(sp_str_t, sp_str_t) canonical;
   bool hints_dirty;
+  sp_sys_timespec_t fence;
   spn_dag_stats_t* stats;
 } spn_dag_file_cache_t;
 

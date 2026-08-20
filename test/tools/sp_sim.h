@@ -18,6 +18,7 @@ typedef struct {
   sp_da(sp_sim_fd_t) fds;
   sp_da(sp_sim_event_t) events;
   sp_sys_timespec_t clock;
+  u64 granularity;
   u64 ids;
   u64 syscalls;
   u64 fault_state;

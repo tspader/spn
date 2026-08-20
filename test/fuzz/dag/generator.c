@@ -63,6 +63,10 @@ fz_profile_t fz_gen_profile(sp_fuzz_prng_t* prng, fz_limits_t limits) {
   }
   profile.back_density = sp_fuzz_chance(prng, 1, 8) ? sp_fuzz_range(prng, 1, 2) : 0;
   profile.steps = sp_fuzz_range(prng, 1, profile.big ? 4 : 12);
+  static const u64 fz_granularities [] = { 16000000ull, 1000000000ull, 2000000000ull };
+  profile.granularity = sp_fuzz_chance(prng, 1, 2)
+    ? fz_granularities[sp_fuzz_below(prng, sp_carr_len(fz_granularities))]
+    : 1;
   sp_fuzz_swarm(prng, profile.step_weights, FZ_STEP_COUNT);
   profile.store_fs = sp_fuzz_chance(prng, 1, 2);
   profile.disco_fs = sp_fuzz_chance(prng, 1, 2);

@@ -35,6 +35,7 @@ set(SPN_SOURCES
   core/dag/run.c
   core/dag/glob.c
   core/dag/occ.c
+  core/dag/stamp.c
   core/dag/wasi.c
   core/dag/wasi/canonicalize.c
   core/enum/enum.c

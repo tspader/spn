@@ -4,6 +4,7 @@ add_executable(fuzz_dag
   ${SRC}/dag/store.c
   ${SRC}/dag/run.c
   ${SRC}/dag/glob.c
+  ${SRC}/dag/stamp.c
   ${SRC}/thread_pool/thread_pool.c
   ${SRC}/codegen/json.c
   ${SRC}/codegen/loader.c

@@ -217,6 +217,18 @@ static void fz_write_source(sp_mem_t mem, fz_universe_t* u, fz_state_t* state, u
   sp_fs_create_file_str(fz_artifact_sim_path(mem, u, artifact), fz_content(mem, state->contents[artifact]));
 }
 
+static void mark_unrecorded(fz_world_t* w, sp_mem_t mem, fz_universe_t* u) {
+  sp_da_for(u->artifacts, it) {
+    if (u->artifacts[it].kind != FZ_ARTIFACT_SOURCE) {
+      continue;
+    }
+    spn_path_t path = spn_path_make(&w->roots, fz_artifact_sim_path(mem, u, it));
+    if (!spn_dag_file_cache_recorded(&w->files, path)) {
+      w->dirty[it] = true;
+    }
+  }
+}
+
 static void fz_eval_action(fz_world_t* w, fz_universe_t* u, sp_str_t* key_bytes, sp_str_t* disk_bytes, fz_predict_row_t* predict, u64 at) {
   fz_action_t* action = &u->actions[at];
   spn_dag_digest_t prelim = fz_model_key(u, key_bytes, at);
@@ -346,6 +358,7 @@ static fz_err_t fz_trace_check_run(sp_mem_t mem, fz_universe_t* u, fz_world_t* w
     }
   }
   fz_journal_run_done(w->j, (u64)err, fired, crashed);
+  mark_unrecorded(w, mem, u);
 
   if (fired || crashed) {
     mark_world(w, FZ_WORLD_MURKY);
@@ -591,6 +604,7 @@ static fz_err_t fz_trace_body(sp_mem_t mem, sp_sim_t* sim, fz_universe_t* u, fz_
 static fz_err_t fz_trace_pass(sp_mem_t mem, fz_universe_t* u, fz_trace_t* trace, sp_fuzz_prng_t schedule, sp_str_t* final, fz_journal_t* j) {
   sp_sim_t sim = sp_zero;
   sp_sim_init(&sim, mem);
+  sim.granularity = u->profile.granularity;
   sp_sim_install(&sim);
   fz_err_t err = fz_trace_body(mem, &sim, u, trace, schedule, final, j);
   sp_sim_remove(&sim);
