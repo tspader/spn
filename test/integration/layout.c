@@ -28,8 +28,6 @@ sp_test(layout, staged_test) {
 // inode's link names, so @loader_path is only well-defined when a staged exe
 // is its inode's sole name.
 sp_test(layout, staged_identity) {
-  sp_try(test_when(t, (test_when_t) { .os = SPN_OS_MACOS }));
-
   fixture_t fixture = sp_zero;
   sp_try(fixture_init(t, &fixture));
   sp_try(run_command(t, &fixture, (command_test_t) {
