@@ -172,7 +172,8 @@ sp_template_err_t sp_template_load_dir(sp_template_registry_t* reg, sp_str_t roo
   sp_template_err_t err = SP_TEMPLATE_OK;
 
   sp_str_t norm_root = sp_fs_normalize_path(reg->mem, root);
-  sp_da(sp_fs_entry_t) entries = sp_fs_collect_recursive(reg->mem, root);
+  sp_da(sp_fs_entry_t) entries = sp_zero;
+  sp_fs_collect_recursive(reg->mem, root, &entries);
 
   sp_da_for(entries, i) {
     sp_fs_entry_t* e = &entries[i];

@@ -1619,8 +1619,7 @@ void spn_tui_init(spn_tui_t* tui, spn_tui_desc_t desc) {
   tui->ctx = desc.ctx;
   tui->mode = desc.mode;
   tui->logger.verbosity = desc.verbosity;
-  tui->wake.read = desc.wake.read;
-  tui->wake.write = desc.wake.write;
+  tui->wake = desc.wake;
 
   tui->mem = sp_mem_arena_as_allocator(sp_mem_arena_new(sp_mem_os_new()));
 
@@ -1755,7 +1754,7 @@ static void prompt_start(spn_tui_t* tui) {
   if (!tui->prompt.ctx) {
     return;
   }
-  sp_prompt_use_wake(tui->prompt.ctx, tui->wake.read, tui->wake.write);
+  sp_prompt_use_wake(tui->prompt.ctx, tui->wake);
 
   prompt_tui = tui;
   tui->prompt.widget = sp_prompt_progress_widget(tui->prompt.ctx, (sp_prompt_progress_t) {

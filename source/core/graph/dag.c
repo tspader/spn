@@ -1036,7 +1036,8 @@ static void dag_stage_link(spn_dag_build_t* b, dag_staged_t* staged, spn_path_t 
 
 static void dag_stage_dir(spn_dag_build_t* b, dag_staged_t* staged, spn_path_t from, spn_path_t to) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  sp_da(sp_fs_entry_t) entries = sp_fs_collect(scratch.mem, spn_path_str(b->graph->roots, scratch.mem, from));
+  sp_da(sp_fs_entry_t) entries = sp_zero;
+  sp_fs_collect(scratch.mem, spn_path_str(b->graph->roots, scratch.mem, from), &entries);
   sp_da_for(entries, it) {
     sp_str_t name = entries[it].name;
     spn_path_t source = spn_path_join(scratch.mem, from, name);

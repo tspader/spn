@@ -831,7 +831,8 @@ spn_err_t spn_dag_store_put_tree(spn_dag_store_t* store, sp_str_t dir, spn_dag_d
   spn_err_t err = SPN_OK;
 
   sp_da(spn_dag_action_output_t) entries = sp_da_new(s.mem, spn_dag_action_output_t);
-  sp_da(sp_fs_entry_t) files = sp_fs_collect_recursive(s.mem, dir);
+  sp_da(sp_fs_entry_t) files = sp_zero;
+  sp_fs_collect_recursive(s.mem, dir, &files);
   sp_da_for(files, it) {
     if (files[it].kind == SP_FS_KIND_DIR) {
       continue;

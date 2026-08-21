@@ -42,10 +42,7 @@ typedef struct {
   spn_ctx_t* ctx;
   spn_session_t* session;
   sp_mem_t mem;
-  struct {
-    sp_sys_fd_t read;
-    sp_sys_fd_t write;
-  } doorbell;
+  sp_sys_event_t doorbell;
   sp_atomic_s32_t interrupted;
 } spn_cli_host_t;
 

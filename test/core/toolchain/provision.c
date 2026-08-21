@@ -325,7 +325,8 @@ sp_test_each(provision, store, provision_test_t, tests, .setup = spn_test_ctx_se
   }
   if (it->expect.store_clean) {
     sp_str_t lock = sp_fmt(mem, "{}.lock", sp_fmt_str(artifact_sha)).value;
-    sp_da(sp_fs_entry_t) entries = sp_fs_collect(mem, store.dir);
+    sp_da(sp_fs_entry_t) entries = sp_zero;
+    sp_fs_collect(mem, store.dir, &entries);
     sp_must_eq(t, 1u, (u32)sp_da_size(entries));
     sp_expect_str_eq(t, entries[0].name, lock);
   }

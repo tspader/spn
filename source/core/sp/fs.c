@@ -57,7 +57,7 @@ s32 sp_sys_flock(sp_sys_fd_t fd, s32 op) {
 static sp_err_t sp_fs_lock_open(sp_fs_lock_t* lock, sp_str_t path) {
   *lock = sp_zero_s(sp_fs_lock_t);
   if (sp_sys_open_s(sp_sys_get_root(0), path, SP_SYS_OPEN_MODE_RW, SP_SYS_OPEN_CREATE, &lock->fd)) {
-    return SP_ERR_OS;
+    return SP_ERR_SYS;
   }
   return SP_OK;
 }
@@ -72,7 +72,7 @@ sp_err_t sp_fs_lock_acquire(sp_fs_lock_t* lock, sp_str_t path) {
 
   if (sp_sys_flock(lock->fd, SP_LOCK_EX)) {
     sp_fs_lock_drop(lock);
-    return SP_ERR_OS;
+    return SP_ERR_SYS;
   }
 
   lock->held = true;
@@ -85,7 +85,7 @@ sp_err_t sp_fs_lock_try_acquire(sp_fs_lock_t* lock, sp_str_t path, bool* acquire
 
   s32 rc = sp_sys_flock(lock->fd, SP_LOCK_EX | SP_LOCK_NB);
   if (rc) {
-    sp_err_t err = rc == -(s32)SP_EAGAIN ? SP_OK : SP_ERR_OS;
+    sp_err_t err = rc == -(s32)SP_EAGAIN ? SP_OK : SP_ERR_SYS;
     sp_fs_lock_drop(lock);
     return err;
   }
@@ -121,10 +121,10 @@ sp_err_t sp_fs_staging_dir_name(sp_mem_t mem, sp_str_t path, sp_str_t extension,
       return SP_OK;
     }
     if (!sp_fs_exists(candidate)) {
-      return SP_ERR_OS;
+      return SP_ERR_SYS;
     }
   }
-  return SP_ERR_OS;
+  return SP_ERR_SYS;
 }
 
 sp_err_t sp_fs_staging_dir(sp_mem_t mem, sp_str_t path, sp_str_t extension, sp_str_t* dir) {

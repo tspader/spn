@@ -276,7 +276,8 @@ static bool run(codegen_t* c) {
 
   try(emit_common(c));
 
-  sp_da(sp_fs_entry_t) entries = sp_fs_collect(c->mem, c->paths.schema);
+  sp_da(sp_fs_entry_t) entries = sp_zero;
+  sp_fs_collect(c->mem, c->paths.schema, &entries);
   sp_da_sort(entries, sort_entries);
   sp_da_for(entries, it) {
     sp_fs_entry_t* entry = &entries[it];

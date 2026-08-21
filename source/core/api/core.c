@@ -215,7 +215,8 @@ s32 spn_api_copy(sp_str_t from, sp_str_t to) {
       sp_glob_set_add(glob, sp_str_to_cstr(scratch.mem, pattern));
       sp_glob_set_build(glob);
 
-      sp_da(sp_fs_entry_t) entries = sp_fs_collect(scratch.mem, dir);
+      sp_da(sp_fs_entry_t) entries = sp_zero;
+      sp_fs_collect(scratch.mem, dir, &entries);
       sp_da_for(entries, it) {
         if (sp_glob_set_match(glob, entries[it].name)) {
           spn_fs_update_file(sp_fs_join_path(scratch.mem, dir, entries[it].name), to);

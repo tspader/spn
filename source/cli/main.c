@@ -7,8 +7,7 @@
 #include "tui/tui.h"
 
 static void on_wake(void* user_data) {
-  u8 byte = 0;
-  sp_sys_write(host.doorbell.write, &byte, 1, SP_NULLPTR);
+  sp_sys_event_signal(host.doorbell);
 }
 
 static void on_signal(sp_os_signal_t signal, void* userdata) {
@@ -41,7 +40,7 @@ static s32 help(sp_io_writer_t* io, sp_cli_t* cli) {
 s32 spn_main(s32 num_args, const c8** args) {
   sp_mem_heap_t* heap = sp_mem_heap_new();
   host.mem = sp_mem_heap_as_allocator(heap);
-  sp_sys_pipe(&host.doorbell.read, &host.doorbell.write);
+  sp_sys_event_open(&host.doorbell);
   host.ctx = spn_ctx_new(on_wake, SP_NULLPTR);
   sp_os_register_signal_handler(SP_OS_SIGNAL_INTERRUPT, on_signal, SP_NULLPTR);
 
@@ -68,10 +67,7 @@ s32 spn_main(s32 num_args, const c8** args) {
     .ctx = host.ctx,
     .mode = mode,
     .verbosity = verbosity,
-    .wake = {
-      .read = host.doorbell.read,
-      .write = host.doorbell.write,
-    },
+    .wake = host.doorbell,
   });
 
   sp_io_writer_t* io = &tui.logger.out.base;
