@@ -11,11 +11,12 @@ Tests should be:
 - Complete. Every feature should be tested.
 
 # running
-Running the tests via CTest is easiest, and outputs to an ISO timestamped directory in `.tmp`:
-```sh
-make test
+Use `spn` to build and run its own tests:
 ```
-or, equivalently, `ctest --test-dir .build/work/$TRIPLE --output-on-failure`.
+spn test
+```
+
+Use `--help` if you need filtering or other advanced usage. If, for some reason, this is broken, you can run them via CTest, but unless we're explicitly in some intermediate state this indicates some kind of product bug and you should stop such that we can consider it.
 
 # notes
 

@@ -174,6 +174,17 @@ sp_test(target, example) {
   });
 }
 
+sp_test(target, root_include) {
+  return run_test(t, (test_t) {
+    .project = "test/integration/fixtures/target/root_include",
+    .copy = { "a.h", "src" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = exe("main") },
+    },
+  });
+}
+
 sp_test(target, publish) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/target/publish",

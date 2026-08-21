@@ -339,6 +339,37 @@ static const test_t tests [] = {
     }
   },
   {
+    .name = "validate_root_source",
+    .manifest = "validate_root_source",
+    .issues = {
+      { SPN_ERR_CODEGEN_PATH },
+    },
+    .exes = {
+      {
+        .name = "t",
+        .source = { { "c.c" } },
+      }
+    }
+  },
+  {
+    .name = "validate_root_nested",
+    .manifest = "validate_root_nested",
+    .issues = {
+      { SPN_ERR_CODEGEN_PATH },
+      { SPN_ERR_CODEGEN_PATH },
+    },
+    .exes = {
+      { .name = "t" }
+    }
+  },
+  {
+    .name = "validate_empty_path",
+    .manifest = "validate_empty_path",
+    .issues = {
+      { SPN_ERR_CODEGEN_PATH },
+    },
+  },
+  {
     .name = "validate_cxx_source_on_build_script",
     .manifest = "validate_cxx_source_on_build_script",
     .build_source = { { "tools/build.cpp" } },
@@ -495,6 +526,16 @@ static const test_t tests [] = {
     .name = "package_include_tree",
     .manifest = "package_include_tree",
     .include = { { "inc", .tree = SPN_TREE_MANIFEST }, { "src" }, { "gen", .when = "os = \"linux\"" } },
+  },
+  {
+    .name = "include_root",
+    .manifest = "include_root",
+    .include = { { "" } },
+    .build_source = { { "b.c" } },
+    .build_include = { { "" } },
+    .exes = {
+      { .name = "t", .include = { { "" }, { "", .tree = SPN_TREE_MANIFEST } } }
+    },
   },
   {
     .name = "qualified_default_namespace",
