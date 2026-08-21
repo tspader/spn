@@ -43,10 +43,7 @@ typedef struct {
   spn_ctx_t* ctx;
   spn_tui_mode_t mode;
   spn_verbosity_t verbosity;
-  struct {
-    sp_sys_fd_t read;
-    sp_sys_fd_t write;
-  } wake;
+  sp_sys_event_t wake;
 } spn_tui_desc_t;
 
 typedef struct {
@@ -55,10 +52,7 @@ typedef struct {
   sp_mem_t mem;
   spn_logger_t logger;
   spn_tui_line_writer_t writer;
-  struct {
-    sp_sys_fd_t read;
-    sp_sys_fd_t write;
-  } wake;
+  sp_sys_event_t wake;
   sp_str_ht(bool) seen_url;
   sp_da(spn_tui_buffered_log_t) buffered_logs;
   u32 num_downloads;

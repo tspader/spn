@@ -106,7 +106,9 @@ SP_PRIVATE spn_err_t spn_toolchain_provision_fill(spn_toolchain_store_t* store, 
 
   sp_fs_remove_file(tarball);
 
-  bool empty = sp_da_empty(sp_fs_collect(store->mem, work));
+  sp_da(sp_fs_entry_t) extracted = sp_zero;
+  sp_fs_collect(store->mem, work, &extracted);
+  bool empty = sp_da_empty(extracted);
   if (extract.status.exit_code || empty) {
     sp_fs_remove_dir(work);
     return spn_err_emit(&spn, (spn_err_union_t) {

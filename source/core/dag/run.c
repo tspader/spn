@@ -271,7 +271,8 @@ static bool is_tree_settled(spn_dag_t* g, spn_dag_artifact_t* artifact, spn_dag_
   }
 
   u64 present = 0;
-  sp_da(sp_fs_entry_t) files = sp_fs_collect_recursive(s.mem, dir);
+  sp_da(sp_fs_entry_t) files = sp_zero;
+  sp_fs_collect_recursive(s.mem, dir, &files);
   sp_da_for(files, it) {
     if (files[it].kind != SP_FS_KIND_DIR) {
       present++;
@@ -466,7 +467,8 @@ static spn_err_t membership_digest(sp_str_t dir, sp_str_t filter, spn_dag_digest
   }
 
   sp_da(sp_fs_entry_t) members = sp_da_new(s.mem, sp_fs_entry_t);
-  sp_da(sp_fs_entry_t) entries = sp_fs_collect(s.mem, dir);
+  sp_da(sp_fs_entry_t) entries = sp_zero;
+  sp_fs_collect(s.mem, dir, &entries);
   sp_da_for(entries, it) {
     if (entries[it].kind != SP_FS_KIND_DIR && glob && !sp_glob_match(glob, entries[it].name)) {
       continue;

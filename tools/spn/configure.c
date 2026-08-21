@@ -14,7 +14,8 @@ static const c8* host_path(spn_t* spn, sp_mem_t mem, sp_str_t guest) {
 }
 
 static void add_inputs(spn_t* spn, sp_mem_t mem, spn_node_t* node, sp_str_t dir) {
-  sp_da(sp_fs_entry_t) entries = sp_fs_collect_recursive(mem, dir);
+  sp_da(sp_fs_entry_t) entries = sp_zero;
+  sp_fs_collect_recursive(mem, dir, &entries);
   sp_da_sort(entries, sort_paths);
   sp_da_for(entries, it) {
     if (entries[it].kind != SP_FS_KIND_FILE) {
@@ -49,7 +50,8 @@ static void add_codegen(spn_t* spn, spn_config_t* config) {
   add_output(spn, mem, node, "source/core/codegen/gen", sp_str_lit("abi"), ".gen.c");
   add_output(spn, mem, node, "include/spn", sp_str_lit("err"), ".h");
 
-  sp_da(sp_fs_entry_t) schemas = sp_fs_collect(mem, sp_str_lit("/source/source/core/codegen/schema"));
+  sp_da(sp_fs_entry_t) schemas = sp_zero;
+  sp_fs_collect(mem, sp_str_lit("/source/source/core/codegen/schema"), &schemas);
   sp_da_sort(schemas, sort_paths);
   sp_da_for(schemas, it) {
     sp_fs_entry_t* entry = &schemas[it];

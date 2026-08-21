@@ -2,7 +2,8 @@
 
 static u32 count_store_dirs(fixture_t* fixture, const c8* dir) {
   sp_str_t path = fixture_path(fixture, sp_cstr_as_str(dir));
-  sp_da(sp_fs_entry_t) entries = sp_fs_collect(fixture->mem, path);
+  sp_da(sp_fs_entry_t) entries = sp_zero;
+  sp_fs_collect(fixture->mem, path, &entries);
   u32 dirs = 0;
   sp_da_for(entries, it) {
     if (entries[it].kind == SP_FS_KIND_DIR) {

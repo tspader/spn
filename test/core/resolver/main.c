@@ -157,7 +157,8 @@ s32 main(s32 argc, const c8** argv) {
 
   spn.intern = sp_intern_new(sp_mem_os_new());
 
-  sp_da(sp_fs_entry_t) entries = sp_fs_collect(mem, test_repo_path(mem, sp_str_lit("test/core/resolver/fixtures")));
+  sp_da(sp_fs_entry_t) entries = sp_zero;
+  sp_fs_collect(mem, test_repo_path(mem, sp_str_lit("test/core/resolver/fixtures")), &entries);
   sp_da_sort(entries, sort_dir_entries);
 
   sp_da(sp_test_decl_t) decls = sp_da_new(mem, sp_test_decl_t);

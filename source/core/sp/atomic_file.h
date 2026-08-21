@@ -75,12 +75,12 @@ static sp_err_t sp_fs_atomic_open_impl(sp_fs_atomic_t* af, sp_sys_fd_t dir, sp_s
   fd = sp_sys_open_s(dir, af->temp, SP_O_CREAT | SP_O_EXCL | SP_O_WRONLY | SP_O_BINARY, 0644);
   if (fd == SP_SYS_INVALID_FD) {
     *af = sp_zero_s(sp_fs_atomic_t);
-    return SP_ERR_OS;
+    return SP_ERR_SYS;
   }
 #else
   if (sp_sys_open_s(dir, af->temp, SP_SYS_OPEN_MODE_WO, SP_SYS_OPEN_CREATE | SP_SYS_OPEN_EXCLUSIVE, &fd)) {
     *af = sp_zero_s(sp_fs_atomic_t);
-    return SP_ERR_OS;
+    return SP_ERR_SYS;
   }
 #endif
 
@@ -118,10 +118,10 @@ sp_err_t sp_fs_atomic_commit(sp_fs_atomic_t* af, sp_fs_atomic_mode_t mode) {
 
   switch (mode) {
     case SP_FS_ATOMIC_REPLACE:
-      if (sp_sys_rename_s(af->dir, af->temp, af->dir, af->path)) { err = SP_ERR_OS; goto fail; }
+      if (sp_sys_rename_s(af->dir, af->temp, af->dir, af->path)) { err = SP_ERR_SYS; goto fail; }
       break;
     case SP_FS_ATOMIC_EXCLUSIVE:
-      if (sp_sys_link_s(af->dir, af->temp, af->dir, af->path)) { err = SP_ERR_OS; goto fail; }
+      if (sp_sys_link_s(af->dir, af->temp, af->dir, af->path)) { err = SP_ERR_SYS; goto fail; }
       sp_sys_unlink_s(af->dir, af->temp);
       break;
   }
@@ -140,7 +140,7 @@ sp_err_t sp_fs_atomic_abort(sp_fs_atomic_t* af) {
   sp_io_file_writer_close(&af->writer);
   s32 rc = sp_sys_unlink_s(af->dir, af->temp);
   af->temp = sp_zero_s(sp_str_t);
-  return rc ? SP_ERR_OS : SP_OK;
+  return rc ? SP_ERR_SYS : SP_OK;
 }
 
 sp_err_t sp_fs_write_atomic_slice_staged(sp_str_t path, sp_str_t staging, sp_mem_slice_t slice) {

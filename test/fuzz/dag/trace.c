@@ -537,7 +537,8 @@ static fz_err_t fz_trace_body(sp_mem_t mem, sp_sim_t* sim, fz_universe_t* u, fz_
         if (!u->profile.store_fs) {
           break;
         }
-        sp_da(sp_fs_entry_t) entries = sp_fs_collect_recursive(mem, sp_str_lit("/store"));
+        sp_da(sp_fs_entry_t) entries = sp_zero;
+        sp_fs_collect_recursive(mem, sp_str_lit("/store"), &entries);
         sp_da(sp_fs_entry_t) blobs = sp_da_new(mem, sp_fs_entry_t);
         sp_da_for(entries, et) {
           if (entries[et].kind == SP_FS_KIND_FILE && !sp_str_contains(entries[et].path, sp_str_lit("/.staging/"))) {
@@ -558,7 +559,8 @@ static fz_err_t fz_trace_body(sp_mem_t mem, sp_sim_t* sim, fz_universe_t* u, fz_
         if (!u->profile.cache_fs) {
           break;
         }
-        sp_da(sp_fs_entry_t) entries = sp_fs_collect(mem, w.cache_dir);
+        sp_da(sp_fs_entry_t) entries = sp_zero;
+        sp_fs_collect(mem, w.cache_dir, &entries);
         sp_da(sp_fs_entry_t) cached = sp_da_new(mem, sp_fs_entry_t);
         sp_da_for(entries, et) {
           if (entries[et].kind == SP_FS_KIND_FILE) {

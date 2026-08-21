@@ -32,7 +32,8 @@ sp_ps_output_t git_repo_run(sp_str_t repo, const sp_str_t* args, u32 count) {
 
 static void git_repo_copy_dir(sp_str_t source, sp_str_t repo) {
   sp_mem_t mem = sp_mem_os_new();
-  sp_da(sp_fs_entry_t) entries = sp_fs_collect_recursive(mem, source);
+  sp_da(sp_fs_entry_t) entries = sp_zero;
+  sp_fs_collect_recursive(mem, source, &entries);
   sp_da_for(entries, it) {
     sp_fs_entry_t* entry = &entries[it];
     if (sp_fs_is_dir(entry->path)) {
