@@ -337,7 +337,6 @@
 #define SP_PROMPT_PRIMED_EVENT_CAP 8
 #define SP_PROMPT_CELL_BUFFER_BYTES 32
 #define SP_PROMPT_BUFFER_EXTRA_BYTES 1024
-#define SP_PROMPT_WAKE_DRAIN_SIZE 64
 #define SP_PROMPT_DEFAULT_VISIBLE_OPTIONS 8
 #define SP_PROMPT_DEFAULT_FPS 15
 
@@ -758,7 +757,7 @@ bool             sp_prompt_cancelled(sp_prompt_ctx_t* ctx);
 // @signals
 void             sp_prompt_complete(sp_prompt_ctx_t* ctx);
 void             sp_prompt_abort(sp_prompt_ctx_t* ctx);
-void             sp_prompt_use_wake(sp_prompt_ctx_t* ctx, sp_sys_fd_t read, sp_sys_fd_t write);
+void             sp_prompt_use_wake(sp_prompt_ctx_t* ctx, sp_sys_event_t event);
 bool             sp_prompt_is_aborted(sp_prompt_ctx_t* ctx);
 void             sp_prompt_send_progress_f32(sp_prompt_ctx_t* ctx, f32 value);
 void             sp_prompt_send_progress_f64(sp_prompt_ctx_t* ctx, f64 value);
@@ -923,8 +922,7 @@ struct sp_prompt_ctx_t {
     } log;
   } channel;
   struct {
-    sp_sys_fd_t read;
-    sp_sys_fd_t write;
+    sp_sys_event_t event;
     sp_atomic_s32_t pending;
     bool external;
   } wake;
@@ -1032,7 +1030,7 @@ s32 sp_prompt_begin_ex(sp_prompt_ctx_t* ctx) {
   ctx->terminal.raw = false;
 
   if (sp_prompt_enable_raw_mode(ctx) == -1) return -1;
-  sp_sys_pipe(&ctx->wake.read, &ctx->wake.write);
+  sp_sys_event_open(&ctx->wake.event);
   sp_prompt_emit(ctx, SP_ANSI_HIDE_CURSOR);
   sp_io_flush(ctx->writer);
   return 0;
@@ -1047,15 +1045,11 @@ void sp_prompt_end(sp_prompt_ctx_t* ctx) {
   }
 
   if (!ctx->wake.external) {
-    if (ctx->wake.read != SP_SYS_INVALID_FD) {
-      sp_sys_close(ctx->wake.read);
-    }
-    if (ctx->wake.write != SP_SYS_INVALID_FD) {
-      sp_sys_close(ctx->wake.write);
+    if (ctx->wake.event.fd != SP_SYS_INVALID_FD) {
+      sp_sys_close(ctx->wake.event.fd);
     }
   }
-  ctx->wake.read = SP_SYS_INVALID_FD;
-  ctx->wake.write = SP_SYS_INVALID_FD;
+  ctx->wake.event.fd = SP_SYS_INVALID_FD;
   ctx->wake.external = false;
 
   if (ctx->terminal.fds.out != SP_SYS_INVALID_FD && ctx->terminal.fds.out != 0) {
@@ -1086,8 +1080,7 @@ void sp_prompt_ctx_init(sp_prompt_ctx_t* ctx, sp_mem_t mem, u32 cols, u32 rows) 
   ctx->cols = cols;
   ctx->rows = rows;
   ctx->state = SP_PROMPT_STATE_ACTIVE;
-  ctx->wake.read = SP_SYS_INVALID_FD;
-  ctx->wake.write = SP_SYS_INVALID_FD;
+  ctx->wake.event.fd = SP_SYS_INVALID_FD;
   ctx->arena = sp_mem_arena_new(mem);
   ctx->mem = sp_mem_arena_as_allocator(ctx->arena);
   sp_da_init(ctx->mem, ctx->frames);
@@ -1176,30 +1169,24 @@ const c8* sp_prompt_join_selection(sp_prompt_ctx_t* ctx, sp_prompt_select_option
   return sp_io_dyn_mem_writer_as_cstr(&w);
 }
 
-// Instead of just writing to the file descriptor that the main loop waits on for events,
-// deduplicate them so we don't fill up the pipe with useless bytes and risk deadlocking
-// if for some reason we're emitting progress extremely fast.
+// The event is idempotent, so signaling on every wake would be correct; the pending flag
+// just saves a syscall when we're emitting progress extremely fast.
 void sp_prompt_wake(sp_prompt_ctx_t* ctx) {
-  if (ctx->wake.write == SP_SYS_INVALID_FD) {
+  if (ctx->wake.event.fd == SP_SYS_INVALID_FD) {
     return;
   }
   if (sp_atomic_s32_cas(&ctx->wake.pending, SP_PROMPT_WAKE_NOT_PENDING, SP_PROMPT_WAKE_PENDING, SP_ATOMIC_SEQ_CST)) {
-    u8 byte = 0;
-    sp_sys_write(ctx->wake.write, &byte, 1, SP_NULLPTR);
+    sp_sys_event_signal(ctx->wake.event);
   }
 }
 
-void sp_prompt_use_wake(sp_prompt_ctx_t* ctx, sp_sys_fd_t read, sp_sys_fd_t write) {
+void sp_prompt_use_wake(sp_prompt_ctx_t* ctx, sp_sys_event_t event) {
   if (!ctx->wake.external) {
-    if (ctx->wake.read != SP_SYS_INVALID_FD) {
-      sp_sys_close(ctx->wake.read);
-    }
-    if (ctx->wake.write != SP_SYS_INVALID_FD) {
-      sp_sys_close(ctx->wake.write);
+    if (ctx->wake.event.fd != SP_SYS_INVALID_FD) {
+      sp_sys_close(ctx->wake.event.fd);
     }
   }
-  ctx->wake.read = read;
-  ctx->wake.write = write;
+  ctx->wake.event = event;
   ctx->wake.external = true;
 }
 
@@ -1365,7 +1352,7 @@ static void sp_prompt_render_frame(sp_prompt_ctx_t* ctx, sp_prompt_widget_t widg
 
 static bool sp_prompt_poll_stdin(sp_prompt_ctx_t* ctx) {
   u8 ready = 0;
-  return sp_sys_fd_ready(ctx->terminal.fds.in, &ready) == SP_OK && ready;
+  return sp_sys_tty_ready(ctx->terminal.fds.in, &ready) == SP_OK && ready;
 }
 
 SP_PRIVATE bool sp_prompt_read_byte(void* out) {
@@ -1661,26 +1648,24 @@ sp_app_result_t sp_prompt_app_on_poll(sp_app_t* app) {
   }
 
   // Widgets that don't .on_update have nothing to do without an event, so we prefer to
-  // yield to the kernel until one shows up. We model this with a pipe; when you want to
-  // make sure the prompt wakes up, you write to your end of the pipe.
+  // yield to the kernel until one shows up. We model this with a sys event; when you want
+  // to make sure the prompt wakes up, you signal it.
   //
-  // We don't actually read the data, though. Still, there's no need for a concurrency
-  // primitive like a condition variable or a semaphore because the only data to
-  // synchronize is a single sp_atomic_s32_t, the state. And more, using a file descriptor
-  // lets us join "wait for stdin" and "wait for wake signal" in one OS primitive.
+  // There's no need for a concurrency primitive like a condition variable or a semaphore
+  // because the only data to synchronize is a single sp_atomic_s32_t, the state. And
+  // more, using an OS handle lets us join "wait for stdin" and "wait for wake signal" in
+  // one OS primitive.
   //
-  // The only unclear thing is that we still drain the wake fd, so it doesn't fill up, but
-  // we discard the data.
+  // The event is level-triggered, so it must be cleared before the next queue scan;
+  // clearing after the scan would drop any wake signaled in between.
   if (sp_da_empty(events)) {
     if (!ctx->widget.on_update) {
-      u8 ready [2] = sp_zero;
-      sp_sys_fd_t fds [2] = { ctx->terminal.fds.in, ctx->wake.read };
-      sp_sys_fds_wait(fds, ready, 2);
+      sp_sys_fd_t fds [2] = { ctx->terminal.fds.in, ctx->wake.event.fd };
+      u64 n = ctx->wake.event.fd != SP_SYS_INVALID_FD ? 2 : 1;
+      u64 signaled = 0;
 
-      if (ready[1]) {
-        u8 drain[SP_PROMPT_WAKE_DRAIN_SIZE];
-        u64 drained = 0;
-        while (sp_sys_read(ctx->wake.read, drain, sizeof(drain), &drained) == SP_OK && drained) {}
+      if (sp_sys_wait(fds, n, 0, &signaled) == SP_OK && signaled == 1) {
+        sp_sys_event_clear(ctx->wake.event);
         sp_atomic_s32_store(&ctx->wake.pending, SP_PROMPT_WAKE_NOT_PENDING, SP_ATOMIC_SEQ_CST);
       }
     }

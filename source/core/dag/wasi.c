@@ -261,7 +261,8 @@ static void wasi_observe_dir(spn_dag_wasi_t* w, sp_str_t dir) {
   wasi_push_obs(w, SPN_DAG_OBS_ENUMERATION, dir);
 
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-  sp_da(sp_fs_entry_t) entries = sp_fs_collect_recursive(s.mem, dir);
+  sp_da(sp_fs_entry_t) entries = sp_zero;
+  sp_fs_collect_recursive(s.mem, dir, &entries);
   sp_da_for(entries, it) {
     if (entries[it].kind == SP_FS_KIND_DIR) {
       wasi_push_obs(w, SPN_DAG_OBS_ENUMERATION, entries[it].path);

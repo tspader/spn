@@ -221,7 +221,8 @@ static void discover_exec_prepare(discover_env_t* env, const discover_run_t* run
 static sp_sys_file_meta_t manifest_meta(discover_env_t* env) {
   sp_sys_file_meta_t meta = sp_zero;
   sp_str_t dir = dag_test_env_path(&env->dag, sp_str_lit("manifests"));
-  sp_da(sp_fs_entry_t) entries = sp_fs_collect(env->dag.mem, dir);
+  sp_da(sp_fs_entry_t) entries = sp_zero;
+  sp_fs_collect(env->dag.mem, dir, &entries);
   if (sp_da_size(entries) == 1) {
     sp_sys_get_path_metadata_s(sp_sys_get_root(0), entries[0].path, &meta);
   }

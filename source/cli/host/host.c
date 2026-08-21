@@ -45,9 +45,7 @@ sp_cli_result_t spn_cli_refresh_indexes() {
 
 spn_err_t spn_cli_wait(spn_op_t* op) {
   while (true) {
-    u8 drain [16];
-    u64 drained = 0;
-    while (sp_sys_read(host.doorbell.read, drain, sizeof(drain), &drained) == SP_OK && drained) {}
+    sp_sys_event_clear(host.doorbell);
 
     if (sp_atomic_s32_load(&host.interrupted, SP_ATOMIC_SEQ_CST)) {
       spn_op_cancel(op);
@@ -59,9 +57,9 @@ spn_err_t spn_cli_wait(spn_op_t* op) {
     }
 
     if (!spn_tui_wants_input(&tui)) {
-      sp_sys_fd_t fds [1] = { host.doorbell.read };
-      u8 ready [1] = sp_zero;
-      sp_sys_fds_wait(fds, ready, 1);
+      sp_sys_fd_t fds [1] = { host.doorbell.fd };
+      u64 signaled = 0;
+      sp_sys_wait(fds, 1, 0, &signaled);
     }
   }
 

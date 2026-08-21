@@ -79,7 +79,8 @@ s32 spn_embed_write(spn_target_unit_t* unit, spn_path_t object, spn_path_t heade
         spn_path_t root = embed.dir.path;
         sp_str_t dir = spn_path_str(&spn.roots, scratch.mem, root);
         embed_obs(obs, SPN_DAG_OBS_ENUMERATION, root);
-        sp_da(sp_fs_entry_t) entries = sp_fs_collect_recursive(scratch.mem, dir);
+        sp_da(sp_fs_entry_t) entries = sp_zero;
+        sp_fs_collect_recursive(scratch.mem, dir, &entries);
         sp_da_for(entries, e) {
           sp_str_t rel = sp_str_suffix(entries[e].path, entries[e].path.len - dir.len - 1);
           if (entries[e].kind == SP_FS_KIND_DIR) {

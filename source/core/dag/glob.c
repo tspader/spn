@@ -106,7 +106,8 @@ static spn_err_t glob_walk(spn_dag_glob_walk_t* w, spn_dag_glob_dir_t start) {
     }
     walk_observe(w, SPN_DAG_OBS_ENUMERATION, visit.path, w->filter);
 
-    sp_da(sp_fs_entry_t) entries = sp_fs_collect(w->mem, walk_str(w, visit.path));
+    sp_da(sp_fs_entry_t) entries = sp_zero;
+    sp_fs_collect(w->mem, walk_str(w, visit.path), &entries);
     sp_da_for(entries, it) {
       sp_fs_entry_t* entry = &entries[it];
       if (entry->kind == SP_FS_KIND_DIR) {

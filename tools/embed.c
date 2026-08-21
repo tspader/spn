@@ -219,7 +219,8 @@ sp_cli_result_t embed_run(sp_cli_t* cli) {
     }
 
     if (sp_fs_is_dir(src)) {
-      sp_da(sp_fs_entry_t) files = sp_fs_collect_recursive(mem, src);
+      sp_da(sp_fs_entry_t) files = sp_zero;
+      sp_fs_collect_recursive(mem, src, &files);
       u32 skip = src.len + 1;
       sp_da_for(files, fit) {
         sp_fs_entry_t ent = files[fit];

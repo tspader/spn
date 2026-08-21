@@ -259,14 +259,16 @@ static sp_err_t setup_fixture_index_from_remote(sp_test_t* t, fixture_t* fixture
   sp_str_t recipes = sp_fs_join_path(mem, project, sp_str_lit("recipes"));
   sp_da(fixture_sub_t) subs = sp_da_new(mem, fixture_sub_t);
 
-  sp_da(sp_fs_entry_t) entries = sp_fs_collect(mem, remote);
+  sp_da(sp_fs_entry_t) entries = sp_zero;
+  sp_fs_collect(mem, remote, &entries);
   sp_da_for(entries, it) {
     sp_fs_entry_t* entry = &entries[it];
     if (!sp_fs_is_dir(entry->path)) {
       continue;
     }
 
-    sp_da(sp_fs_entry_t) versions = sp_fs_collect(mem, entry->path);
+    sp_da(sp_fs_entry_t) versions = sp_zero;
+    sp_fs_collect(mem, entry->path, &versions);
     sp_must(t, !sp_da_empty(versions));
     sp_da_sort(versions, sort_dirs_by_name);
 
@@ -330,13 +332,15 @@ static sp_err_t setup_fixture_index_from_remote(sp_test_t* t, fixture_t* fixture
   }
 
   if (sp_fs_is_dir(raw)) {
-    sp_da(sp_fs_entry_t) namespaces = sp_fs_collect(mem, raw);
+    sp_da(sp_fs_entry_t) namespaces = sp_zero;
+    sp_fs_collect(mem, raw, &namespaces);
     sp_da_for(namespaces, nt) {
       sp_fs_entry_t* ns = &namespaces[nt];
       if (!sp_fs_is_dir(ns->path)) {
         continue;
       }
-      sp_da(sp_fs_entry_t) files = sp_fs_collect(mem, ns->path);
+      sp_da(sp_fs_entry_t) files = sp_zero;
+      sp_fs_collect(mem, ns->path, &files);
       sp_da_for(files, ft) {
         sp_str_t content = test_read_file(mem, files[ft].path);
         sp_da_for(subs, st) {
@@ -386,7 +390,8 @@ static sp_err_t setup_fixture_source_repos(sp_test_t* t, fixture_t* fixture, sp_
   subs[num_subs].value = sp_str_replace_c8(mem, fixture->root, '\\', '/');
   num_subs++;
 
-  sp_da(sp_fs_entry_t) entries = sp_fs_collect(mem, source);
+  sp_da(sp_fs_entry_t) entries = sp_zero;
+  sp_fs_collect(mem, source, &entries);
   sp_da_for(entries, it) {
     sp_fs_entry_t* entry = &entries[it];
     if (!sp_fs_is_dir(entry->path)) {
@@ -412,7 +417,8 @@ static sp_err_t setup_fixture_source_repos(sp_test_t* t, fixture_t* fixture, sp_
     return SP_OK;
   }
 
-  sp_da(sp_fs_entry_t) files = sp_fs_collect_recursive(mem, fixture->root);
+  sp_da(sp_fs_entry_t) files = sp_zero;
+  sp_fs_collect_recursive(mem, fixture->root, &files);
   sp_da_for(files, it) {
     sp_fs_entry_t* file = &files[it];
     if (sp_fs_is_dir(file->path)) {
@@ -1132,7 +1138,8 @@ sp_err_t run_actions(sp_test_t* t, fixture_t* fixture, const action_t* actions) 
       }
       case ACTION_VERIFY_DIR_COUNT: {
         sp_str_t path = fixture_path(fixture, sp_str_view(action.verify_dir_count.dir));
-        sp_da(sp_fs_entry_t) entries = sp_fs_collect(mem, path);
+        sp_da(sp_fs_entry_t) entries = sp_zero;
+        sp_fs_collect(mem, path, &entries);
         u32 dirs = 0;
         sp_da_for(entries, et) {
           if (entries[et].kind == SP_FS_KIND_DIR) {

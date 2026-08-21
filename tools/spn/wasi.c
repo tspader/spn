@@ -113,7 +113,7 @@ static sp_err_t err_from_wasi(__wasi_errno_t e) {
     case __WASI_ERRNO_NOSYS:
     case __WASI_ERRNO_NOTSUP:       return SP_ERR_SYS_UNSUPPORTED;
     case __WASI_ERRNO_TIMEDOUT:     return SP_ERR_SYS_TIMED_OUT;
-    default:                        return SP_ERR_OS;
+    default:                        return SP_ERR_SYS;
   }
 }
 
