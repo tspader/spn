@@ -1,4 +1,6 @@
 #include "sp.h"
+#include "sp/atomic_file.h"
+#include "sp/io.h"
 #include "sp/macro.h"
 #include "project/project.h"
 #include "ctx/types.h"
@@ -1054,6 +1056,46 @@ static void dag_stage_file(spn_dag_build_t* b, dag_staged_t* staged, spn_dag_id_
   dag_stage_link(b, staged, spn_dag_find_artifact(b->graph, artifact)->materialized, to);
 }
 
+static void dag_stage_copy(spn_dag_build_t* b, dag_staged_t* staged, spn_dag_id_t id, spn_path_t to) {
+  if (spn_path_empty(to) || sp_ht_getp(*staged, to)) {
+    return;
+  }
+  sp_ht_insert(*staged, spn_path_copy(b->mem, to), (u8)true);
+
+  spn_dag_artifact_t* artifact = spn_dag_find_artifact(b->graph, id);
+
+  sp_sys_file_meta_t staged_meta = sp_zero;
+  spn_dag_digest_t staged_digest = sp_zero;
+  if (spn_dag_digest_valid(artifact->digest) &&
+      !spn_dag_file_cache_stat(&b->files, to, &staged_meta) && staged_meta.nlink == 1 &&
+      !spn_dag_file_cache_digest(&b->files, to, &staged_digest) &&
+      spn_dag_digest_equal(staged_digest, artifact->digest)) {
+    return;
+  }
+
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_str_t source = spn_path_str(b->graph->roots, scratch.mem, artifact->materialized);
+  sp_str_t target = spn_path_str(b->graph->roots, scratch.mem, to);
+
+  sp_sys_file_meta_t meta = sp_zero;
+  sp_mem_slice_t bytes = sp_zero;
+  sp_fs_atomic_t af = sp_zero;
+  if (!sp_sys_get_path_metadata_s(sp_sys_get_root(0), source, &meta) &&
+      !sp_io_read_file_slice(scratch.mem, source, &bytes) &&
+      !sp_fs_atomic_open(&af, target)) {
+    if (sp_io_write_all(sp_fs_atomic_writer(&af), bytes.data, bytes.len, SP_NULLPTR)) {
+      sp_fs_atomic_abort(&af);
+    }
+    else {
+      sp_sys_chmod_s(af.dir, af.temp, &meta);
+      sp_fs_atomic_commit(&af, SP_FS_ATOMIC_REPLACE);
+    }
+  }
+  sp_mem_end_scratch(scratch);
+
+  spn_dag_file_cache_invalidate(&b->files, to);
+}
+
 static void dag_stage_pkg_store(spn_dag_build_t* b, dag_staged_t* staged, spn_pkg_unit_t* unit, spn_path_t root) {
   if (!unit) {
     return;
@@ -1093,7 +1135,7 @@ static void dag_stage(spn_dag_build_t* b) {
       spn_dag_id_t output = ids->output;
 
       spn_path_t staged_path = spn_target_unit_staged_path(scratch.mem, target);
-      dag_stage_file(b, &staged, output, staged_path);
+      dag_stage_copy(b, &staged, output, staged_path);
 
       spn_path_t dir = { .root = staged_path.root, .sub = sp_fs_parent_path(staged_path.sub) };
       sp_da(spn_target_unit_t*) libs = spn_target_runtime_libs(scratch.mem, target);
