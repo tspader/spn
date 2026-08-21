@@ -32,6 +32,13 @@ static const tree_path_test_t tree_path_tests [] = {
     .expect = { .root = SPN_PATH_ROOT_PROJECT, .sub = "R/T/B.c", .resolved = "/A/R/T/B.c" }
   },
   {
+    .name = "empty_names_the_tree_root",
+    .roots = { .project = "/A" },
+    .recipe = "/A/R", .source = "/A/S",
+    .decl = SPN_TREE_SOURCE, .path = "",
+    .expect = { .root = SPN_PATH_ROOT_PROJECT, .sub = "S", .resolved = "/A/S" }
+  },
+  {
     .name = "absolute_ignores_the_declared_tree",
     .roots = { .project = "/A" },
     .recipe = "/A/R", .source = "/A/S",

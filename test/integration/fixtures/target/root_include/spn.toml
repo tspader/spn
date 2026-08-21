@@ -1,0 +1,8 @@
+[package]
+name = "root_include"
+version = "0.1.0"
+include = ["."]
+
+[[bin]]
+name = "main"
+source = ["src/main.c"]

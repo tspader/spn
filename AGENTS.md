@@ -4,6 +4,9 @@
 - Build scripts are written in plain C and compiled to WASM
 - `spn` is written in C using `sp.h` as its custom standard library
 
+# machine
+Machine specific information is in @.llm/prompt/machine.md. If it doesn't exist, there is none.
+
 # building
 We keep two builds; a CMake-based build for building from scratch, and a self hosted build. The CMake build is wrapped with a tiny Makefile, just for coordination rather than build logic:
 

@@ -1,0 +1,12 @@
+[package]
+name = "p"
+version = "1.0.0"
+include = ["."]
+
+[package.build]
+source = ["b.c"]
+include = ["."]
+
+[[bin]]
+name = "t"
+include = [".", { path = ".", tree = "manifest" }]
