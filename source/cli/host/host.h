@@ -35,6 +35,7 @@ typedef struct {
     sp_str_t output;
     bool verbose;
     bool quiet;
+    bool version;
     u32 refresh;
     spn_cli_profile_t profile;
   } args;

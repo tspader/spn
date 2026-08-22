@@ -52,6 +52,13 @@ static sp_cli_cmd_t root = {
       .kind = SP_CLI_OPT_BOOLEAN,
       .ptr = &host.args.quiet,
     },
+    {
+      .brief = 'V',
+      .name = "version",
+      .summary = "Show version information",
+      .kind = SP_CLI_OPT_BOOLEAN,
+      .ptr = &host.args.version,
+    },
   },
   .env = {
     {

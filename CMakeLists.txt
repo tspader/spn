@@ -106,6 +106,7 @@ endif()
 set(EMBED_OBJ ${STORE}/lib/spn.embed.o)
 set(EMBED_HDR ${STORE}/include/spn.embed.h)
 
+include(tools/cmake/build_info.cmake)
 include(tools/cmake/libs.cmake)
 
 add_subdirectory(tools)
