@@ -51,10 +51,18 @@ ifneq ($(SANITIZE),)
   FLAVOR := -san
 endif
 
+ifeq ($(CONFIG),Debug)
+  CONFIG_TAG :=
+else ifeq ($(CONFIG),Release)
+  CONFIG_TAG := -release
+else
+  $(error unsupported CONFIG '$(CONFIG)'; use Debug or Release)
+endif
+
 BUILD := $(ROOT)/.build
-WORK := $(BUILD)/work/$(TRIPLE)$(FLAVOR)
+WORK := $(BUILD)/work/$(TRIPLE)$(FLAVOR)$(CONFIG_TAG)
 WORK_HOST := $(BUILD)/work/$(HOST_TRIPLE)
-STORE := $(BUILD)/store/$(TRIPLE)$(FLAVOR)
+STORE := $(BUILD)/store/$(TRIPLE)$(FLAVOR)$(CONFIG_TAG)
 
 EXE :=
 ifneq (,$(findstring windows,$(TRIPLE)))
@@ -69,8 +77,8 @@ ifeq ($(OS),Windows_NT)
 else ifneq ($(SANITIZE),)
 	@echo "sanitized binary: $(BIN)"
 else ifeq ($(TRIPLE),$(HOST_TRIPLE))
-	@ln -sfn .build/store/$(TRIPLE) $(ROOT)/bootstrap
-	@ln -sf .build/work/$(TRIPLE)/compile_commands.json $(ROOT)/compile_commands.json
+	@ln -sfn .build/store/$(TRIPLE)$(CONFIG_TAG) $(ROOT)/bootstrap
+	@ln -sf .build/work/$(TRIPLE)$(CONFIG_TAG)/compile_commands.json $(ROOT)/compile_commands.json
 	@echo "host binary: bootstrap/bin/spn -> $(BIN)"
 else
 	@echo "cross binary: $(BIN)"
