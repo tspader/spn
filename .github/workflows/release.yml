@@ -1,0 +1,53 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        required: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@v5
+      - run: |
+          version="$(sed -n 's/^version = "\(.*\)"$/\1/p' spn.toml)"
+          test "v${version}" = "${TAG}"
+      - run: |
+          runs="$(gh run list --commit ${{ github.sha }} --workflow ci --status success --json databaseId --jq length)"
+          test "${runs}" -gt 0
+
+  package:
+    needs: [check]
+    uses: ./.github/workflows/package.yml
+    with:
+      channel: stable
+
+  release:
+    needs: [package]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+      - run: sha256sum spn-* > SHASUMS256.txt
+      - run: gh release create "${TAG}" spn-* SHASUMS256.txt --repo ${{ github.repository }} --target ${{ github.sha }} --title "${TAG}" --generate-notes
