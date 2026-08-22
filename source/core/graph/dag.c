@@ -1352,6 +1352,7 @@ spn_err_t spn_dag_build_session(spn_op_t* op) {
       spn_try(spn_project_update_lock(session->ctx, project, session->resolve));
     }
     dag_stage(b);
+    spn_dag_file_cache_flush(&b->files, b->files_path);
   }
 
   dag_emit_reports(b, elapsed);
