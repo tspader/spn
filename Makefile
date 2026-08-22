@@ -81,14 +81,14 @@ build: configure
 
 ifeq ($(TRIPLE),$(HOST_TRIPLE))
 configure: fetch
-	@cmake -S $(ROOT) -B $(WORK) $(GEN_FLAGS) -DTRIPLE=$(TRIPLE) -DHOST_TRIPLE=$(HOST_TRIPLE) -DSPN_SANITIZE=$(if $(SANITIZE),ON,OFF)
+	@cmake -S $(ROOT) -B $(WORK) $(GEN_FLAGS) -DTRIPLE=$(TRIPLE) -DHOST_TRIPLE=$(HOST_TRIPLE) -DCMAKE_BUILD_TYPE=$(CONFIG) -DSPN_SANITIZE=$(if $(SANITIZE),ON,OFF)
 else
 .PHONY: host-tools
 host-tools: fetch
 	@cmake -S $(ROOT) -B $(WORK_HOST) -DTRIPLE=$(HOST_TRIPLE) -DHOST_TRIPLE=$(HOST_TRIPLE)
 	@cmake --build $(WORK_HOST) --parallel $(NPROC) --target embed jtd_gen
 configure: host-tools
-	@cmake -S $(ROOT) -B $(WORK) -DTRIPLE=$(TRIPLE) -DHOST_TRIPLE=$(HOST_TRIPLE) -DSPN_HOST_TOOLS=$(WORK_HOST)/tools
+	@cmake -S $(ROOT) -B $(WORK) -DTRIPLE=$(TRIPLE) -DHOST_TRIPLE=$(HOST_TRIPLE) -DCMAKE_BUILD_TYPE=$(CONFIG) -DSPN_HOST_TOOLS=$(WORK_HOST)/tools
 endif
 
 fetch:
