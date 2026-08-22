@@ -24,11 +24,12 @@ jobs:
       TAG: ${{ inputs.tag }}
     steps:
       - uses: actions/checkout@v5
+      - run: test "${{ github.ref }}" = "refs/heads/main"
       - run: |
           version="$(sed -n 's/^version = "\(.*\)"$/\1/p' spn.toml)"
           test "v${version}" = "${TAG}"
       - run: |
-          runs="$(gh run list --commit ${{ github.sha }} --workflow ci --status success --json databaseId --jq length)"
+          runs="$(gh run list --commit ${{ github.sha }} --workflow ci.yml --branch main --event push --status success --json databaseId --jq length)"
           test "${runs}" -gt 0
 
   package:
