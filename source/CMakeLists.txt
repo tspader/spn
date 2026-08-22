@@ -153,6 +153,7 @@ target_include_directories(spn PRIVATE
   ${CMAKE_SOURCE_DIR}/include
   ${SRC}/codegen/gen
   ${STORE}/include
+  ${CMAKE_BINARY_DIR}/gen
 )
 target_link_libraries(spn PRIVATE m vmlib yyjson)
 # vmlib carries C++ objects (WAMR Fast JIT: asmjit + x86_64 codegen). spn's own
