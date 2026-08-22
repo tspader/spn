@@ -54,7 +54,7 @@ target_include_directories(integration PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/tools
 )
 target_compile_definitions(integration PRIVATE
-  SPN_TEST_BIN=".build/store/${TRIPLE}/bin/spn${CMAKE_EXECUTABLE_SUFFIX}"
+  SPN_TEST_BIN=".build/store/${TRIPLE}${SPN_FLAVOR}/bin/spn${CMAKE_EXECUTABLE_SUFFIX}"
 )
 target_link_libraries(integration PRIVATE yyjson)
 add_dependencies(integration spn spn_codegen_gen)

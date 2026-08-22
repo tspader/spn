@@ -30,5 +30,5 @@ make
 ./build/debug/spn build
 ```
 
-Dependencies are pinned by SHA in `tools/cmake/fetch.cmake` and fetched into `.build/source`. Build artifacts land in `.build/store/$TRIPLE`; `bootstrap` is a symlink to the host triple's store.
+Dependencies are pinned by SHA in `tools/cmake/fetch.cmake` and fetched into `.build/source`. Build artifacts land in `.build/store/$TRIPLE` (suffixed with `-san` and/or `-release` for sanitized and release builds); `bootstrap` is a symlink to the host triple's store.
 
