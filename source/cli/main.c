@@ -38,10 +38,7 @@ static s32 help(sp_io_writer_t* io, sp_cli_t* cli) {
   return 0;
 }
 
-static s32 version(void) {
-  sp_io_stream_writer_t out;
-  sp_io_stream_writer_from_fd(&out, sp_sys_stdout, SP_IO_CLOSE_MODE_NONE);
-
+static s32 version(sp_io_writer_t* io) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   sp_da(sp_str_t) parts = sp_da_new(scratch.mem, sp_str_t);
 
@@ -55,11 +52,11 @@ static s32 version(void) {
     sp_da_push(parts, sp_str_prefix(commit, sp_min((s32)commit.len, 9)));
   }
 
-  sp_fmt_io(&out.base, "spn {}", sp_fmt_cstr(SPN_VERSION));
   if (sp_da_size(parts)) {
-    sp_fmt_io(&out.base, " ({})", sp_fmt_str(sp_str_join_n(scratch.mem, parts, sp_da_size(parts), sp_str_lit(" "))));
+    sp_fmt_io(io, "spn {} ({})\n", sp_fmt_cstr(SPN_VERSION), sp_fmt_str(sp_str_join_n(scratch.mem, parts, sp_da_size(parts), sp_str_lit(" "))));
+  } else {
+    sp_fmt_io(io, "spn {}\n", sp_fmt_cstr(SPN_VERSION));
   }
-  sp_fmt_io(&out.base, "\n");
 
   sp_mem_end_scratch(scratch);
   return 0;
@@ -78,10 +75,6 @@ s32 spn_main(s32 num_args, const c8** args) {
     .args = args,
     .num_args = num_args,
   }, &cli);
-
-  if (host.args.version) {
-    return version();
-  }
 
   spn_verbosity_t verbosity = SPN_VERBOSITY_NORMAL;
   if (host.args.quiet) {
@@ -104,11 +97,14 @@ s32 spn_main(s32 num_args, const c8** args) {
 
   sp_io_writer_t* io = &tui.logger.out.base;
 
-  switch (cli.status) {
-    case SP_CLI_HELP: return help(io, &cli);
-    case SP_CLI_ERR: return err(io, &cli);
-    case SP_CLI_OK:
-    case SP_CLI_CONTINUE: break;
+  if (cli.status == SP_CLI_ERR) {
+    return err(io, &cli);
+  }
+  if (host.args.version) {
+    return version(io);
+  }
+  if (cli.status == SP_CLI_HELP) {
+    return help(io, &cli);
   }
 
   sp_cli_result_t status = sp_cli_dispatch(&cli);
