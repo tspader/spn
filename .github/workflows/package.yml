@@ -1,0 +1,55 @@
+name: package
+
+on:
+  workflow_call:
+    inputs:
+      channel:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  ZIG_LOCAL_CACHE_DIR: ${{ github.workspace }}/.cache/zig
+  ZIG_GLOBAL_CACHE_DIR: ${{ github.workspace }}/.cache/zig
+  SPN_STORAGE_DIR: ${{ github.workspace }}/.cache/spn
+
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { id: x86_64-linux, os: ubuntu-latest, triple: x86_64-linux-musl, ext: tar.gz, exe: spn, tar: tar }
+          - { id: aarch64-macos, os: macos-latest, triple: aarch64-macos-none, ext: tar.gz, exe: spn, tar: tar }
+          - { id: x86_64-windows, os: windows-latest, triple: x86_64-windows-msvc, ext: zip, exe: spn.exe, tar: C:/Windows/System32/tar.exe }
+    name: package-${{ matrix.id }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    env:
+      SPN_BUILD_CHANNEL: ${{ inputs.channel }}
+      SPN_BUILD_COMMIT: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/cache@v4
+        with:
+          path: |
+            .cache
+            .build/source
+            ~/.cache/spn/toolchain
+          key: ci-${{ matrix.id }}-release-${{ github.sha }}
+          restore-keys: ci-${{ matrix.id }}-
+
+      - run: make CONFIG=Release TRIPLE=${{ matrix.triple }}
+      - run: ${{ matrix.tar }} -a -cf spn-${{ matrix.id }}.${{ matrix.ext }} -C .build/store/${{ matrix.triple }}/bin ${{ matrix.exe }}
+        env:
+          COPYFILE_DISABLE: 1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spn-${{ matrix.id }}
+          path: spn-${{ matrix.id }}.${{ matrix.ext }}
