@@ -9,6 +9,7 @@ add_executable(core
   lazy.c
   stable_map.c
   triple.c
+  version.c
   when.c
   closure/harness.c
   closure/closure.c
