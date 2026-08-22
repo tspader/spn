@@ -1,0 +1,29 @@
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+  ${CMAKE_SOURCE_DIR}/spn.toml
+  ${CMAKE_SOURCE_DIR}/source/core/version.h
+)
+
+file(STRINGS ${CMAKE_SOURCE_DIR}/spn.toml SPN_MANIFEST_VERSION_LINE REGEX "^version = ")
+string(REGEX REPLACE "^version = \"([^\"]+)\"$" "\\1" SPN_MANIFEST_VERSION "${SPN_MANIFEST_VERSION_LINE}")
+if(NOT SPN_MANIFEST_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+$")
+  message(FATAL_ERROR "failed to read version from spn.toml (matched: '${SPN_MANIFEST_VERSION_LINE}')")
+endif()
+
+file(STRINGS ${CMAKE_SOURCE_DIR}/source/core/version.h SPN_HEADER_VERSION_LINE REGEX "^#define SPN_VERSION ")
+string(REGEX REPLACE "^#define SPN_VERSION \"([^\"]+)\"$" "\\1" SPN_HEADER_VERSION "${SPN_HEADER_VERSION_LINE}")
+if(NOT SPN_HEADER_VERSION STREQUAL SPN_MANIFEST_VERSION)
+  message(FATAL_ERROR "spn.toml version is ${SPN_MANIFEST_VERSION} but source/core/version.h defines SPN_VERSION as '${SPN_HEADER_VERSION}'; they must match")
+endif()
+
+set(SPN_BUILD_CHANNEL "$ENV{SPN_BUILD_CHANNEL}")
+if(NOT SPN_BUILD_CHANNEL STREQUAL "")
+  if(NOT SPN_BUILD_CHANNEL MATCHES "^(dev|canary|stable)$")
+    message(FATAL_ERROR "invalid SPN_BUILD_CHANNEL: '${SPN_BUILD_CHANNEL}'")
+  endif()
+  add_compile_definitions(SPN_BUILD_CHANNEL="${SPN_BUILD_CHANNEL}")
+endif()
+
+set(SPN_BUILD_COMMIT "$ENV{SPN_BUILD_COMMIT}")
+if(NOT SPN_BUILD_COMMIT STREQUAL "")
+  add_compile_definitions(SPN_BUILD_COMMIT="${SPN_BUILD_COMMIT}")
+endif()
