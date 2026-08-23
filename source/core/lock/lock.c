@@ -166,7 +166,7 @@ sp_str_t spn_lock_file_to_str(sp_mem_t mem, spn_lock_file_t* lock) {
 
   spn_toml_begin_table_cstr(&toml, "spn");
   spn_toml_append_str_cstr(&toml, "version", sp_str_lit(SPN_VERSION));
-  spn_toml_append_str_cstr(&toml, "commit", sp_str_lit(SPN_BUILD_COMMIT));
+  spn_toml_append_str_cstr(&toml, "commit", sp_cstr_as_str(spn_build_commit));
   spn_toml_end_table(&toml);
 
   if (sp_ht_size(lock->system_deps)) {

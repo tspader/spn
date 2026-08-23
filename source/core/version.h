@@ -1,14 +1,11 @@
 #ifndef SPN_VERSION_H
 #define SPN_VERSION_H
 
+#include "sp.h"
+
 #define SPN_VERSION "0.4.0"
 
-#ifndef SPN_BUILD_CHANNEL
-  #define SPN_BUILD_CHANNEL "dev"
-#endif
-
-#ifndef SPN_BUILD_COMMIT
-  #define SPN_BUILD_COMMIT ""
-#endif
+extern const c8* spn_build_channel;
+extern const c8* spn_build_commit;
 
 #endif

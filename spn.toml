@@ -190,6 +190,7 @@ source = [
   "source/core/unit/link.c",
   "source/core/unit/paths.c",
   "source/core/unit/target.c",
+  "source/core/version.c",
   "source/core/when/when.c",
   "test/core/tools/wasm_emit.c",
   "test/tools/fixture.c",
