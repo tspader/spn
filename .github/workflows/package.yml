@@ -51,6 +51,20 @@ jobs:
       - run: ${{ matrix.tar }} -a -cf spn-${{ matrix.id }}.${{ matrix.ext }} -C .build/store/${{ matrix.triple }}-release/bin ${{ matrix.exe }}
         env:
           COPYFILE_DISABLE: 1
+      - run: |
+          version="$(sed -n 's/^version = "\(.*\)"$/\1/p' spn.toml)"
+          sha="$(printf '%.9s' '${{ github.sha }}')"
+          if [ "${{ inputs.channel }}" = "stable" ]; then
+            expected="spn ${version} (${sha})"
+          else
+            expected="spn ${version} (${{ inputs.channel }} ${sha})"
+          fi
+          mkdir smoke
+          ${{ matrix.tar }} -a -xf spn-${{ matrix.id }}.${{ matrix.ext }} -C smoke
+          actual="$(smoke/${{ matrix.exe }} --version)"
+          echo "expected: ${expected}"
+          echo "actual:   ${actual}"
+          test "${actual}" = "${expected}"
       - uses: actions/upload-artifact@v4
         with:
           name: spn-${{ matrix.id }}
