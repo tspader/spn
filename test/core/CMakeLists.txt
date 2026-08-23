@@ -200,6 +200,7 @@ add_executable(core
   ${SRC}/unit/link.c
   ${SRC}/unit/paths.c
   ${SRC}/unit/target.c
+  ${SRC}/version.c
   ${SRC}/when/when.c
   ${TEST_TOOLS}/fixture.c
   ${TEST_TOOLS}/sp_sim.c

@@ -42,12 +42,12 @@ static s32 version(sp_io_writer_t* io) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   sp_da(sp_str_t) parts = sp_da_new(scratch.mem, sp_str_t);
 
-  sp_str_t channel = sp_str_lit(SPN_BUILD_CHANNEL);
+  sp_str_t channel = sp_cstr_as_str(spn_build_channel);
   if (!sp_str_equal_cstr(channel, "stable")) {
     sp_da_push(parts, channel);
   }
 
-  sp_str_t commit = sp_str_lit(SPN_BUILD_COMMIT);
+  sp_str_t commit = sp_cstr_as_str(spn_build_commit);
   if (commit.len) {
     sp_da_push(parts, sp_str_prefix(commit, sp_min((s32)commit.len, 9)));
   }
