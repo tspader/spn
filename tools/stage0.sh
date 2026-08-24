@@ -11,7 +11,7 @@ fi
 case "$(uname -s)" in
   Linux) OS=linux ;;
   Darwin) OS=macos ;;
-  MINGW*|MSYS*|CYGWIN*) OS=windows ;;
+  MINGW*|MSYS*) OS=windows ;;
   *) echo "stage0: unsupported OS $(uname -s); set SPN_STAGE0 to a spn $VERSION binary" >&2; exit 1 ;;
 esac
 case "$(uname -m)" in

@@ -3,6 +3,10 @@ name: selfhost
 on:
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -27,13 +31,22 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v4
         with:
           path: |
             .cache
             build
             ~/.cache/spn/stage0
-          key: selfhost-${{ matrix.id }}-${{ github.sha }}
+          key: selfhost-${{ matrix.id }}-${{ github.run_id }}
           restore-keys: selfhost-${{ matrix.id }}-
 
       - run: make ci-selfhost
+
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: |
+            .cache
+            build
+            ~/.cache/spn/stage0
+          key: selfhost-${{ matrix.id }}-${{ github.run_id }}

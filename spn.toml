@@ -61,6 +61,10 @@ linkage = "shared"
 toolchain = "zig"
 abi = "mingw"
 
+[profile.msvc]
+toolchain = "msvc"
+abi = "msvc"
+
 [profile.sanitizer]
 linkage = "shared"
 sanitize = ["address", "undefined"]

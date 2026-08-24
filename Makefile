@@ -123,10 +123,10 @@ ci-%:
 	@$(MAKE) all test TRIPLE=$*
 
 SELFHOST_PROFILES := default
-ifeq ($(HOST_TRIPLE),x86_64-linux-gnu)
+ifeq ($(findstring linux,$(HOST_TRIPLE)),linux)
   SELFHOST_PROFILES := gnu musl
 else ifeq ($(OS),Windows_NT)
-  SELFHOST_PROFILES := default mingw
+  SELFHOST_PROFILES := msvc mingw
 endif
 
 STAGE0 = $(shell sh $(ROOT)/tools/stage0.sh)
@@ -138,9 +138,9 @@ stage0:
 ci-selfhost: export SPN_CONFIG_DIR := $(BUILD)/ci-config
 ci-selfhost: stage0 $(addprefix selfhost-,$(SELFHOST_PROFILES))
 
-selfhost-%:
-	@$(STAGE0) build -p $*
-	@$(STAGE0) test -p $*
+selfhost-%: stage0
+	@"$(STAGE0)" build -p $*
+	@"$(STAGE0)" test -p $*
 
 smoke: build
 	@ctest --test-dir $(WORK) -C $(CONFIG) --output-on-failure -E "graph|integration|^fuzz"
