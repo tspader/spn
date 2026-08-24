@@ -4,6 +4,7 @@ name: ci
 on:
   workflow_dispatch:
   pull_request:
+  merge_group:
   push:
     branches: [main]
 
@@ -19,8 +20,6 @@ defaults:
     shell: bash
 
 env:
-  ZIG_LOCAL_CACHE_DIR: ${{ github.workspace }}/.cache/zig
-  ZIG_GLOBAL_CACHE_DIR: ${{ github.workspace }}/.cache/zig
   SPN_STORAGE_DIR: ${{ github.workspace }}/.cache/spn
 
 jobs:
@@ -37,19 +36,31 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/cache@v4
+      - uses: actions/cache/restore@v4
         with:
           path: |
             .cache
-            .build/source
-            ~/.cache/spn/toolchain
-          key: ci-${{ matrix.id }}-${{ github.sha }}
-          restore-keys: ci-${{ matrix.id }}-
+            build
+            ~/.cache/spn/stage0
+          key: selfhost-${{ matrix.id }}-${{ github.run_id }}
+          restore-keys: selfhost-${{ matrix.id }}-
 
-      - run: make ci
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+
+      - run: make ci-selfhost
+
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: |
+            .cache
+            build
+            ~/.cache/spn/stage0
+          key: selfhost-${{ matrix.id }}-${{ github.run_id }}
 
   package:
-    if: ${{ github.event_name != 'pull_request' }}
+    if: ${{ github.event_name != 'pull_request' && github.event_name != 'merge_group' }}
     needs: [build]
     uses: ./.github/workflows/package.yml
     with:

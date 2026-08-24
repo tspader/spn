@@ -1,0 +1,42 @@
+name: bootstrap
+
+on:
+  workflow_dispatch:
+  merge_group:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { id: x86_64-linux, os: ubuntu-latest }
+          - { id: aarch64-macos, os: macos-latest }
+          - { id: x86_64-windows, os: windows-latest }
+    name: bootstrap-${{ matrix.id }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - run: make ci
+
+  bootstrap:
+    name: bootstrap
+    if: ${{ !cancelled() }}
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - run: jq --exit-status 'all(.result == "success" or .result == "skipped")' <<< '${{ toJson(needs) }}'
