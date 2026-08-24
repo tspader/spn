@@ -52,6 +52,15 @@ mode = "debug"
 toolchain = "zig"
 abi = "musl"
 
+[profile.gnu]
+toolchain = "zig"
+abi = "gnu"
+linkage = "shared"
+
+[profile.mingw]
+toolchain = "zig"
+abi = "mingw"
+
 [profile.sanitizer]
 linkage = "shared"
 sanitize = ["address", "undefined"]

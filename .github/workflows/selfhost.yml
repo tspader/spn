@@ -11,9 +11,7 @@ defaults:
     shell: bash
 
 env:
-  STAGE0_TAG: v0.4.1
   SPN_STORAGE_DIR: ${{ github.workspace }}/.cache/spn
-  SPN_CONFIG_DIR: ${{ github.workspace }}/.build/ci-config
 
 jobs:
   selfhost:
@@ -21,55 +19,21 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { id: x86_64-linux, os: ubuntu-latest, asset: spn-x86_64-linux.tar.gz, exe: spn, tar: tar }
-          - { id: aarch64-macos, os: macos-latest, asset: spn-aarch64-macos.tar.gz, exe: spn, tar: tar }
-          - { id: x86_64-windows, os: windows-latest, asset: spn-x86_64-windows.zip, exe: spn.exe, tar: C:/Windows/System32/tar.exe }
+          - { id: x86_64-linux, os: ubuntu-latest }
+          - { id: aarch64-macos, os: macos-latest }
+          - { id: x86_64-windows, os: windows-latest }
     name: selfhost-${{ matrix.id }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
-    env:
-      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v5
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache@v4
         with:
           path: |
             .cache
             build
-          key: selfhost-${{ matrix.id }}-${{ github.run_id }}
+            ~/.cache/spn/stage0
+          key: selfhost-${{ matrix.id }}-${{ github.sha }}
           restore-keys: selfhost-${{ matrix.id }}-
 
-      - name: stage0
-        run: |
-          mkdir stage0
-          gh release download "${STAGE0_TAG}" --pattern '${{ matrix.asset }}' --output stage0/pkg --repo ${{ github.repository }}
-          ${{ matrix.tar }} -xf stage0/pkg -C stage0
-          stage0/${{ matrix.exe }} --version
-          touch .restore-stamp
-
-      - name: build
-        run: time stage0/${{ matrix.exe }} build
-
-      - name: test
-        run: time stage0/${{ matrix.exe }} test
-
-      - name: report
-        if: always()
-        run: |
-          test -f .restore-stamp || exit 0
-          for root in .cache/spn build; do
-            test -d $root || continue
-            total="$(find $root -name '*.o' -o -name '*.obj' | wc -l)"
-            new="$(find $root \( -name '*.o' -o -name '*.obj' \) -newer .restore-stamp | wc -l)"
-            echo "== $root: $total objects, $new new"
-            find $root \( -name '*.o' -o -name '*.obj' \) -newer .restore-stamp | sed "s|^$root/||" | cut -d/ -f1-4 | sort | uniq -c | sort -rn
-          done
-          du -sh .cache/spn build 2>/dev/null || true
-
-      - uses: actions/cache/save@v4
-        if: always()
-        with:
-          path: |
-            .cache
-            build
-          key: selfhost-${{ matrix.id }}-${{ github.run_id }}
+      - run: make ci-selfhost
