@@ -40,6 +40,9 @@ jobs:
           key: selfhost-${{ matrix.id }}-${{ github.run_id }}
           restore-keys: selfhost-${{ matrix.id }}-
 
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+
       - run: make ci-selfhost
 
       - uses: actions/cache/save@v4
