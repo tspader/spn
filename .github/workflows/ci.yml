@@ -44,8 +44,9 @@ jobs:
           key: selfhost-${{ matrix.id }}-${{ github.run_id }}
           restore-keys: selfhost-${{ matrix.id }}-
 
-      - uses: ilammy/msvc-dev-cmd@v1
+      - run: tools/devenv.ps1
         if: runner.os == 'Windows'
+        shell: pwsh
 
       - run: make ci-selfhost
 

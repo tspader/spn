@@ -2,11 +2,18 @@ param(
   [string]$Arch = "x64"
 )
 
-$VcVars = "C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvarsall.bat"
+$VsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+$Vs = & $VsWhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+if (-not $Vs) {
+  throw "devenv: no Visual Studio installation with the VC toolset"
+}
 
-cmd /c "`"$VcVars`" $Arch && set" |
+cmd /c "`"$Vs\VC\Auxiliary\Build\vcvarsall.bat`" $Arch && set" |
   ForEach-Object {
     if ($_ -match '^(.*?)=(.*)$') {
       [System.Environment]::SetEnvironmentVariable($matches[1], $matches[2], 'Process')
+      if ($env:GITHUB_ENV) {
+        Add-Content $env:GITHUB_ENV $matches[0]
+      }
     }
   }
