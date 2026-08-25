@@ -4,7 +4,6 @@ name: ci
 on:
   workflow_dispatch:
   pull_request:
-  merge_group:
   push:
     branches: [main]
 
@@ -60,7 +59,6 @@ jobs:
           key: selfhost-${{ matrix.id }}-${{ github.run_id }}
 
   package:
-    if: ${{ github.event_name != 'pull_request' && github.event_name != 'merge_group' }}
     needs: [build]
     uses: ./.github/workflows/package.yml
     with:
@@ -87,4 +85,6 @@ jobs:
     needs: [build, package, canary]
     runs-on: ubuntu-latest
     steps:
-      - run: jq --exit-status 'all(.result == "success" or .result == "skipped")' <<< '${{ toJson(needs) }}'
+      - env:
+          NEEDS: ${{ toJson(needs) }}
+        run: jq --exit-status '(.build.result == "success") and (.package.result == "success") and (.canary.result == "success" or .canary.result == "skipped")' <<< "$NEEDS"
