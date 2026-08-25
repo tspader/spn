@@ -1,0 +1,212 @@
+diff --git a/core/iwasm/common/wasm_runtime_common.c b/core/iwasm/common/wasm_runtime_common.c
+index 6590684..55aadc3 100644
+--- a/core/iwasm/common/wasm_runtime_common.c
++++ b/core/iwasm/common/wasm_runtime_common.c
+@@ -5554,7 +5554,7 @@ wasm_runtime_invoke_native(WASMExecEnv *exec_env, void *func_ptr,
+                         fps[n_fps * 2 + 1] = 0xFFFFFFFF;
+                     }
+                     else {
+-                        *(float64 *)&fps[n_fps * 2] = *(float64 *)argv_src;
++                        memcpy(&fps[n_fps * 2], argv_src, sizeof(float64));
+                         argv_src += 2;
+                     }
+                     n_fps++;
+@@ -5569,7 +5569,7 @@ wasm_runtime_invoke_native(WASMExecEnv *exec_env, void *func_ptr,
+                     /* use int regs firstly if available */
+                     if (n_ints & 1)
+                         n_ints++;
+-                    *(float64 *)&ints[n_ints] = *(float64 *)argv_src;
++                    memcpy(&ints[n_ints], argv_src, sizeof(float64));
+                     n_ints += 2;
+                     argv_src += 2;
+                 }
+@@ -5583,7 +5583,7 @@ wasm_runtime_invoke_native(WASMExecEnv *exec_env, void *func_ptr,
+                             *(float32 *)argv_src++;
+                     }
+                     else {
+-                        *(float64 *)&stacks[n_stacks] = *(float64 *)argv_src;
++                        memcpy(&stacks[n_stacks], argv_src, sizeof(float64));
+                         argv_src += 2;
+                         n_stacks += 2;
+                     }
+@@ -6236,9 +6236,9 @@ wasm_runtime_invoke_native(WASMExecEnv *exec_env, void *func_ptr,
+ #endif
+ #endif
+                 if (n_ints < MAX_REG_INTS)
+-                    ints[n_ints++] = *(uint64 *)argv_src;
++                    memcpy(&ints[n_ints++], argv_src, sizeof(uint64));
+                 else
+-                    stacks[n_stacks++] = *(uint64 *)argv_src;
++                    memcpy(&stacks[n_stacks++], argv_src, sizeof(uint64));
+                 argv_src += 2;
+                 break;
+             case VALUE_TYPE_F32:
+@@ -6251,10 +6251,10 @@ wasm_runtime_invoke_native(WASMExecEnv *exec_env, void *func_ptr,
+                 break;
+             case VALUE_TYPE_F64:
+                 if (n_fps < MAX_REG_FLOATS) {
+-                    *(float64 *)&fps[n_fps++] = *(float64 *)argv_src;
++                    memcpy(&fps[n_fps++], argv_src, sizeof(float64));
+                 }
+                 else {
+-                    *(float64 *)&stacks[n_stacks++] = *(float64 *)argv_src;
++                    memcpy(&stacks[n_stacks++], argv_src, sizeof(float64));
+                 }
+                 argv_src += 2;
+                 break;
+@@ -6303,9 +6303,9 @@ wasm_runtime_invoke_native(WASMExecEnv *exec_env, void *func_ptr,
+     /* Save extra result values' address to argv1 */
+     for (i = 0; i < ext_ret_count; i++) {
+         if (n_ints < MAX_REG_INTS)
+-            ints[n_ints++] = *(uint64 *)argv_src;
++            memcpy(&ints[n_ints++], argv_src, sizeof(uint64));
+         else
+-            stacks[n_stacks++] = *(uint64 *)argv_src;
++            memcpy(&stacks[n_stacks++], argv_src, sizeof(uint64));
+         argv_src += 2;
+     }
+ 
+diff --git a/core/iwasm/fast-jit/cg/x86-64/jit_codegen_x86_64.cpp b/core/iwasm/fast-jit/cg/x86-64/jit_codegen_x86_64.cpp
+index 967bf14..672524e 100644
+--- a/core/iwasm/fast-jit/cg/x86-64/jit_codegen_x86_64.cpp
++++ b/core/iwasm/fast-jit/cg/x86-64/jit_codegen_x86_64.cpp
+@@ -5512,7 +5512,7 @@ cmp_r_and_jmp_relative(JitCompContext *cc, x86::Assembler &a, COND_OP op,
+         /* The offset written by asmjit is always 0, we patch it again */
+         stream = (char *)a.code()->sectionById(0)->buffer().data()
+                  + a.code()->sectionById(0)->buffer().size() - 6;
+-        *(int32 *)(stream + 2) = offset;
++        memcpy(stream + 2, &offset, sizeof(int32));
+     }
+     return true;
+ }
+@@ -5607,7 +5607,7 @@ fail:
+                          + a.code()->sectionById(0)->buffer().size() - 6;  \
+                 _offset = label_offsets[label_dst]                         \
+                           - a.code()->sectionById(0)->buffer().size();     \
+-                *(int32 *)(stream + 2) = _offset;                          \
++                memcpy(stream + 2, &_offset, sizeof(int32));               \
+             }                                                              \
+         }                                                                  \
+         else {                                                             \
+@@ -5774,7 +5774,10 @@ lookupswitch_r(JitCompContext *cc, x86::Assembler &a, bh_list *jmp_info_list,
+                  + a.code()->sectionById(0)->buffer().size();
+         imm.setValue(INT32_MAX);
+         a.jb(imm);
+-        *(uint32 *)(stream + 2) = 6;
++        {
++            uint32 _v = 6;
++            memcpy(stream + 2, &_v, sizeof(_v));
++        }
+ 
+         node = (JmpInfo *)jit_calloc(sizeof(JmpInfo));
+         if (!node)
+@@ -6190,25 +6193,29 @@ patch_jmp_info_list(JitCompContext *cc, bh_list *jmp_info_list)
+             /* Jmp with relative address */
+             reg_dst =
+                 jit_reg_new(JIT_REG_KIND_L32, jmp_info->dst_info.label_dst);
+-            *(int32 *)stream =
++            int32 _rel =
+                 (int32)((uintptr_t)*jit_annl_jitted_addr(cc, reg_dst)
+                         - (uintptr_t)stream)
+                 - 4;
++            memcpy(stream, &_rel, sizeof(_rel));
+         }
+         else if (jmp_info->type == JMP_DST_LABEL_ABS) {
+             /* Jmp with absolute address */
+             reg_dst =
+                 jit_reg_new(JIT_REG_KIND_L32, jmp_info->dst_info.label_dst);
+-            *(uintptr_t *)stream =
++            uintptr_t _addr =
+                 (uintptr_t)*jit_annl_jitted_addr(cc, reg_dst);
++            memcpy(stream, &_addr, sizeof(_addr));
+         }
+         else if (jmp_info->type == JMP_END_OF_CALLBC) {
+             /* 7 is the size of mov and jmp instruction */
+-            *(uintptr_t *)stream = (uintptr_t)stream + sizeof(uintptr_t) + 7;
++            uintptr_t _addr = (uintptr_t)stream + sizeof(uintptr_t) + 7;
++            memcpy(stream, &_addr, sizeof(_addr));
+         }
+         else if (jmp_info->type == JMP_LOOKUPSWITCH_BASE) {
+             /* 11 is the size of 8-byte addr and 3-byte jmp instruction */
+-            *(uintptr_t *)stream = (uintptr_t)stream + 11;
++            uintptr_t _addr = (uintptr_t)stream + 11;
++            memcpy(stream, &_addr, sizeof(_addr));
+         }
+ 
+         jmp_info = jmp_info_next;
+@@ -8633,7 +8640,10 @@ jit_codegen_compile_call_to_llvm_jit(const WASMType *func_type)
+         char *stream_new = (char *)a.code()->sectionById(0)->buffer().data()
+                            + a.code()->sectionById(0)->buffer().size();
+ 
+-        *(int32 *)(stream - 4) = (uint32)(stream_new - stream);
++        {
++            int32 _rel = (int32)(uint32)(stream_new - stream);
++            memcpy(stream - 4, &_rel, sizeof(_rel));
++        }
+     }
+ 
+     /* Get function result and return */
+@@ -8835,7 +8845,10 @@ jit_codegen_compile_call_to_fast_jit(const WASMModule *module, uint32 func_idx)
+         /* Patch the offset of jne instruction */
+         char *stream_new = (char *)a.code()->sectionById(0)->buffer().data()
+                            + a.code()->sectionById(0)->buffer().size();
+-        *(int32 *)(stream - 4) = (int32)(stream_new - stream);
++        {
++            int32 _rel = (int32)(stream_new - stream);
++            memcpy(stream - 4, &_rel, sizeof(_rel));
++        }
+     }
+ 
+     int_reg_idx = 1; /* skip exec_env */
+@@ -9319,7 +9332,10 @@ jit_codegen_init()
+         /* Patch the offset of jne instruction */
+         char *stream_new = (char *)a.code()->sectionById(0)->buffer().data()
+                            + a.code()->sectionById(0)->buffer().size();
+-        *(int32 *)(stream_old - 4) = (int32)(stream_new - stream_old);
++        {
++            int32 _rel = (int32)(stream_new - stream_old);
++            memcpy(stream_old - 4, &_rel, sizeof(_rel));
++        }
+     }
+ 
+     /* Load compiled func ptr and call it */
+diff --git a/core/iwasm/fast-jit/jit_frontend.c b/core/iwasm/fast-jit/jit_frontend.c
+index c96b541..11049b5 100644
+--- a/core/iwasm/fast-jit/jit_frontend.c
++++ b/core/iwasm/fast-jit/jit_frontend.c
+@@ -44,7 +44,8 @@ get_global_base_offset(const WASMModule *module)
+ static uint32
+ get_first_table_inst_offset(const WASMModule *module)
+ {
+-    return get_global_base_offset(module) + module->global_data_size;
++    return (get_global_base_offset(module) + module->global_data_size + 7)
++           & ~(uint32)7;
+ }
+ 
+ uint32
+diff --git a/core/iwasm/interpreter/wasm_runtime.c b/core/iwasm/interpreter/wasm_runtime.c
+index 879df37..b1ef12d 100644
+--- a/core/iwasm/interpreter/wasm_runtime.c
++++ b/core/iwasm/interpreter/wasm_runtime.c
+@@ -2466,6 +2466,7 @@ wasm_instantiate(WASMModule *module, WASMModuleInstance *parent,
+     /* Size of module inst, memory instances and global data */
+     total_size = (uint64)module_inst_struct_size + module_inst_mem_inst_size
+                  + module->global_data_size;
++    total_size = (total_size + 7LL) & ~7LL;
+ 
+     /* Calculate the size of table data */
+     for (i = 0; i < module->import_table_count; i++) {
+@@ -2607,8 +2608,11 @@ wasm_instantiate(WASMModule *module, WASMModuleInstance *parent,
+     module_inst->global_data = (uint8 *)module_inst + module_inst_struct_size
+                                + module_inst_mem_inst_size;
+     module_inst->global_data_size = module->global_data_size;
+-    first_table = (WASMTableInstance *)(module_inst->global_data
+-                                        + module->global_data_size);
++    first_table =
++        (WASMTableInstance *)(((uintptr_t)(module_inst->global_data
++                                           + module->global_data_size)
++                               + 7)
++                              & ~(uintptr_t)7);
+ 
+     module_inst->memory_count =
+         module->import_memory_count + module->memory_count;
