@@ -43,9 +43,7 @@ jobs:
             .build/source
             ~/.cache/spn/toolchain
           key: ci-${{ matrix.id }}-release-${{ github.sha }}
-          restore-keys: |
-            ci-${{ matrix.id }}-release-
-            ci-${{ matrix.id }}-
+          restore-keys: ci-${{ matrix.id }}-release-
 
       - run: make CONFIG=Release TRIPLE=${{ matrix.triple }}
       - run: ${{ matrix.tar }} -a -cf spn-${{ matrix.id }}.${{ matrix.ext }} -C .build/store/${{ matrix.triple }}-release/bin ${{ matrix.exe }}
