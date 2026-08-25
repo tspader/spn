@@ -5,6 +5,7 @@
 #include "ctx/ctx.h"
 #include "error/error.h"
 #include "event/event.h"
+#include "external/wasm/wasm.h"
 #include "git/cache.h"
 #include "index/index.h"
 #include "intern/intern.h"
@@ -303,6 +304,13 @@ void spn_ctx_close(spn_ctx_t* ctx, bool ok) {
     },
   });
 
+  if (ctx->session) {
+    sp_om_for(ctx->session->units.packages, it) {
+      spn_pkg_unit_t* unit = sp_om_at(ctx->session->units.packages, it);
+      spn_wasm_script_close(&unit->wasm.configure);
+      spn_wasm_script_close(&unit->wasm.build);
+    }
+  }
   ctx->session = SP_NULLPTR;
 
   spn_lazy_log_close(&ctx->events->log);

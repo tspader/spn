@@ -48,7 +48,7 @@ spn_err_t spn_wasm_init() {
 // WAMR mprotects guard pages at the bottom of any thread that runs a script;
 // a thread that exits without destroying its env leaves those pages PROT_NONE
 // on a stack glibc will hand to the next pthread, which then faults on it
-void spn_wasm_thread_exit() {
+void spn_wasm_thread_exit(void) {
   if (wasm_runtime_thread_env_inited()) {
     wasm_runtime_destroy_thread_env();
   }
@@ -177,6 +177,20 @@ spn_err_t spn_wasm_script_open(spn_wasm_script_t* script, spn_pkg_unit_t* unit) 
   sp_mutex_unlock(&script->mutex);
 
   return err;
+}
+
+void spn_wasm_script_close(spn_wasm_script_t* script) {
+  sp_mutex_lock(&script->mutex);
+  if (script->state == SPN_WASM_SCRIPT_OPEN) {
+    wasm_runtime_destroy_exec_env(script->env);
+    script->env = SP_NULLPTR;
+    wasm_runtime_deinstantiate(script->instance);
+    script->instance = SP_NULLPTR;
+    wasm_runtime_unload(script->module);
+    script->module = SP_NULLPTR;
+    script->state = SPN_WASM_SCRIPT_CLOSED;
+  }
+  sp_mutex_unlock(&script->mutex);
 }
 
 static void export_name(sp_str_t name, c8* buffer) {
