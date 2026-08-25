@@ -40,6 +40,7 @@ files = [
   "tools/patches/wamr-wasi-hook.patch",
   "tools/patches/wamr-darwin-timeb.patch",
   "tools/patches/wamr-win-readdir.patch",
+  "tools/patches/wamr-sanitize.patch",
 ]
 
 [profile.default]
@@ -66,6 +67,7 @@ toolchain = "msvc"
 abi = "msvc"
 
 [profile.sanitizer]
+toolchain = "system"
 linkage = "shared"
 sanitize = ["address", "undefined"]
 
