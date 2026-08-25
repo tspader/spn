@@ -133,9 +133,9 @@ void spn_profile_populate(spn_profile_table_t* profiles, spn_pkg_info_t* pkg) {
   }
 }
 
-static spn_abi_t spn_profile_default_abi(spn_os_t os, bool shared) {
+static spn_abi_t spn_profile_default_abi(sp_str_t toolchain, spn_os_t os, bool shared) {
   switch (os) {
-    case SPN_OS_WINDOWS: return SPN_ABI_GNU;
+    case SPN_OS_WINDOWS: return sp_str_equal_cstr(toolchain, "msvc") ? SPN_ABI_MSVC : SPN_ABI_GNU;
     case SPN_OS_LINUX:   return shared ? SPN_ABI_GNU : SPN_ABI_MUSL;
     case SPN_OS_MACOS:
     case SPN_OS_WASI:
@@ -178,7 +178,7 @@ spn_err_t spn_profile_resolve(spn_profile_table_t profiles, const spn_profile_ov
   bool shared = merged.linkage == SPN_LIB_KIND_SHARED || (!merged.linkage && is_shared);
   if (!target.arch) target.arch = host.arch;
   if (!target.os)   target.os = host.os;
-  if (!target.abi)  target.abi = spn_profile_default_abi(target.os, shared);
+  if (!target.abi)  target.abi = spn_profile_default_abi(merged.toolchain, target.os, shared);
 
   if (!merged.linkage) {
     merged.linkage = !shared && target.abi == SPN_ABI_MUSL ? SPN_LIB_KIND_STATIC : SPN_LIB_KIND_SHARED;
