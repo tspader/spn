@@ -20,8 +20,7 @@
 #include "unit/package.h"
 #include "unit/unit.h"
 
-static s32 on_configure_package(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
-  spn_pkg_unit_t* unit = (spn_pkg_unit_t*)user_data;
+static spn_err_t configure_package(spn_dag_t* g, spn_dag_action_t* action, spn_pkg_unit_t* unit) {
   spn_pkg_unit_create_layout(unit);
   spn_wasm_script_t* configure = &unit->wasm.configure;
   if (configure->state != SPN_WASM_SCRIPT_NONE) {
@@ -37,14 +36,21 @@ static s32 on_configure_package(spn_dag_t* g, spn_dag_action_t* action, void* us
   return SPN_OK;
 }
 
+static spn_err_t on_configure_package(spn_dag_t* g, spn_dag_action_t* action, void* user_data, spn_dag_env_t* env, sp_mem_t mem, sp_da(spn_dag_obs_t)* obs) {
+  if (configure_package(g, action, (spn_pkg_unit_t*)user_data)) {
+    return SPN_ERR_DAG_ACTION;
+  }
+  return SPN_OK;
+}
+
 static spn_err_t add_configure_action(spn_dag_build_t* b, spn_pkg_unit_t* unit) {
   spn_dag_t* g = b->graph;
 
   spn_dag_pkg_ids_t ids = sp_zero;
   ids.action = spn_dag_add_action(g, (spn_dag_action_config_t) {
+    .kind = SPN_DAG_ACTION_UNCACHEABLE,
     .execute = on_configure_package,
     .user_data = unit,
-    .uncacheable = true,
   });
   ids.stamp = spn_dag_add_file(g, unit->paths.stamp.configure);
   spn_try(spn_dag_action_add_output(g, ids.action, ids.stamp));

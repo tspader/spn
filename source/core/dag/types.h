@@ -40,8 +40,7 @@ typedef struct {
 
 typedef struct spn_dag_env_t spn_dag_env_t;
 
-SP_TYPEDEF_FN(s32, spn_dag_exec_fn_t, spn_dag_t*, spn_dag_action_t*, void*);
-SP_TYPEDEF_FN(spn_err_t, spn_dag_discover_fn_t, spn_dag_t*, spn_dag_action_t*, void*, spn_dag_env_t*, sp_mem_t, sp_da(spn_dag_obs_t)*);
+SP_TYPEDEF_FN(spn_err_t, spn_dag_exec_fn_t, spn_dag_t*, spn_dag_action_t*, void*, spn_dag_env_t*, sp_mem_t, sp_da(spn_dag_obs_t)*);
 
 typedef struct {
   u32 index;
@@ -66,24 +65,28 @@ typedef struct {
   sp_da(spn_dag_id_t) consumers;
 } spn_dag_artifact_t;
 
+typedef enum {
+  SPN_DAG_ACTION_STATIC,
+  SPN_DAG_ACTION_DISCOVERED,
+  SPN_DAG_ACTION_UNCACHEABLE,
+} spn_dag_action_kind_t;
+
 struct spn_dag_action_t {
   spn_dag_id_t id;
+  spn_dag_action_kind_t kind;
   spn_dag_digest_t identity;
   spn_dag_exec_fn_t execute;
-  spn_dag_discover_fn_t discover;
   void* user_data;
-  bool uncacheable;
   sp_da(spn_dag_id_t) consumes;
   sp_da(spn_dag_id_t) produces;
   bool wrote;
 };
 
 typedef struct {
+  spn_dag_action_kind_t kind;
   spn_dag_digest_t identity;
   spn_dag_exec_fn_t execute;
-  spn_dag_discover_fn_t discover;
   void* user_data;
-  bool uncacheable;
 } spn_dag_action_config_t;
 
 struct spn_dag_t {

@@ -111,12 +111,16 @@ u32 dag_test_obs_build(const dag_test_obs_t* specs, u32 cap, spn_dag_obs_t* out)
   return count;
 }
 
-s32 dag_test_exec_stamp(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
+spn_err_t dag_test_exec_noop(spn_dag_t* g, spn_dag_action_t* action, void* user_data, spn_dag_env_t* dag_env, sp_mem_t mem, sp_da(spn_dag_obs_t)* obs) {
+  return SPN_OK;
+}
+
+spn_err_t dag_test_exec_stamp(spn_dag_t* g, spn_dag_action_t* action, void* user_data, spn_dag_env_t* dag_env, sp_mem_t mem, sp_da(spn_dag_obs_t)* obs) {
   dag_test_env_t* env = (dag_test_env_t*)user_data;
   env->runs++;
   spn_dag_artifact_t* out = spn_dag_find_artifact(env->g, action->produces[0]);
   sp_str_t content = sp_fmt(env->mem, "{}", sp_fmt_uint(env->runs)).value;
-  return sp_fs_create_file_str(dag_test_render(env, out->materialized), content) ? 1 : 0;
+  return sp_fs_create_file_str(dag_test_render(env, out->materialized), content) ? SPN_ERR_DAG_ACTION : SPN_OK;
 }
 
 sp_err_t dag_test_expect_file(sp_test_t* t, sp_mem_t mem, sp_str_t path, const c8* expected) {

@@ -14,7 +14,7 @@ typedef struct {
   bool tree;
   bool fails;
   bool skips_output;
-  bool uncacheable;
+  spn_dag_action_kind_t kind;
 } run_action_t;
 
 typedef struct {
@@ -134,7 +134,7 @@ static const run_test_t run_tests [] = {
   {
     .name = "uncacheable_stable_output_downstream_hits",
     .actions = {
-      { .identity = "I", .inputs = { "S" }, .output = "X", .writes = "C", .uncacheable = true },
+      { .identity = "I", .inputs = { "S" }, .output = "X", .writes = "C", .kind = SPN_DAG_ACTION_UNCACHEABLE },
       { .identity = "J", .inputs = { "X" }, .output = "Y" },
     },
     .builds = {
@@ -145,7 +145,7 @@ static const run_test_t run_tests [] = {
   {
     .name = "uncacheable_changed_output_reruns_downstream",
     .actions = {
-      { .identity = "I", .inputs = { "S" }, .output = "X", .uncacheable = true },
+      { .identity = "I", .inputs = { "S" }, .output = "X", .kind = SPN_DAG_ACTION_UNCACHEABLE },
       { .identity = "J", .inputs = { "X" }, .output = "Y" },
     },
     .builds = {
@@ -192,19 +192,30 @@ static const run_test_t run_tests [] = {
   },
 };
 
-static s32 run_on_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
+static spn_err_t run_on_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data, spn_dag_env_t* env, sp_mem_t mem, sp_da(spn_dag_obs_t)* obs) {
   run_ctx_t* ctx = (run_ctx_t*)user_data;
   if (ctx->spec->fails) {
-    return 1;
+    return SPN_ERR_DAG_ACTION;
   }
+
+  sp_carr_for(ctx->spec->discovers, it) {
+    if (!ctx->spec->discovers[it]) {
+      break;
+    }
+    sp_da_push(*obs, ((spn_dag_obs_t) {
+      .kind = SPN_DAG_OBS_FILE,
+      .path = spn_path_make(g->roots, dag_test_env_path(ctx->env, sp_str_view(ctx->spec->discovers[it])))
+    }));
+  }
+
   if (ctx->spec->skips_output) {
     ctx->env->runs++;
-    return 0;
+    return SPN_OK;
   }
   sp_da_for(action->consumes, it) {
     spn_dag_artifact_t* in = spn_dag_find_artifact(ctx->g, action->consumes[it]);
     if (in->kind == SPN_DAG_ARTIFACT_KIND_FILE && !sp_fs_exists(dag_test_render(ctx->env, in->materialized))) {
-      return 1;
+      return SPN_ERR_DAG_ACTION;
     }
   }
   ctx->env->runs++;
@@ -214,23 +225,9 @@ static s32 run_on_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data) 
     : sp_fmt(ctx->env->mem, "{}", sp_fmt_uint(ctx->env->runs)).value;
   if (out->kind == SPN_DAG_ARTIFACT_KIND_TREE) {
     spn_path_t inside = spn_path_join(ctx->env->mem, out->materialized, sp_str_lit("H"));
-    return sp_fs_create_file_str(dag_test_render(ctx->env, inside), sp_str_lit("T")) ? 1 : 0;
+    return sp_fs_create_file_str(dag_test_render(ctx->env, inside), sp_str_lit("T")) ? SPN_ERR_DAG_ACTION : SPN_OK;
   }
-  return sp_fs_create_file_str(dag_test_render(ctx->env, out->materialized), content) ? 1 : 0;
-}
-
-static spn_err_t run_on_discover(spn_dag_t* g, spn_dag_action_t* action, void* user_data, spn_dag_env_t* env, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
-  run_ctx_t* ctx = (run_ctx_t*)user_data;
-  sp_carr_for(ctx->spec->discovers, it) {
-    if (!ctx->spec->discovers[it]) {
-      break;
-    }
-    sp_da_push(*out, ((spn_dag_obs_t) {
-      .kind = SPN_DAG_OBS_FILE,
-      .path = spn_path_make(g->roots, dag_test_env_path(ctx->env, sp_str_view(ctx->spec->discovers[it])))
-    }));
-  }
-  return SPN_OK;
+  return sp_fs_create_file_str(dag_test_render(ctx->env, out->materialized), content) ? SPN_ERR_DAG_ACTION : SPN_OK;
 }
 
 static sp_err_t run_build_dag(sp_test_t* t, dag_test_env_t* env, spn_dag_t* g, const run_test_t* test) {
@@ -246,11 +243,10 @@ static sp_err_t run_build_dag(sp_test_t* t, dag_test_env_t* env, spn_dag_t* g, c
     ctx->spec = spec;
 
     spn_dag_id_t action = spn_dag_add_action(g, (spn_dag_action_config_t) {
+      .kind = spec->discovers[0] ? SPN_DAG_ACTION_DISCOVERED : spec->kind,
       .identity = dag_test_digest(spec->identity),
       .execute = run_on_exec,
-      .discover = spec->discovers[0] ? run_on_discover : SP_NULLPTR,
-      .user_data = ctx,
-      .uncacheable = spec->uncacheable
+      .user_data = ctx
     });
     sp_carr_for(spec->inputs, ii) {
       if (!spec->inputs[ii]) {

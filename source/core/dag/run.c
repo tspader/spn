@@ -229,12 +229,19 @@ static void progress_total(spn_dag_env_t* env, u64 total) {
 }
 
 static void progress_count(spn_dag_env_t* env, const spn_dag_action_t* action, bool hit) {
-  if (action->uncacheable) sp_assert(!hit);
   if (!env->progress) {
     return;
   }
-  if (!action->uncacheable) {
-    sp_atomic_s32_add(hit ? &env->progress->hits : &env->progress->misses, 1, SP_ATOMIC_SEQ_CST);
+  switch (action->kind) {
+    case SPN_DAG_ACTION_STATIC:
+    case SPN_DAG_ACTION_DISCOVERED: {
+      sp_atomic_s32_add(hit ? &env->progress->hits : &env->progress->misses, 1, SP_ATOMIC_SEQ_CST);
+      break;
+    }
+    case SPN_DAG_ACTION_UNCACHEABLE: {
+      sp_assert(!hit);
+      break;
+    }
   }
   sp_atomic_s32_add(&env->progress->completed, 1, SP_ATOMIC_SEQ_CST);
   if (env->wake) {
@@ -612,39 +619,52 @@ static void diag_flush(spn_dag_env_t* env, spn_dag_attempt_t* attempt, spn_err_t
   }
 }
 
+static spn_dag_digest_t weak_key_traced(spn_dag_t* g, spn_dag_action_t* action, spn_dag_env_t* env) {
+  spn_dag_digest_t key = spn_dag_weak_key(g, action->id);
+  trace_emit(env, (spn_dag_trace_event_t) { .kind = SPN_DAG_TRACE_KEY, .action = action->id, .key = key });
+  return key;
+}
+
+static bool restore_strong(spn_dag_t* g, spn_dag_action_t* action, spn_dag_digest_t weak, spn_dag_env_t* env, sp_mem_t mem) {
+  spn_dag_pathset_t set = sp_zero;
+  bool present = spn_dag_obs_table_get(env->discovery, weak, mem, &set);
+  trace_emit(env, (spn_dag_trace_event_t) { .kind = SPN_DAG_TRACE_DISCOVERY, .action = action->id, .key = weak, .hit = present });
+  if (!present) {
+    return false;
+  }
+  u32 count = (u32)sp_da_size(set.obs);
+  bool resolved = !resolve_observations(env->files, set.obs, count);
+  trace_resolve(env, action->id, resolved);
+  if (!resolved) {
+    return false;
+  }
+  spn_dag_digest_t strong = spn_dag_strong_key(weak, set.obs, count);
+  trace_emit(env, (spn_dag_trace_event_t) { .kind = SPN_DAG_TRACE_STRONG, .action = action->id, .key = strong });
+  return try_restore(g, action, strong, env);
+}
+
 static spn_err_t lookup(spn_dag_t* g, spn_dag_action_t* action, spn_dag_env_t* env, sp_mem_t mem, spn_dag_attempt_t* attempt) {
   attempt->action = action;
   attempt->mem = mem;
   sp_da_init(mem, attempt->digests);
   sp_da_init(mem, attempt->obs);
 
-  if (action->uncacheable) {
-    attempt->scratch = begin_scratch(g, action, env->scratch);
-    return spn_path_empty(attempt->scratch) ? SPN_ERR_DAG_SCRATCH : SPN_OK;
-  }
-
-  attempt->key = spn_dag_weak_key(g, action->id);
-  trace_emit(env, (spn_dag_trace_event_t) { .kind = SPN_DAG_TRACE_KEY, .action = action->id, .key = attempt->key });
-
-  if (action->discover) {
-    spn_dag_pathset_t set = sp_zero;
-    bool present = spn_dag_obs_table_get(env->discovery, attempt->key, mem, &set);
-    trace_emit(env, (spn_dag_trace_event_t) { .kind = SPN_DAG_TRACE_DISCOVERY, .action = action->id, .key = attempt->key, .hit = present });
-    if (present) {
-      u32 count = (u32)sp_da_size(set.obs);
-      bool resolved = !resolve_observations(env->files, set.obs, count);
-      trace_resolve(env, action->id, resolved);
-      if (resolved) {
-        spn_dag_digest_t strong = spn_dag_strong_key(attempt->key, set.obs, count);
-        trace_emit(env, (spn_dag_trace_event_t) { .kind = SPN_DAG_TRACE_STRONG, .action = action->id, .key = strong });
-        if (try_restore(g, action, strong, env)) {
-          attempt->hit = true;
-          return SPN_OK;
-        }
-      }
+  switch (action->kind) {
+    case SPN_DAG_ACTION_STATIC: {
+      attempt->key = weak_key_traced(g, action, env);
+      attempt->hit = try_restore(g, action, attempt->key, env);
+      break;
     }
-  } else if (try_restore(g, action, attempt->key, env)) {
-    attempt->hit = true;
+    case SPN_DAG_ACTION_DISCOVERED: {
+      attempt->key = weak_key_traced(g, action, env);
+      attempt->hit = restore_strong(g, action, attempt->key, env, mem);
+      break;
+    }
+    case SPN_DAG_ACTION_UNCACHEABLE: {
+      break;
+    }
+  }
+  if (attempt->hit) {
     return SPN_OK;
   }
 
@@ -665,19 +685,21 @@ static spn_err_t execute(spn_dag_t* g, spn_dag_attempt_t* attempt, spn_dag_env_t
   spn_dag_action_t* action = attempt->action;
   trace_emit(env, (spn_dag_trace_event_t) { .kind = SPN_DAG_TRACE_EXECUTE, .action = action->id, .key = attempt->key });
 
-  if (action->execute) {
-    if (action->execute(g, action, action->user_data)) {
-      diag_set(&attempt->diag, SPN_ERR_DAG_ACTION, action->id, sp_str_lit(""));
-      return SPN_ERR_DAG_ACTION;
-    }
+  spn_err_t err = action->execute(g, action, action->user_data, env, attempt->mem, &attempt->obs);
+  if (err) {
+    diag_set(&attempt->diag, err, action->id, sp_str_lit(""));
+    return err;
   }
-  if (action->discover) {
-    spn_err_t err = action->discover(g, action, action->user_data, env, attempt->mem, &attempt->obs);
-    if (err) {
-      diag_set(&attempt->diag, err, action->id, sp_str_lit(""));
-      return err;
+  switch (action->kind) {
+    case SPN_DAG_ACTION_DISCOVERED: {
+      canonicalize_observations(attempt->obs);
+      break;
     }
-    canonicalize_observations(attempt->obs);
+    case SPN_DAG_ACTION_STATIC:
+    case SPN_DAG_ACTION_UNCACHEABLE: {
+      sp_assert(sp_da_empty(attempt->obs));
+      break;
+    }
   }
 
   sp_da_for(action->produces, it) {
@@ -705,31 +727,38 @@ static spn_err_t commit(spn_dag_t* g, spn_dag_attempt_t* attempt, spn_dag_env_t*
     spn_dag_find_artifact(g, action->produces[it])->digest = attempt->digests[it];
   }
 
-  if (action->uncacheable) {
-    spn_try(settle(g, action, env, &attempt->diag));
-    trace_emit(env, (spn_dag_trace_event_t) { .kind = SPN_DAG_TRACE_COMMIT, .action = action->id });
-    return SPN_OK;
-  }
-
-  spn_dag_digest_t key = attempt->key;
-  bool resolved = true;
-  if (action->discover) {
-    u32 count = (u32)sp_da_size(attempt->obs);
-    resolved = !resolve_observations(env->files, attempt->obs, count);
-    trace_resolve(env, action->id, resolved);
-    spn_dag_obs_table_put(env->discovery, attempt->key, attempt->obs, count);
-    if (resolved) {
-      key = spn_dag_strong_key(attempt->key, attempt->obs, count);
-      trace_emit(env, (spn_dag_trace_event_t) { .kind = SPN_DAG_TRACE_STRONG, .action = action->id, .key = key });
+  switch (action->kind) {
+    case SPN_DAG_ACTION_UNCACHEABLE: {
+      spn_try(settle(g, action, env, &attempt->diag));
+      trace_emit(env, (spn_dag_trace_event_t) { .kind = SPN_DAG_TRACE_COMMIT, .action = action->id });
+      return SPN_OK;
+    }
+    case SPN_DAG_ACTION_STATIC: {
+      spn_try(settle(g, action, env, &attempt->diag));
+      record(g, action, attempt->key, env);
+      trace_emit(env, (spn_dag_trace_event_t) { .kind = SPN_DAG_TRACE_COMMIT, .action = action->id, .key = attempt->key, .hit = true });
+      return SPN_OK;
+    }
+    case SPN_DAG_ACTION_DISCOVERED: {
+      u32 count = (u32)sp_da_size(attempt->obs);
+      bool resolved = !resolve_observations(env->files, attempt->obs, count);
+      trace_resolve(env, action->id, resolved);
+      spn_dag_obs_table_put(env->discovery, attempt->key, attempt->obs, count);
+      spn_dag_digest_t key = attempt->key;
+      if (resolved) {
+        key = spn_dag_strong_key(attempt->key, attempt->obs, count);
+        trace_emit(env, (spn_dag_trace_event_t) { .kind = SPN_DAG_TRACE_STRONG, .action = action->id, .key = key });
+      }
+      spn_try(settle(g, action, env, &attempt->diag));
+      if (resolved) {
+        record(g, action, key, env);
+      }
+      trace_emit(env, (spn_dag_trace_event_t) { .kind = SPN_DAG_TRACE_COMMIT, .action = action->id, .key = key, .hit = resolved });
+      return SPN_OK;
     }
   }
 
-  spn_try(settle(g, action, env, &attempt->diag));
-  if (resolved) {
-    record(g, action, key, env);
-  }
-  trace_emit(env, (spn_dag_trace_event_t) { .kind = SPN_DAG_TRACE_COMMIT, .action = action->id, .key = key, .hit = resolved });
-  return SPN_OK;
+  sp_unreachable_return(SPN_ERROR);
 }
 
 static spn_err_t exec_action(spn_dag_t* g, spn_dag_action_t* action, spn_dag_env_t* env) {
@@ -756,14 +785,7 @@ static spn_err_t exec_action(spn_dag_t* g, spn_dag_action_t* action, spn_dag_env
 
 spn_err_t spn_dag_execute(spn_dag_t* g, spn_dag_id_t action_id, spn_dag_env_t* env) {
   spn_dag_action_t* action = spn_dag_find_action(g, action_id);
-  sp_assert(!action->discover);
-  return exec_action(g, action, env);
-}
-
-spn_err_t spn_dag_execute_discovered(spn_dag_t* g, spn_dag_id_t action_id, spn_dag_env_t* env) {
-  spn_dag_action_t* action = spn_dag_find_action(g, action_id);
-  sp_assert(action->discover);
-  sp_assert(env->discovery);
+  sp_assert(action->kind != SPN_DAG_ACTION_DISCOVERED || env->discovery);
   return exec_action(g, action, env);
 }
 
@@ -1029,7 +1051,7 @@ static void run_dispatch(spn_dag_run_t* run, spn_dag_id_t id) {
     flight_free(flight);
   }
 
-  if (action->discover) {
+  if (action->kind == SPN_DAG_ACTION_DISCOVERED) {
     sp_assert(run->env->discovery);
     bool requeue = false;
     if (defer_pathset(run, action, spn_dag_weak_key(run->g, action->id), (u64)sp_atomic_s32_load(&run->completed, SP_ATOMIC_SEQ_CST), &requeue)) {
@@ -1071,7 +1093,7 @@ static void run_complete(spn_dag_run_t* run, spn_dag_flight_t* flight) {
     return;
   }
 
-  if (action->discover) {
+  if (action->kind == SPN_DAG_ACTION_DISCOVERED) {
     bool requeue = false;
     if (defer_observations(run, action, flight->attempt.obs, flight->epoch, &requeue)) {
       run->states[action->id.index].parked = flight;

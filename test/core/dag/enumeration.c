@@ -127,13 +127,14 @@ static const enum_test_t enum_tests [] = {
   },
 };
 
-static spn_err_t enum_discover(spn_dag_t* g, spn_dag_action_t* action, void* user_data, spn_dag_env_t* dag_env, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
+static spn_err_t enum_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data, spn_dag_env_t* dag_env, sp_mem_t mem, sp_da(spn_dag_obs_t)* obs) {
   enum_env_t* env = (enum_env_t*)user_data;
+  spn_try(dag_test_exec_stamp(g, action, user_data, dag_env, mem, obs));
   sp_carr_for(env->test->obs, it) {
     if (!env->test->obs[it].dir) {
       break;
     }
-    sp_da_push(*out, ((spn_dag_obs_t) {
+    sp_da_push(*obs, ((spn_dag_obs_t) {
       .kind = SPN_DAG_OBS_ENUMERATION,
       .path = spn_path_make(g->roots, dag_test_env_path(&env->dag, sp_str_view(env->test->obs[it].dir))),
       .filter = env->test->obs[it].filter ? sp_str_view(env->test->obs[it].filter) : sp_str_lit("")
@@ -190,14 +191,14 @@ sp_test_each(dag_enumeration, runs, enum_test_t, enum_tests) {
 
     spn_dag_t* g = dag_test_env_graph(&env.dag);
     spn_dag_id_t action = spn_dag_add_action(g, (spn_dag_action_config_t) {
+      .kind = SPN_DAG_ACTION_DISCOVERED,
       .identity = dag_test_digest(it->name),
-      .execute = dag_test_exec_stamp,
-      .discover = enum_discover,
+      .execute = enum_exec,
       .user_data = &env
     });
     sp_must_eq(t, SPN_OK, spn_dag_action_add_output(g, action, spn_dag_add_output(g, sp_str_lit("O"))));
 
-    sp_expect_eq(t, SPN_OK, spn_dag_execute_discovered(g, action, &env.dag.env));
+    sp_expect_eq(t, SPN_OK, spn_dag_execute(g, action, &env.dag.env));
     sp_expect_eq(t, run->expect_runs, env.dag.runs);
   }
 

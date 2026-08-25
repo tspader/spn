@@ -162,8 +162,9 @@ static const discover_test_t discover_tests [] = {
   },
 };
 
-static spn_err_t discover_exec_on_discover(spn_dag_t* g, spn_dag_action_t* action, void* user_data, spn_dag_env_t* dag_env, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
+static spn_err_t discover_exec_fn(spn_dag_t* g, spn_dag_action_t* action, void* user_data, spn_dag_env_t* dag_env, sp_mem_t mem, sp_da(spn_dag_obs_t)* obs) {
   discover_env_t* env = (discover_env_t*)user_data;
+  spn_try(dag_test_exec_stamp(g, action, user_data, dag_env, mem, obs));
   if (env->run->discover_fails) {
     return SPN_ERROR;
   }
@@ -171,7 +172,7 @@ static spn_err_t discover_exec_on_discover(spn_dag_t* g, spn_dag_action_t* actio
     if (!env->run->headers[it].path) {
       break;
     }
-    sp_da_push(*out, ((spn_dag_obs_t) {
+    sp_da_push(*obs, ((spn_dag_obs_t) {
       .kind = SPN_DAG_OBS_FILE,
       .path = spn_path_make(g->roots, dag_test_env_path(&env->dag, sp_str_view(env->run->headers[it].path)))
     }));
@@ -180,7 +181,7 @@ static spn_err_t discover_exec_on_discover(spn_dag_t* g, spn_dag_action_t* actio
     if (!env->run->missing[it]) {
       break;
     }
-    sp_da_push(*out, ((spn_dag_obs_t) {
+    sp_da_push(*obs, ((spn_dag_obs_t) {
       .kind = SPN_DAG_OBS_FILE,
       .path = spn_path_make(g->roots, dag_test_env_path(&env->dag, sp_str_view(env->run->missing[it])))
     }));
@@ -189,7 +190,7 @@ static spn_err_t discover_exec_on_discover(spn_dag_t* g, spn_dag_action_t* actio
     if (!env->run->probes[it]) {
       break;
     }
-    sp_da_push(*out, ((spn_dag_obs_t) {
+    sp_da_push(*obs, ((spn_dag_obs_t) {
       .kind = SPN_DAG_OBS_ABSENT,
       .path = spn_path_make(g->roots, dag_test_env_path(&env->dag, sp_str_view(env->run->probes[it])))
     }));
@@ -251,9 +252,9 @@ sp_test_each(dag_discover_exec, runs, discover_test_t, discover_tests) {
 
     spn_dag_t* g = dag_test_env_graph(&env.dag);
     spn_dag_id_t action = spn_dag_add_action(g, (spn_dag_action_config_t) {
+      .kind = SPN_DAG_ACTION_DISCOVERED,
       .identity = dag_test_digest(it->input),
-      .execute = dag_test_exec_stamp,
-      .discover = discover_exec_on_discover,
+      .execute = discover_exec_fn,
       .user_data = &env
     });
     spn_dag_action_add_input(g, action, spn_dag_add_value(g, it->input, sp_cstr_len(it->input)));
@@ -265,7 +266,7 @@ sp_test_each(dag_discover_exec, runs, discover_test_t, discover_tests) {
       before = manifest_meta(&env);
     }
 
-    spn_err_t err = spn_dag_execute_discovered(g, action, &env.dag.env);
+    spn_err_t err = spn_dag_execute(g, action, &env.dag.env);
 
     if (run->manifest_stable) {
       sp_sys_file_meta_t after = manifest_meta(&env);

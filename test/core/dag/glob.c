@@ -259,9 +259,10 @@ static const glob_exec_test_t glob_exec_tests [] = {
   },
 };
 
-static spn_err_t glob_exec_discover(spn_dag_t* g, spn_dag_action_t* action, void* user_data, spn_dag_env_t* dag_env, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
+static spn_err_t glob_exec_fn(spn_dag_t* g, spn_dag_action_t* action, void* user_data, spn_dag_env_t* dag_env, sp_mem_t mem, sp_da(spn_dag_obs_t)* obs) {
   glob_exec_env_t* env = (glob_exec_env_t*)user_data;
-  return spn_dag_glob(mem, g->roots, env->pattern, out, SP_NULLPTR);
+  spn_try(dag_test_exec_stamp(g, action, user_data, dag_env, mem, obs));
+  return spn_dag_glob(mem, g->roots, env->pattern, obs, SP_NULLPTR);
 }
 
 sp_test_each(dag_glob, exec, glob_exec_test_t, glob_exec_tests) {
@@ -290,14 +291,14 @@ sp_test_each(dag_glob, exec, glob_exec_test_t, glob_exec_tests) {
 
     spn_dag_t* g = dag_test_env_graph(&env.dag);
     spn_dag_id_t action = spn_dag_add_action(g, (spn_dag_action_config_t) {
+      .kind = SPN_DAG_ACTION_DISCOVERED,
       .identity = dag_test_digest(it->name),
-      .execute = dag_test_exec_stamp,
-      .discover = glob_exec_discover,
+      .execute = glob_exec_fn,
       .user_data = &env
     });
     sp_must_eq(t, SPN_OK, spn_dag_action_add_output(g, action, spn_dag_add_output(g, sp_str_lit("O"))));
 
-    sp_expect_eq(t, SPN_OK, spn_dag_execute_discovered(g, action, &env.dag.env));
+    sp_expect_eq(t, SPN_OK, spn_dag_execute(g, action, &env.dag.env));
     sp_expect_eq(t, run->expect_runs, env.dag.runs);
   }
 

@@ -59,7 +59,8 @@ static const key_test_t key_tests [] = {
 static sp_err_t build_action_key(sp_test_t* t, sp_mem_t mem, const spn_path_roots_t* roots, const key_action_t* spec, spn_dag_digest_t* key) {
   spn_dag_t* g = spn_dag_new(mem, roots);
   spn_dag_id_t action = spn_dag_add_action(g, (spn_dag_action_config_t) {
-    .identity = dag_test_digest(spec->identity)
+    .identity = dag_test_digest(spec->identity),
+    .execute = dag_test_exec_noop
   });
 
   sp_carr_for(spec->inputs, it) {

@@ -155,11 +155,22 @@ static const par_test_t par_tests [] = {
   },
 };
 
-static s32 par_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
+static spn_err_t par_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data, spn_dag_env_t* env, sp_mem_t mem, sp_da(spn_dag_obs_t)* obs) {
   par_ctx_t* ctx = (par_ctx_t*)user_data;
   if (ctx->spec->fails) {
-    return 1;
+    return SPN_ERR_DAG_ACTION;
   }
+
+  sp_carr_for(ctx->spec->discovers, it) {
+    if (!ctx->spec->discovers[it]) {
+      break;
+    }
+    sp_da_push(*obs, ((spn_dag_obs_t) {
+      .kind = SPN_DAG_OBS_FILE,
+      .path = spn_path_make(g->roots, sp_fs_join_path(mem, ctx->env->dag.root, sp_str_view(ctx->spec->discovers[it])))
+    }));
+  }
+
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
   const spn_path_roots_t* roots = &ctx->env->dag.roots;
 
@@ -167,7 +178,7 @@ static s32 par_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
     spn_dag_artifact_t* in = spn_dag_find_artifact(ctx->g, action->consumes[it]);
     if (in->kind == SPN_DAG_ARTIFACT_KIND_FILE && !sp_fs_exists(spn_path_str(roots, s.mem, in->materialized))) {
       sp_mem_end_scratch(s);
-      return 1;
+      return SPN_ERR_DAG_ACTION;
     }
   }
 
@@ -179,21 +190,7 @@ static s32 par_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
     : out->materialized;
   sp_err_t err = sp_fs_create_file_str(spn_path_str(roots, s.mem, target), content);
   sp_mem_end_scratch(s);
-  return err ? 1 : 0;
-}
-
-static spn_err_t par_discover(spn_dag_t* g, spn_dag_action_t* action, void* user_data, spn_dag_env_t* env, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
-  par_ctx_t* ctx = (par_ctx_t*)user_data;
-  sp_carr_for(ctx->spec->discovers, it) {
-    if (!ctx->spec->discovers[it]) {
-      break;
-    }
-    sp_da_push(*out, ((spn_dag_obs_t) {
-      .kind = SPN_DAG_OBS_FILE,
-      .path = spn_path_make(g->roots, sp_fs_join_path(mem, ctx->env->dag.root, sp_str_view(ctx->spec->discovers[it])))
-    }));
-  }
-  return SPN_OK;
+  return err ? SPN_ERR_DAG_ACTION : SPN_OK;
 }
 
 static sp_err_t par_build_graph(sp_test_t* t, par_env_t* env, spn_dag_t* g, const par_test_t* test) {
@@ -209,9 +206,9 @@ static sp_err_t par_build_graph(sp_test_t* t, par_env_t* env, spn_dag_t* g, cons
     ctx->spec = spec;
 
     spn_dag_id_t action = spn_dag_add_action(g, (spn_dag_action_config_t) {
+      .kind = spec->discovers[0] ? SPN_DAG_ACTION_DISCOVERED : SPN_DAG_ACTION_STATIC,
       .identity = dag_test_digest(spec->identity),
       .execute = par_exec,
-      .discover = spec->discovers[0] ? par_discover : SP_NULLPTR,
       .user_data = ctx
     });
     sp_carr_for(spec->inputs, ii) {

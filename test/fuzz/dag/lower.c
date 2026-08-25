@@ -8,10 +8,9 @@ typedef struct {
   u64 action;
 } fz_exec_ctx_t;
 
-static s32 fz_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
+static spn_err_t fz_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data, spn_dag_env_t* env, sp_mem_t mem, sp_da(spn_dag_obs_t)* obs) {
   fz_exec_ctx_t* ctx = (fz_exec_ctx_t*)user_data;
   fz_lowered_t* low = ctx->low;
-  sp_mem_t mem = low->mem;
   fz_action_t* fz = &low->u->actions[ctx->action];
   low->execs[ctx->action]++;
   fz_journal_exec(low->journal, ctx->action);
@@ -34,33 +33,33 @@ static s32 fz_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
       }
       case SPN_DAG_ARTIFACT_KIND_FILE: {
         if (sp_io_read_file(mem, spn_path_str(low->roots, mem, in->materialized), &inputs[it])) {
-          return 1;
+          return SPN_ERR_DAG_ACTION;
         }
         break;
       }
       case SPN_DAG_ARTIFACT_KIND_TREE: {
-        sp_unreachable_return(1);
+        sp_unreachable_return(SPN_ERR_DAG_ACTION);
       }
     }
   }
 
   sp_da_for(fz->obs, ot) {
-    fz_obs_t obs = fz->obs[ot];
-    sp_str_t path = obs.probe
-      ? fz_phantom_sim_path(mem, obs.phantom)
-      : fz_artifact_sim_path(mem, low->u, obs.artifact);
+    fz_obs_t fo = fz->obs[ot];
+    sp_str_t path = fo.probe
+      ? fz_phantom_sim_path(mem, fo.phantom)
+      : fz_artifact_sim_path(mem, low->u, fo.artifact);
     sp_str_t bytes = sp_zero;
     if (!sp_io_read_file(mem, path, &bytes)) {
       inputs[consumed + ot] = bytes;
       continue;
     }
-    if (obs.probe) {
-      if (low->state->phantoms[obs.phantom].present) {
-        return 1;
+    if (fo.probe) {
+      if (low->state->phantoms[fo.phantom].present) {
+        return SPN_ERR_DAG_ACTION;
       }
     }
-    else if (spn_dag_digest_valid(spn_dag_find_artifact(low->g, low->ids[obs.artifact])->digest)) {
-      return 1;
+    else if (spn_dag_digest_valid(spn_dag_find_artifact(low->g, low->ids[fo.artifact])->digest)) {
+      return SPN_ERR_DAG_ACTION;
     }
     inputs[consumed + ot] = sp_str_lit("absent");
   }
@@ -69,29 +68,23 @@ static s32 fz_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
     spn_dag_artifact_t* out = spn_dag_find_artifact(low->g, action->produces[it]);
     sp_str_t content = fz_output_content(mem, low->u->actions[ctx->action].identity, inputs, count, out->name);
     if (sp_fs_create_file_str(spn_path_str(low->roots, mem, out->materialized), content)) {
-      return 1;
+      return SPN_ERR_DAG_ACTION;
     }
   }
-  return 0;
-}
 
-static spn_err_t fz_discover(spn_dag_t* g, spn_dag_action_t* action, void* user_data, spn_dag_env_t* env, sp_mem_t mem, sp_da(spn_dag_obs_t)* out) {
-  fz_exec_ctx_t* ctx = (fz_exec_ctx_t*)user_data;
-  fz_lowered_t* low = ctx->low;
-
-  sp_da_for(low->u->actions[ctx->action].obs, ot) {
-    fz_obs_t obs = low->u->actions[ctx->action].obs[ot];
-    if (obs.probe) {
-      sp_str_t path = fz_phantom_sim_path(mem, obs.phantom);
-      sp_da_push(*out, ((spn_dag_obs_t) {
+  sp_da_for(fz->obs, ot) {
+    fz_obs_t fo = fz->obs[ot];
+    if (fo.probe) {
+      sp_str_t path = fz_phantom_sim_path(mem, fo.phantom);
+      sp_da_push(*obs, ((spn_dag_obs_t) {
         .kind = sp_fs_is_file(path) ? SPN_DAG_OBS_FILE : SPN_DAG_OBS_ABSENT,
         .path = spn_path_make(g->roots, path),
       }));
     }
     else {
-      sp_da_push(*out, ((spn_dag_obs_t) {
+      sp_da_push(*obs, ((spn_dag_obs_t) {
         .kind = SPN_DAG_OBS_FILE,
-        .path = spn_path_make(g->roots, fz_artifact_sim_path(mem, low->u, obs.artifact)),
+        .path = spn_path_make(g->roots, fz_artifact_sim_path(mem, low->u, fo.artifact)),
       }));
     }
   }
@@ -140,9 +133,9 @@ void fz_lower(fz_lowered_t* low, sp_mem_t mem, fz_universe_t* u, const spn_path_
 
     sp_str_t identity = sp_fmt(mem, "id{}", sp_fmt_uint(action->identity)).value;
     spn_dag_id_t id = spn_dag_add_action(low->g, (spn_dag_action_config_t) {
+      .kind = action->discover ? SPN_DAG_ACTION_DISCOVERED : SPN_DAG_ACTION_STATIC,
       .identity = spn_dag_digest(identity.data, identity.len),
       .execute = fz_exec,
-      .discover = action->discover ? fz_discover : SP_NULLPTR,
       .user_data = ctx,
     });
     sp_assert(id.index == at);

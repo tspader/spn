@@ -17,7 +17,7 @@ typedef struct {
   const c8* inputs [DAG_TEST_MAX_INPUTS];
   const c8* outputs [DAG_TEST_MAX_OUTPUTS];
   const c8* write [DAG_TEST_MAX_OUTPUTS];
-  bool uncacheable;
+  spn_dag_action_kind_t kind;
 } exec_action_t;
 
 typedef struct {
@@ -135,7 +135,7 @@ static const exec_test_t exec_tests [] = {
   },
   {
     .name = "uncacheable_always_executes",
-    .action = { .identity = "I", .inputs = { "A" }, .outputs = { "O" }, .write = { "V" }, .uncacheable = true },
+    .action = { .identity = "I", .inputs = { "A" }, .outputs = { "O" }, .write = { "V" }, .kind = SPN_DAG_ACTION_UNCACHEABLE },
     .ops = {
       { .kind = EXEC_OP_RUN, .expect = { .runs = 1, .contents = { "V1" } } },
       { .kind = EXEC_OP_RUN, .expect = { .runs = 2, .contents = { "V2" } } },
@@ -151,10 +151,10 @@ static const exec_test_t exec_tests [] = {
   },
 };
 
-static s32 exec_test_fn(spn_dag_t* g, spn_dag_action_t* action, void* user_data) {
+static spn_err_t exec_test_fn(spn_dag_t* g, spn_dag_action_t* action, void* user_data, spn_dag_env_t* env, sp_mem_t mem, sp_da(spn_dag_obs_t)* obs) {
   exec_fn_ctx_t* ctx = (exec_fn_ctx_t*)user_data;
   if (ctx->behavior == EXEC_BEHAVIOR_FAIL) {
-    return 1;
+    return SPN_ERR_DAG_ACTION;
   }
 
   ctx->env->dag.runs++;
@@ -166,10 +166,10 @@ static s32 exec_test_fn(spn_dag_t* g, spn_dag_action_t* action, void* user_data)
     spn_dag_artifact_t* artifact = spn_dag_find_artifact(ctx->g, action->produces[it]);
     sp_str_t content = sp_fmt(ctx->env->dag.mem, "{}{}", sp_fmt_cstr(ctx->spec->write[it]), sp_fmt_uint(ctx->env->dag.runs)).value;
     if (sp_fs_create_file_str(dag_test_render(&ctx->env->dag, artifact->materialized), content)) {
-      return 1;
+      return SPN_ERR_DAG_ACTION;
     }
   }
-  return 0;
+  return SPN_OK;
 }
 
 static void exec_action_change(exec_action_t* action, exec_change_t change) {
@@ -198,10 +198,10 @@ static sp_err_t exec_action_run(sp_test_t* t, exec_env_t* env, const exec_action
   };
 
   spn_dag_id_t action = spn_dag_add_action(g, (spn_dag_action_config_t) {
+    .kind = spec->kind,
     .identity = dag_test_digest(spec->identity),
     .execute = exec_test_fn,
-    .user_data = &ctx,
-    .uncacheable = spec->uncacheable
+    .user_data = &ctx
   });
 
   sp_carr_for(spec->inputs, it) {
