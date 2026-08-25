@@ -3,7 +3,7 @@ name: bootstrap
 on:
   workflow_dispatch:
   pull_request:
-    types: [opened, synchronize, reopened, labeled]
+    types: [labeled]
   push:
     branches: [main]
 
@@ -20,7 +20,7 @@ defaults:
 
 jobs:
   build:
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'merge') }}
+    if: ${{ github.event_name != 'pull_request' || github.event.label.name == 'merge' }}
     strategy:
       fail-fast: false
       matrix:
@@ -37,7 +37,7 @@ jobs:
 
   bootstrap:
     name: bootstrap
-    if: ${{ !cancelled() && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'merge')) }}
+    if: ${{ !cancelled() }}
     needs: [build]
     runs-on: ubuntu-latest
     steps:
