@@ -29,8 +29,10 @@ jobs:
           version="$(sed -n 's/^version = "\(.*\)"$/\1/p' spn.toml)"
           test "v${version}" = "${TAG}"
       - run: |
-          runs="$(gh run list --commit ${{ github.sha }} --workflow ci.yml --branch main --event push --status success --json databaseId --jq length)"
-          test "${runs}" -gt 0
+          for workflow in ci.yml bootstrap.yml; do
+            runs="$(gh run list --commit ${{ github.sha }} --workflow "${workflow}" --branch main --event push --status success --json databaseId --jq length)"
+            test "${runs}" -gt 0
+          done
 
   package:
     needs: [check]
