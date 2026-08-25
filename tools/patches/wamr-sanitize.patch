@@ -1,3 +1,15 @@
+diff --git a/core/iwasm/common/wasm_exec_env.h b/core/iwasm/common/wasm_exec_env.h
+index 5d80312..c9ab869 100644
+--- a/core/iwasm/common/wasm_exec_env.h
++++ b/core/iwasm/common/wasm_exec_env.h
+@@ -219,6 +219,7 @@ wasm_exec_env_alloc_wasm_frame(WASMExecEnv *exec_env, unsigned size)
+     uint8 *addr = exec_env->wasm_stack.top;
+ 
+     bh_assert(!(size & 3));
++    size = (size + 7U) & ~7U;
+ 
+     /* For classic interpreter, the outs area doesn't contain the const cells,
+        its size cannot be larger than the frame size, so here checking stack
 diff --git a/core/iwasm/common/wasm_runtime_common.c b/core/iwasm/common/wasm_runtime_common.c
 index 6590684..55aadc3 100644
 --- a/core/iwasm/common/wasm_runtime_common.c
@@ -66,6 +78,173 @@ index 6590684..55aadc3 100644
          argv_src += 2;
      }
  
+diff --git a/core/iwasm/common/wasm_runtime_common.h b/core/iwasm/common/wasm_runtime_common.h
+index b6056eb..695ea5d 100644
+--- a/core/iwasm/common/wasm_runtime_common.h
++++ b/core/iwasm/common/wasm_runtime_common.h
+@@ -33,39 +33,67 @@ extern "C" {
+ 
+ #if WASM_CPU_SUPPORTS_UNALIGNED_ADDR_ACCESS != 0
+ 
+-#define PUT_I64_TO_ADDR(addr, value)       \
+-    do {                                   \
+-        *(int64 *)(addr) = (int64)(value); \
++#define PUT_I64_TO_ADDR(addr, value)             \
++    do {                                         \
++        int64 _val = (int64)(value);             \
++        memcpy((addr), &_val, sizeof(_val));     \
+     } while (0)
+-#define PUT_V128_TO_ADDR(addr, value) \
+-    do {                              \
+-        *(V128 *)(addr) = (value);    \
++#define PUT_V128_TO_ADDR(addr, value)            \
++    do {                                         \
++        V128 _val = (value);                     \
++        memcpy((addr), &_val, sizeof(_val));     \
+     } while (0)
+-#define PUT_F64_TO_ADDR(addr, value)           \
+-    do {                                       \
+-        *(float64 *)(addr) = (float64)(value); \
++#define PUT_F64_TO_ADDR(addr, value)             \
++    do {                                         \
++        float64 _val = (float64)(value);         \
++        memcpy((addr), &_val, sizeof(_val));     \
+     } while (0)
+-#define PUT_REF_TO_ADDR(addr, value)        \
+-    do {                                    \
+-        *(void **)(addr) = (void *)(value); \
++#define PUT_REF_TO_ADDR(addr, value)             \
++    do {                                         \
++        void *_val = (void *)(value);            \
++        memcpy((addr), &_val, sizeof(_val));     \
+     } while (0)
+ 
+-#define GET_I64_FROM_ADDR(addr) (*(int64 *)(addr))
+-#define GET_F64_FROM_ADDR(addr) (*(float64 *)(addr))
+-#define GET_REF_FROM_ADDR(addr) (*(void **)(addr))
+-#define GET_V128_FROM_ADDR(addr) (*(V128 *)(addr))
++static inline int64
++GET_I64_FROM_ADDR(const void *addr)
++{
++    int64 val;
++    memcpy(&val, addr, sizeof(val));
++    return val;
++}
++static inline float64
++GET_F64_FROM_ADDR(const void *addr)
++{
++    float64 val;
++    memcpy(&val, addr, sizeof(val));
++    return val;
++}
++static inline void *
++GET_REF_FROM_ADDR(const void *addr)
++{
++    void *val;
++    memcpy(&val, addr, sizeof(val));
++    return val;
++}
++static inline V128
++GET_V128_FROM_ADDR(const void *addr)
++{
++    V128 val;
++    memcpy(&val, addr, sizeof(val));
++    return val;
++}
+ 
+ /* For STORE opcodes */
+ #define STORE_I64 PUT_I64_TO_ADDR
+ static inline void
+ STORE_U32(void *addr, uint32_t value)
+ {
+-    *(uint32_t *)(addr) = (uint32_t)(value);
++    memcpy(addr, &value, sizeof(value));
+ }
+ static inline void
+ STORE_U16(void *addr, uint16_t value)
+ {
+-    *(uint16_t *)(addr) = (uint16_t)(value);
++    memcpy(addr, &value, sizeof(value));
+ }
+ static inline void
+ STORE_U8(void *addr, uint8_t value)
+@@ -76,21 +104,64 @@ STORE_U8(void *addr, uint8_t value)
+ static inline void
+ STORE_V128(void *addr, V128 value)
+ {
+-    *(V128 *)addr = value;
++    memcpy(addr, &value, sizeof(value));
+ }
+ 
+ /* For LOAD opcodes */
+-#define LOAD_I64(addr) (*(int64 *)(addr))
+-#define LOAD_F64(addr) (*(float64 *)(addr))
+-#define LOAD_I32(addr) (*(int32 *)(addr))
+-#define LOAD_U32(addr) (*(uint32 *)(addr))
+-#define LOAD_I16(addr) (*(int16 *)(addr))
+-#define LOAD_U16(addr) (*(uint16 *)(addr))
+-#define LOAD_V128(addr) (*(V128 *)(addr))
+-
+-#define STORE_PTR(addr, ptr)          \
+-    do {                              \
+-        *(void **)addr = (void *)ptr; \
++static inline int64
++LOAD_I64(const void *addr)
++{
++    int64 val;
++    memcpy(&val, addr, sizeof(val));
++    return val;
++}
++static inline float64
++LOAD_F64(const void *addr)
++{
++    float64 val;
++    memcpy(&val, addr, sizeof(val));
++    return val;
++}
++static inline int32
++LOAD_I32(const void *addr)
++{
++    int32 val;
++    memcpy(&val, addr, sizeof(val));
++    return val;
++}
++static inline uint32
++LOAD_U32(const void *addr)
++{
++    uint32 val;
++    memcpy(&val, addr, sizeof(val));
++    return val;
++}
++static inline int16
++LOAD_I16(const void *addr)
++{
++    int16 val;
++    memcpy(&val, addr, sizeof(val));
++    return val;
++}
++static inline uint16
++LOAD_U16(const void *addr)
++{
++    uint16 val;
++    memcpy(&val, addr, sizeof(val));
++    return val;
++}
++static inline V128
++LOAD_V128(const void *addr)
++{
++    V128 val;
++    memcpy(&val, addr, sizeof(val));
++    return val;
++}
++
++#define STORE_PTR(addr, ptr)                 \
++    do {                                     \
++        void *_ptr = (void *)(ptr);          \
++        memcpy((addr), &_ptr, sizeof(_ptr)); \
+     } while (0)
+ 
+ #else /* WASM_CPU_SUPPORTS_UNALIGNED_ADDR_ACCESS != 0 */
 diff --git a/core/iwasm/fast-jit/cg/x86-64/jit_codegen_x86_64.cpp b/core/iwasm/fast-jit/cg/x86-64/jit_codegen_x86_64.cpp
 index 967bf14..672524e 100644
 --- a/core/iwasm/fast-jit/cg/x86-64/jit_codegen_x86_64.cpp
@@ -184,6 +363,71 @@ index c96b541..11049b5 100644
  }
  
  uint32
+diff --git a/core/iwasm/interpreter/wasm_interp_fast.c b/core/iwasm/interpreter/wasm_interp_fast.c
+index 937a7fd..f8e3ceb 100644
+--- a/core/iwasm/interpreter/wasm_interp_fast.c
++++ b/core/iwasm/interpreter/wasm_interp_fast.c
+@@ -281,8 +281,20 @@ local_copysign(double x, double y)
+ }
+ 
+ #if WASM_CPU_SUPPORTS_UNALIGNED_ADDR_ACCESS != 0
+-#define LOAD_U32_WITH_2U16S(addr) (*(uint32 *)(addr))
+-#define LOAD_PTR(addr) (*(void **)(addr))
++static inline uint32
++LOAD_U32_WITH_2U16S(void *addr)
++{
++    uint32 val;
++    memcpy(&val, addr, sizeof(val));
++    return val;
++}
++static inline void *
++LOAD_PTR(void *addr)
++{
++    void *val;
++    memcpy(&val, addr, sizeof(val));
++    return val;
++}
+ #else /* else of WASM_CPU_SUPPORTS_UNALIGNED_ADDR_ACCESS */
+ static inline uint32
+ LOAD_U32_WITH_2U16S(void *addr)
+@@ -1434,12 +1446,13 @@ wasm_interp_dump_op_count()
+ #define HANDLE_OP(opcode) HANDLE_##opcode:
+ #endif
+ #if WASM_CPU_SUPPORTS_UNALIGNED_ADDR_ACCESS != 0
+-#define FETCH_OPCODE_AND_DISPATCH()                    \
+-    do {                                               \
+-        const void *p_label_addr = *(void **)frame_ip; \
+-        frame_ip += sizeof(void *);                    \
+-        CHECK_INSTRUCTION_LIMIT();                     \
+-        goto *p_label_addr;                            \
++#define FETCH_OPCODE_AND_DISPATCH()                                \
++    do {                                                           \
++        void *p_label_addr;                                        \
++        memcpy(&p_label_addr, frame_ip, sizeof(p_label_addr));     \
++        frame_ip += sizeof(void *);                                \
++        CHECK_INSTRUCTION_LIMIT();                                 \
++        goto *p_label_addr;                                        \
+     } while (0)
+ #else
+ #if UINTPTR_MAX == UINT64_MAX
+@@ -4492,7 +4505,7 @@ wasm_interp_call_func_bytecode(WASMModuleInstance *module,
+                 b = GET_I64_FROM_ADDR(frame_lp + GET_OFFSET());
+                 a = GET_I64_FROM_ADDR(frame_lp + GET_OFFSET());
+                 if (a == (int64)0x8000000000000000LL && b == -1) {
+-                    *(int64 *)(frame_lp + GET_OFFSET()) = 0;
++                    PUT_I64_TO_ADDR(frame_lp + GET_OFFSET(), 0);
+                     HANDLE_OP_END();
+                 }
+                 if (b == 0) {
+@@ -6001,7 +6014,7 @@ wasm_interp_call_func_bytecode(WASMModuleInstance *module,
+                         frame_ip += sizeof(V128);
+                         addr_ret = GET_OFFSET();
+ 
+-                        PUT_V128_TO_ADDR(frame_lp + addr_ret, *(V128 *)orig_ip);
++                        PUT_V128_TO_ADDR(frame_lp + addr_ret, GET_V128_FROM_ADDR(orig_ip));
+                         break;
+                     }
+                     /* TODO: Add a faster SIMD implementation */
 diff --git a/core/iwasm/interpreter/wasm_runtime.c b/core/iwasm/interpreter/wasm_runtime.c
 index 879df37..b1ef12d 100644
 --- a/core/iwasm/interpreter/wasm_runtime.c
