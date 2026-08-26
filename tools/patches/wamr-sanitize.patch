@@ -363,8 +363,49 @@ index c96b541..11049b5 100644
  }
  
  uint32
+diff --git a/core/iwasm/fast-jit/jit_ir.c b/core/iwasm/fast-jit/jit_ir.c
+index 68503e3..3ba377c 100644
+--- a/core/iwasm/fast-jit/jit_ir.c
++++ b/core/iwasm/fast-jit/jit_ir.c
+@@ -675,6 +675,14 @@ get_const_val_in_reg(JitReg reg)
+         return _jit_cc_new_const(cc, JIT_REG_KIND_##KIND, sizeof(val), &val); \
+     } while (0)
+ 
++#define _JIT_CC_NEW_CONST_FLOAT_HELPER(KIND, TYPE, val)                       \
++    do {                                                                      \
++        if (val >= 0 && val < (TYPE)_JIT_REG_CONST_VAL_FLAG) {                \
++            _JIT_CC_NEW_CONST_HELPER(KIND, TYPE, val);                        \
++        }                                                                     \
++        return _jit_cc_new_const(cc, JIT_REG_KIND_##KIND, sizeof(val), &val); \
++    } while (0)
++
+ JitReg
+ jit_cc_new_const_I32_rel(JitCompContext *cc, int32 val, uint32 rel)
+ {
+@@ -697,7 +705,7 @@ jit_cc_new_const_F32(JitCompContext *cc, float val)
+         /* Create const -0.0f */
+         return _jit_cc_new_const(cc, JIT_REG_KIND_F32, sizeof(float), &val);
+ 
+-    _JIT_CC_NEW_CONST_HELPER(F32, float, val);
++    _JIT_CC_NEW_CONST_FLOAT_HELPER(F32, float, val);
+ }
+ 
+ JitReg
+@@ -709,10 +717,11 @@ jit_cc_new_const_F64(JitCompContext *cc, double val)
+         /* Create const -0.0d */
+         return _jit_cc_new_const(cc, JIT_REG_KIND_F64, sizeof(double), &val);
+ 
+-    _JIT_CC_NEW_CONST_HELPER(F64, double, val);
++    _JIT_CC_NEW_CONST_FLOAT_HELPER(F64, double, val);
+ }
+ 
+ #undef _JIT_CC_NEW_CONST_HELPER
++#undef _JIT_CC_NEW_CONST_FLOAT_HELPER
+ 
+ #define _JIT_CC_GET_CONST_HELPER(KIND, TYPE)                               \
+     do {                                                                   \
 diff --git a/core/iwasm/interpreter/wasm_interp_fast.c b/core/iwasm/interpreter/wasm_interp_fast.c
-index 937a7fd..f8e3ceb 100644
+index 937a7fd..91ed17d 100644
 --- a/core/iwasm/interpreter/wasm_interp_fast.c
 +++ b/core/iwasm/interpreter/wasm_interp_fast.c
 @@ -281,8 +281,20 @@ local_copysign(double x, double y)
@@ -390,6 +431,67 @@ index 937a7fd..f8e3ceb 100644
  #else /* else of WASM_CPU_SUPPORTS_UNALIGNED_ADDR_ACCESS */
  static inline uint32
  LOAD_U32_WITH_2U16S(void *addr)
+@@ -416,30 +428,30 @@ wasm_interp_get_frame_ref(WASMInterpFrame *frame)
+             local_type = cur_func->local_types[local_idx - param_count]; \
+     } while (0)
+ 
+-#define GET_OFFSET() (frame_ip += 2, *(int16 *)(frame_ip - 2))
++#define GET_OFFSET() (frame_ip += 2, LOAD_I16(frame_ip - 2))
+ 
+ #define SET_OPERAND_I32(off, value)                                 \
+     do {                                                            \
+-        *(uint32 *)(frame_lp + *(int16 *)(frame_ip + off)) = value; \
++        *(uint32 *)(frame_lp + LOAD_I16(frame_ip + off)) = value; \
+     } while (0)
+ #define SET_OPERAND_F32(off, value)                                  \
+     do {                                                             \
+-        *(float32 *)(frame_lp + *(int16 *)(frame_ip + off)) = value; \
++        *(float32 *)(frame_lp + LOAD_I16(frame_ip + off)) = value; \
+     } while (0)
+ #define SET_OPERAND_I64(off, value)                               \
+     do {                                                          \
+-        uint32 *addr_tmp = frame_lp + *(int16 *)(frame_ip + off); \
++        uint32 *addr_tmp = frame_lp + LOAD_I16(frame_ip + off); \
+         PUT_I64_TO_ADDR(addr_tmp, value);                         \
+     } while (0)
+ #define SET_OPERAND_F64(off, value)                               \
+     do {                                                          \
+-        uint32 *addr_tmp = frame_lp + *(int16 *)(frame_ip + off); \
++        uint32 *addr_tmp = frame_lp + LOAD_I16(frame_ip + off); \
+         PUT_F64_TO_ADDR(addr_tmp, value);                         \
+     } while (0)
+ #define SET_OPERAND_REF(off, value)            \
+     do {                                       \
+         uint32 *addr_tmp;                      \
+-        opnd_off = *(int16 *)(frame_ip + off); \
++        opnd_off = LOAD_I16(frame_ip + off); \
+         addr_tmp = frame_lp + opnd_off;        \
+         PUT_REF_TO_ADDR(addr_tmp, value);      \
+         SET_FRAME_REF(opnd_off);               \
+@@ -448,17 +460,17 @@ wasm_interp_get_frame_ref(WASMInterpFrame *frame)
+ #define SET_OPERAND(op_type, off, value) SET_OPERAND_##op_type(off, value)
+ 
+ #define GET_OPERAND_I32(type, off) \
+-    *(type *)(frame_lp + *(int16 *)(frame_ip + off))
++    *(type *)(frame_lp + LOAD_I16(frame_ip + off))
+ #define GET_OPERAND_F32(type, off) \
+-    *(type *)(frame_lp + *(int16 *)(frame_ip + off))
++    *(type *)(frame_lp + LOAD_I16(frame_ip + off))
+ #define GET_OPERAND_I64(type, off) \
+-    (type) GET_I64_FROM_ADDR(frame_lp + *(int16 *)(frame_ip + off))
++    (type) GET_I64_FROM_ADDR(frame_lp + LOAD_I16(frame_ip + off))
+ #define GET_OPERAND_F64(type, off) \
+-    (type) GET_F64_FROM_ADDR(frame_lp + *(int16 *)(frame_ip + off))
++    (type) GET_F64_FROM_ADDR(frame_lp + LOAD_I16(frame_ip + off))
+ #define GET_OPERAND_V128(off) \
+-    GET_V128_FROM_ADDR(frame_lp + *(int16 *)(frame_ip + off))
++    GET_V128_FROM_ADDR(frame_lp + LOAD_I16(frame_ip + off))
+ #define GET_OPERAND_REF(type, off) \
+-    (type) GET_REF_FROM_ADDR(frame_lp + *(int16 *)(frame_ip + off))
++    (type) GET_REF_FROM_ADDR(frame_lp + LOAD_I16(frame_ip + off))
+ 
+ #define GET_OPERAND(type, op_type, off) GET_OPERAND_##op_type(type, off)
+ 
 @@ -1434,12 +1446,13 @@ wasm_interp_dump_op_count()
  #define HANDLE_OP(opcode) HANDLE_##opcode:
  #endif
@@ -428,6 +530,59 @@ index 937a7fd..f8e3ceb 100644
                          break;
                      }
                      /* TODO: Add a faster SIMD implementation */
+@@ -7642,9 +7655,8 @@ wasm_interp_call_func_bytecode(WASMModuleInstance *module,
+                     outs_area->lp,
+                     GET_OPERAND(void *, REF,
+                                 2 * (cur_func->param_count - i - 1)));
+-                CLEAR_FRAME_REF(
+-                    *(uint16 *)(frame_ip
+-                                + (2 * (cur_func->param_count - i - 1))));
++                CLEAR_FRAME_REF(LOAD_U16(
++                    frame_ip + (2 * (cur_func->param_count - i - 1))));
+                 outs_area->lp += REF_CELL_NUM;
+             }
+ #endif
+diff --git a/core/iwasm/interpreter/wasm_loader.c b/core/iwasm/interpreter/wasm_loader.c
+index 0900223..8ca8333 100644
+--- a/core/iwasm/interpreter/wasm_loader.c
++++ b/core/iwasm/interpreter/wasm_loader.c
+@@ -13384,9 +13384,9 @@ re_scan:
+                                 uint8 opcode_tmp = WASM_OP_SELECT_64;
+ #if WASM_ENABLE_LABELS_AS_VALUES != 0
+ #if WASM_CPU_SUPPORTS_UNALIGNED_ADDR_ACCESS != 0
+-                                *(void **)(p_code_compiled_tmp
+-                                           - sizeof(void *)) =
+-                                    handle_table[opcode_tmp];
++                                STORE_PTR(p_code_compiled_tmp
++                                              - sizeof(void *),
++                                          handle_table[opcode_tmp]);
+ #elif UINTPTR_MAX == UINT64_MAX
+                                 /* emit int32 relative offset in 64-bit target
+                                  */
+@@ -13420,9 +13420,9 @@ re_scan:
+                                 uint8 opcode_tmp = WASM_OP_SELECT_128;
+ #if WASM_ENABLE_LABELS_AS_VALUES != 0
+ #if WASM_CPU_SUPPORTS_UNALIGNED_ADDR_ACCESS != 0
+-                                *(void **)(p_code_compiled_tmp
+-                                           - sizeof(void *)) =
+-                                    handle_table[opcode_tmp];
++                                STORE_PTR(p_code_compiled_tmp
++                                              - sizeof(void *),
++                                          handle_table[opcode_tmp]);
+ #elif UINTPTR_MAX == UINT64_MAX
+                                 /* emit int32 relative offset in 64-bit target
+                                  */
+@@ -13559,8 +13559,8 @@ re_scan:
+ #endif
+ #if WASM_ENABLE_LABELS_AS_VALUES != 0
+ #if WASM_CPU_SUPPORTS_UNALIGNED_ADDR_ACCESS != 0
+-                        *(void **)(p_code_compiled_tmp - sizeof(void *)) =
+-                            handle_table[opcode_tmp];
++                        STORE_PTR(p_code_compiled_tmp - sizeof(void *),
++                                  handle_table[opcode_tmp]);
+ #else
+ #if UINTPTR_MAX == UINT64_MAX
+                         /* emit int32 relative offset in 64-bit target */
 diff --git a/core/iwasm/interpreter/wasm_runtime.c b/core/iwasm/interpreter/wasm_runtime.c
 index 879df37..b1ef12d 100644
 --- a/core/iwasm/interpreter/wasm_runtime.c
