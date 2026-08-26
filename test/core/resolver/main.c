@@ -161,7 +161,11 @@ s32 main(s32 argc, const c8** argv) {
   sp_fs_collect(mem, test_repo_path(mem, sp_str_lit("test/core/resolver/fixtures")), &entries);
   sp_da_sort(entries, sort_dir_entries);
 
-  sp_da(sp_test_decl_t) decls = sp_da_new(mem, sp_test_decl_t);
+  sp_da(sp_test_entry_t) tests = sp_da_new(mem, sp_test_entry_t);
+  sp_da_push(tests, ((sp_test_entry_t) {
+    .kind = SP_TEST_ENTRY_SUITE,
+    .suite = { .name = "resolver", .serial = true },
+  }));
   sp_da_for(entries, it) {
     if (entries[it].kind != SP_FS_KIND_DIR) {
       continue;
@@ -169,19 +173,19 @@ s32 main(s32 argc, const c8** argv) {
     if (sp_str_starts_with(entries[it].name, sp_str_lit("."))) {
       continue;
     }
-    sp_da_push(decls, ((sp_test_decl_t) {
-      .name = sp_str_to_cstr(mem, entries[it].name),
-      .fn = run_fixture,
+    sp_da_push(tests, ((sp_test_entry_t) {
+      .kind = SP_TEST_ENTRY_TEST,
+      .decl = {
+        .suite = "resolver",
+        .name = sp_str_to_cstr(mem, entries[it].name),
+        .kind = SP_TEST_DECL_FN,
+        .fn = run_fixture,
+      },
     }));
   }
-  sp_da_push(decls, sp_zero_s(sp_test_decl_t));
+  sp_da_push(tests, sp_zero_s(sp_test_entry_t));
 
-  sp_test_suite_t suites [] = {
-    { .name = "resolver", .tests = decls, .serial = true },
-    sp_zero,
-  };
-
-  s32 result = sp_test_main(argc, argv, suites);
+  s32 result = sp_test_main(argc, argv, tests);
 
   sp_mem_arena_destroy(arena);
   return result;
