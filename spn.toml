@@ -41,6 +41,7 @@ files = [
   "tools/patches/wamr-darwin-timeb.patch",
   "tools/patches/wamr-win-readdir.patch",
   "tools/patches/wamr-sanitize.patch",
+  "tools/patches/wamr-musl-stack.patch",
 ]
 
 [profile.default]
