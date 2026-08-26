@@ -969,6 +969,12 @@ static s32 spn_toml_edit_splice_sort(const void* a, const void* b) {
   return 0;
 }
 
+static void write_source_range(sp_io_writer_t* out, sp_str_t source, u32 from, u32 to) {
+  if (to > from) {
+    sp_io_write(out, source.data + from, to - from, SP_NULLPTR);
+  }
+}
+
 sp_str_t spn_toml_edit_render(spn_toml_edit_t* edit, sp_mem_t mem) {
   sp_da_sort(edit->splices, spn_toml_edit_splice_sort);
 
@@ -979,11 +985,11 @@ sp_str_t spn_toml_edit_render(spn_toml_edit_t* edit, sp_mem_t mem) {
   sp_da_for(edit->splices, it) {
     spn_toml_edit_splice_t* splice = &edit->splices[it];
     SP_ASSERT(splice->at >= cursor);
-    sp_io_write(&out.base, edit->source.data + cursor, splice->at - cursor, SP_NULLPTR);
+    write_source_range(&out.base, edit->source, cursor, splice->at);
     sp_io_write_str(&out.base, splice->insert, SP_NULLPTR);
     cursor = splice->at + splice->remove;
   }
-  sp_io_write(&out.base, edit->source.data + cursor, edit->source.len - cursor, SP_NULLPTR);
+  write_source_range(&out.base, edit->source, cursor, edit->source.len);
 
   return sp_io_dyn_mem_writer_take_str(&out);
 }
