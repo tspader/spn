@@ -81,15 +81,6 @@ spn_sanitizer_set_t spn_clang_supported_sanitizers(spn_triple_t target) {
   SP_UNREACHABLE_RETURN(0);
 }
 
-// @spader Same hack as the bootstrap CMakeLists: zig cc turns on UBSan traps
-// by default in debug builds, and we have UB to clean up before it can stay on
-static void zig_default_sanitizer_off(const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, spn_cc_flags_t* flags) {
-  if (!sp_str_equal_cstr(toolchain->name, "zig")) return;
-  if (profile->sanitizers) return;
-  sp_da_push(flags->compile, sp_str_lit("-fno-sanitize=undefined"));
-  sp_da_push(flags->link, sp_str_lit("-fno-sanitize=undefined"));
-}
-
 void spn_gnu_render_flags(sp_mem_t mem, const spn_profile_info_t* profile, spn_cc_flags_t* flags) {
   if (profile->mode == SPN_BUILD_MODE_DEBUG) {
     sp_da_push(flags->compile, sp_str_lit("-g"));
@@ -127,7 +118,6 @@ void spn_gnu_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, c
   sp_da_init(mem, flags.compile);
   sp_da_init(mem, flags.link);
   spn_gnu_render_flags(mem, profile, &flags);
-  zig_default_sanitizer_off(toolchain, profile, &flags);
   if (compile->lang == SPN_LANG_C) {
     spn_cc_push_str(mem, invocation, c_standard_to_flag(profile->standard));
   } else if (compile->lang == SPN_LANG_CXX) {
@@ -191,7 +181,6 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
   sp_da_init(mem, flags.compile);
   sp_da_init(mem, flags.link);
   spn_gnu_render_flags(mem, profile, &flags);
-  zig_default_sanitizer_off(toolchain, profile, &flags);
   spn_cc_push_strs(mem, invocation, flags.link);
   switch (link->kind) {
     case SPN_CC_OUTPUT_REACTOR: {
