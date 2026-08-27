@@ -260,7 +260,7 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
   }
   sp_da_for(link->private_libs, it) {
     spn_cc_push_fmt(mem, invocation, "-l{}", sp_fmt_str(link->private_libs[it]));
-    if (profile->os == SPN_OS_WINDOWS) {
+    if (profile->os == SPN_OS_WINDOWS && toolchain->driver != SPN_CC_DRIVER_ZIG) {
       spn_triple_t triple = { profile->arch, profile->os, profile->abi };
       sp_str_t archive = spn_triple_lib_file_name(mem, triple, link->private_libs[it], SP_OS_LIB_STATIC);
       spn_cc_push_fmt(mem, invocation, "-Wl,--exclude-libs,{}", sp_fmt_str(archive));
