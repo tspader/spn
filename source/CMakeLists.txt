@@ -91,6 +91,7 @@ set(SPN_SOURCES
   core/pkg/options.c
   core/pkg/pkg.c
   core/profile/profile.c
+  core/reflect/json.c
   core/resolve/resolve.c
   core/semver/compare.c
   core/semver/convert.c
