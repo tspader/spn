@@ -1,4 +1,4 @@
-#include "sp_sim.h"
+#include "sim.h"
 
 #define SP_SIM_ROOT ((sp_sys_fd_t)-4097)
 #define SP_SIM_FD_BASE ((sp_sys_fd_t)4096)
@@ -69,14 +69,32 @@ static sp_sim_t* sp_sim_syscall(void) {
 
 static bool sp_sim_fail(void) {
   sp_sim_t* sim = sp_sim_active;
-  if (!sim->fault_den) {
-    return false;
-  }
-  sim->fault_state ^= sim->fault_state << 13;
-  sim->fault_state ^= sim->fault_state >> 7;
-  sim->fault_state ^= sim->fault_state << 17;
-  if (sim->fault_state % sim->fault_den) {
-    return false;
+  sim->fail_points++;
+  switch (sim->fault_kind) {
+    case SP_SIM_FAULT_NONE: {
+      return false;
+    }
+    case SP_SIM_FAULT_RANDOM: {
+      sim->fault_state ^= sim->fault_state << 13;
+      sim->fault_state ^= sim->fault_state >> 7;
+      sim->fault_state ^= sim->fault_state << 17;
+      if (sim->fault_state % sim->fault_den) {
+        return false;
+      }
+      break;
+    }
+    case SP_SIM_FAULT_AT: {
+      if (sim->fail_points != sim->fault_next) {
+        return false;
+      }
+      break;
+    }
+    case SP_SIM_FAULT_FROM: {
+      if (sim->fail_points < sim->fault_next) {
+        return false;
+      }
+      break;
+    }
   }
   sim->faults++;
   sp_da_push(sim->fault_log, sim->syscalls);
@@ -1007,8 +1025,27 @@ bool sp_sim_stealth_write(sp_sim_t* sim, sp_str_t path, sp_str_t bytes) {
 void sp_sim_fault_eio(sp_sim_t* sim, u64 seed, u64 denominator) {
   SP_ASSERT(sp_sim_active == sim);
   SP_ASSERT(denominator > 1);
+  sim->fault_kind = SP_SIM_FAULT_RANDOM;
   sim->fault_state = seed ? seed : 1;
   sim->fault_den = denominator;
+  sim->faults = 0;
+  sp_da_clear(sim->fault_log);
+}
+
+void sp_sim_fault_at(sp_sim_t* sim, u64 nth) {
+  SP_ASSERT(sp_sim_active == sim);
+  SP_ASSERT(nth);
+  sim->fault_kind = SP_SIM_FAULT_AT;
+  sim->fault_next = sim->fail_points + nth;
+  sim->faults = 0;
+  sp_da_clear(sim->fault_log);
+}
+
+void sp_sim_fault_from(sp_sim_t* sim, u64 nth) {
+  SP_ASSERT(sp_sim_active == sim);
+  SP_ASSERT(nth);
+  sim->fault_kind = SP_SIM_FAULT_FROM;
+  sim->fault_next = sim->fail_points + nth;
   sim->faults = 0;
   sp_da_clear(sim->fault_log);
 }
@@ -1022,7 +1059,7 @@ void sp_sim_fault_crash(sp_sim_t* sim, u64 after) {
 
 void sp_sim_fault_clear(sp_sim_t* sim) {
   SP_ASSERT(sp_sim_active == sim);
-  sim->fault_den = 0;
+  sim->fault_kind = SP_SIM_FAULT_NONE;
   sim->crash_at = 0;
 }
 

@@ -1,6 +1,6 @@
 #include "dag_test.h"
 #include "dag/stamp.h"
-#include "sp_sim.h"
+#include "sim/sim.h"
 
 #define FENCE_TEST_MAX_OPS 8
 #define FENCE_TEST_TICK_NS 1000000000

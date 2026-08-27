@@ -3,9 +3,9 @@
 
 #include "sp.h"
 
-#include "sp_fuzz.h"
+#include "fuzz/fuzz.h"
 #include "dag/dag.h"
-#include "sp_sim.h"
+#include "sim/sim.h"
 
 typedef struct spn_cg_fuzz_graph spn_cg_fuzz_graph_t;
 
@@ -20,6 +20,7 @@ typedef struct {
 
 s32      sp_fuzz_main(s32 num_args, c8** args, const sp_fuzz_desc_t* desc);
 sp_str_t sp_fuzz_render_path();
+bool     sp_fuzz_sweep();
 sp_str_t sp_fuzz_repro_args(sp_mem_t mem, u64 iter);
 
 const spn_cg_fuzz_graph_t* sp_fuzz_graph();
@@ -40,10 +41,23 @@ typedef enum {
   FZ_ERR_STALE_OUTPUT,
   FZ_ERR_EXEC_MISSING,
   FZ_ERR_EXEC_SPURIOUS,
-  FZ_ERR_MODEL,
+  FZ_ERR_KEY,
   FZ_ERR_SCHEDULE,
   FZ_ERR_COUNT,
 } fz_err_t;
+
+typedef enum {
+  FZ_SWEEP_NONE,
+  FZ_SWEEP_AT,
+  FZ_SWEEP_FROM,
+} fz_sweep_kind_t;
+
+typedef struct {
+  fz_sweep_kind_t kind;
+  u64 run;
+  u64 nth;
+  sp_da(u64)* windows;
+} fz_sweep_t;
 
 typedef enum {
   FZ_STEP_RUN,
@@ -100,13 +114,6 @@ typedef struct {
   u64* contents;
   fz_phantom_t* phantoms;
 } fz_state_t;
-
-typedef enum {
-  FZ_WORLD_CLEAN,
-  FZ_WORLD_STEALTHY,
-  FZ_WORLD_MURKY,
-  FZ_WORLD_TAINTED,
-} fz_world_state_t;
 
 typedef struct {
   bool* file;
@@ -206,20 +213,31 @@ fz_trace_t    fz_gen_trace(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u)
 void             fz_roots_init(spn_path_roots_t* roots);
 void             fz_lower(fz_lowered_t* low, sp_mem_t mem, fz_universe_t* u, const spn_path_roots_t* roots);
 sp_str_t         fz_output_content(sp_mem_t mem, u64 identity, const sp_str_t* inputs, u64 count, sp_str_t name);
-void             fz_expect(sp_mem_t mem, fz_universe_t* u, const fz_state_t* state, sp_str_t* bytes);
 u64              fz_action_inputs(sp_mem_t mem, fz_universe_t* u, const fz_state_t* state, u64 action, const sp_str_t* bytes, sp_str_t** inputs);
-spn_dag_digest_t fz_model_key(fz_universe_t* u, const sp_str_t* bytes, u64 action);
 fz_shape_t       fz_shape_now(sp_mem_t mem, fz_universe_t* u, const fz_state_t* state, u64 action);
-spn_dag_digest_t fz_model_strong(fz_universe_t* u, const fz_state_t* state, const sp_str_t* bytes, spn_dag_digest_t prelim, u64 action, const fz_shape_t* shape);
+spn_dag_digest_t fz_model_weak(sp_mem_t mem, fz_universe_t* u, const sp_str_t* bytes, u64 action);
+u32              fz_model_obs(sp_mem_t mem, fz_universe_t* u, const fz_state_t* state, const sp_str_t* bytes, u64 action, const fz_shape_t* shape, spn_dag_obs_t** obs);
 void             fz_executor_init(fz_executor_t* ex, sp_mem_t mem, sp_sim_t* sim, sp_fuzz_prng_t prng);
 fz_err_t         fz_run_trace(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u, fz_trace_t* trace, fz_journal_t* j);
+fz_err_t         fz_run_sweep(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u, fz_trace_t* trace, fz_journal_t* j);
 
 typedef struct {
   u64 action;
+  spn_dag_digest_t weak;
   spn_dag_digest_t key;
+  spn_dag_digest_t commit;
   bool resolved;
   bool hit;
+  bool certain;
+  bool keyed;
 } fz_predict_row_t;
+
+typedef struct {
+  u64 action;
+  spn_dag_digest_t want;
+  spn_dag_digest_t got;
+  bool ok;
+} fz_key_row_t;
 
 typedef struct {
   u64 action;
@@ -241,10 +259,12 @@ void fz_journal_init(fz_journal_t* j, sp_mem_t mem);
 void fz_journal_universe(fz_journal_t* j, fz_universe_t* u, fz_trace_t* trace, u64 iter);
 void fz_journal_step(fz_journal_t* j, fz_step_t* step, u64 index);
 void fz_journal_run_done(fz_journal_t* j, u64 err, u64 fired, bool crashed);
-void fz_journal_world(fz_journal_t* j, fz_world_state_t world);
-void fz_journal_predict(fz_journal_t* j, const fz_predict_row_t* rows, u64 count);
+void fz_journal_stealth(fz_journal_t* j);
+void fz_journal_sweep(fz_journal_t* j, const fz_sweep_t* sweep);
+void fz_journal_model(fz_journal_t* j, sp_str_t kind, const fz_predict_row_t* rows, u64 count);
 void fz_journal_exec(fz_journal_t* j, u64 action);
 void fz_journal_check_execs(fz_journal_t* j, const fz_exec_row_t* rows, u64 count);
+void fz_journal_check_keys(fz_journal_t* j, const fz_key_row_t* rows, u64 count);
 void fz_journal_check_bytes(fz_journal_t* j, sp_str_t kind, const fz_bytes_row_t* rows, u64 count);
 void fz_journal_blob(fz_journal_t* j, u64 artifact, sp_str_t want, sp_str_t got);
 void fz_journal_drop(fz_journal_t* j, sp_str_t what, sp_str_t path);

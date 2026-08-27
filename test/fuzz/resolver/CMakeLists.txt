@@ -55,7 +55,7 @@ add_executable(fuzz_resolver
   checkers/solve.c
   checkers/units.c
   dump.c
-  ${TEST_TOOLS}/sp_fuzz.c
+  ${TEST_TOOLS}/fuzz/fuzz.c
   ${TEST_TOOLS}/toml.c
 )
 spn_test_binary(fuzz_resolver)

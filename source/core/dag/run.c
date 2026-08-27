@@ -442,7 +442,7 @@ static bool obs_equal(const spn_dag_obs_t* a, const spn_dag_obs_t* b) {
   return a->kind == b->kind && spn_path_equal(a->path, b->path) && sp_str_equal(a->filter, b->filter);
 }
 
-static void canonicalize_observations(sp_da(spn_dag_obs_t) obs) {
+void spn_dag_obs_canonicalize(sp_da(spn_dag_obs_t) obs) {
   if (sp_da_empty(obs)) {
     return;
   }
@@ -506,9 +506,14 @@ static spn_err_t resolve_one(spn_dag_file_cache_t* files, spn_dag_obs_t* o, sp_m
       return membership_digest(spn_path_str(files->roots, mem, o->path), o->filter, &o->meta.digest);
     }
     case SPN_DAG_OBS_ABSENT: {
-      if (!sp_fs_exists(spn_path_str(files->roots, mem, o->path))) {
+      sp_sys_file_meta_t sys = sp_zero;
+      sp_err_t rc = sp_sys_get_path_metadata_s(sp_sys_get_root(0), spn_path_str(files->roots, mem, o->path), &sys);
+      if (rc == SP_ERR_SYS_NOT_FOUND) {
         o->meta = (spn_dag_file_meta_t) sp_zero;
         return SPN_OK;
+      }
+      if (rc) {
+        return SPN_ERR_DAG_STAT;
       }
       break;
     }
@@ -692,7 +697,7 @@ static spn_err_t execute(spn_dag_t* g, spn_dag_attempt_t* attempt, spn_dag_env_t
   }
   switch (action->kind) {
     case SPN_DAG_ACTION_DISCOVERED: {
-      canonicalize_observations(attempt->obs);
+      spn_dag_obs_canonicalize(attempt->obs);
       break;
     }
     case SPN_DAG_ACTION_STATIC:

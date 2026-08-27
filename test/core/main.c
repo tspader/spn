@@ -4,7 +4,7 @@
 #include "sp/queue.h"
 
 #include "spn_test.h"
-#include "sp_sim.h"
+#include "sim/sim.h"
 
 #include "ctx/types.h"
 #include "event/event.h"

@@ -28,3 +28,8 @@ graph = { max_obs = 1000 }
 [profile.soak]
 iterations = 100000
 keep_going = true
+
+[profile.sweep]
+iterations = 16
+sweep = true
+graph = { max_actions = 4, small_actions = 4, max_sources = 4, max_produces = 2, max_phantoms = 2, max_obs = 4 }
