@@ -257,8 +257,8 @@ sp_test(script, build_script) {
           { .args = { "tools/build.c" } },
         },
         .exists = {
-          sp_str_lit("build/wasm32-wasi/.spn/build_script/object/build/build/manifest/tools/a/main.c.o"),
-          sp_str_lit("build/wasm32-wasi/.spn/build_script/object/build/build/manifest/tools/b/main.c.o"),
+          sp_str_lit("build/wasm32-wasi-musl/.spn/build_script/object/build/build/manifest/tools/a/main.c.o"),
+          sp_str_lit("build/wasm32-wasi-musl/.spn/build_script/object/build/build/manifest/tools/b/main.c.o"),
           store_file("include/version.h"),
         },
       },

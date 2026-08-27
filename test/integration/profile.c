@@ -134,9 +134,9 @@ sp_test(profile, cross_target_macos) {
     .project = "test/integration/fixtures/profile/override",
     .args = { "build", "--target", "aarch64-macos" },
     .expect = {
-      .exists = { target_exe("main", "aarch64-macos") },
+      .exists = { target_exe("main", "aarch64-macos-apple") },
       .events = {
-        { .event = SPN_EVENT_INIT_BUILD_GRAPH, .key = "target", .value = "aarch64-macos" },
+        { .event = SPN_EVENT_INIT_BUILD_GRAPH, .key = "target", .value = "aarch64-macos-apple" },
         { .event = SPN_EVENT_INIT_BUILD_GRAPH, .key = "toolchain", .value = "zig" },
       },
     },

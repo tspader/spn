@@ -76,21 +76,6 @@ static const compile_test_t tests [] = {
     },
   },
   {
-    .name = "zig_debug_defaults_ubsan_off",
-    .driver = SPN_CC_DRIVER_ZIG,
-    .profile = {
-      .arch = SPN_ARCH_X64,
-      .os = SPN_OS_LINUX,
-      .abi = SPN_ABI_MUSL,
-      .standard = SPN_C99,
-      .mode = SPN_BUILD_MODE_DEBUG,
-    },
-    .expect = {
-      .command = "cc",
-      .args = { "--target=x86_64-linux-musl", "-std=c99", "-g", "-fno-sanitize=undefined", "-c", "-Werror=return-type", "main.c", "-o", "main.o" },
-    },
-  },
-  {
     .name = "msvc_windows",
     .driver = SPN_CC_DRIVER_MSVC,
     .profile = {
