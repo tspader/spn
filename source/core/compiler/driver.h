@@ -23,6 +23,7 @@ void spn_gnu_render_archive(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, c
 void spn_gnu_render_flags(sp_mem_t mem, const spn_profile_info_t* profile, spn_cc_flags_t* flags);
 spn_sanitizer_set_t spn_gcc_supported_sanitizers(spn_triple_t target);
 spn_sanitizer_set_t spn_clang_supported_sanitizers(spn_triple_t target);
+spn_sanitizer_set_t spn_zig_supported_sanitizers(spn_triple_t target);
 
 void spn_msvc_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_compile_t* compile, spn_invocation_t* invocation);
 void spn_msvc_render_compile_files(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_compile_files_t* files, spn_invocation_t* invocation);

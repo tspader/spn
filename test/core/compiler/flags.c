@@ -13,7 +13,6 @@ typedef struct {
   const c8* name;
   spn_profile_info_t profile;
   spn_cc_driver_t driver;
-  const c8* toolchain;
   flags_expect_t expect;
 } flags_test_t;
 
@@ -107,19 +106,77 @@ static const flags_test_t tests [] = {
     .expect = { .unsupported = SPN_SANITIZER_ADDRESS },
   },
   {
-    .name = "reject_asan_on_zig_musl",
+    .name = "zig_driver_rejects_asan",
     .profile = {
       .arch = SPN_ARCH_X64,
       .os = SPN_OS_LINUX,
       .abi = SPN_ABI_MUSL,
       .sanitizers = SPN_SANITIZER_ADDRESS | SPN_SANITIZER_UNDEFINED,
     },
-    .driver = SPN_CC_DRIVER_CLANG,
-    .toolchain = "zig",
+    .driver = SPN_CC_DRIVER_ZIG,
     .expect = { .unsupported = SPN_SANITIZER_ADDRESS },
   },
   {
-    .name = "allow_ubsan_on_zig_musl",
+    .name = "zig_driver_allows_ubsan_on_windows",
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_GNU,
+      .mode = SPN_BUILD_MODE_DEBUG,
+      .opt = SPN_OPT_LEVEL_0,
+      .sanitizers = SPN_SANITIZER_UNDEFINED,
+    },
+    .driver = SPN_CC_DRIVER_ZIG,
+    .expect = {
+      .compile = { "-g", "-O0", "-fsanitize=undefined", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer" },
+      .link = { "-fsanitize=undefined" },
+    },
+  },
+  {
+    .name = "zig_driver_allows_tsan",
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_MUSL,
+      .mode = SPN_BUILD_MODE_DEBUG,
+      .opt = SPN_OPT_LEVEL_0,
+      .sanitizers = SPN_SANITIZER_THREAD,
+    },
+    .driver = SPN_CC_DRIVER_ZIG,
+    .expect = {
+      .compile = { "-g", "-O0", "-fsanitize=thread", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer" },
+      .link = { "-fsanitize=thread" },
+    },
+  },
+  {
+    .name = "zig_driver_allows_tsan_on_macos",
+    .profile = {
+      .arch = SPN_ARCH_ARM64,
+      .os = SPN_OS_MACOS,
+      .abi = SPN_ABI_APPLE,
+      .mode = SPN_BUILD_MODE_DEBUG,
+      .opt = SPN_OPT_LEVEL_0,
+      .sanitizers = SPN_SANITIZER_THREAD,
+    },
+    .driver = SPN_CC_DRIVER_ZIG,
+    .expect = {
+      .compile = { "-g", "-O0", "-fsanitize=thread", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer" },
+      .link = { "-fsanitize=thread" },
+    },
+  },
+  {
+    .name = "zig_driver_rejects_tsan_on_windows",
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_GNU,
+      .sanitizers = SPN_SANITIZER_THREAD | SPN_SANITIZER_UNDEFINED,
+    },
+    .driver = SPN_CC_DRIVER_ZIG,
+    .expect = { .unsupported = SPN_SANITIZER_THREAD },
+  },
+  {
+    .name = "zig_driver_allows_ubsan",
     .profile = {
       .arch = SPN_ARCH_X64,
       .os = SPN_OS_LINUX,
@@ -128,8 +185,7 @@ static const flags_test_t tests [] = {
       .opt = SPN_OPT_LEVEL_0,
       .sanitizers = SPN_SANITIZER_UNDEFINED,
     },
-    .driver = SPN_CC_DRIVER_CLANG,
-    .toolchain = "zig",
+    .driver = SPN_CC_DRIVER_ZIG,
     .expect = {
       .compile = { "-g", "-O0", "-fsanitize=undefined", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer" },
       .link = { "-fsanitize=undefined" },
@@ -155,9 +211,6 @@ static const flags_test_t tests [] = {
 sp_test_each(render_flags, resolve, flags_test_t, tests, .setup = spn_test_ctx_setup) {
   sp_mem_t mem = sp_test_arena(t);
   spn_cc_toolchain_t toolchain = test_toolchain(it->driver);
-  if (it->toolchain) {
-    toolchain.name = sp_str_view(it->toolchain);
-  }
 
   spn_cc_flags_t flags = sp_zero;
   spn_err_t err = spn_cc_render_flags(mem, &toolchain, &it->profile, &flags);

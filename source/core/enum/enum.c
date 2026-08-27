@@ -75,6 +75,9 @@ spn_cc_driver_t spn_cc_driver_from_str(sp_str_t str) {
   if (sp_str_equal_cstr(str, "msvc")) {
     return SPN_CC_DRIVER_MSVC;
   }
+  if (sp_str_equal_cstr(str, "zig")) {
+    return SPN_CC_DRIVER_ZIG;
+  }
 
   return SPN_CC_DRIVER_NONE;
 }
@@ -92,6 +95,9 @@ sp_str_t spn_cc_driver_to_str(spn_cc_driver_t driver) {
     }
     case SPN_CC_DRIVER_MSVC: {
       return sp_str_lit("msvc");
+    }
+    case SPN_CC_DRIVER_ZIG: {
+      return sp_str_lit("zig");
     }
   }
 

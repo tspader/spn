@@ -206,12 +206,12 @@ static const link_test_t tests [] = {
     },
   },
   {
-    .name = "mingw_subsystem",
+    .name = "windows_gnu_subsystem",
     .driver = SPN_CC_DRIVER_GCC,
     .profile = {
       .arch = SPN_ARCH_X64,
       .os = SPN_OS_WINDOWS,
-      .abi = SPN_ABI_MINGW,
+      .abi = SPN_ABI_GNU,
     },
     .kind = SPN_CC_OUTPUT_EXE,
     .subsystem = SPN_WIN_SUBSYSTEM_WINDOWS,
@@ -391,12 +391,12 @@ static const link_test_t tests [] = {
     },
   },
   {
-    .name = "mingw_shared_def",
+    .name = "windows_gnu_shared_def",
     .driver = SPN_CC_DRIVER_GCC,
     .profile = {
       .arch = SPN_ARCH_X64,
       .os = SPN_OS_WINDOWS,
-      .abi = SPN_ABI_MINGW,
+      .abi = SPN_ABI_GNU,
     },
     .kind = SPN_CC_OUTPUT_SHARED_LIB,
     .exports = "S.def",

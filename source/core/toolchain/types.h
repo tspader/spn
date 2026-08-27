@@ -13,6 +13,7 @@ typedef enum {
   SPN_CC_DRIVER_GCC,
   SPN_CC_DRIVER_CLANG,
   SPN_CC_DRIVER_MSVC,
+  SPN_CC_DRIVER_ZIG,
 } spn_cc_driver_t;
 
 typedef enum {

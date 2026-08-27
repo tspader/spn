@@ -3,7 +3,7 @@
     {
       "name": "zig",
       "version": "0.16.0",
-      "driver": "clang",
+      "driver": "zig",
       "compiler": {
         "program": "zig",
         "args": [
