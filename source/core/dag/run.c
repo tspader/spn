@@ -506,9 +506,14 @@ static spn_err_t resolve_one(spn_dag_file_cache_t* files, spn_dag_obs_t* o, sp_m
       return membership_digest(spn_path_str(files->roots, mem, o->path), o->filter, &o->meta.digest);
     }
     case SPN_DAG_OBS_ABSENT: {
-      if (!sp_fs_exists(spn_path_str(files->roots, mem, o->path))) {
+      sp_sys_file_meta_t sys = sp_zero;
+      sp_err_t rc = sp_sys_get_path_metadata_s(sp_sys_get_root(0), spn_path_str(files->roots, mem, o->path), &sys);
+      if (rc == SP_ERR_SYS_NOT_FOUND) {
         o->meta = (spn_dag_file_meta_t) sp_zero;
         return SPN_OK;
+      }
+      if (rc) {
+        return SPN_ERR_DAG_STAT;
       }
       break;
     }
