@@ -371,11 +371,11 @@ static sp_err_t sp_sim_sys_open(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_
 
   if (!node) {
     if (!(flags & SP_SYS_OPEN_CREATE)) {
-      return SP_ERR_SYS;
+      return SP_ERR_SYS_NOT_FOUND;
     }
     sp_sim_inode_t* parent = sp_sim_find(sp_sim_parent(norm));
     if (!parent || parent->kind != SP_FS_KIND_DIR) {
-      return SP_ERR_SYS;
+      return SP_ERR_SYS_NOT_FOUND;
     }
     node = sp_sim_inode(SP_FS_KIND_FILE);
     sp_sim_insert(norm, node);
@@ -413,7 +413,10 @@ static sp_err_t sp_sim_sys_open_dir(sp_sys_fd_t fd, const c8* path, u32 len, sp_
   c8 norm_buf [SP_PATH_MAX];
   sp_str_t norm = sp_sim_norm(path, len, norm_buf);
   sp_sim_inode_t* node = sp_sim_find(norm);
-  if (!node || node->kind != SP_FS_KIND_DIR) {
+  if (!node) {
+    return SP_ERR_SYS_NOT_FOUND;
+  }
+  if (node->kind != SP_FS_KIND_DIR) {
     return SP_ERR_SYS;
   }
 
@@ -468,7 +471,7 @@ static sp_err_t sp_sim_sys_mkdir(sp_sys_fd_t fd, const c8* path, u32 len, s32 mo
 
   sp_sim_inode_t* parent = sp_sim_find(sp_sim_parent(norm));
   if (!parent || parent->kind != SP_FS_KIND_DIR) {
-    return SP_ERR_SYS;
+    return SP_ERR_SYS_NOT_FOUND;
   }
 
   sp_sim_insert(norm, sp_sim_inode(SP_FS_KIND_DIR));
@@ -484,7 +487,10 @@ static sp_err_t sp_sim_sys_rmdir(sp_sys_fd_t fd, const c8* path, u32 len) {
   c8 buf [SP_PATH_MAX];
   sp_str_t norm = sp_sim_norm(path, len, buf);
   sp_sim_inode_t* node = sp_sim_find(norm);
-  if (!node || node->kind != SP_FS_KIND_DIR || norm.len == 1) {
+  if (!node) {
+    return SP_ERR_SYS_NOT_FOUND;
+  }
+  if (node->kind != SP_FS_KIND_DIR || norm.len == 1) {
     return SP_ERR_SYS;
   }
 
@@ -508,7 +514,10 @@ static sp_err_t sp_sim_sys_unlink(sp_sys_fd_t fd, const c8* path, u32 len) {
   c8 buf [SP_PATH_MAX];
   sp_str_t norm = sp_sim_norm(path, len, buf);
   sp_sim_inode_t* node = sp_sim_find(norm);
-  if (!node || node->kind == SP_FS_KIND_DIR) {
+  if (!node) {
+    return SP_ERR_SYS_NOT_FOUND;
+  }
+  if (node->kind == SP_FS_KIND_DIR) {
     return SP_ERR_SYS;
   }
 
@@ -531,7 +540,7 @@ static sp_err_t sp_sim_sys_rename(sp_sys_fd_t from_fd, const c8* from, u32 from_
 
   sp_sim_inode_t* src = sp_sim_find(from_norm);
   if (!src) {
-    return SP_ERR_SYS;
+    return SP_ERR_SYS_NOT_FOUND;
   }
   if (sp_str_equal(from_norm, to_norm)) {
     return SP_OK;
@@ -543,7 +552,7 @@ static sp_err_t sp_sim_sys_rename(sp_sys_fd_t from_fd, const c8* from, u32 from_
     }
     sp_sim_inode_t* parent = sp_sim_find(sp_sim_parent(to_norm));
     if (!parent || parent->kind != SP_FS_KIND_DIR) {
-      return SP_ERR_SYS;
+      return SP_ERR_SYS_NOT_FOUND;
     }
 
     sp_da(sp_str_t) moved = sp_da_new(sim->mem, sp_str_t);
@@ -577,7 +586,7 @@ static sp_err_t sp_sim_sys_rename(sp_sys_fd_t from_fd, const c8* from, u32 from_
   else {
     sp_sim_inode_t* parent = sp_sim_find(sp_sim_parent(to_norm));
     if (!parent || parent->kind != SP_FS_KIND_DIR) {
-      return SP_ERR_SYS;
+      return SP_ERR_SYS_NOT_FOUND;
     }
   }
 
@@ -600,7 +609,10 @@ static sp_err_t sp_sim_sys_link(sp_sys_fd_t from_fd, const c8* existing, u32 exi
   sp_str_t alias_norm = sp_sim_norm(alias, alias_len, alias_buf);
 
   sp_sim_inode_t* src = sp_sim_find(existing_norm);
-  if (!src || src->kind != SP_FS_KIND_FILE) {
+  if (!src) {
+    return SP_ERR_SYS_NOT_FOUND;
+  }
+  if (src->kind != SP_FS_KIND_FILE) {
     return SP_ERR_SYS;
   }
   if (sp_sim_find(alias_norm)) {
@@ -609,7 +621,7 @@ static sp_err_t sp_sim_sys_link(sp_sys_fd_t from_fd, const c8* existing, u32 exi
 
   sp_sim_inode_t* parent = sp_sim_find(sp_sim_parent(alias_norm));
   if (!parent || parent->kind != SP_FS_KIND_DIR) {
-    return SP_ERR_SYS;
+    return SP_ERR_SYS_NOT_FOUND;
   }
 
   sp_sim_insert(alias_norm, src);
@@ -632,7 +644,7 @@ static sp_err_t sp_sim_sys_get_path_metadata(sp_sys_fd_t fd, const c8* path, u32
   c8 buf [SP_PATH_MAX];
   sp_sim_inode_t* node = sp_sim_find(sp_sim_norm(path, len, buf));
   if (!node) {
-    return SP_ERR_SYS;
+    return SP_ERR_SYS_NOT_FOUND;
   }
   sp_sim_meta(node, st);
   return SP_OK;
@@ -651,7 +663,7 @@ static sp_err_t sp_sim_sys_chmod(sp_sys_fd_t fd, const c8* path, u32 len, const 
   sp_sim_syscall_at(fd);
 
   c8 buf [SP_PATH_MAX];
-  return sp_sim_find(sp_sim_norm(path, len, buf)) ? SP_OK : SP_ERR_SYS;
+  return sp_sim_find(sp_sim_norm(path, len, buf)) ? SP_OK : SP_ERR_SYS_NOT_FOUND;
 }
 
 static sp_err_t sp_sim_sys_clock_gettime(s32 clockid, sp_sys_timespec_t* ts) {
