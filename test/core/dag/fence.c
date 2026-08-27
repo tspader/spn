@@ -10,6 +10,7 @@ typedef enum {
   FENCE_OP_FILE,
   FENCE_OP_STEALTH,
   FENCE_OP_PROBE,
+  FENCE_OP_DIR,
   FENCE_OP_TRUST,
   FENCE_OP_TICK,
   FENCE_OP_REFRESH,
@@ -88,6 +89,29 @@ static const test_t tests [] = {
       { .kind = FENCE_OP_DIGEST, .path = "F", .expect = { .blob = "B" } },
     }
   },
+  {
+    .name = "trip_refresh_records_settled",
+    .ops = {
+      { .kind = FENCE_OP_DIR },
+      { .kind = FENCE_OP_FILE, .path = "F", .blob = "A" },
+      { .kind = FENCE_OP_TICK },
+      { .kind = FENCE_OP_DIGEST, .path = "F", .expect = { .blob = "A" } },
+      { .kind = FENCE_OP_STEALTH, .path = "F", .blob = "B" },
+      { .kind = FENCE_OP_REFRESH },
+      { .kind = FENCE_OP_DIGEST, .path = "F", .expect = { .blob = "A" } },
+    }
+  },
+  {
+    .name = "trip_refresh_skips_open_quantum",
+    .ops = {
+      { .kind = FENCE_OP_DIR },
+      { .kind = FENCE_OP_FILE, .path = "F", .blob = "A" },
+      { .kind = FENCE_OP_DIGEST, .path = "F", .expect = { .blob = "A" } },
+      { .kind = FENCE_OP_STEALTH, .path = "F", .blob = "B" },
+      { .kind = FENCE_OP_REFRESH },
+      { .kind = FENCE_OP_DIGEST, .path = "F", .expect = { .blob = "B" } },
+    }
+  },
 };
 
 sp_test_each(dag_fence, ops, test_t, tests) {
@@ -126,8 +150,12 @@ sp_test_each(dag_fence, ops, test_t, tests) {
       }
       case FENCE_OP_PROBE: {
         sp_sys_timespec_t fence = sp_zero;
-        sp_expect_eq(t, SPN_OK, cache_timestamp_fence(sp_str_lit("/w"), &fence));
+        sp_expect_eq(t, SPN_OK, spn_dag_stamp_probe(sp_str_lit("/w"), &fence));
         spn_dag_file_cache_fence(&files, fence);
+        break;
+      }
+      case FENCE_OP_DIR: {
+        sp_expect_eq(t, SPN_OK, spn_dag_file_cache_fence_dir(&files, sp_str_lit("/w")));
         break;
       }
       case FENCE_OP_TRUST: {

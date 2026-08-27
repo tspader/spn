@@ -70,13 +70,26 @@ sp_str_t spn_dag_file_cache_canonical(spn_dag_file_cache_t* c, sp_str_t path) {
 
 void spn_dag_file_cache_fence(spn_dag_file_cache_t* c, sp_sys_timespec_t fence) {
   sp_mutex_lock(&c->mutex);
-  c->fence = fence;
+  c->stamp = (spn_dag_stamp_t) { .fence = fence };
   sp_mutex_unlock(&c->mutex);
+}
+
+spn_err_t spn_dag_file_cache_fence_dir(spn_dag_file_cache_t* c, sp_str_t dir) {
+  sp_sys_timespec_t fence = sp_zero;
+  spn_try(spn_dag_stamp_probe(dir, &fence));
+
+  sp_mutex_lock(&c->mutex);
+  c->stamp = (spn_dag_stamp_t) {
+    .fence = fence,
+    .dir = sp_str_copy(c->mem, dir)
+  };
+  sp_mutex_unlock(&c->mutex);
+  return SPN_OK;
 }
 
 void spn_dag_file_cache_seed(spn_dag_file_cache_t* c, spn_dag_file_meta_t meta) {
   sp_mutex_lock(&c->mutex);
-  if (is_timestamp_fenced(c->fence, meta.mtime)) {
+  if (spn_dag_stamp_fenced(c->stamp.fence, meta.mtime)) {
     sp_ht_insert(c->entries, meta.id, meta);
   }
   sp_mutex_unlock(&c->mutex);
@@ -173,7 +186,11 @@ spn_err_t spn_dag_file_cache_digest(spn_dag_file_cache_t* c, spn_path_t path, sp
     sp_mutex_unlock(&c->mutex);
     return SPN_OK;
   }
+
+  bool record = false;
+  spn_err_t admitted = spn_dag_stamp_admit(&c->stamp, fresh.mtime, &record);
   sp_mutex_unlock(&c->mutex);
+  spn_try(admitted);
 
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
   u64 size = 0;
@@ -185,14 +202,14 @@ spn_err_t spn_dag_file_cache_digest(spn_dag_file_cache_t* c, spn_path_t path, sp
     sp_atomic_u64_add(&c->stats->hashed_bytes, size, SP_ATOMIC_RELAXED);
   }
 
-  fresh.digest = *digest;
-  sp_mutex_lock(&c->mutex);
-  if (is_timestamp_fenced(c->fence, fresh.mtime)) {
+  if (record) {
+    fresh.digest = *digest;
+    sp_mutex_lock(&c->mutex);
     sp_ht_insert(c->entries, fresh.id, fresh);
     sp_ht_insert(c->hints, spn_path_copy(c->mem, path), fresh);
     c->hints_dirty = true;
+    sp_mutex_unlock(&c->mutex);
   }
-  sp_mutex_unlock(&c->mutex);
   return SPN_OK;
 }
 
@@ -1120,14 +1137,12 @@ spn_err_t spn_dag_run_executor(spn_dag_t* g, spn_dag_env_t* env, spn_thread_pool
 
   sp_str_t scratch = spn_path_str(g->roots, s.mem, spn_path_join(s.mem, env->scratch, sp_str_lit("scratch")));
   sp_fs_create_dir(scratch);
-  sp_sys_timespec_t fence = sp_zero;
   spn_dag_run_t run = {
     .g = g,
     .env = env,
     .ex = ex,
-    .err = cache_timestamp_fence(scratch, &fence),
+    .err = spn_dag_file_cache_fence_dir(env->files, scratch),
   };
-  spn_dag_file_cache_fence(env->files, fence);
   if (run.err) {
     diag_set(&env->diag, run.err, (spn_dag_id_t) sp_zero, sp_str_lit(""));
   }

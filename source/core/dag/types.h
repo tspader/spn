@@ -110,6 +110,11 @@ typedef struct {
 } spn_dag_stats_t;
 
 typedef struct {
+  sp_sys_timespec_t fence;
+  sp_str_t dir;
+} spn_dag_stamp_t;
+
+typedef struct {
   sp_mem_arena_t* arena;
   sp_mem_t mem;
   sp_mutex_t mutex;
@@ -119,7 +124,7 @@ typedef struct {
   sp_ht(spn_path_t, spn_dag_file_meta_t) hints;
   sp_ht(sp_str_t, sp_str_t) canonical;
   bool hints_dirty;
-  sp_sys_timespec_t fence;
+  spn_dag_stamp_t stamp;
   spn_dag_stats_t* stats;
 } spn_dag_file_cache_t;
 
