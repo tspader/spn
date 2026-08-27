@@ -19,10 +19,8 @@
     },
 
     "artifact": {
-      "properties": {
-        "url": { "type": "string" }
-      },
       "optionalProperties": {
+        "url": { "type": "string" },
         "sha256": { "type": "string" }
       }
     },

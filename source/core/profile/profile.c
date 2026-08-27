@@ -133,18 +133,20 @@ void spn_profile_populate(spn_profile_table_t* profiles, spn_pkg_info_t* pkg) {
   }
 }
 
-static spn_abi_t spn_profile_default_abi(sp_str_t toolchain, spn_os_t os, bool shared) {
-  switch (os) {
-    case SPN_OS_WINDOWS: return sp_str_equal_cstr(toolchain, "msvc") ? SPN_ABI_MSVC : SPN_ABI_GNU;
-    case SPN_OS_LINUX:   return shared ? SPN_ABI_GNU : SPN_ABI_MUSL;
-    case SPN_OS_MACOS:
-    case SPN_OS_WASI:
-    case SPN_OS_NONE:    return SPN_ABI_NONE;
-  }
-  SP_UNREACHABLE_RETURN(SPN_ABI_NONE);
+bool spn_profile_shared(const spn_profile_info_t* profile, bool shared_demand) {
+  return profile->linkage == SPN_LIB_KIND_SHARED || (!profile->linkage && shared_demand);
 }
 
-spn_err_t spn_profile_resolve(spn_profile_table_t profiles, const spn_profile_override_t* override, spn_triple_t host, bool is_shared, spn_profile_info_t* result) {
+void spn_profile_finalize(spn_profile_info_t* profile, spn_triple_t triple, bool shared) {
+  profile->arch = triple.arch;
+  profile->os = triple.os;
+  profile->abi = triple.abi;
+  if (!profile->linkage) {
+    profile->linkage = !shared && triple.abi == SPN_ABI_MUSL ? SPN_LIB_KIND_STATIC : SPN_LIB_KIND_SHARED;
+  }
+}
+
+spn_err_t spn_profile_resolve(spn_profile_table_t profiles, const spn_profile_override_t* override, spn_profile_info_t* result) {
   sp_str_t name = select_name(override);
 
   if (sp_str_find_c8(name, '/') >= 0 || sp_str_find_c8(name, '\\') >= 0) {
@@ -175,14 +177,6 @@ spn_err_t spn_profile_resolve(spn_profile_table_t profiles, const spn_profile_ov
 
   spn_triple_t target = { merged.arch, merged.os, merged.abi };
   bool targeted = target.arch || target.os || target.abi;
-  bool shared = merged.linkage == SPN_LIB_KIND_SHARED || (!merged.linkage && is_shared);
-  if (!target.arch) target.arch = host.arch;
-  if (!target.os)   target.os = host.os;
-  if (!target.abi)  target.abi = spn_profile_default_abi(merged.toolchain, target.os, shared);
-
-  if (!merged.linkage) {
-    merged.linkage = !shared && target.abi == SPN_ABI_MUSL ? SPN_LIB_KIND_STATIC : SPN_LIB_KIND_SHARED;
-  }
 
   if (!merged.opt) {
     merged.opt = merged.mode == SPN_BUILD_MODE_RELEASE ? SPN_OPT_LEVEL_2 : SPN_OPT_LEVEL_0;

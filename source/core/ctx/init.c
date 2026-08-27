@@ -24,6 +24,7 @@
 #include "toolchain/catalog.h"
 #include "toolchain/probe.h"
 #include "toolchain/provision.h"
+#include "triple/triple.h"
 #include "version.h"
 
 static sp_str_t join_path(spn_ctx_t* ctx, sp_str_t base, const c8* dir) {
@@ -240,6 +241,8 @@ spn_ctx_t* spn_ctx_new(spn_wake_fn_t wake, void* wake_data) {
   *ctx->env = sp_env_capture(ctx->heap);
   ctx->events = spn_event_buffer_new(ctx->mem);
   ctx->events->wake = &ctx->wake;
+
+  ctx->host = spn_triple_host();
 
   sp_str_t builtins = sp_str((const c8*)toolchains_json, toolchains_json_size);
   sp_assert(spn_toolchain_catalog_init(&ctx->catalog, builtins, ctx->heap) == SPN_OK);

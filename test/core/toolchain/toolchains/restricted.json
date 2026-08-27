@@ -1,0 +1,21 @@
+{
+  "toolchain": [
+    {
+      "name": "A",
+      "driver": "gcc",
+      "compiler": { "program": "A" },
+      "linker":   { "program": "A" },
+      "archiver": { "program": "ar" },
+      "host": {
+        "x86_64-linux": {}
+      }
+    },
+    {
+      "name": "B",
+      "driver": "gcc",
+      "compiler": { "program": "B" },
+      "linker":   { "program": "B" },
+      "archiver": { "program": "ar" }
+    }
+  ]
+}

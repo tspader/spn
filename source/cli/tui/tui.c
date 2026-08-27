@@ -1040,6 +1040,14 @@ static sp_str_t render_event_detail(spn_ctx_t* ctx, sp_mem_t mem, spn_event_t* e
           );
           break;
         }
+        case SPN_ERR_TARGET_ABI: {
+          sp_fmt_io(
+            &w.base,
+            "cross target {.yellow} needs an abi; pass --abi or add it to --target",
+            sp_fmt_str(spn_triple_to_str(mem, event->err.completion.target))
+          );
+          break;
+        }
         case SPN_ERR_TOOLCHAIN_SCRIPT_TARGET: {
           sp_fmt_io(
             &w.base,
@@ -1062,7 +1070,7 @@ static sp_str_t render_event_detail(spn_ctx_t* ctx, sp_mem_t mem, spn_event_t* e
           sp_str_t host = spn_triple_to_str(mem, event->err.toolchain.host);
           sp_fmt_io(
             &w.base,
-            "toolchain {} isn't distributed for host {.yellow}",
+            "toolchain {} isn't available on host {.yellow}",
             sp_fmt_str(get_colored_name(mem, event->err.toolchain.name)),
             sp_fmt_str(host)
           );
@@ -1448,11 +1456,40 @@ static void render_event_extra(sp_io_writer_t* w, spn_event_t* event) {
         }
         case SPN_ERR_TOOLCHAIN_TARGET:
         case SPN_ERR_TOOLCHAIN_SCRIPT_TARGET: {
+          sp_da_for(event->err.toolchain.targets, it) {
+            sp_io_write_str(w, it ? sp_str_lit(", ") : sp_str_lit("it can target: "), SP_NULLPTR);
+            sp_fmt_io(w, "{.yellow}", sp_fmt_str(event->err.toolchain.targets[it]));
+          }
+          if (!sp_da_empty(event->err.toolchain.targets)) {
+            sp_io_write_c8(w, '\n');
+          }
           sp_da_for(event->err.toolchain.candidates, it) {
             sp_io_write_str(w, it ? sp_str_lit(", ") : sp_str_lit("toolchains that can: "), SP_NULLPTR);
             sp_fmt_io(w, "{.green}", sp_fmt_str(event->err.toolchain.candidates[it]));
           }
           if (!sp_da_empty(event->err.toolchain.candidates)) {
+            sp_io_write_c8(w, '\n');
+          }
+          break;
+        }
+        case SPN_ERR_TOOLCHAIN_HOST:
+        case SPN_ERR_TOOLCHAIN_UNKNOWN:
+        case SPN_ERR_TOOLCHAIN_NONE: {
+          sp_da_for(event->err.toolchain.candidates, it) {
+            sp_io_write_str(w, it ? sp_str_lit(", ") : sp_str_lit("toolchains that can: "), SP_NULLPTR);
+            sp_fmt_io(w, "{.green}", sp_fmt_str(event->err.toolchain.candidates[it]));
+          }
+          if (!sp_da_empty(event->err.toolchain.candidates)) {
+            sp_io_write_c8(w, '\n');
+          }
+          break;
+        }
+        case SPN_ERR_TARGET_ABI: {
+          sp_da_for(event->err.completion.candidates, it) {
+            sp_io_write_str(w, it ? sp_str_lit(", ") : sp_str_lit("one of: "), SP_NULLPTR);
+            sp_fmt_io(w, "{.green}", sp_fmt_str(event->err.completion.candidates[it]));
+          }
+          if (!sp_da_empty(event->err.completion.candidates)) {
             sp_io_write_c8(w, '\n');
           }
           break;

@@ -19,6 +19,7 @@
 #include "pkg/pkg.h"
 #include "pkg/options.h"
 #include "profile/profile.h"
+#include "toolchain/select.h"
 #include "toolchain/toolchain.h"
 #include "triple/triple.h"
 
@@ -109,7 +110,7 @@ spn_err_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem, spn_p
   s->config = config;
   s->paths.root = spn_path_from_root(SPN_PATH_ROOT_PROJECT);
   s->paths.build = spn_path_join(s->mem, s->paths.root, sp_str_lit("build"));
-  spn_triple_t host = spn_triple_host();
+  spn_triple_t host = ctx->host;
 
   sp_str_ht_init(s->mem, s->profiles);
   spn_profile_populate(&s->profiles, root);
@@ -125,7 +126,18 @@ spn_err_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem, spn_p
   sp_om_new(s->units.targets);
   sp_om_new(s->units.objects);
 
-  spn_try(spn_profile_resolve(s->profiles, &config.profile, host, is_shared_linkage(root), &s->profile));
+  spn_try(spn_profile_resolve(s->profiles, &config.profile, &s->profile));
+
+  bool shared = spn_profile_shared(&s->profile, is_shared_linkage(root));
+  spn_toolchain_resolution_t resolution = sp_zero;
+  spn_try(spn_toolchain_select(&ctx->catalog, (spn_toolchain_query_t) {
+    .name = s->profile.toolchain,
+    .target = { s->profile.arch, s->profile.os, s->profile.abi },
+    .host = host,
+    .role = SPN_TOOLCHAIN_ROLE_BUILD,
+    .shared = shared,
+  }, s->mem, &resolution));
+  spn_profile_finalize(&s->profile, resolution.triple, shared);
 
   switch (s->profile.os) {
     case SPN_OS_MACOS: {
@@ -177,7 +189,7 @@ void spn_session_export_toolchain_env(spn_session_t* s) {
   sp_env_insert(&s->env, sp_str_lit("CC"), spn_toolchain_launcher_to_str(&spn.roots, s->mem, toolchain->cc.compiler));
   sp_env_insert(&s->env, sp_str_lit("AR"), spn_toolchain_launcher_to_str(&spn.roots, s->mem, toolchain->cc.archiver));
   sp_env_insert(&s->env, sp_str_lit("LD"), spn_toolchain_launcher_to_str(&spn.roots, s->mem, toolchain->cc.linker));
-  if (spn_toolchain_has_cxx(toolchain->info)) {
+  if (!spn_arg_empty(toolchain->cc.cxx.program)) {
     sp_env_insert(&s->env, sp_str_lit("CXX"), spn_toolchain_launcher_to_str(&spn.roots, s->mem, toolchain->cc.cxx));
   }
 }

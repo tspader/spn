@@ -3,11 +3,10 @@ name = "p"
 version = "1.0.0"
 
 [[toolchain]]
-name = "zig"
-compiler = "zig cc"
-linker = "zig cc"
+name = "pin"
+compiler = "cc"
+linker = "cc"
 archiver = "ar"
-driver = "clang"
+driver = "gcc"
 
 [toolchain.host.x86_64-linux]
-url = "https://tc"

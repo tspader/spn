@@ -75,6 +75,7 @@ typedef struct {
   const c8* cxx;
   const c8* cxx_args [8];
   spn_cc_driver_t driver;
+  spn_triple_t hosts [2];
   spn_triple_t targets [4];
 } toolchain_t;
 
@@ -428,11 +429,60 @@ static const test_t tests [] = {
     }
   },
   {
+    .name = "validate_toolchain_target_abi",
+    .manifest = "toolchain_target_abi",
+    .issues = {
+      { SPN_ERR_CODEGEN_MISSING_KEY, "toolchain[0].target[0].abi" }
+    }
+  },
+  {
+    .name = "validate_toolchain_target_os",
+    .manifest = "toolchain_target_os",
+    .issues = {
+      { SPN_ERR_CODEGEN_MISSING_KEY, "toolchain[0].target[0].os" }
+    }
+  },
+  {
     .name = "validate_toolchain_url_without_sha",
     .manifest = "toolchain_no_sha",
     .issues = {
       { SPN_ERR_CODEGEN_MISSING_KEY, "toolchain[0].sha256" }
     }
+  },
+  {
+    .name = "validate_toolchain_sha_without_url",
+    .manifest = "toolchain_sha_without_url",
+    .issues = {
+      { SPN_ERR_CODEGEN_MISSING_KEY, "toolchain[0].url" }
+    }
+  },
+  {
+    .name = "validate_toolchain_host_invalid",
+    .manifest = "toolchain_host_invalid",
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].host" }
+    }
+  },
+  {
+    .name = "validate_toolchain_target_foreign_abi",
+    .manifest = "toolchain_target_foreign_abi",
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].target[0].abi" }
+    }
+  },
+  {
+    .name = "toolchain_host_restriction",
+    .manifest = "toolchain_host_pin",
+    .toolchains = {
+      {
+        .name = "pin",
+        .compiler = "cc",
+        .linker = "cc",
+        .archiver = "ar",
+        .driver = SPN_CC_DRIVER_GCC,
+        .hosts = { { SPN_ARCH_X64, SPN_OS_LINUX } },
+      },
+    },
   },
   {
     .name = "validate_duplicate_name",
@@ -557,7 +607,7 @@ static const test_t tests [] = {
         .linker = "zig",
         .archiver = "ar",
         .driver = SPN_CC_DRIVER_CLANG,
-        .targets = { { SPN_ARCH_ARM64, SPN_OS_MACOS } },
+        .targets = { { SPN_ARCH_ARM64, SPN_OS_MACOS, SPN_ABI_APPLE } },
       },
     },
   },
@@ -1142,6 +1192,15 @@ sp_test_each(lower, cases, test_t, tests) {
       sp_expect_eq(t, (u32)triple.arch, (u32)tc->targets[r].arch);
       sp_expect_eq(t, (u32)triple.os, (u32)tc->targets[r].os);
       sp_expect_eq(t, (u32)triple.abi, (u32)tc->targets[r].abi);
+    }
+
+    sp_carr_for(expected.hosts, r) {
+      spn_triple_t triple = expected.hosts[r];
+      if (triple.arch == SPN_ARCH_NONE) break;
+      sp_must(t, r < sp_da_size(tc->hosts));
+      sp_expect_eq(t, (u32)triple.arch, (u32)tc->hosts[r].triple.arch);
+      sp_expect_eq(t, (u32)triple.os, (u32)tc->hosts[r].triple.os);
+      sp_expect_eq(t, (u32)triple.abi, (u32)tc->hosts[r].triple.abi);
     }
   }
 

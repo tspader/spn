@@ -1,0 +1,11 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[[toolchain]]
+name = "cross"
+compiler = "cc"
+linker = "ld"
+archiver = "ar"
+driver = "gcc"
+target = [{ arch = "x86_64", os = "macos", abi = "gnu" }]
