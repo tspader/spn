@@ -1,7 +1,7 @@
 #include "fuzz.h"
 #include "sp/io.h"
 
-static void fz_line(sp_io_writer_t* io, sp_str_t line) {
+static void line(sp_io_writer_t* io, sp_str_t line) {
   sp_io_write_str(io, line, SP_NULLPTR);
   sp_io_write_c8(io, '\n');
 }
@@ -91,13 +91,13 @@ sp_str_t fz_render_iteration(sp_mem_t mem, sp_str_t root, fz_universe_t* u, fz_t
 
   sp_io_file_writer_t repro = sp_zero;
   if (!sp_io_file_writer_from_path(&repro, sp_fs_join_path(mem, dir, sp_str_lit("repro")))) {
-    fz_line(&repro.base, sp_fuzz_repro_args(mem, iter));
+    line(&repro.base, sp_fuzz_repro_args(mem, iter));
     sp_io_file_writer_close(&repro);
   }
 
   sp_io_file_writer_t graph = sp_zero;
   if (!sp_io_file_writer_from_path(&graph, sp_fs_join_path(mem, dir, sp_str_lit("graph.mmd")))) {
-    fz_line(&graph.base, sp_fmt(mem, "%% iter {}: {} actions, {} artifacts{}{}{}",
+    line(&graph.base, sp_fmt(mem, "%% iter {}: {} actions, {} artifacts{}{}{}",
       sp_fmt_uint(iter),
       sp_fmt_uint(sp_da_size(u->actions)),
       sp_fmt_uint(sp_da_size(u->artifacts)),
@@ -114,51 +114,51 @@ sp_str_t fz_render_iteration(sp_mem_t mem, sp_str_t root, fz_universe_t* u, fz_t
       fz_step_t* step = &trace->steps[st];
       switch (step->kind) {
         case FZ_STEP_RUN: {
-          fz_line(&steps.base, sp_str_lit("run"));
+          line(&steps.base, sp_str_lit("run"));
           break;
         }
         case FZ_STEP_MUTATE: {
-          fz_line(&steps.base, sp_fmt(mem, "mutate f{} c{}", sp_fmt_uint(step->artifact), sp_fmt_uint(step->content)).value);
+          line(&steps.base, sp_fmt(mem, "mutate f{} c{}", sp_fmt_uint(step->artifact), sp_fmt_uint(step->content)).value);
           break;
         }
         case FZ_STEP_TOUCH: {
-          fz_line(&steps.base, sp_fmt(mem, "touch f{}", sp_fmt_uint(step->artifact)).value);
+          line(&steps.base, sp_fmt(mem, "touch f{}", sp_fmt_uint(step->artifact)).value);
           break;
         }
         case FZ_STEP_REVERT: {
-          fz_line(&steps.base, sp_fmt(mem, "revert f{} c{}", sp_fmt_uint(step->artifact), sp_fmt_uint(step->content)).value);
+          line(&steps.base, sp_fmt(mem, "revert f{} c{}", sp_fmt_uint(step->artifact), sp_fmt_uint(step->content)).value);
           break;
         }
         case FZ_STEP_STEALTH: {
-          fz_line(&steps.base, sp_fmt(mem, "stealth f{} c{}", sp_fmt_uint(step->artifact), sp_fmt_uint(step->content)).value);
+          line(&steps.base, sp_fmt(mem, "stealth f{} c{}", sp_fmt_uint(step->artifact), sp_fmt_uint(step->content)).value);
           break;
         }
         case FZ_STEP_DELETE: {
-          fz_line(&steps.base, sp_fmt(mem, "delete f{}", sp_fmt_uint(step->artifact)).value);
+          line(&steps.base, sp_fmt(mem, "delete f{}", sp_fmt_uint(step->artifact)).value);
           break;
         }
         case FZ_STEP_PHANTOM: {
-          fz_line(&steps.base, sp_fmt(mem, "phantom g{} c{}", sp_fmt_uint(step->artifact), sp_fmt_uint(step->content)).value);
+          line(&steps.base, sp_fmt(mem, "phantom g{} c{}", sp_fmt_uint(step->artifact), sp_fmt_uint(step->content)).value);
           break;
         }
         case FZ_STEP_DISCOVERY: {
-          fz_line(&steps.base, sp_str_lit("discovery"));
+          line(&steps.base, sp_str_lit("discovery"));
           break;
         }
         case FZ_STEP_EIO: {
-          fz_line(&steps.base, sp_fmt(mem, "eio 1/{}", sp_fmt_uint(step->rate)).value);
+          line(&steps.base, sp_fmt(mem, "eio 1/{}", sp_fmt_uint(step->rate)).value);
           break;
         }
         case FZ_STEP_CRASH: {
-          fz_line(&steps.base, sp_str_lit("crash"));
+          line(&steps.base, sp_str_lit("crash"));
           break;
         }
         case FZ_STEP_BLOB: {
-          fz_line(&steps.base, sp_str_lit("blob"));
+          line(&steps.base, sp_str_lit("blob"));
           break;
         }
         case FZ_STEP_EVICT: {
-          fz_line(&steps.base, sp_str_lit("evict"));
+          line(&steps.base, sp_str_lit("evict"));
           break;
         }
         case FZ_STEP_COUNT: {

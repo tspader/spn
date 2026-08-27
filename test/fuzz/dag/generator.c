@@ -22,16 +22,16 @@ sp_str_t fz_phantom_sim_path(sp_mem_t mem, u64 phantom) {
   return sp_fmt(mem, "/{}", sp_fmt_str(fz_phantom_path(mem, phantom))).value;
 }
 
-#define fz_limit(knob, fallback) (sp_opt_is_null(knob) ? (u64)(fallback) : sp_max(sp_opt_get(knob), (u64)1))
+#define limit(knob, fallback) (sp_opt_is_null(knob) ? (u64)(fallback) : sp_max(sp_opt_get(knob), (u64)1))
 
 fz_limits_t fz_gen_limits(const spn_cg_fuzz_graph_t* graph) {
   return (fz_limits_t) {
-    .actions = fz_limit(graph->max_actions, 128),
-    .small_actions = fz_limit(graph->small_actions, 8),
-    .sources = fz_limit(graph->max_sources, 16),
-    .produces = fz_limit(graph->max_produces, 3),
-    .phantoms = fz_limit(graph->max_phantoms, 4),
-    .obs = fz_limit(graph->max_obs, 8),
+    .actions = limit(graph->max_actions, 128),
+    .small_actions = limit(graph->small_actions, 8),
+    .sources = limit(graph->max_sources, 16),
+    .produces = limit(graph->max_produces, 3),
+    .phantoms = limit(graph->max_phantoms, 4),
+    .obs = limit(graph->max_obs, 8),
   };
 }
 
@@ -75,11 +75,11 @@ fz_profile_t fz_gen_profile(sp_fuzz_prng_t* prng, fz_limits_t limits) {
   return profile;
 }
 
-static u64 fz_pick_content(sp_fuzz_prng_t* prng, fz_profile_t* profile) {
+static u64 pick_content(sp_fuzz_prng_t* prng, fz_profile_t* profile) {
   return sp_fuzz_below(prng, profile->content_count);
 }
 
-static s64 fz_obs_producer(fz_universe_t* u, u64 action, fz_obs_t obs) {
+static s64 obs_producer(fz_universe_t* u, u64 action, fz_obs_t obs) {
   if (obs.probe) {
     return -1;
   }
@@ -87,7 +87,7 @@ static s64 fz_obs_producer(fz_universe_t* u, u64 action, fz_obs_t obs) {
   return producer == (s64)action ? -1 : producer;
 }
 
-static sp_da(u64) fz_topo(sp_mem_t mem, fz_universe_t* u, bool obs) {
+static sp_da(u64) topo(sp_mem_t mem, fz_universe_t* u, bool obs) {
   u64 actions = sp_da_size(u->actions);
   u64* degree = sp_alloc_n(mem, u64, actions ? actions : 1);
   sp_mem_zero(degree, actions * sizeof(u64));
@@ -107,7 +107,7 @@ static sp_da(u64) fz_topo(sp_mem_t mem, fz_universe_t* u, bool obs) {
     }
     if (obs) {
       sp_da_for(action->obs, ot) {
-        s64 producer = fz_obs_producer(u, at, action->obs[ot]);
+        s64 producer = obs_producer(u, at, action->obs[ot]);
         if (producer >= 0) {
           sp_da_push(dependents[producer], at);
           degree[at]++;
@@ -143,14 +143,14 @@ fz_universe_t fz_gen_universe(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_profile_t p
   sp_for(it, profile.value_count) {
     sp_da_push(u.artifacts, ((fz_artifact_t) {
       .kind = FZ_ARTIFACT_VALUE,
-      .content = fz_pick_content(prng, &profile),
+      .content = pick_content(prng, &profile),
       .producer = -1,
     }));
   }
   sp_for(it, profile.source_count) {
     sp_da_push(u.artifacts, ((fz_artifact_t) {
       .kind = FZ_ARTIFACT_SOURCE,
-      .content = fz_pick_content(prng, &profile),
+      .content = pick_content(prng, &profile),
       .producer = -1,
     }));
   }
@@ -239,8 +239,8 @@ fz_universe_t fz_gen_universe(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_profile_t p
     }
   }
 
-  u.cyclic = sp_da_size(fz_topo(mem, &u, false)) < sp_da_size(u.actions);
-  u.order = fz_topo(mem, &u, true);
+  u.cyclic = sp_da_size(topo(mem, &u, false)) < sp_da_size(u.actions);
+  u.order = topo(mem, &u, true);
   u.obs_cyclic = sp_da_size(u.order) < sp_da_size(u.actions);
   if (!profile.back_density) {
     sp_assert(!u.cyclic);
@@ -266,7 +266,7 @@ fz_trace_t fz_gen_trace(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u) {
       case FZ_STEP_MUTATE: {
         u64 source = sp_fuzz_below(prng, profile->source_count);
         step.artifact = profile->value_count + source;
-        step.content = fz_pick_content(prng, profile);
+        step.content = pick_content(prng, profile);
         sp_da_push(history[source], step.content);
         break;
       }
@@ -300,7 +300,7 @@ fz_trace_t fz_gen_trace(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u) {
       }
       case FZ_STEP_PHANTOM: {
         step.artifact = sp_fuzz_below(prng, profile->limits.phantoms);
-        step.content = fz_pick_content(prng, profile);
+        step.content = pick_content(prng, profile);
         break;
       }
       case FZ_STEP_EIO: {

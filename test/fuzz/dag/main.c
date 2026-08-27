@@ -16,18 +16,18 @@ sp_str_t fz_err_to_str(fz_err_t err) {
     case FZ_ERR_STALE_OUTPUT: return sp_str_lit("an output's bytes diverge from the model");
     case FZ_ERR_EXEC_MISSING: return sp_str_lit("an action hit the cache where the model expected execution");
     case FZ_ERR_EXEC_SPURIOUS: return sp_str_lit("an action executed where the model expected a cache hit");
-    case FZ_ERR_MODEL:        return sp_str_lit("cache mirror bytes diverge from the clean model in a world without stealth writes");
+    case FZ_ERR_KEY:          return sp_str_lit("a dag key diverges from the model");
     case FZ_ERR_SCHEDULE:     return sp_str_lit("a schedule reseed changed output bytes");
     case FZ_ERR_COUNT:        break;
   }
   sp_unreachable_return(sp_str_lit("unknown"));
 }
 
-static sp_str_t fz_err_str(u32 err) {
+static sp_str_t err_str(u32 err) {
   return fz_err_to_str((fz_err_t)err);
 }
 
-static void fz_write_failure(sp_mem_t mem, sp_str_t dir, fz_err_t err, u64 iter) {
+static void write_failure(sp_mem_t mem, sp_str_t dir, fz_err_t err, u64 iter) {
   sp_io_file_writer_t out = sp_zero;
   if (sp_io_file_writer_from_path(&out, sp_fs_join_path(mem, dir, sp_str_lit("failure.json")))) {
     return;
@@ -38,8 +38,12 @@ static void fz_write_failure(sp_mem_t mem, sp_str_t dir, fz_err_t err, u64 iter)
   sp_io_file_writer_close(&out);
 }
 
-static u32 fz_run_iteration(sp_mem_t mem, sp_fuzz_prng_t prng, u64 iter) {
+static u32 run_iteration(sp_mem_t mem, sp_fuzz_prng_t prng, u64 iter) {
   fz_profile_t profile = fz_gen_profile(&prng, fz_gen_limits(sp_fuzz_graph()));
+  if (sp_fuzz_sweep()) {
+    profile.step_weights[FZ_STEP_EIO] = 0;
+    profile.step_weights[FZ_STEP_CRASH] = 0;
+  }
   fz_universe_t universe = fz_gen_universe(mem, &prng, profile);
   fz_trace_t trace = fz_gen_trace(mem, &prng, &universe);
 
@@ -54,7 +58,9 @@ static u32 fz_run_iteration(sp_mem_t mem, sp_fuzz_prng_t prng, u64 iter) {
     j = &journal;
   }
 
-  fz_err_t err = fz_run_trace(mem, &prng, &universe, &trace, j);
+  fz_err_t err = sp_fuzz_sweep() && !universe.cyclic && !universe.obs_cyclic
+    ? fz_run_sweep(mem, &prng, &universe, &trace, j)
+    : fz_run_trace(mem, &prng, &universe, &trace, j);
 
   if (j) {
     fz_journal_done(j, err);
@@ -64,7 +70,7 @@ static u32 fz_run_iteration(sp_mem_t mem, sp_fuzz_prng_t prng, u64 iter) {
       sp_io_file_writer_close(&out);
     }
     if (err) {
-      fz_write_failure(mem, dir, err, iter);
+      write_failure(mem, dir, err, iter);
     }
   }
 
@@ -77,8 +83,8 @@ s32 main(s32 num_args, c8** args) {
     .summary = "Deterministic fuzzer for the content-addressed DAG",
     .iters = 512,
     .errs = FZ_ERR_COUNT,
-    .err_str = fz_err_str,
-    .run = fz_run_iteration,
+    .err_str = err_str,
+    .run = run_iteration,
   };
   return sp_fuzz_main(num_args, args, &desc);
 }

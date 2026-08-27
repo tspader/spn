@@ -371,6 +371,7 @@ source = [
   "test/fuzz/dag/render.c",
   "test/fuzz/dag/trace.c",
   "test/tools/sp_sim.c",
+  "test/tools/sp_dag_track.c",
   "test/tools/sp_fuzz.c",
   "test/tools/toml.c",
 ]

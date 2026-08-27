@@ -11,6 +11,7 @@
         "iteration": { "type": "uint64" },
         "seed": { "type": "uint64" },
         "keep_going": { "type": "boolean" },
+        "sweep": { "type": "boolean" },
         "render": { "type": "string" },
         "graph": { "ref": "fuzz_graph" }
       }

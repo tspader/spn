@@ -22,65 +22,74 @@ typedef struct {
   const c8* profile;
   const c8* render;
   bool keep_going;
+  bool sweep;
   bool dry_run;
   bool list_profiles;
   s32 status;
-} sp_fuzz_cli_t;
+} cli_t;
 
 typedef struct {
   sp_prompt_ctx_t* ctx;
   sp_app_t app;
   bool on;
-} sp_fuzz_prompt_t;
+} prompt_t;
 
 static struct {
   const c8* config;
   const c8* profile;
   bool keep_going;
+  bool sweep;
   sp_str_t render;
   spn_cg_fuzz_graph_t graph;
-} sp_fuzz_cli_state;
+} cli_state;
 
 sp_str_t sp_fuzz_render_path() {
-  return sp_fuzz_cli_state.render;
+  return cli_state.render;
+}
+
+bool sp_fuzz_sweep() {
+  return cli_state.sweep;
 }
 
 const spn_cg_fuzz_graph_t* sp_fuzz_graph() {
-  return &sp_fuzz_cli_state.graph;
+  return &cli_state.graph;
 }
 
-static sp_err_t sp_fuzz_fmt_hex(sp_io_writer_t* io, sp_fmt_arg_t* arg) {
+static sp_err_t fmt_hex(sp_io_writer_t* io, sp_fmt_arg_t* arg) {
   return sp_fmt_write_u64_ex(io, arg->value.u, SP_FMT_RADIX_HEX);
 }
 
-static void sp_fuzz_repro_common(sp_io_writer_t* io) {
-  if (sp_fuzz_cli_state.config) {
-    sp_fmt_io(io, "--config {} ", sp_fmt_cstr(sp_fuzz_cli_state.config));
+static void repro_common(sp_io_writer_t* io) {
+  if (cli_state.config) {
+    sp_fmt_io(io, "--config {} ", sp_fmt_cstr(cli_state.config));
   }
-  if (sp_fuzz_cli_state.profile) {
-    sp_fmt_io(io, "--profile {} ", sp_fmt_cstr(sp_fuzz_cli_state.profile));
+  if (cli_state.profile) {
+    sp_fmt_io(io, "--profile {} ", sp_fmt_cstr(cli_state.profile));
   }
-  sp_fmt_io(io, "--seed 0x{}", sp_fmt_u64_custom(sp_fuzz_seed_get(), sp_fuzz_fmt_hex));
-  if (sp_fuzz_cli_state.keep_going) {
+  sp_fmt_io(io, "--seed 0x{}", sp_fmt_u64_custom(sp_fuzz_seed_get(), fmt_hex));
+  if (cli_state.keep_going) {
     sp_fmt_io(io, " --keep-going");
   }
-  if (!sp_str_empty(sp_fuzz_cli_state.render)) {
-    sp_fmt_io(io, " --render {}", sp_fmt_str(sp_fuzz_cli_state.render));
+  if (cli_state.sweep) {
+    sp_fmt_io(io, " --sweep");
+  }
+  if (!sp_str_empty(cli_state.render)) {
+    sp_fmt_io(io, " --render {}", sp_fmt_str(cli_state.render));
   }
 }
 
 sp_str_t sp_fuzz_repro_args(sp_mem_t mem, u64 iter) {
   sp_io_dyn_mem_writer_t out;
   sp_io_dyn_mem_writer_init(mem, &out);
-  sp_fuzz_repro_common(&out.base);
+  repro_common(&out.base);
   sp_fmt_io(&out.base, " --iter {}", sp_fmt_uint(iter));
   return sp_io_dyn_mem_writer_as_str(&out);
 }
 
-static sp_str_t sp_fuzz_params(sp_mem_t mem, sp_fuzz_opts_t opts) {
+static sp_str_t params(sp_mem_t mem, sp_fuzz_opts_t opts) {
   sp_io_dyn_mem_writer_t out;
   sp_io_dyn_mem_writer_init(mem, &out);
-  sp_fuzz_repro_common(&out.base);
+  repro_common(&out.base);
   if (opts.only >= 0) {
     sp_fmt_io(&out.base, " --iter {}", sp_fmt_uint((u64)opts.only));
   }
@@ -90,7 +99,7 @@ static sp_str_t sp_fuzz_params(sp_mem_t mem, sp_fuzz_opts_t opts) {
   return sp_io_dyn_mem_writer_as_str(&out);
 }
 
-static const spn_cg_fuzz_profile_t* sp_fuzz_find_profile(const spn_cg_fuzz_t* cfg, sp_str_t name) {
+static const spn_cg_fuzz_profile_t* find_profile(const spn_cg_fuzz_t* cfg, sp_str_t name) {
   sp_da_for(cfg->profile, it) {
     if (sp_str_equal(cfg->profile[it].key, name)) {
       return &cfg->profile[it].value;
@@ -99,7 +108,7 @@ static const spn_cg_fuzz_profile_t* sp_fuzz_find_profile(const spn_cg_fuzz_t* cf
   return SP_NULLPTR;
 }
 
-static sp_str_t sp_fuzz_profile_names(sp_mem_t mem, const spn_cg_fuzz_t* cfg) {
+static sp_str_t profile_names(sp_mem_t mem, const spn_cg_fuzz_t* cfg) {
   sp_io_dyn_mem_writer_t out;
   sp_io_dyn_mem_writer_init(mem, &out);
   sp_da_for(cfg->profile, it) {
@@ -108,41 +117,42 @@ static sp_str_t sp_fuzz_profile_names(sp_mem_t mem, const spn_cg_fuzz_t* cfg) {
   return sp_io_dyn_mem_writer_as_str(&out);
 }
 
-#define sp_fuzz_overlay_opt(dst, src, field) \
+#define overlay_opt(dst, src, field) \
   do { \
     if (!sp_opt_is_null((src)->field)) { \
       (dst)->field = (src)->field; \
     } \
   } while (0)
 
-static void sp_fuzz_overlay_profile(spn_cg_fuzz_profile_t* dst, const spn_cg_fuzz_profile_t* src) {
-  sp_fuzz_overlay_opt(dst, src, iterations);
-  sp_fuzz_overlay_opt(dst, src, iteration);
-  sp_fuzz_overlay_opt(dst, src, seed);
-  sp_fuzz_overlay_opt(dst, src, keep_going);
+static void overlay_profile(spn_cg_fuzz_profile_t* dst, const spn_cg_fuzz_profile_t* src) {
+  overlay_opt(dst, src, iterations);
+  overlay_opt(dst, src, iteration);
+  overlay_opt(dst, src, seed);
+  overlay_opt(dst, src, keep_going);
+  overlay_opt(dst, src, sweep);
   if (!sp_str_empty(src->render)) {
     dst->render = src->render;
   }
-  sp_fuzz_overlay_opt(&dst->graph, &src->graph, max_actions);
-  sp_fuzz_overlay_opt(&dst->graph, &src->graph, small_actions);
-  sp_fuzz_overlay_opt(&dst->graph, &src->graph, max_sources);
-  sp_fuzz_overlay_opt(&dst->graph, &src->graph, max_produces);
-  sp_fuzz_overlay_opt(&dst->graph, &src->graph, max_phantoms);
-  sp_fuzz_overlay_opt(&dst->graph, &src->graph, max_obs);
+  overlay_opt(&dst->graph, &src->graph, max_actions);
+  overlay_opt(&dst->graph, &src->graph, small_actions);
+  overlay_opt(&dst->graph, &src->graph, max_sources);
+  overlay_opt(&dst->graph, &src->graph, max_produces);
+  overlay_opt(&dst->graph, &src->graph, max_phantoms);
+  overlay_opt(&dst->graph, &src->graph, max_obs);
 }
 
-static sp_cli_result_t sp_fuzz_resolve_profile(sp_cli_t* cli, sp_mem_t mem, const spn_cg_fuzz_t* cfg, sp_str_t name, spn_cg_fuzz_profile_t* out) {
+static sp_cli_result_t resolve_profile(sp_cli_t* cli, sp_mem_t mem, const spn_cg_fuzz_t* cfg, sp_str_t name, spn_cg_fuzz_profile_t* out) {
   u64 count = sp_da_size(cfg->profile);
   const spn_cg_fuzz_profile_t** chain = sp_alloc_n(mem, const spn_cg_fuzz_profile_t*, count ? count : 1);
   u64 depth = 0;
 
   sp_str_t cursor = name;
   while (!sp_str_empty(cursor)) {
-    const spn_cg_fuzz_profile_t* found = sp_fuzz_find_profile(cfg, cursor);
+    const spn_cg_fuzz_profile_t* found = find_profile(cfg, cursor);
     if (!found) {
       sp_str_t detail = depth
         ? sp_fmt(mem, "profile {.cyan} inherits from unknown profile {.red}", sp_fmt_str(name), sp_fmt_str(cursor)).value
-        : sp_fmt(mem, "unknown profile {.red}; available: {}", sp_fmt_str(cursor), sp_fmt_str(sp_fuzz_profile_names(mem, cfg))).value;
+        : sp_fmt(mem, "unknown profile {.red}; available: {}", sp_fmt_str(cursor), sp_fmt_str(profile_names(mem, cfg))).value;
       return sp_cli_set_error(cli, detail);
     }
     if (depth >= count) {
@@ -153,12 +163,12 @@ static sp_cli_result_t sp_fuzz_resolve_profile(sp_cli_t* cli, sp_mem_t mem, cons
   }
 
   for (u64 it = depth; it-- > 0;) {
-    sp_fuzz_overlay_profile(out, chain[it]);
+    overlay_profile(out, chain[it]);
   }
   return SP_CLI_OK;
 }
 
-static sp_cli_result_t sp_fuzz_load_config(sp_cli_t* cli, sp_mem_t mem, sp_fuzz_cli_t* config, spn_cg_fuzz_t* out) {
+static sp_cli_result_t load_config(sp_cli_t* cli, sp_mem_t mem, cli_t* config, spn_cg_fuzz_t* out) {
   bool implied = !config->config;
   if (implied) {
     config->config = "fuzz.toml";
@@ -185,27 +195,27 @@ static sp_cli_result_t sp_fuzz_load_config(sp_cli_t* cli, sp_mem_t mem, sp_fuzz_
   return SP_CLI_OK;
 }
 
-static sp_cli_result_t sp_fuzz_load_profile(sp_cli_t* cli, sp_mem_t mem, sp_fuzz_cli_t* config, spn_cg_fuzz_profile_t* out) {
+static sp_cli_result_t load_profile(sp_cli_t* cli, sp_mem_t mem, cli_t* config, spn_cg_fuzz_profile_t* out) {
   if (!config->config && !config->profile) {
     return SP_CLI_OK;
   }
 
   spn_cg_fuzz_t cfg = sp_zero;
-  sp_cli_result_t err = sp_fuzz_load_config(cli, mem, config, &cfg);
+  sp_cli_result_t err = load_config(cli, mem, config, &cfg);
   if (err) {
     return err;
   }
 
   sp_str_t name = config->profile ? sp_cstr_as_str(config->profile) : sp_str_lit("default");
-  if (!config->profile && !sp_fuzz_find_profile(&cfg, name)) {
+  if (!config->profile && !find_profile(&cfg, name)) {
     return SP_CLI_OK;
   }
-  return sp_fuzz_resolve_profile(cli, mem, &cfg, name, out);
+  return resolve_profile(cli, mem, &cfg, name, out);
 }
 
-static sp_cli_result_t sp_fuzz_list_profiles(sp_cli_t* cli, sp_mem_t mem, sp_fuzz_cli_t* config) {
+static sp_cli_result_t list_profiles(sp_cli_t* cli, sp_mem_t mem, cli_t* config) {
   spn_cg_fuzz_t cfg = sp_zero;
-  sp_cli_result_t err = sp_fuzz_load_config(cli, mem, config, &cfg);
+  sp_cli_result_t err = load_config(cli, mem, config, &cfg);
   if (err) {
     return err;
   }
@@ -229,7 +239,7 @@ static sp_cli_result_t sp_fuzz_list_profiles(sp_cli_t* cli, sp_mem_t mem, sp_fuz
   return SP_CLI_OK;
 }
 
-#define sp_fuzz_graph_knob(io, graph, first, field) \
+#define graph_knob(io, graph, first, field) \
   do { \
     if (!sp_opt_is_null((graph)->field)) { \
       sp_fmt_io(io, *(first) ? "graph: {}={}" : " {}={}", sp_fmt_cstr(#field), sp_fmt_uint(sp_opt_get((graph)->field))); \
@@ -237,20 +247,20 @@ static sp_cli_result_t sp_fuzz_list_profiles(sp_cli_t* cli, sp_mem_t mem, sp_fuz
     } \
   } while (0)
 
-static sp_str_t sp_fuzz_graph_line(sp_mem_t mem, const spn_cg_fuzz_graph_t* graph) {
+static sp_str_t graph_line(sp_mem_t mem, const spn_cg_fuzz_graph_t* graph) {
   sp_io_dyn_mem_writer_t out;
   sp_io_dyn_mem_writer_init(mem, &out);
   bool first = true;
-  sp_fuzz_graph_knob(&out.base, graph, &first, max_actions);
-  sp_fuzz_graph_knob(&out.base, graph, &first, small_actions);
-  sp_fuzz_graph_knob(&out.base, graph, &first, max_sources);
-  sp_fuzz_graph_knob(&out.base, graph, &first, max_produces);
-  sp_fuzz_graph_knob(&out.base, graph, &first, max_phantoms);
-  sp_fuzz_graph_knob(&out.base, graph, &first, max_obs);
+  graph_knob(&out.base, graph, &first, max_actions);
+  graph_knob(&out.base, graph, &first, small_actions);
+  graph_knob(&out.base, graph, &first, max_sources);
+  graph_knob(&out.base, graph, &first, max_produces);
+  graph_knob(&out.base, graph, &first, max_phantoms);
+  graph_knob(&out.base, graph, &first, max_obs);
   return sp_io_dyn_mem_writer_as_str(&out);
 }
 
-static void sp_fuzz_prompt_start(sp_fuzz_prompt_t* prompt, sp_mem_t mem, const sp_fuzz_desc_t* desc, sp_str_t note) {
+static void prompt_start(prompt_t* prompt, sp_mem_t mem, const sp_fuzz_desc_t* desc, sp_str_t note) {
   if (!sp_sys_is_tty(sp_sys_stdout)) {
     return;
   }
@@ -270,7 +280,7 @@ static void sp_fuzz_prompt_start(sp_fuzz_prompt_t* prompt, sp_mem_t mem, const s
   prompt->on = true;
 }
 
-static void sp_fuzz_prompt_pump(sp_fuzz_prompt_t* prompt, u64 done, u64 total, u64 failed) {
+static void prompt_pump(prompt_t* prompt, u64 done, u64 total, u64 failed) {
   if (!prompt->on) {
     return;
   }
@@ -286,7 +296,7 @@ static void sp_fuzz_prompt_pump(sp_fuzz_prompt_t* prompt, u64 done, u64 total, u
   sp_prompt_app_on_poll(&prompt->app);
 }
 
-static void sp_fuzz_prompt_stop(sp_fuzz_prompt_t* prompt, bool ok) {
+static void prompt_stop(prompt_t* prompt, bool ok) {
   if (!prompt->on) {
     return;
   }
@@ -296,7 +306,7 @@ static void sp_fuzz_prompt_stop(sp_fuzz_prompt_t* prompt, bool ok) {
   prompt->on = false;
 }
 
-static void sp_fuzz_report(sp_fuzz_prompt_t* prompt, sp_io_writer_t* out, sp_str_t line) {
+static void report(prompt_t* prompt, sp_io_writer_t* out, sp_str_t line) {
   if (prompt->on) {
     sp_prompt_log_str(prompt->ctx, line);
   }
@@ -305,23 +315,23 @@ static void sp_fuzz_report(sp_fuzz_prompt_t* prompt, sp_io_writer_t* out, sp_str
   }
 }
 
-static sp_cli_result_t sp_fuzz_cli_run(sp_cli_t* cli) {
-  sp_fuzz_cli_t* config = (sp_fuzz_cli_t*)cli->user_data;
+static sp_cli_result_t cli_run(sp_cli_t* cli) {
+  cli_t* config = (cli_t*)cli->user_data;
   const sp_fuzz_desc_t* desc = config->desc;
   sp_mem_t mem = sp_mem_os_new();
 
   if (config->list_profiles) {
-    return sp_fuzz_list_profiles(cli, mem, config);
+    return list_profiles(cli, mem, config);
   }
 
   spn_cg_fuzz_profile_t profile = sp_zero;
-  sp_cli_result_t loaded = sp_fuzz_load_profile(cli, mem, config, &profile);
+  sp_cli_result_t loaded = load_profile(cli, mem, config, &profile);
   if (loaded) {
     return loaded;
   }
-  sp_fuzz_cli_state.config = config->config;
-  sp_fuzz_cli_state.profile = config->profile;
-  sp_fuzz_cli_state.graph = profile.graph;
+  cli_state.config = config->config;
+  cli_state.profile = config->profile;
+  cli_state.graph = profile.graph;
 
   if (config->seed) {
     sp_fuzz_seed_compute(sp_cstr_as_str(config->seed));
@@ -350,16 +360,17 @@ static sp_cli_result_t sp_fuzz_cli_run(sp_cli_t* cli) {
     opts.iters = (u64)config->iter + 1;
   }
 
-  sp_fuzz_cli_state.keep_going = config->keep_going || (!sp_opt_is_null(profile.keep_going) && sp_opt_get(profile.keep_going));
-  sp_fuzz_cli_state.render = config->render ? sp_cstr_as_str(config->render) : profile.render;
-  bool keep_going = sp_fuzz_cli_state.keep_going;
+  cli_state.keep_going = config->keep_going || (!sp_opt_is_null(profile.keep_going) && sp_opt_get(profile.keep_going));
+  cli_state.sweep = config->sweep || (!sp_opt_is_null(profile.sweep) && sp_opt_get(profile.sweep));
+  cli_state.render = config->render ? sp_cstr_as_str(config->render) : profile.render;
+  bool keep_going = cli_state.keep_going;
 
-  sp_str_t graph_line = sp_fuzz_graph_line(mem, &profile.graph);
+  sp_str_t knobs = graph_line(mem, &profile.graph);
   if (config->dry_run) {
     sp_io_writer_t* out = sp_io_get_std_out();
-    sp_fmt_io(out, "{}\n", sp_fmt_str(sp_fuzz_params(mem, opts)));
-    if (!sp_str_empty(graph_line)) {
-      sp_fmt_io(out, "{}\n", sp_fmt_str(graph_line));
+    sp_fmt_io(out, "{}\n", sp_fmt_str(params(mem, opts)));
+    if (!sp_str_empty(knobs)) {
+      sp_fmt_io(out, "{}\n", sp_fmt_str(knobs));
     }
     return SP_CLI_OK;
   }
@@ -374,12 +385,12 @@ static sp_cli_result_t sp_fuzz_cli_run(sp_cli_t* cli) {
   u64 failed = 0;
   u64 done = 0;
 
-  sp_fuzz_prompt_t prompt = sp_zero;
-  sp_str_t note = sp_fuzz_params(mem, opts);
-  if (!sp_str_empty(graph_line)) {
-    note = sp_fmt(mem, "{}\n{}", sp_fmt_str(note), sp_fmt_str(graph_line)).value;
+  prompt_t prompt = sp_zero;
+  sp_str_t note = params(mem, opts);
+  if (!sp_str_empty(knobs)) {
+    note = sp_fmt(mem, "{}\n{}", sp_fmt_str(note), sp_fmt_str(knobs)).value;
   }
-  sp_fuzz_prompt_start(&prompt, mem, desc, note);
+  prompt_start(&prompt, mem, desc, note);
   if (!prompt.on) {
     sp_fmt_io(out, "{}\n", sp_fmt_str(note));
   }
@@ -399,7 +410,7 @@ static sp_cli_result_t sp_fuzz_cli_run(sp_cli_t* cli) {
       }
 
       sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-      sp_fuzz_report(&prompt, out, sp_fmt(s.mem, "fuzz: {} (repro: {})", sp_fmt_str(desc->err_str(err)), sp_fmt_str(sp_fuzz_repro_args(s.mem, iter))).value);
+      report(&prompt, out, sp_fmt(s.mem, "fuzz: {} (repro: {})", sp_fmt_str(desc->err_str(err)), sp_fmt_str(sp_fuzz_repro_args(s.mem, iter))).value);
       sp_mem_end_scratch(s);
 
       if (!keep_going) {
@@ -408,7 +419,7 @@ static sp_cli_result_t sp_fuzz_cli_run(sp_cli_t* cli) {
       }
     }
 
-    sp_fuzz_prompt_pump(&prompt, iter + 1, opts.iters, failed);
+    prompt_pump(&prompt, iter + 1, opts.iters, failed);
     if (prompt.on && sp_prompt_cancelled(prompt.ctx)) {
       config->status = 1;
       break;
@@ -416,7 +427,7 @@ static sp_cli_result_t sp_fuzz_cli_run(sp_cli_t* cli) {
   }
 
   bool was_tty = prompt.on || sp_sys_is_tty(sp_sys_stdout);
-  sp_fuzz_prompt_stop(&prompt, !failed && !config->status);
+  prompt_stop(&prompt, !failed && !config->status);
 
   if (!was_tty && !failed && !config->status) {
     sp_fmt_io(out, "fuzz: {} iterations passed\n", sp_fmt_uint(done));
@@ -435,7 +446,7 @@ static sp_cli_result_t sp_fuzz_cli_run(sp_cli_t* cli) {
 }
 
 s32 sp_fuzz_main(s32 num_args, c8** args, const sp_fuzz_desc_t* desc) {
-  sp_fuzz_cli_t config = {
+  cli_t config = {
     .desc = desc,
     .iters = -1,
     .iter = -1,
@@ -507,6 +518,13 @@ s32 sp_fuzz_main(s32 num_args, c8** args, const sp_fuzz_desc_t* desc) {
         .ptr = &config.keep_going,
       },
       {
+        .brief = 'w',
+        .name = "sweep",
+        .kind = SP_CLI_OPT_BOOLEAN,
+        .summary = "Replay each iteration per fault point, failing it transiently and then persistently",
+        .ptr = &config.sweep,
+      },
+      {
         .brief = 'r',
         .name = "render",
         .kind = SP_CLI_OPT_CSTR,
@@ -515,7 +533,7 @@ s32 sp_fuzz_main(s32 num_args, c8** args, const sp_fuzz_desc_t* desc) {
         .ptr = &config.render,
       },
     },
-    .handler = sp_fuzz_cli_run,
+    .handler = cli_run,
   };
 
   switch (sp_cli_run((sp_cli_desc_t) {

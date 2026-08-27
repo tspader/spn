@@ -442,7 +442,7 @@ static bool obs_equal(const spn_dag_obs_t* a, const spn_dag_obs_t* b) {
   return a->kind == b->kind && spn_path_equal(a->path, b->path) && sp_str_equal(a->filter, b->filter);
 }
 
-static void canonicalize_observations(sp_da(spn_dag_obs_t) obs) {
+void spn_dag_obs_canonicalize(sp_da(spn_dag_obs_t) obs) {
   if (sp_da_empty(obs)) {
     return;
   }
@@ -697,7 +697,7 @@ static spn_err_t execute(spn_dag_t* g, spn_dag_attempt_t* attempt, spn_dag_env_t
   }
   switch (action->kind) {
     case SPN_DAG_ACTION_DISCOVERED: {
-      canonicalize_observations(attempt->obs);
+      spn_dag_obs_canonicalize(attempt->obs);
       break;
     }
     case SPN_DAG_ACTION_STATIC:
