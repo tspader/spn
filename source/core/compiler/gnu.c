@@ -114,7 +114,7 @@ static void add_launcher(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
   sp_assert(!spn_arg_empty(launcher.program));
   invocation->program = launcher.program;
   spn_cc_push_strs(mem, invocation, launcher.args);
-  if (toolchain->driver == SPN_CC_DRIVER_CLANG || toolchain->driver == SPN_CC_DRIVER_ZIG) {
+  if (spn_cc_has(toolchain, SPN_CC_CAP_TARGET_TRIPLE)) {
     spn_triple_t triple = { profile->arch, profile->os, profile->abi };
     sp_str_t target = spn_triple_to_cc_target(mem, triple);
     if (!sp_str_empty(target)) {
@@ -164,7 +164,7 @@ void spn_gnu_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, c
       spn_cc_push_fmt(mem, invocation, "-mmacosx-version-min={}.{}", sp_fmt_uint(compile->min_os.major), sp_fmt_uint(compile->min_os.minor));
     }
   }
-  if (profile->os == SPN_OS_WINDOWS && (toolchain->driver == SPN_CC_DRIVER_CLANG || toolchain->driver == SPN_CC_DRIVER_ZIG)) {
+  if (profile->os == SPN_OS_WINDOWS && spn_cc_has(toolchain, SPN_CC_CAP_CLANG_FRONTEND)) {
     spn_cc_push_c(mem, invocation, "-gno-codeview-command-line");
   }
   spn_cc_push_strs(mem, invocation, compile->args);
@@ -178,7 +178,7 @@ void spn_gnu_render_compile_files(sp_mem_t mem, const spn_cc_toolchain_t* toolch
     spn_cc_push_c(mem, invocation, "-MF");
     spn_cc_push_path(mem, invocation, files->depfile);
   }
-  if (profile->os == SPN_OS_WINDOWS && (toolchain->driver == SPN_CC_DRIVER_CLANG || toolchain->driver == SPN_CC_DRIVER_ZIG)) {
+  if (profile->os == SPN_OS_WINDOWS && spn_cc_has(toolchain, SPN_CC_CAP_CLANG_FRONTEND)) {
     spn_cc_push_c(mem, invocation, "-Xclang");
     spn_cc_push_fmt(mem, invocation, "-object-file-name={}", sp_fmt_str(sp_fs_get_name(files->output.sub)));
   }
@@ -260,7 +260,7 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
   }
   sp_da_for(link->private_libs, it) {
     spn_cc_push_fmt(mem, invocation, "-l{}", sp_fmt_str(link->private_libs[it]));
-    if (profile->os == SPN_OS_WINDOWS && toolchain->driver != SPN_CC_DRIVER_ZIG) {
+    if (profile->os == SPN_OS_WINDOWS && spn_cc_has(toolchain, SPN_CC_CAP_EXCLUDE_LIBS)) {
       spn_triple_t triple = { profile->arch, profile->os, profile->abi };
       sp_str_t archive = spn_triple_lib_file_name(mem, triple, link->private_libs[it], SP_OS_LIB_STATIC);
       spn_cc_push_fmt(mem, invocation, "-Wl,--exclude-libs,{}", sp_fmt_str(archive));
