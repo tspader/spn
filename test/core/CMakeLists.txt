@@ -4,6 +4,7 @@ add_executable(core
   fs.c
   filter.c
   wake.c
+  sim.c
   identity.c
   intern.c
   lazy.c
