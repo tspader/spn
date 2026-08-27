@@ -183,6 +183,7 @@ struct spn_toolchain_unit_t {
   sp_str_t root;
   spn_cc_toolchain_t cc;
   sp_hash_t identity;
+  sp_str_t version;
 };
 
 static inline spn_user_node_t* spn_node_deref(spn_node_ref_t ref) {

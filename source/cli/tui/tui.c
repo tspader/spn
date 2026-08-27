@@ -1068,6 +1068,15 @@ static sp_str_t render_event_detail(spn_ctx_t* ctx, sp_mem_t mem, spn_event_t* e
           );
           break;
         }
+        case SPN_ERR_TOOLCHAIN_MISSING: {
+          sp_fmt_io(
+            &w.base,
+            "toolchain {} needs {.cyan}, which isn't installed",
+            sp_fmt_str(get_colored_name(mem, event->err.program.name)),
+            sp_fmt_str(event->err.program.program)
+          );
+          break;
+        }
         case SPN_ERR_WASM_READ_FAILED: {
           sp_fmt_io(
             &w.base,
@@ -1291,11 +1300,20 @@ static sp_str_t render_event_detail(spn_ctx_t* ctx, sp_mem_t mem, spn_event_t* e
       break;
     }
     case SPN_EVENT_INIT_BUILD_GRAPH: {
-      sp_fmt_io(&w.base, "{}, {.yellow}, {.green}",
-        sp_fmt_str(event->graph_init.profile),
-        sp_fmt_str(event->graph_init.target),
-        sp_fmt_str(event->graph_init.toolchain)
-      );
+      if (sp_str_empty(event->graph_init.version)) {
+        sp_fmt_io(&w.base, "{}, {.yellow}, {.green}",
+          sp_fmt_str(event->graph_init.profile),
+          sp_fmt_str(event->graph_init.target),
+          sp_fmt_str(event->graph_init.toolchain)
+        );
+      } else {
+        sp_fmt_io(&w.base, "{}, {.yellow}, {.green} {.gray}",
+          sp_fmt_str(event->graph_init.profile),
+          sp_fmt_str(event->graph_init.target),
+          sp_fmt_str(event->graph_init.toolchain),
+          sp_fmt_str(event->graph_init.version)
+        );
+      }
       break;
     }
     case SPN_EVENT_LINK_START: {

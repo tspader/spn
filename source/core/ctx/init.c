@@ -22,6 +22,7 @@
 #include "toml/issue.h"
 #include "toml/loader.h"
 #include "toolchain/catalog.h"
+#include "toolchain/probe.h"
 #include "toolchain/provision.h"
 #include "version.h"
 
@@ -167,6 +168,7 @@ static spn_err_t open_ctx(spn_ctx_t* ctx, spn_open_request_t request) {
     .mirror = sp_env_get(ctx->env, sp_str_lit("SPN_MIRROR")),
     .fetch = spn_fetch_curl,
   };
+  spn_probe_cache_load(&ctx->caches.toolchains.probes, join_path(ctx, ctx->paths.toolchain, "probe.cache"), ctx->mem);
 
   spn_try(extract_runtime(ctx));
 

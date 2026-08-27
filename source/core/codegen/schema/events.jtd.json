@@ -311,6 +311,7 @@
         "profile": { "type": "string" },
         "target": { "type": "string" },
         "toolchain": { "type": "string" },
+        "version": { "type": "string" },
         "force": { "type": "boolean" }
       }
     },
