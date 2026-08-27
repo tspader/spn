@@ -23,9 +23,9 @@ add_executable(fuzz_dag
   model.c
   render.c
   trace.c
-  ${TEST_TOOLS}/sp_sim.c
-  ${TEST_TOOLS}/sp_fuzz.c
-  ${TEST_TOOLS}/sp_dag_track.c
+  ${TEST_TOOLS}/sim/sim.c
+  ${TEST_TOOLS}/fuzz/fuzz.c
+  ${TEST_TOOLS}/dag/track.c
   ${TEST_TOOLS}/toml.c
 )
 spn_test_binary(fuzz_dag)

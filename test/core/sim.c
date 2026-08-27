@@ -1,5 +1,5 @@
 #include "spn_test.h"
-#include "sp_sim.h"
+#include "sim/sim.h"
 
 #define SIM_TEST_MAX_OPS 8
 

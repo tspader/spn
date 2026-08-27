@@ -1,6 +1,6 @@
 #include "fuzz.h"
-#include "sp_sim.h"
-#include "sp_dag_track.h"
+#include "sim/sim.h"
+#include "dag/track.h"
 #include "paths/paths.h"
 #include "sp/io.h"
 

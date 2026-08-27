@@ -1,4 +1,4 @@
-#include "sp_sim.h"
+#include "sim.h"
 
 #define SP_SIM_ROOT ((sp_sys_fd_t)-4097)
 #define SP_SIM_FD_BASE ((sp_sys_fd_t)4096)

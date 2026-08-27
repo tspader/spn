@@ -1,4 +1,4 @@
-#include "sp_fuzz.h"
+#include "fuzz.h"
 
 #include "intern/intern.h"
 

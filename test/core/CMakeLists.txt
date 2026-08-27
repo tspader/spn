@@ -207,8 +207,8 @@ add_executable(core
   ${SRC}/version.c
   ${SRC}/when/when.c
   ${TEST_TOOLS}/fixture.c
-  ${TEST_TOOLS}/sp_sim.c
-  ${TEST_TOOLS}/sp_dag_track.c
+  ${TEST_TOOLS}/sim/sim.c
+  ${TEST_TOOLS}/dag/track.c
   ${TEST_TOOLS}/toml.c
   tools/wasm_emit.c
   ${EMBED_OBJ}

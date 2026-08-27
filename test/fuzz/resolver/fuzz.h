@@ -7,7 +7,7 @@
 #include "resolve/types.h"
 #include "semver/types.h"
 #include "target/types.h"
-#include "sp_fuzz.h"
+#include "fuzz/fuzz.h"
 
 #define FZ_MAX_PKGS 128
 #define FZ_SMALL_PKGS 6

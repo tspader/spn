@@ -213,8 +213,8 @@ source = [
   "source/core/when/when.c",
   "test/core/tools/wasm_emit.c",
   "test/tools/fixture.c",
-  "test/tools/sp_sim.c",
-  "test/tools/sp_dag_track.c",
+  "test/tools/sim/sim.c",
+  "test/tools/dag/track.c",
   "test/tools/toml.c",
 ]
 include = ["include", "source/core", "source/core/codegen/gen", "source/core/external", "test/core", "test/core/tools", "test/tools", "tools", "tools/gen"]
@@ -370,9 +370,9 @@ source = [
   "test/fuzz/dag/model.c",
   "test/fuzz/dag/render.c",
   "test/fuzz/dag/trace.c",
-  "test/tools/sp_sim.c",
-  "test/tools/sp_dag_track.c",
-  "test/tools/sp_fuzz.c",
+  "test/tools/sim/sim.c",
+  "test/tools/dag/track.c",
+  "test/tools/fuzz/fuzz.c",
   "test/tools/toml.c",
 ]
 include = ["include", "source/core", "source/core/codegen/gen", "test/fuzz/dag", "test/tools"]
@@ -437,7 +437,7 @@ source = [
   "test/fuzz/resolver/checkers/solve.c",
   "test/fuzz/resolver/checkers/units.c",
   "test/fuzz/resolver/dump.c",
-  "test/tools/sp_fuzz.c",
+  "test/tools/fuzz/fuzz.c",
   "test/tools/toml.c",
 ]
 include = ["include", "source/core", "source/core/codegen/gen", "test/fuzz/resolver", "test/tools"]

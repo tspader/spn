@@ -1,5 +1,5 @@
 #include "dag_test.h"
-#include "sp_dag_track.h"
+#include "dag/track.h"
 
 #define TRACK_TEST_MAX_OPS 14
 #define TRACK_TEST_MAX_CHECKS 4

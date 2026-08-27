@@ -3,9 +3,9 @@
 
 #include "sp.h"
 
-#include "sp_fuzz.h"
+#include "fuzz/fuzz.h"
 #include "dag/dag.h"
-#include "sp_sim.h"
+#include "sim/sim.h"
 
 typedef struct spn_cg_fuzz_graph spn_cg_fuzz_graph_t;
 
