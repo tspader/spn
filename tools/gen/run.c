@@ -197,30 +197,58 @@ static bool render_union(codegen_t* c, sp_fs_entry_t* entry, sp_str_t json, gen_
   return true;
 }
 
-static bool render_record(codegen_t* c, sp_fs_entry_t* entry, yyjson_doc* doc, gen_format_t format) {
-  sp_str_t merged = sp_zero;
-  try(merge_schema(c, entry->path, doc, &merged));
+static bool lower_record(codegen_t* c, sp_fs_entry_t* entry, yyjson_doc* doc, gen_format_t format, gen_t** lowered, sp_str_t* merged) {
+  try(merge_schema(c, entry->path, doc, merged));
 
   jtd_result_t jtd = sp_zero;
-  try(parse_jtd(c, entry->path, merged, &jtd));
+  try(parse_jtd(c, entry->path, *merged, &jtd));
 
   sp_str_t name = sp_str_strip_right(entry->name, sp_str_lit(".jtd.json"));
   gen_t* gen = gen_new(c->mem);
   gen->format = format;
+  gen->name = name;
   if (!gen_lower(gen, name, jtd.root)) {
     return fail(c, gen->err);
   }
   gen->root = gen_find(gen, name);
   try(mark_shared(c, entry->path, gen, &jtd));
-  if (gen->format == GEN_FORMAT_JSON && sp_da_size(gen->containers.shorthand)) {
-    return fail(c, sp_fmt(c->mem, "{.cyan}: shorthand arrays are not supported for json schemas", sp_fmt_str(name)).value);
-  }
-
-  try(render_one(c, out_path(c, c->paths.out, name, ".gen.h"), gen_render_decls(gen)));
-  try(render_one(c, out_path(c, c->paths.out, name, ".gen.c"), gen_render_impl(gen)));
-  try(write_file(c, out_path(c, c->paths.out, name, ".jtd.json"), merged));
-  emit(c, sp_fmt(c->mem, "wrote {} ({})", sp_fmt_str(name), sp_fmt_cstr(gen_format_name(format))).value);
+  *lowered = gen;
   return true;
+}
+
+static bool commit_record(codegen_t* c, gen_t* gen, sp_str_t merged, gen_render_t decls, gen_render_t impl) {
+  try(render_one(c, out_path(c, c->paths.out, gen->name, ".gen.h"), decls));
+  try(render_one(c, out_path(c, c->paths.out, gen->name, ".gen.c"), impl));
+  try(write_file(c, out_path(c, c->paths.out, gen->name, ".jtd.json"), merged));
+  emit(c, sp_fmt(c->mem, "wrote {} ({})", sp_fmt_str(gen->name), sp_fmt_cstr(gen_format_name(gen->format))).value);
+  return true;
+}
+
+static bool render_toml(codegen_t* c, sp_fs_entry_t* entry, yyjson_doc* doc) {
+  sp_str_t merged = sp_zero;
+  gen_t* gen = SP_NULLPTR;
+  try(lower_record(c, entry, doc, GEN_FORMAT_TOML, &gen, &merged));
+  return commit_record(c, gen, merged, gen_render_decls(gen), gen_render_impl(gen));
+}
+
+static bool render_json(codegen_t* c, sp_fs_entry_t* entry, yyjson_doc* doc) {
+  sp_str_t merged = sp_zero;
+  gen_t* gen = SP_NULLPTR;
+  try(lower_record(c, entry, doc, GEN_FORMAT_JSON, &gen, &merged));
+  if (sp_da_size(gen->containers.shorthand)) {
+    return fail(c, sp_fmt(c->mem, "{.cyan}: shorthand arrays are not supported for json schemas", sp_fmt_str(gen->name)).value);
+  }
+  return commit_record(c, gen, merged, gen_render_decls(gen), gen_render_impl(gen));
+}
+
+static bool render_data(codegen_t* c, sp_fs_entry_t* entry, yyjson_doc* doc) {
+  sp_str_t merged = sp_zero;
+  gen_t* gen = SP_NULLPTR;
+  try(lower_record(c, entry, doc, GEN_FORMAT_DATA, &gen, &merged));
+  if (!gen_data_check(gen)) {
+    return fail(c, gen->err);
+  }
+  return commit_record(c, gen, merged, gen_render_data_decls(gen), gen_render_data_impl(gen));
 }
 
 static bool render_kind(codegen_t* c, sp_fs_entry_t* entry) {
@@ -235,10 +263,13 @@ static bool render_kind(codegen_t* c, sp_fs_entry_t* entry) {
   }
 
   if (sp_cstr_equal(format, "toml")) {
-    return render_record(c, entry, doc, GEN_FORMAT_TOML);
+    return render_toml(c, entry, doc);
   }
   if (sp_cstr_equal(format, "json")) {
-    return render_record(c, entry, doc, GEN_FORMAT_JSON);
+    return render_json(c, entry, doc);
+  }
+  if (sp_cstr_equal(format, "data")) {
+    return render_data(c, entry, doc);
   }
   if (sp_cstr_equal(format, "errors")) {
     return render_union(c, entry, json, GEN_FORMAT_ERRORS, sp_str_lit("spn_err"));

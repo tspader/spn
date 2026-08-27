@@ -18,6 +18,7 @@ source = [
   "tools/gen/bind.c",
   "tools/gen/union.c",
   "tools/gen/abi.c",
+  "tools/gen/data.c",
   "tools/gen/run.c",
 ]
 include = ["include", "source/core", "tools", "tools/gen"]

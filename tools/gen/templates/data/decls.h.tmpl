@@ -1,0 +1,15 @@
+#ifndef SPN_CG_{{ .guard }}_H
+#define SPN_CG_{{ .guard }}_H
+
+#include "common.gen.h"
+#include "reflect/types.h"
+{{ for .includes }}
+#include "{{ .name }}"
+{{ end }}
+
+{{ $types }}
+{{ for .reflects }}
+extern const spn_reflect_type_t spn_reflect_{{ .name }};
+{{ end }}
+
+#endif
