@@ -2,14 +2,14 @@
 
 #include "sp/fs.h"
 
-bool is_timestamp_fenced(sp_sys_timespec_t fence, sp_sys_timespec_t mtime) {
+bool spn_dag_stamp_fenced(sp_sys_timespec_t fence, sp_sys_timespec_t mtime) {
   if (mtime.tv_sec != fence.tv_sec) {
     return mtime.tv_sec < fence.tv_sec;
   }
   return mtime.tv_nsec < fence.tv_nsec;
 }
 
-spn_err_t cache_timestamp_fence(sp_str_t dir, sp_sys_timespec_t* fence) {
+spn_err_t spn_dag_stamp_probe(sp_str_t dir, sp_sys_timespec_t* fence) {
   *fence = (sp_sys_timespec_t) sp_zero;
 
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
@@ -29,4 +29,17 @@ spn_err_t cache_timestamp_fence(sp_str_t dir, sp_sys_timespec_t* fence) {
   }
   sp_mem_end_scratch(s);
   return err;
+}
+
+spn_err_t spn_dag_stamp_admit(spn_dag_stamp_t* stamp, sp_sys_timespec_t mtime, bool* admit) {
+  *admit = spn_dag_stamp_fenced(stamp->fence, mtime);
+  if (*admit || sp_str_empty(stamp->dir)) {
+    return SPN_OK;
+  }
+
+  sp_sys_timespec_t probe = sp_zero;
+  spn_try(spn_dag_stamp_probe(stamp->dir, &probe));
+  stamp->fence = probe;
+  *admit = spn_dag_stamp_fenced(stamp->fence, mtime);
+  return SPN_OK;
 }

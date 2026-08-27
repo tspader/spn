@@ -64,6 +64,7 @@ void                spn_dag_obs_table_put(spn_dag_obs_table_t* t, spn_dag_digest
 
 void                spn_dag_file_cache_init(spn_dag_file_cache_t* c, sp_mem_t mem, const spn_path_roots_t* roots);
 void                spn_dag_file_cache_fence(spn_dag_file_cache_t* c, sp_sys_timespec_t fence);
+spn_err_t           spn_dag_file_cache_fence_dir(spn_dag_file_cache_t* c, sp_str_t dir);
 void                spn_dag_file_cache_load(spn_dag_file_cache_t* c, sp_str_t path);
 void                spn_dag_file_cache_flush(spn_dag_file_cache_t* c, sp_str_t path);
 void                spn_dag_file_cache_seed(spn_dag_file_cache_t* c, spn_dag_file_meta_t meta);

@@ -50,6 +50,6 @@ static const test_t tests [] = {
 sp_test_each(dag_stamp, fenced, test_t, tests) {
   sp_sys_timespec_t fence = { .tv_sec = it->fence_sec, .tv_nsec = it->fence_nsec };
   sp_sys_timespec_t mtime = { .tv_sec = it->mtime_sec, .tv_nsec = it->mtime_nsec };
-  sp_expect_eq(t, it->expect.fenced, is_timestamp_fenced(fence, mtime));
+  sp_expect_eq(t, it->expect.fenced, spn_dag_stamp_fenced(fence, mtime));
   return SP_OK;
 }
