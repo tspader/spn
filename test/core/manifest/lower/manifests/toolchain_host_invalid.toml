@@ -1,0 +1,12 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[[toolchain]]
+name = "pin"
+compiler = "cc"
+linker = "cc"
+archiver = "ar"
+driver = "gcc"
+
+[toolchain.host.x86-linux]

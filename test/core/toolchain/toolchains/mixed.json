@@ -1,0 +1,16 @@
+{
+  "toolchain": [
+    {
+      "name": "A",
+      "version": "1.0.0",
+      "driver": "gcc",
+      "compiler": { "program": "A" },
+      "linker":   { "program": "A" },
+      "archiver": { "program": "ar" },
+      "host": {
+        "x86_64-linux": { "url": "https://example.com/linux.tar.xz", "sha256": "aa" },
+        "aarch64-macos": {}
+      }
+    }
+  ]
+}

@@ -13,6 +13,7 @@ typedef enum {
   SPN_CC_DRIVER_GCC,
   SPN_CC_DRIVER_CLANG,
   SPN_CC_DRIVER_MSVC,
+  SPN_CC_DRIVER_ZIG,
 } spn_cc_driver_t;
 
 typedef enum {
@@ -64,11 +65,25 @@ struct spn_toolchain_catalog_t {
 typedef spn_err_t (*spn_fetch_fn)(sp_str_t url, sp_str_t dest, void* user_data);
 
 typedef struct {
+  sp_str_t path;
+  u64 size;
+  sp_tm_epoch_t mtime;
+  sp_hash_t hash;
+} spn_probe_entry_t;
+
+typedef struct {
+  sp_mem_t mem;
+  sp_str_t file;
+  sp_str_om(spn_probe_entry_t) entries;
+} spn_probe_cache_t;
+
+typedef struct {
   sp_mem_t mem;
   sp_str_t dir;
   sp_str_t mirror;
   spn_fetch_fn fetch;
   void* fetch_user_data;
+  spn_probe_cache_t probes;
 } spn_toolchain_store_t;
 
 #endif

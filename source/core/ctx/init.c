@@ -22,7 +22,9 @@
 #include "toml/issue.h"
 #include "toml/loader.h"
 #include "toolchain/catalog.h"
+#include "toolchain/probe.h"
 #include "toolchain/provision.h"
+#include "triple/triple.h"
 #include "version.h"
 
 static sp_str_t join_path(spn_ctx_t* ctx, sp_str_t base, const c8* dir) {
@@ -167,6 +169,7 @@ static spn_err_t open_ctx(spn_ctx_t* ctx, spn_open_request_t request) {
     .mirror = sp_env_get(ctx->env, sp_str_lit("SPN_MIRROR")),
     .fetch = spn_fetch_curl,
   };
+  spn_probe_cache_load(&ctx->caches.toolchains.probes, join_path(ctx, ctx->paths.toolchain, "probe.cache"), ctx->mem);
 
   spn_try(extract_runtime(ctx));
 
@@ -238,6 +241,8 @@ spn_ctx_t* spn_ctx_new(spn_wake_fn_t wake, void* wake_data) {
   *ctx->env = sp_env_capture(ctx->heap);
   ctx->events = spn_event_buffer_new(ctx->mem);
   ctx->events->wake = &ctx->wake;
+
+  ctx->host = spn_triple_host();
 
   sp_str_t builtins = sp_str((const c8*)toolchains_json, toolchains_json_size);
   sp_assert(spn_toolchain_catalog_init(&ctx->catalog, builtins, ctx->heap) == SPN_OK);

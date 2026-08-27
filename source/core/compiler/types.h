@@ -28,6 +28,14 @@ typedef enum {
   SPN_AR_DRIVER_MSVC,
 } spn_ar_driver_t;
 
+typedef enum {
+  SPN_CC_CAP_TARGET_TRIPLE  = 1 << 0,
+  SPN_CC_CAP_CLANG_FRONTEND = 1 << 1,
+  SPN_CC_CAP_EXCLUDE_LIBS   = 1 << 2,
+} spn_cc_cap_t;
+
+typedef u32 spn_cc_cap_set_t;
+
 typedef struct {
   sp_str_t name;
   spn_cc_driver_t driver;

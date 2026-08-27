@@ -1294,6 +1294,7 @@ spn_err_t spn_dag_build_session(spn_op_t* op) {
       .profile = session->profile.name,
       .target = spn_triple_to_str(session->mem, target),
       .toolchain = session->units.target->toolchain->info->name,
+      .version = session->units.target->toolchain->version,
       .force = session->config.force,
     }
   });

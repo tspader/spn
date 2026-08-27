@@ -49,9 +49,13 @@ static spn_err_t fz_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data
       ? fz_phantom_sim_path(mem, fo.phantom)
       : fz_artifact_sim_path(mem, low->u, fo.artifact);
     sp_str_t bytes = sp_zero;
-    if (!sp_io_read_file(mem, path, &bytes)) {
+    sp_err_t err = sp_io_read_file(mem, path, &bytes);
+    if (!err) {
       inputs[consumed + ot] = bytes;
       continue;
+    }
+    if (err != SP_ERR_SYS_NOT_FOUND) {
+      return SPN_ERR_DAG_ACTION;
     }
     if (fo.probe) {
       if (low->state->phantoms[fo.phantom].present) {
@@ -76,8 +80,13 @@ static spn_err_t fz_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data
     fz_obs_t fo = fz->obs[ot];
     if (fo.probe) {
       sp_str_t path = fz_phantom_sim_path(mem, fo.phantom);
+      sp_sys_file_meta_t meta = sp_zero;
+      sp_err_t err = sp_sys_get_path_metadata_s(sp_sys_get_root(0), path, &meta);
+      if (err && err != SP_ERR_SYS_NOT_FOUND) {
+        return SPN_ERR_DAG_ACTION;
+      }
       sp_da_push(*obs, ((spn_dag_obs_t) {
-        .kind = sp_fs_is_file(path) ? SPN_DAG_OBS_FILE : SPN_DAG_OBS_ABSENT,
+        .kind = !err && meta.kind == SP_FS_KIND_FILE ? SPN_DAG_OBS_FILE : SPN_DAG_OBS_ABSENT,
         .path = spn_path_make(g->roots, path),
       }));
     }

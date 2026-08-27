@@ -45,8 +45,8 @@ static const parse_test_t tests [] = {
             },
           },
           .targets = {
-            { SPN_ARCH_WASM32, SPN_OS_WASI },
-            { .os = SPN_OS_LINUX, .abi = SPN_ABI_MUSL },
+            { SPN_ARCH_WASM32, SPN_OS_WASI, SPN_ABI_MUSL },
+            { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL },
           },
         },
       },
@@ -66,6 +66,35 @@ static const parse_test_t tests [] = {
           .cxx = { .program = "" },
           .linker = { .program = "cc" },
           .archiver = { .program = "ar" },
+        },
+      },
+    },
+  },
+  {
+    .name = "host_restricted_local",
+    .file = "restricted.json",
+    .expect = {
+      .entries = 2,
+      .toolchains = {
+        {
+          .name = "A",
+          .version = "",
+          .driver = SPN_CC_DRIVER_GCC,
+          .source = SPN_TOOLCHAIN_SOURCE_LOCAL,
+          .compiler = { .program = "A" },
+          .hosts = {
+            {
+              .triple = { SPN_ARCH_X64, SPN_OS_LINUX },
+              .url = "",
+              .sha256 = "",
+            },
+          },
+        },
+        {
+          .name = "B",
+          .driver = SPN_CC_DRIVER_GCC,
+          .source = SPN_TOOLCHAIN_SOURCE_LOCAL,
+          .compiler = { .program = "B" },
         },
       },
     },
@@ -101,6 +130,11 @@ static const parse_test_t tests [] = {
   {
     .name = "malformed_json",
     .file = "malformed.json",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "invalid_host_key",
+    .file = "bad_host.json",
     .expect = { .err = SPN_ERROR },
   },
 };

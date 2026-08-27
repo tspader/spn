@@ -756,11 +756,11 @@ static spn_err_t add_target_build_targets(spn_session_t* s) {
 
   sp_om_for(s->units.objects, it) {
     spn_compile_unit_t* object = sp_om_at(s->units.objects, it);
-    spn_toolchain_info_t* toolchain = object->target->pkg->build->toolchain->info;
-    if (object->lang != SPN_LANG_CXX || spn_toolchain_has_cxx(toolchain)) {
+    spn_toolchain_unit_t* toolchain = object->target->pkg->build->toolchain;
+    if (object->lang != SPN_LANG_CXX || !spn_arg_empty(toolchain->cc.cxx.program)) {
       continue;
     }
-    return spn_err_emit(s->ctx, (spn_err_union_t) { .kind = SPN_ERR_TOOLCHAIN_NO_CXX, .toolchain = { .name = toolchain->name } });
+    return spn_err_emit(s->ctx, (spn_err_union_t) { .kind = SPN_ERR_TOOLCHAIN_NO_CXX, .toolchain = { .name = toolchain->info->name } });
   }
 
   sp_da_for(targets, it) {

@@ -106,6 +106,7 @@ add_executable(core
   toolchain/builtins.c
   toolchain/catalog.c
   toolchain/parse.c
+  toolchain/probe.c
   toolchain/provision.c
   toolchain/select.c
   toolchain/sha256.c
@@ -190,6 +191,7 @@ add_executable(core
   ${SRC}/toml/edit.c
   ${SRC}/pkg/load.c
   ${SRC}/toolchain/catalog.c
+  ${SRC}/toolchain/probe.c
   ${SRC}/toolchain/provision.c
   ${SRC}/toolchain/select.c
   ${SRC}/toolchain/toolchain.c
@@ -230,6 +232,7 @@ set_source_files_properties(
   toolchain/builtins.c
   toolchain/catalog.c
   toolchain/parse.c
+  toolchain/probe.c
   toolchain/provision.c
   toolchain/select.c
   toolchain/sha256.c

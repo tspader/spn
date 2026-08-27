@@ -33,6 +33,7 @@ struct spn_ctx_t {
   sp_env_t* env;
   spn_system_paths_t paths;
   spn_path_roots_t roots;
+  spn_triple_t host;
   spn_toolchain_catalog_t catalog;
 
   struct {

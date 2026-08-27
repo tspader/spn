@@ -306,11 +306,35 @@ static void lower_toolchains(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg
         },
       }));
     }
-    toolchain.source = sp_da_empty(toolchain.hosts) ? SPN_TOOLCHAIN_SOURCE_LOCAL : SPN_TOOLCHAIN_SOURCE_DISTRIBUTION;
+    toolchain.source = SPN_TOOLCHAIN_SOURCE_LOCAL;
+    sp_da_for(toolchain.hosts, at) {
+      if (!sp_str_empty(toolchain.hosts[at].artifact.url)) {
+        toolchain.source = SPN_TOOLCHAIN_SOURCE_DISTRIBUTION;
+        break;
+      }
+    }
 
     toolchain.targets = sp_da_new(ctx->mem, spn_triple_t);
     sp_da_for(t->target, it) {
-      sp_da_push(toolchain.targets, lower_triple(&t->target[it]));
+      spn_triple_t partial = lower_triple(&t->target[it]);
+      spn_triple_t full = sp_zero;
+      if (!spn_triple_entry(partial, &full)) {
+        spn_toml_loader_push_key(ctx, "toolchain");
+        spn_toml_loader_push_index(ctx, n);
+        spn_toml_loader_push_key(ctx, "target");
+        spn_toml_loader_push_index(ctx, it);
+        if (partial.arch && partial.os && partial.abi) {
+          spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "abi");
+        } else {
+          spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, !partial.arch ? "arch" : !partial.os ? "os" : "abi");
+        }
+        spn_toml_loader_pop(ctx);
+        spn_toml_loader_pop(ctx);
+        spn_toml_loader_pop(ctx);
+        spn_toml_loader_pop(ctx);
+        continue;
+      }
+      sp_da_push(toolchain.targets, full);
     }
 
     sp_str_om_insert(out->toolchains, toolchain.name, toolchain);
@@ -1025,8 +1049,17 @@ static void validate_inline_toolchains(spn_toml_loader_t* ctx, const spn_cg_mani
       spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, "driver");
     }
     sp_da_for(t->host, h) {
-      if (sp_str_empty(t->host[h].value.sha256)) {
+      spn_triple_t host_triple = sp_zero;
+      if (spn_triple_parse(t->host[h].key, &host_triple) || !host_triple.arch || !host_triple.os) {
+        spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "host");
+      }
+      bool url = !sp_str_empty(t->host[h].value.url);
+      bool sha = !sp_str_empty(t->host[h].value.sha256);
+      if (url && !sha) {
         spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, "sha256");
+      }
+      if (sha && !url) {
+        spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, "url");
       }
     }
     spn_toml_loader_pop(ctx);

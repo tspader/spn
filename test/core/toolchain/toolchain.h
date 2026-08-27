@@ -12,9 +12,9 @@
 
 #define HOST_X64_LINUX  { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU }
 #define HOST_ARM_LINUX  { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_GNU }
-#define HOST_ARM_MACOS  { SPN_ARCH_ARM64, SPN_OS_MACOS, SPN_ABI_NONE }
+#define HOST_ARM_MACOS  { SPN_ARCH_ARM64, SPN_OS_MACOS, SPN_ABI_APPLE }
 #define TARGET_WIN_GNU  { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU }
-#define TARGET_WASM     { SPN_ARCH_WASM32, SPN_OS_WASI, SPN_ABI_NONE }
+#define TARGET_WASM     { SPN_ARCH_WASM32, SPN_OS_WASI, SPN_ABI_MUSL }
 
 typedef struct {
   const c8* program;
@@ -104,7 +104,7 @@ static sp_err_t fixture_check_entry(sp_test_t* t, spn_toolchain_info_t* info, fi
   if (fixture_check_launcher(t, info->archiver, expect.archiver)) return SP_ERR;
 
   u32 hosts = 0;
-  sp_carr_detect_len(expect.hosts, hosts, expect.hosts[hosts].url);
+  sp_carr_detect_len(expect.hosts, hosts, !fixture_triple_empty(expect.hosts[hosts].triple));
 
   u32 targets = 0;
   sp_carr_detect_len(expect.targets, targets, !fixture_triple_empty(expect.targets[targets]));

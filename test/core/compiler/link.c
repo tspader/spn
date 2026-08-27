@@ -206,12 +206,12 @@ static const link_test_t tests [] = {
     },
   },
   {
-    .name = "mingw_subsystem",
+    .name = "windows_gnu_subsystem",
     .driver = SPN_CC_DRIVER_GCC,
     .profile = {
       .arch = SPN_ARCH_X64,
       .os = SPN_OS_WINDOWS,
-      .abi = SPN_ABI_MINGW,
+      .abi = SPN_ABI_GNU,
     },
     .kind = SPN_CC_OUTPUT_EXE,
     .subsystem = SPN_WIN_SUBSYSTEM_WINDOWS,
@@ -391,12 +391,12 @@ static const link_test_t tests [] = {
     },
   },
   {
-    .name = "mingw_shared_def",
+    .name = "windows_gnu_shared_def",
     .driver = SPN_CC_DRIVER_GCC,
     .profile = {
       .arch = SPN_ARCH_X64,
       .os = SPN_OS_WINDOWS,
-      .abi = SPN_ABI_MINGW,
+      .abi = SPN_ABI_GNU,
     },
     .kind = SPN_CC_OUTPUT_SHARED_LIB,
     .exports = "S.def",
@@ -409,6 +409,30 @@ static const link_test_t tests [] = {
         "main.o",
         "-Wl,--whole-archive", "libD.a", "-Wl,--no-whole-archive",
         "-lP", "-Wl,--exclude-libs,libP.a",
+        "-o", "main"
+      },
+    },
+  },
+  {
+    .name = "windows_zig_shared_def",
+    .driver = SPN_CC_DRIVER_ZIG,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_GNU,
+    },
+    .kind = SPN_CC_OUTPUT_SHARED_LIB,
+    .exports = "S.def",
+    .whole_archive = "libD.a",
+    .private_lib = "P",
+    .expect = {
+      .command = "cc",
+      .args = {
+        "--target=x86_64-windows-gnu",
+        "-shared", "S.def",
+        "main.o",
+        "-Wl,--whole-archive", "libD.a", "-Wl,--no-whole-archive",
+        "-lP",
         "-o", "main"
       },
     },

@@ -12,6 +12,7 @@
     "toolchain_unknown": { "ref": "toolchain" },
     "toolchain_none": { "ref": "toolchain" },
     "toolchain_target": { "ref": "toolchain" },
+    "target_abi": { "ref": "completion" },
     "toolchain_script_target": { "ref": "toolchain" },
     "toolchain_host": { "ref": "toolchain" },
     "toolchain_fetch": { "ref": "artifact" },
@@ -19,6 +20,7 @@
     "toolchain_sha": { "ref": "artifact" },
     "toolchain_extract": { "ref": "artifact" },
     "toolchain_no_cxx": { "ref": "toolchain" },
+    "toolchain_missing": { "ref": "program" },
     "toml_parse": { "properties": {} },
     "codegen_expected_bool": { "properties": {} },
     "codegen_expected_str": { "properties": {} },
@@ -175,7 +177,21 @@
         "name": { "type": "string" },
         "target": { "metadata": { "extern": "triple" } },
         "host": { "metadata": { "extern": "triple" } },
+        "candidates": { "elements": { "type": "string" } },
+        "targets": { "elements": { "type": "string" } }
+      }
+    },
+    "completion": {
+      "properties": {
+        "target": { "metadata": { "extern": "triple" } },
+        "host": { "metadata": { "extern": "triple" } },
         "candidates": { "elements": { "type": "string" } }
+      }
+    },
+    "program": {
+      "properties": {
+        "name": { "type": "string" },
+        "program": { "type": "string" }
       }
     },
     "cc_feature": { "enum": ["compile", "link_exe", "link_shared", "link_reactor", "archive", "frameworks"] },

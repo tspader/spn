@@ -1,7 +1,7 @@
 [package]
 name = "exports_own_exported"
 version = "0.1.0"
-system_deps = ["dl"]
+system_deps = [{ lib = "dl", when = { os = { not = "windows" } } }]
 
 [deps.package]
 S = "1.0.0"

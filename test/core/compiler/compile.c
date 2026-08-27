@@ -67,7 +67,7 @@ static const compile_test_t tests [] = {
     .profile = {
       .arch = SPN_ARCH_X64,
       .os = SPN_OS_WINDOWS,
-      .abi = SPN_ABI_MINGW,
+      .abi = SPN_ABI_GNU,
       .standard = SPN_C11,
     },
     .expect = {
@@ -174,6 +174,7 @@ static const compile_test_t tests [] = {
     .profile = {
       .arch = SPN_ARCH_ARM64,
       .os = SPN_OS_MACOS,
+      .abi = SPN_ABI_APPLE,
       .standard = SPN_C99,
       .sysroot = "/sdk",
     },
@@ -250,6 +251,7 @@ static const compile_test_t tests [] = {
     .profile = {
       .arch = SPN_ARCH_ARM64,
       .os = SPN_OS_MACOS,
+      .abi = SPN_ABI_APPLE,
       .standard = SPN_C99,
     },
     .min_os = { 13, 1 },

@@ -11,7 +11,7 @@
 #endif
 
 #if defined(SP_MACOS)
-  #define SPN_TEST_TRIPLE SPN_TEST_ARCH "-macos"
+  #define SPN_TEST_TRIPLE SPN_TEST_ARCH "-macos-apple"
 #elif defined(SP_WIN32)
   #define SPN_TEST_TRIPLE SPN_TEST_ARCH "-windows-gnu"
 #else

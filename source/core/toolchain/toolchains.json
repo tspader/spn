@@ -3,7 +3,7 @@
     {
       "name": "zig",
       "version": "0.16.0",
-      "driver": "clang",
+      "driver": "zig",
       "compiler": {
         "program": "zig",
         "args": [
@@ -58,7 +58,8 @@
       "target": [
         {
           "arch": "wasm32",
-          "os": "wasi"
+          "os": "wasi",
+          "abi": "musl"
         },
         {
           "arch": "x86_64",
@@ -82,11 +83,13 @@
         },
         {
           "arch": "x86_64",
-          "os": "macos"
+          "os": "macos",
+          "abi": "apple"
         },
         {
           "arch": "aarch64",
-          "os": "macos"
+          "os": "macos",
+          "abi": "apple"
         },
         {
           "arch": "x86_64",
@@ -97,16 +100,6 @@
           "arch": "aarch64",
           "os": "windows",
           "abi": "gnu"
-        },
-        {
-          "arch": "x86_64",
-          "os": "windows",
-          "abi": "mingw"
-        },
-        {
-          "arch": "aarch64",
-          "os": "windows",
-          "abi": "mingw"
         }
       ]
     },
@@ -125,6 +118,10 @@
       "cxx": {
         "program": "cl"
       },
+      "host": {
+        "x86_64-windows": {},
+        "aarch64-windows": {}
+      },
       "target": [
         {
           "arch": "x86_64",
@@ -139,19 +136,41 @@
       ]
     },
     {
-      "name": "system",
-      "driver": "gcc",
+      "name": "clang",
+      "driver": "clang",
       "compiler": {
-        "program": "cc"
+        "program": "clang"
       },
       "linker": {
-        "program": "cc"
+        "program": "clang"
       },
       "archiver": {
         "program": "ar"
       },
       "cxx": {
-        "program": "c++"
+        "program": "clang++"
+      },
+      "host": {
+        "x86_64-linux": {},
+        "aarch64-linux": {},
+        "x86_64-macos": {},
+        "aarch64-macos": {}
+      }
+    },
+    {
+      "name": "gcc",
+      "driver": "gcc",
+      "compiler": {
+        "program": "gcc"
+      },
+      "linker": {
+        "program": "gcc"
+      },
+      "archiver": {
+        "program": "ar"
+      },
+      "cxx": {
+        "program": "g++"
       }
     }
   ]

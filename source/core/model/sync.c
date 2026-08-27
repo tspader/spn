@@ -25,6 +25,7 @@
 #include "thread_pool/thread_pool.h"
 #include "toml/loader.h"
 #include "toml/issue.h"
+#include "toolchain/probe.h"
 #include "toolchain/toolchain.h"
 #include "toolchain/types.h"
 #include "unit/types.h"
@@ -100,8 +101,16 @@ static spn_err_t setup_toolchain_unit(spn_toolchain_store_t* store, spn_toolchai
     unit->cc.archiver = spn_toolchain_launcher_with_root(spn.mem, toolchain->archiver, root);
   }
 
-  if (toolchain->source == SPN_TOOLCHAIN_SOURCE_LOCAL) {
-    unit->identity = sp_hash_str(unit->cc.compiler.program.prefix);
+  switch (toolchain->source) {
+    case SPN_TOOLCHAIN_SOURCE_LOCAL: {
+      spn_try(spn_toolchain_probe(&unit->cc, spn_probe_split_path(spn.mem, spn_probe_env_path(spn.env)), &store->probes, spn.mem, &unit->identity));
+      spn_probe_cache_flush(&store->probes);
+      break;
+    }
+    case SPN_TOOLCHAIN_SOURCE_DISTRIBUTION: {
+      unit->version = toolchain->version;
+      break;
+    }
   }
 
   return SPN_OK;

@@ -62,14 +62,15 @@ linkage = "shared"
 
 [profile.mingw]
 toolchain = "zig"
-abi = "mingw"
+os = "windows"
+abi = "gnu"
 
 [profile.msvc]
 toolchain = "msvc"
 abi = "msvc"
 
 [profile.sanitizer]
-toolchain = "system"
+toolchain = "clang"
 linkage = "shared"
 sanitize = ["address", "undefined"]
 
@@ -197,6 +198,7 @@ source = [
   "source/core/target/select.c",
   "source/core/toml/edit.c",
   "source/core/toolchain/catalog.c",
+  "source/core/toolchain/probe.c",
   "source/core/toolchain/provision.c",
   "source/core/toolchain/select.c",
   "source/core/toolchain/toolchain.c",

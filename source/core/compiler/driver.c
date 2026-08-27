@@ -56,19 +56,30 @@ void spn_cc_push_args(sp_mem_t mem, spn_invocation_t* invocation, sp_da(spn_arg_
   }
 }
 
-spn_sanitizer_set_t get_supported_sanitizers(const spn_cc_toolchain_t* toolchain, spn_triple_t target) {
-  spn_sanitizer_set_t set = sp_zero;
-  switch (toolchain->driver) {
-    case SPN_CC_DRIVER_GCC: set = spn_gcc_supported_sanitizers(target); break;
-    case SPN_CC_DRIVER_CLANG: set = spn_clang_supported_sanitizers(target); break;
-    case SPN_CC_DRIVER_MSVC: set = spn_msvc_supported_sanitizers(target); break;
+spn_cc_cap_set_t spn_cc_driver_caps(spn_cc_driver_t driver) {
+  switch (driver) {
+    case SPN_CC_DRIVER_GCC: return SPN_CC_CAP_EXCLUDE_LIBS;
+    case SPN_CC_DRIVER_CLANG: return SPN_CC_CAP_TARGET_TRIPLE | SPN_CC_CAP_CLANG_FRONTEND | SPN_CC_CAP_EXCLUDE_LIBS;
+    case SPN_CC_DRIVER_ZIG: return SPN_CC_CAP_TARGET_TRIPLE | SPN_CC_CAP_CLANG_FRONTEND;
+    case SPN_CC_DRIVER_MSVC: return 0;
     case SPN_CC_DRIVER_NONE: sp_unreachable_case();
   }
+  SP_UNREACHABLE_RETURN(0);
+}
 
-  if (sp_str_equal_cstr(toolchain->name, "zig")) { // @spader Give zig its own driver
-    set &= SPN_SANITIZER_UNDEFINED;
+bool spn_cc_has(const spn_cc_toolchain_t* toolchain, spn_cc_cap_t cap) {
+  return (spn_cc_driver_caps(toolchain->driver) & cap) == (spn_cc_cap_set_t)cap;
+}
+
+spn_sanitizer_set_t get_supported_sanitizers(const spn_cc_toolchain_t* toolchain, spn_triple_t target) {
+  switch (toolchain->driver) {
+    case SPN_CC_DRIVER_GCC: return spn_gcc_supported_sanitizers(target);
+    case SPN_CC_DRIVER_CLANG: return spn_clang_supported_sanitizers(target);
+    case SPN_CC_DRIVER_MSVC: return spn_msvc_supported_sanitizers(target);
+    case SPN_CC_DRIVER_ZIG: return spn_zig_supported_sanitizers(target);
+    case SPN_CC_DRIVER_NONE: sp_unreachable_case();
   }
-  return set;
+  SP_UNREACHABLE_RETURN(0);
 }
 
 spn_err_t spn_cc_validate_profile(const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile) {
@@ -110,7 +121,8 @@ spn_err_t spn_cc_render_flags(sp_mem_t mem, const spn_cc_toolchain_t* toolchain,
   spn_try(spn_cc_validate_profile(toolchain, profile));
   switch (toolchain->driver) {
     case SPN_CC_DRIVER_GCC:
-    case SPN_CC_DRIVER_CLANG: {
+    case SPN_CC_DRIVER_CLANG:
+    case SPN_CC_DRIVER_ZIG: {
       spn_gnu_render_flags(mem, profile, flags);
       break;
     }
@@ -130,7 +142,8 @@ spn_err_t spn_cc_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchai
   *invocation = sp_zero_s(spn_invocation_t);
   switch (toolchain->driver) {
     case SPN_CC_DRIVER_GCC:
-    case SPN_CC_DRIVER_CLANG: {
+    case SPN_CC_DRIVER_CLANG:
+    case SPN_CC_DRIVER_ZIG: {
       spn_gnu_render_compile(mem, toolchain, profile, compile, invocation);
       return SPN_OK;
     }
@@ -162,7 +175,8 @@ spn_invocation_t spn_cc_render_compile_command(sp_mem_t mem, const spn_cc_toolch
 
   switch (toolchain->driver) {
     case SPN_CC_DRIVER_GCC:
-    case SPN_CC_DRIVER_CLANG: {
+    case SPN_CC_DRIVER_CLANG:
+    case SPN_CC_DRIVER_ZIG: {
       spn_gnu_render_compile_files(mem, toolchain, profile, files, &invocation);
       break;
     }
@@ -229,7 +243,8 @@ spn_err_t spn_cc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, 
   *invocation = sp_zero_s(spn_invocation_t);
   switch (toolchain->driver) {
     case SPN_CC_DRIVER_GCC:
-    case SPN_CC_DRIVER_CLANG: {
+    case SPN_CC_DRIVER_CLANG:
+    case SPN_CC_DRIVER_ZIG: {
       spn_gnu_render_link(mem, toolchain, profile, link, files, invocation);
       return SPN_OK;
     }

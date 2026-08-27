@@ -11,10 +11,10 @@ archiver = "ar"
 driver = "clang"
 target = [{ arch = "aarch64", os = "macos" }]
 
-[toolchain.host.x86_64]
+[toolchain.host.x86_64-linux]
 url = "https://tc"
 sha256 = "deadbeef"
 
-[toolchain.host.aarch64]
+[toolchain.host.aarch64-macos]
 url = "https://tc"
 sha256 = "deadbeef"

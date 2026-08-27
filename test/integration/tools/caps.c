@@ -11,8 +11,8 @@
 static const test_toolchain_t toolchains [] = {
   {
     .name = "zig",
-    .driver = SPN_CC_DRIVER_CLANG,
-    .abi = SPN_ABI_MINGW,
+    .driver = SPN_CC_DRIVER_ZIG,
+    .abi = SPN_ABI_GNU,
     .targets = {
       "wasm32-wasi-musl",
       "x86_64-linux-gnu",
@@ -35,7 +35,11 @@ static const test_toolchain_t toolchains [] = {
     },
   },
   {
-    .name = "system",
+    .name = "clang",
+    .driver = SPN_CC_DRIVER_CLANG,
+  },
+  {
+    .name = "gcc",
     .driver = SPN_CC_DRIVER_GCC,
   },
 };

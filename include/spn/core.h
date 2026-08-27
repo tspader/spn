@@ -23,8 +23,8 @@ typedef enum {
   SPN_ABI_NONE,
   SPN_ABI_GNU,
   SPN_ABI_MUSL,
-  SPN_ABI_MINGW,
   SPN_ABI_MSVC,
+  SPN_ABI_APPLE,
 } spn_abi_t;
 
 typedef enum {

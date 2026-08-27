@@ -7,7 +7,7 @@
       "linker":   { "program": "A" },
       "archiver": { "program": "ar" },
       "target": [
-        { "os": "windows", "abi": "gnu" }
+        { "arch": "x86_64", "os": "windows", "abi": "gnu" }
       ]
     },
     {
@@ -22,7 +22,10 @@
         "x86_64-linux": { "url": "https://example.com/linux.tar.xz", "sha256": "aa" }
       },
       "target": [
-        { "os": "linux" }
+        { "arch": "x86_64", "os": "linux", "abi": "gnu" },
+        { "arch": "x86_64", "os": "linux", "abi": "musl" },
+        { "arch": "aarch64", "os": "linux", "abi": "gnu" },
+        { "arch": "aarch64", "os": "linux", "abi": "musl" }
       ]
     },
     {
@@ -32,9 +35,17 @@
       "linker":   { "program": "C" },
       "archiver": { "program": "ar" },
       "target": [
-        { "os": "linux" },
-        { "os": "windows", "abi": "gnu" }
+        { "arch": "aarch64", "os": "linux", "abi": "gnu" },
+        { "arch": "aarch64", "os": "linux", "abi": "musl" },
+        { "arch": "x86_64", "os": "windows", "abi": "gnu" }
       ]
+    },
+    {
+      "name": "D",
+      "driver": "gcc",
+      "compiler": { "program": "D" },
+      "linker":   { "program": "D" },
+      "archiver": { "program": "ar" }
     }
   ]
 }

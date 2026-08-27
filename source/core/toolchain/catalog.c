@@ -33,8 +33,12 @@ spn_err_t spn_toolchain_catalog_init(spn_toolchain_catalog_t* catalog, sp_str_t 
 
     toolchain.hosts = sp_da_new(mem, spn_toolchain_host_t);
     sp_da_for(t->host, it) {
+      spn_triple_t host_triple = sp_zero;
+      if (spn_triple_parse(t->host[it].key, &host_triple) || !host_triple.arch || !host_triple.os) {
+        return SPN_ERROR;
+      }
       sp_da_push(toolchain.hosts, ((spn_toolchain_host_t) {
-        .triple = spn_triple_from_str(t->host[it].key),
+        .triple = host_triple,
         .artifact = {
           .url = t->host[it].value.url,
           .sha256 = t->host[it].value.sha256,
@@ -42,15 +46,26 @@ spn_err_t spn_toolchain_catalog_init(spn_toolchain_catalog_t* catalog, sp_str_t 
         },
       }));
     }
-    toolchain.source = sp_da_empty(toolchain.hosts) ? SPN_TOOLCHAIN_SOURCE_LOCAL : SPN_TOOLCHAIN_SOURCE_DISTRIBUTION;
+    toolchain.source = SPN_TOOLCHAIN_SOURCE_LOCAL;
+    sp_da_for(toolchain.hosts, at) {
+      if (!sp_str_empty(toolchain.hosts[at].artifact.url)) {
+        toolchain.source = SPN_TOOLCHAIN_SOURCE_DISTRIBUTION;
+        break;
+      }
+    }
 
     toolchain.targets = sp_da_new(mem, spn_triple_t);
     sp_da_for(t->target, it) {
-      sp_da_push(toolchain.targets, ((spn_triple_t) {
+      spn_triple_t partial = {
         .arch = sp_opt_is_null(t->target[it].arch) ? SPN_ARCH_NONE : sp_opt_get(t->target[it].arch),
         .os = sp_opt_is_null(t->target[it].os) ? SPN_OS_NONE : sp_opt_get(t->target[it].os),
         .abi = sp_opt_is_null(t->target[it].abi) ? SPN_ABI_NONE : sp_opt_get(t->target[it].abi),
-      }));
+      };
+      spn_triple_t full = sp_zero;
+      if (!spn_triple_entry(partial, &full)) {
+        return SPN_ERROR;
+      }
+      sp_da_push(toolchain.targets, full);
     }
 
     spn_toolchain_catalog_add(catalog, toolchain);
