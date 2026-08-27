@@ -42,6 +42,7 @@ files = [
   "tools/patches/wamr-win-readdir.patch",
   "tools/patches/wamr-sanitize.patch",
   "tools/patches/wamr-musl-stack.patch",
+  "tools/patches/wamr-mingw-tls.patch",
 ]
 
 [profile.default]
