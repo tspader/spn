@@ -134,7 +134,8 @@ static void fixture_setup_paths(fixture_t* fixture) {
 #if defined(SPN_TEST_BIN)
   fixture->paths.spn = test_repo_path(mem, sp_str_lit(SPN_TEST_BIN));
 #else
-  fixture->paths.spn = test_repo_path(mem, exe("spn"));
+  sp_str_t test_dir = sp_fs_parent_path(sp_fs_get_exe_path(mem));
+  fixture->paths.spn = sp_fs_join_path(mem, sp_fs_parent_path(test_dir), exe_file_name("spn", SP_NULLPTR));
 #endif
 }
 

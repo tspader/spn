@@ -706,13 +706,25 @@ static sp_str_t render_event_detail(spn_ctx_t* ctx, sp_mem_t mem, spn_event_t* e
           break;
         }
         case SPN_ERR_SANITIZER_UNSUPPORTED: {
-          sp_fmt_io(
-            &w.base,
-            "toolchain {.cyan} targeting {.yellow} doesn't support {.red}",
-            sp_fmt_str(event->err.sanitizer.toolchain),
-            sp_fmt_str(spn_triple_to_str(mem, event->err.sanitizer.target)),
-            sp_fmt_str(spn_sanitizer_set_to_str(mem, event->err.sanitizer.unsupported))
-          );
+          if (event->err.sanitizer.supported) {
+            sp_fmt_io(
+              &w.base,
+              "toolchain {.cyan} targeting {.yellow} doesn't support {.red}; it supports {.green}",
+              sp_fmt_str(event->err.sanitizer.toolchain),
+              sp_fmt_str(spn_triple_to_str(mem, event->err.sanitizer.target)),
+              sp_fmt_str(spn_sanitizer_set_to_str(mem, event->err.sanitizer.unsupported)),
+              sp_fmt_str(spn_sanitizer_set_to_str(mem, event->err.sanitizer.supported))
+            );
+          } else {
+            sp_fmt_io(
+              &w.base,
+              "toolchain {.cyan} targeting {.yellow} doesn't support any sanitizers; drop {.red} or pick another toolchain with {.cyan}",
+              sp_fmt_str(event->err.sanitizer.toolchain),
+              sp_fmt_str(spn_triple_to_str(mem, event->err.sanitizer.target)),
+              sp_fmt_str(spn_sanitizer_set_to_str(mem, event->err.sanitizer.unsupported)),
+              sp_fmt_str(sp_str_lit("--toolchain"))
+            );
+          }
           break;
         }
         case SPN_ERR_SANITIZER_STATIC: {

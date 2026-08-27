@@ -1,0 +1,19 @@
+diff --git a/core/shared/platform/windows/platform_internal.h b/core/shared/platform/windows/platform_internal.h
+index f77e1ad..45c611e 100644
+--- a/core/shared/platform/windows/platform_internal.h
++++ b/core/shared/platform/windows/platform_internal.h
+@@ -98,7 +98,14 @@ os_mem_commit(void *ptr, size_t size, int flags);
+ void
+ os_mem_decommit(void *ptr, size_t size);
+
++#ifdef _MSC_VER
+ #define os_thread_local_attribute __declspec(thread)
++#else
++/* mingw's headers define __declspec(e) as __attribute__((e)); there is no
++   `thread` attribute, so it is silently ignored and the variable becomes a
++   plain global shared across threads */
++#define os_thread_local_attribute _Thread_local
++#endif
+
+ #define strncasecmp _strnicmp
+ #define strcasecmp _stricmp

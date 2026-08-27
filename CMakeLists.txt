@@ -101,10 +101,8 @@ if(SPN_SANITIZE)
     add_link_options(-fsanitize=address,undefined)
   endif()
 elseif(NOT MSVC)
-  # Zig turns UBSan on (in trap mode) by default in debug builds; force it off
-  # until the UB it catches is fixed. @spader We should nuke this ASAP
-  add_compile_options(-fno-sanitize=undefined)
-  add_link_options(-fno-sanitize=undefined)
+  add_compile_options(-fsanitize-trap=undefined)
+  add_link_options(-fsanitize-trap=undefined)
 endif()
 
 set(EMBED_OBJ ${STORE}/lib/spn.embed.o)

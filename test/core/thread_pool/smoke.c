@@ -20,7 +20,7 @@ static void smoke_run(void* data) {
   sp_atomic_s32_add(&smoke_runs, 1, SP_ATOMIC_SEQ_CST);
 }
 
-static void smoke_exit() {
+static void smoke_exit(void) {
   sp_atomic_s32_add(&smoke_exits, 1, SP_ATOMIC_SEQ_CST);
 }
 

@@ -40,6 +40,9 @@ files = [
   "tools/patches/wamr-wasi-hook.patch",
   "tools/patches/wamr-darwin-timeb.patch",
   "tools/patches/wamr-win-readdir.patch",
+  "tools/patches/wamr-sanitize.patch",
+  "tools/patches/wamr-musl-stack.patch",
+  "tools/patches/wamr-mingw-tls.patch",
 ]
 
 [profile.default]
@@ -66,6 +69,7 @@ toolchain = "msvc"
 abi = "msvc"
 
 [profile.sanitizer]
+toolchain = "system"
 linkage = "shared"
 sanitize = ["address", "undefined"]
 
@@ -306,6 +310,28 @@ source = [
   "source/core/sp/str.c",
   "source/core/triple/triple.c",
   "test/integration/main.c",
+  "test/integration/cli.c",
+  "test/integration/compile_commands.c",
+  "test/integration/consume.c",
+  "test/integration/corrupt.c",
+  "test/integration/cxx.c",
+  "test/integration/deps.c",
+  "test/integration/exports.c",
+  "test/integration/freshness.c",
+  "test/integration/harness_test.c",
+  "test/integration/layout.c",
+  "test/integration/log.c",
+  "test/integration/offline.c",
+  "test/integration/options.c",
+  "test/integration/patch.c",
+  "test/integration/platform.c",
+  "test/integration/profile.c",
+  "test/integration/reexport.c",
+  "test/integration/script.c",
+  "test/integration/target.c",
+  "test/integration/units.c",
+  "test/integration/upstream.c",
+  "test/integration/worlds.c",
   "test/integration/tools/caps.c",
   "test/integration/tools/harness.c",
   "test/tools/fixture.c",

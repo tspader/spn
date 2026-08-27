@@ -73,7 +73,8 @@ spn_sanitizer_set_t get_supported_sanitizers(const spn_cc_toolchain_t* toolchain
 
 spn_err_t spn_cc_validate_profile(const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile) {
   spn_triple_t target = { profile->arch, profile->os, profile->abi };
-  spn_sanitizer_set_t unsupported = profile->sanitizers & ~get_supported_sanitizers(toolchain, target);
+  spn_sanitizer_set_t supported = get_supported_sanitizers(toolchain, target);
+  spn_sanitizer_set_t unsupported = profile->sanitizers & ~supported;
   if (unsupported) {
     return spn_err_emit(&spn, (spn_err_union_t) {
       .kind = SPN_ERR_SANITIZER_UNSUPPORTED,
@@ -81,6 +82,7 @@ spn_err_t spn_cc_validate_profile(const spn_cc_toolchain_t* toolchain, const spn
         .toolchain = toolchain->name,
         .target = target,
         .unsupported = unsupported,
+        .supported = supported,
       },
     });
   }
@@ -95,6 +97,7 @@ spn_err_t spn_cc_validate_profile(const spn_cc_toolchain_t* toolchain, const spn
         .toolchain = toolchain->name,
         .target = target,
         .unsupported = ubsan,
+        .supported = supported,
       },
     });
   }
