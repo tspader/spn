@@ -2,7 +2,7 @@
   "definitions": {
     "arch": { "enum": ["x86_64", "aarch64", "wasm32"] },
     "os": { "enum": ["windows", "linux", "macos", "wasi"] },
-    "abi": { "enum": ["gnu", "musl", "msvc", "mingw"] },
+    "abi": { "enum": ["gnu", "musl", "msvc", "apple"] },
     "linkage": { "enum": ["shared", "static", "source", "object"] },
     "cc_driver": { "enum": ["gcc", "clang", "msvc"], "metadata": { "include": "toolchain/types.h" } },
     "index_protocol": { "enum": ["git", "http", "dir"], "metadata": { "include": "index/types.h" } },

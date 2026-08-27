@@ -58,7 +58,8 @@
       "target": [
         {
           "arch": "wasm32",
-          "os": "wasi"
+          "os": "wasi",
+          "abi": "musl"
         },
         {
           "arch": "x86_64",
@@ -82,11 +83,13 @@
         },
         {
           "arch": "x86_64",
-          "os": "macos"
+          "os": "macos",
+          "abi": "apple"
         },
         {
           "arch": "aarch64",
-          "os": "macos"
+          "os": "macos",
+          "abi": "apple"
         },
         {
           "arch": "x86_64",
@@ -97,16 +100,6 @@
           "arch": "aarch64",
           "os": "windows",
           "abi": "gnu"
-        },
-        {
-          "arch": "x86_64",
-          "os": "windows",
-          "abi": "mingw"
-        },
-        {
-          "arch": "aarch64",
-          "os": "windows",
-          "abi": "mingw"
         }
       ]
     },

@@ -144,7 +144,7 @@ sp_cli_cmd_t spn_cmd_build = {
     {
       .name = "abi",
       .kind = SP_CLI_OPT_STR,
-      .summary = "Override target ABI (gnu, musl, mingw)",
+      .summary = "Override target ABI (gnu, musl, msvc, apple)",
       .placeholder = "ABI",
       .ptr = &host.args.profile.abi,
     },

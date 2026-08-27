@@ -62,7 +62,8 @@ linkage = "shared"
 
 [profile.mingw]
 toolchain = "zig"
-abi = "mingw"
+os = "windows"
+abi = "gnu"
 
 [profile.msvc]
 toolchain = "msvc"
