@@ -47,6 +47,7 @@ add_executable(core
   dag/store.c
   dag/strong_key.c
   dag/tree.c
+  dag/track.c
   dag/wasm.c
   gen/lower.c
   gen/reader.c
@@ -207,6 +208,7 @@ add_executable(core
   ${SRC}/when/when.c
   ${TEST_TOOLS}/fixture.c
   ${TEST_TOOLS}/sp_sim.c
+  ${TEST_TOOLS}/sp_dag_track.c
   ${TEST_TOOLS}/toml.c
   tools/wasm_emit.c
   ${EMBED_OBJ}

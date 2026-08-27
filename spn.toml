@@ -214,6 +214,7 @@ source = [
   "test/core/tools/wasm_emit.c",
   "test/tools/fixture.c",
   "test/tools/sp_sim.c",
+  "test/tools/sp_dag_track.c",
   "test/tools/toml.c",
 ]
 include = ["include", "source/core", "source/core/codegen/gen", "source/core/external", "test/core", "test/core/tools", "test/tools", "tools", "tools/gen"]
