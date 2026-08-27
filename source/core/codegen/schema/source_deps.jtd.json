@@ -1,0 +1,15 @@
+{
+  "metadata": { "format": "data" },
+  "properties": {
+    "Version": { "type": "string", "metadata": { "field": "version" } },
+    "Data": { "ref": "source_deps_data", "metadata": { "field": "data" } }
+  },
+  "definitions": {
+    "source_deps_data": {
+      "properties": {
+        "Source": { "type": "string", "metadata": { "field": "source" } },
+        "Includes": { "elements": { "type": "string" }, "metadata": { "field": "includes" } }
+      }
+    }
+  }
+}

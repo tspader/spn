@@ -71,6 +71,9 @@ set(GEN_FILES
   ${GEN_DIR}/resolve.gen.h
   ${GEN_DIR}/resolve.gen.c
   ${GEN_DIR}/resolve.jtd.json
+  ${GEN_DIR}/source_deps.gen.h
+  ${GEN_DIR}/source_deps.gen.c
+  ${GEN_DIR}/source_deps.jtd.json
   ${GEN_DIR}/toolchains.gen.h
   ${GEN_DIR}/toolchains.gen.c
   ${GEN_DIR}/toolchains.jtd.json

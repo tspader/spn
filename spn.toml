@@ -87,6 +87,7 @@ source = [
   "source/core/codegen/gen/fuzz.gen.c",
   "source/core/codegen/gen/manifest.gen.c",
   "source/core/codegen/gen/release.gen.c",
+  "source/core/codegen/gen/source_deps.gen.c",
   "source/core/codegen/gen/toolchains.gen.c",
 ]
 include = ["include", "source/core", "source/core/external", "source/core/codegen/gen"]
