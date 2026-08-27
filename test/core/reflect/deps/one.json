@@ -1,0 +1,10 @@
+{
+    "Version": "V",
+    "Data": {
+        "Source": "A",
+        "ProvidedModule": "",
+        "Includes": [
+            "B"
+        ]
+    }
+}
