@@ -22,6 +22,7 @@ add_executable(core
   compiler/harness.c
   compiler/archive.c
   compiler/compile.c
+  compiler/depfile.c
   compiler/exports/format.c
   compiler/exports/render.c
   compiler/flags.c
@@ -139,6 +140,7 @@ add_executable(core
   ${SRC}/compiler/exports.c
   ${SRC}/compiler/gnu.c
   ${SRC}/compiler/msvc.c
+  ${SRC}/compiler/occ.c
   ${SRC}/compiler/toc.c
   ${SRC}/core/core.c
   ${SRC}/ctx/ctx.c

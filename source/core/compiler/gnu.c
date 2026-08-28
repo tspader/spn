@@ -1,4 +1,5 @@
 #include "compiler/driver.h"
+#include "compiler/occ.h"
 #include "compiler/push.h"
 
 #include "enum/enum.h"
@@ -184,6 +185,18 @@ void spn_gnu_render_compile_files(sp_mem_t mem, const spn_cc_toolchain_t* toolch
   }
   spn_cc_push_c(mem, invocation, "-o");
   spn_cc_push_path(mem, invocation, files->output);
+}
+
+spn_err_t spn_gnu_parse_depfile(sp_mem_t mem, sp_str_t content, sp_da(sp_str_t)* prereqs) {
+  occ_parser_t parser = sp_zero;
+  if (occ_init(&parser, content)) {
+    return SPN_ERROR;
+  }
+  sp_str_t prereq = sp_zero;
+  while (occ_next(&parser, &prereq)) {
+    sp_da_push(*prereqs, sp_str_copy(mem, prereq));
+  }
+  return parser.err ? SPN_ERROR : SPN_OK;
 }
 
 void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_link_t* link, const spn_cc_link_files_t* files, spn_invocation_t* invocation) {

@@ -145,6 +145,7 @@ source = [
   "source/core/compiler/exports.c",
   "source/core/compiler/gnu.c",
   "source/core/compiler/msvc.c",
+  "source/core/compiler/occ.c",
   "source/core/compiler/toc.c",
   "source/core/core/core.c",
   "source/core/ctx/ctx.c",
@@ -300,8 +301,11 @@ source = [
   "source/core/compiler/driver.c",
   "source/core/compiler/gnu.c",
   "source/core/compiler/msvc.c",
+  "source/core/compiler/occ.c",
+  "source/core/reflect/json.c",
   "source/core/codegen/gen/errors.gen.c",
   "source/core/codegen/gen/events.gen.c",
+  "source/core/codegen/gen/source_deps.gen.c",
   "source/core/codegen/json.c",
   "source/core/codegen/loader.c",
   "source/core/core/core.c",
@@ -345,7 +349,7 @@ source = [
   "test/tools/fixture.c",
   "test/tools/toml.c",
 ]
-include = ["include", "source/core", "source/core/external", "test/integration/tools", "test/tools"]
+include = ["include", "source/core", "source/core/codegen/gen", "source/core/external", "test/integration/tools", "test/tools"]
 flags = []
 
 [[test]]

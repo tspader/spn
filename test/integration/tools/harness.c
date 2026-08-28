@@ -783,6 +783,12 @@ static sp_ps_output_t run_spn_command(sp_test_t* t, fixture_t* fixture, const c8
       }
       sp_ps_config_add_arg(mem, &config, sp_str_view(args[it]));
     }
+    const test_toolchain_t* toolchain = test_toolchain();
+    bool takes_toolchain = sp_cstr_equal(args[0], "build") || sp_cstr_equal(args[0], "test");
+    if (takes_toolchain && !sp_cstr_equal(toolchain->name, "zig")) {
+      sp_ps_config_add_arg(mem, &config, sp_str_lit("--toolchain"));
+      sp_ps_config_add_arg(mem, &config, sp_cstr_as_str(toolchain->name));
+    }
   }
 
   sp_ps_output_t output = sp_ps_run(mem, config);
@@ -1381,10 +1387,6 @@ sp_err_t run_opt_test(sp_test_t* t, opt_test_t test) {
     if (target) {
       command.args[arg++] = "--target";
       command.args[arg++] = target;
-    }
-    if (!sp_str_equal_cstr(sp_str_lit("zig"), toolchain->name)) {
-      command.args[arg++] = "--toolchain";
-      command.args[arg++] = toolchain->name;
     }
     if ((command.expect.bin.name || command.expect.bin.path.len) && !test_when_runs(&when)) {
       command.expect.bin.build_only = true;

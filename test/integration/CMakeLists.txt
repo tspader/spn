@@ -2,8 +2,11 @@ add_executable(integration
   ${SRC}/compiler/driver.c
   ${SRC}/compiler/gnu.c
   ${SRC}/compiler/msvc.c
+  ${SRC}/compiler/occ.c
+  ${SRC}/reflect/json.c
   ${SRC}/codegen/gen/errors.gen.c
   ${SRC}/codegen/gen/events.gen.c
+  ${SRC}/codegen/gen/source_deps.gen.c
   ${SRC}/codegen/json.c
   ${SRC}/codegen/loader.c
   ${SRC}/core/core.c

@@ -3,6 +3,8 @@
 
 #include "enum/enum.h"
 #include "paths/paths.h"
+#include "reflect/reflect.h"
+#include "source_deps.gen.h"
 #include "sp/macro.h"
 
 spn_sanitizer_set_t spn_msvc_supported_sanitizers(spn_triple_t target) {
@@ -122,9 +124,26 @@ void spn_msvc_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, 
 }
 
 void spn_msvc_render_compile_files(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_compile_files_t* files, spn_invocation_t* invocation) {
-  sp_assert(spn_path_empty(files->depfile));
+  if (!spn_path_empty(files->depfile)) {
+    spn_cc_push_c(mem, invocation, "/sourceDependencies");
+    spn_cc_push_path(mem, invocation, files->depfile);
+  }
   spn_cc_push_glued(mem, invocation, "/Fo", files->output);
   spn_cc_push_path(mem, invocation, files->source);
+}
+
+spn_err_t spn_msvc_parse_depfile(sp_mem_t mem, sp_str_t content, sp_da(sp_str_t)* prereqs) {
+  spn_cg_source_deps_t deps = sp_zero;
+  if (spn_reflect_json_read(content, &spn_reflect_source_deps, &deps, mem)) {
+    return SPN_ERROR;
+  }
+  if (sp_str_empty(deps.version) || sp_str_empty(deps.data.source)) {
+    return SPN_ERROR;
+  }
+  sp_da_for(deps.data.includes, it) {
+    sp_da_push(*prereqs, deps.data.includes[it]);
+  }
+  return SPN_OK;
 }
 
 void spn_msvc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_link_t* link, const spn_cc_link_files_t* files, spn_invocation_t* invocation) {

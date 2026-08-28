@@ -80,6 +80,7 @@
     "dag_missing_output": { "ref": "dag" },
     "dag_scratch": { "properties": {} },
     "dag_action": { "properties": {} },
+    "dag_depfile": { "ref": "dag" },
     "dag_store_read": { "ref": "dag" },
     "dag_store_write": { "ref": "dag" },
     "dag_store_missing": { "properties": {} },

@@ -27,6 +27,7 @@ set(SPN_SOURCES
   core/compiler/exports.c
   core/compiler/gnu.c
   core/compiler/msvc.c
+  core/compiler/occ.c
   core/compiler/toc.c
   core/ctx/ctx.c
   core/ctx/init.c
@@ -34,7 +35,6 @@ set(SPN_SOURCES
   core/dag/store.c
   core/dag/run.c
   core/dag/glob.c
-  core/dag/occ.c
   core/dag/stamp.c
   core/dag/wasi.c
   core/dag/wasi/canonicalize.c
