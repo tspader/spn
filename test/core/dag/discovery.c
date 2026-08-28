@@ -95,7 +95,7 @@ static const discovery_test_t discovery_tests [] = {
     .entries = {
       { .key = "K", .obs = { { .path = "/A" } } }
     },
-    .plant = { .key = "K", .content = "not json\n" },
+    .plant = { .key = "K", .content = r("not json") },
     .reload = true,
     .key = "K"
   },
@@ -104,7 +104,7 @@ static const discovery_test_t discovery_tests [] = {
     .entries = {
       { .key = "K", .obs = { { .path = "/A" } } }
     },
-    .plant = { .key = "K", .content = "5\nfile 0 /A\n" },
+    .plant = { .key = "K", .content = r("5") r("file 0 /A") },
     .reload = true,
     .key = "K"
   },
