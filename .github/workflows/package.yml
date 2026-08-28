@@ -25,9 +25,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { id: x86_64-linux, os: ubuntu-latest, triple: x86_64-linux-musl, ext: tar.gz, exe: spn, tar: tar }
-          - { id: aarch64-macos, os: macos-latest, triple: aarch64-macos-none, ext: tar.gz, exe: spn, tar: tar }
-          - { id: x86_64-windows, os: windows-latest, triple: x86_64-windows-msvc, ext: zip, exe: spn.exe, tar: C:/Windows/System32/tar.exe }
+          - { id: x86_64-linux, os: ubuntu-latest, triple: x86_64-linux-musl, ext: tar.gz, exe: spn, tar: tar, render: .build/store/x86_64-linux-gnu/bin/installer_render }
+          - { id: aarch64-macos, os: macos-latest, triple: aarch64-macos-none, ext: tar.gz, exe: spn, tar: tar, render: .build/store/aarch64-macos-none-release/bin/installer_render }
+          - { id: x86_64-windows, os: windows-latest, triple: x86_64-windows-msvc, ext: zip, exe: spn.exe, tar: C:/Windows/System32/tar.exe, render: .build/store/x86_64-windows-msvc-release/bin/installer_render.exe }
     name: package-${{ matrix.id }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
@@ -63,6 +63,11 @@ jobs:
           echo "expected: ${expected}"
           echo "actual:   ${actual}"
           test "${actual}" = "${expected}"
+      - run: test/install/run.sh ${{ matrix.render }} --assets .
+      - if: runner.os == 'Windows'
+        shell: pwsh
+        run: test/install/run.ps1 -Renderer ${{ matrix.render }} -Assets . -Registry
+
       - uses: actions/upload-artifact@v4
         with:
           name: spn-${{ matrix.id }}
