@@ -169,6 +169,6 @@ sp_test(git_key, checkout_key_golden) {
   sp_str_t key = spn_git_checkout_key(sp_test_arena(t), checkout_id((checkout_key_input_t) {
     .url = "https://github.com/foo/bar.git", .rev = "aaa", .dir = ""
   }));
-  sp_expect_str_eq_c(t, key, "bar-51a9a462b5f729ea");
+  sp_expect_str_eq_c(t, key, "bar-d7e1af375d9bffa0");
   return SP_OK;
 }

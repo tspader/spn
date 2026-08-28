@@ -7,6 +7,7 @@
 #include "event/event.h"
 #include "external/wasm/wasm.h"
 #include "git/cache.h"
+#include "hash/digest/digest.h"
 #include "index/index.h"
 #include "intern/intern.h"
 #include "log/lazy/lazy.h"
@@ -99,7 +100,6 @@ static spn_err_t extract_runtime(spn_ctx_t* ctx) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   spn_err_t result = SPN_OK;
 
-  // @spader Use SHA256 for this
   // The stamp must change whenever the embedded runtime does, not just on
   // release; otherwise dev builds compile scripts against a stale extraction
   sp_hash_t runtime_hash = 0;
@@ -107,10 +107,10 @@ static spn_err_t extract_runtime(spn_ctx_t* ctx) {
     spn_embed_entry_t entry = spn_embed_manifest[it];
     sp_hash_t hashes [] = {
       runtime_hash,
-      sp_hash_cstr(entry.path),
-      sp_hash_bytes(entry.data, entry.size, 0),
+      spn_digest_hash_str(sp_cstr_as_str(entry.path)),
+      spn_digest_hash(entry.data, entry.size),
     };
-    runtime_hash = sp_hash_combine(hashes, sp_carr_len(hashes));
+    runtime_hash = spn_digest_hash_combine(hashes, sp_carr_len(hashes));
   }
   sp_str_t stamp = sp_fmt(scratch.mem, "{}:{}", sp_fmt_cstr(SPN_VERSION), sp_fmt_uint(runtime_hash)).value;
 

@@ -699,7 +699,7 @@ spn_err_t spn_dag_store_put_file(spn_dag_store_t* store, sp_str_t path, sp_str_t
     }
     case SPN_DAG_STORE_FILESYSTEM: {
       u64 size = 0;
-      if (spn_sha256_file_digest(path, digest->bytes, &size)) {
+      if (spn_digest_file(SPN_DIGEST_BLAKE3, path, digest->bytes, &size)) {
         return SPN_ERR_DAG_STORE_READ;
       }
       if (store->stats) {

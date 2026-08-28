@@ -19,6 +19,8 @@ add_executable(resolver
   ${SRC}/git/key.c
   ${SRC}/git/url.c
   ${SRC}/git/patch.c
+  ${SRC}/hash/digest/digest.c
+  ${SRC}/hash/sha256/sha256.c
   ${SRC}/when/when.c
   ${SRC}/toolchain/catalog.c
   ${SRC}/codegen/gen/toolchains.gen.c
@@ -58,6 +60,6 @@ add_executable(resolver
 )
 spn_test_binary(resolver)
 target_include_directories(resolver PRIVATE ${SRC}/codegen/gen)
-target_link_libraries(resolver PRIVATE yyjson)
+target_link_libraries(resolver PRIVATE yyjson blake3)
 add_dependencies(resolver spn_codegen_gen)
 add_test(NAME resolver COMMAND "$<TARGET_FILE:resolver>" WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")

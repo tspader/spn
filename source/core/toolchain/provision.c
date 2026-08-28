@@ -2,7 +2,7 @@
 
 #include "ctx/types.h"
 #include "error/error.h"
-#include "sha256/sha256.h"
+#include "hash/digest/digest.h"
 #include "sp/fs.h"
 
 spn_err_t spn_fetch_curl(sp_str_t url, sp_str_t dest, void* user_data) {
@@ -67,7 +67,7 @@ SP_PRIVATE spn_err_t spn_toolchain_provision_fill(spn_toolchain_store_t* store, 
   }
 
   sp_str_t actual = sp_zero;
-  if (spn_sha256_file(store->mem, tarball, &actual) || !sp_str_equal(actual, artifact.sha256)) {
+  if (spn_digest_file_hex(SPN_DIGEST_SHA256, store->mem, tarball, &actual) || !sp_str_equal(actual, artifact.sha256)) {
     sp_fs_remove_file(tarball);
     return spn_err_emit(&spn, (spn_err_union_t) {
       .kind = SPN_ERR_TOOLCHAIN_SHA,

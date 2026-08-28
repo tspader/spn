@@ -1,7 +1,6 @@
 #include "dag/dag.h"
 #include "dag/types.h"
 #include "paths/paths.h"
-#include "sha256/sha256.h"
 #include "sp.h"
 #include "sp/macro.h"
 #include "spn/core.h"
@@ -149,63 +148,63 @@ spn_err_t spn_dag_action_add_output(spn_dag_t* g, spn_dag_id_t action_id, spn_da
   return SPN_OK;
 }
 
-void spn_dag_hash_bytes(spn_sha256_ctx_t* ctx, const void* data, u64 len) {
-  spn_sha256_update(ctx, (const u8*)data, len);
+void spn_dag_hash_bytes(spn_digest_ctx_t* ctx, const void* data, u64 len) {
+  spn_digest_update(ctx, data, len);
 }
 
-void spn_dag_hash_u8(spn_sha256_ctx_t* ctx, u8 value) {
+void spn_dag_hash_u8(spn_digest_ctx_t* ctx, u8 value) {
   spn_dag_hash_bytes(ctx, &value, sizeof(value));
 }
 
-void spn_dag_hash_u64(spn_sha256_ctx_t* ctx, u64 value) {
+void spn_dag_hash_u64(spn_digest_ctx_t* ctx, u64 value) {
   spn_dag_hash_bytes(ctx, &value, sizeof(value));
 }
 
-void spn_dag_hash_str(spn_sha256_ctx_t* ctx, sp_str_t str) {
+void spn_dag_hash_str(spn_digest_ctx_t* ctx, sp_str_t str) {
   spn_dag_hash_u64(ctx, str.len);
   spn_dag_hash_bytes(ctx, str.data, str.len);
 }
 
-void spn_dag_hash_digest(spn_sha256_ctx_t* ctx, spn_dag_digest_t digest) {
+void spn_dag_hash_digest(spn_digest_ctx_t* ctx, spn_dag_digest_t digest) {
   spn_dag_hash_bytes(ctx, digest.bytes, sizeof(digest.bytes));
 }
 
-void spn_dag_hash_path(spn_sha256_ctx_t* ctx, spn_path_t path) {
+void spn_dag_hash_path(spn_digest_ctx_t* ctx, spn_path_t path) {
   spn_dag_hash_u8(ctx, (u8)path.root);
   spn_dag_hash_str(ctx, path.sub);
 }
 
-void spn_dag_hash_paths(spn_sha256_ctx_t* ctx, sp_da(spn_path_t) paths) {
+void spn_dag_hash_paths(spn_digest_ctx_t* ctx, sp_da(spn_path_t) paths) {
   spn_dag_hash_u64(ctx, sp_da_size(paths));
   sp_da_for(paths, it) {
     spn_dag_hash_path(ctx, paths[it]);
   }
 }
 
-void spn_dag_hash_arg(spn_sha256_ctx_t* ctx, spn_arg_t arg) {
+void spn_dag_hash_arg(spn_digest_ctx_t* ctx, spn_arg_t arg) {
   spn_dag_hash_str(ctx, arg.prefix);
   spn_dag_hash_path(ctx, arg.path);
 }
 
-void spn_dag_hash_args(spn_sha256_ctx_t* ctx, sp_da(spn_arg_t) args) {
+void spn_dag_hash_args(spn_digest_ctx_t* ctx, sp_da(spn_arg_t) args) {
   spn_dag_hash_u64(ctx, sp_da_size(args));
   sp_da_for(args, it) {
     spn_dag_hash_arg(ctx, args[it]);
   }
 }
 
-spn_dag_digest_t spn_dag_hash_final(spn_sha256_ctx_t* ctx) {
+spn_dag_digest_t spn_dag_hash_final(spn_digest_ctx_t* ctx) {
   spn_dag_digest_t digest = sp_zero;
-  spn_sha256_final(ctx, digest.bytes);
+  spn_digest_final(ctx, digest.bytes);
   return digest;
 }
 
 spn_dag_digest_t spn_dag_weak_key(spn_dag_t* g, spn_dag_id_t action_id) {
   spn_dag_action_t* action = spn_dag_find_action(g, action_id);
 
-  spn_sha256_ctx_t ctx = sp_zero;
-  spn_sha256_init(&ctx);
-  spn_dag_hash_str(&ctx, sp_str_lit("spn.dag.action.v2"));
+  spn_digest_ctx_t ctx = sp_zero;
+  spn_digest_init_blake3(&ctx);
+  spn_dag_hash_str(&ctx, sp_str_lit("spn.dag.action.v3"));
   spn_dag_hash_digest(&ctx, action->identity);
 
   spn_dag_hash_u64(&ctx, sp_da_size(action->consumes));
@@ -227,9 +226,9 @@ spn_dag_digest_t spn_dag_weak_key(spn_dag_t* g, spn_dag_id_t action_id) {
 }
 
 spn_dag_digest_t spn_dag_strong_key(spn_dag_digest_t weak, const spn_dag_obs_t* obs, u32 count) {
-  spn_sha256_ctx_t ctx = sp_zero;
-  spn_sha256_init(&ctx);
-  spn_dag_hash_str(&ctx, sp_str_lit("spn.dag.strong.v6"));
+  spn_digest_ctx_t ctx = sp_zero;
+  spn_digest_init_blake3(&ctx);
+  spn_dag_hash_str(&ctx, sp_str_lit("spn.dag.strong.v7"));
   spn_dag_hash_digest(&ctx, weak);
   spn_dag_hash_u64(&ctx, count);
   sp_for(it, count) {
@@ -245,7 +244,7 @@ spn_dag_digest_t spn_dag_strong_key(spn_dag_digest_t weak, const spn_dag_obs_t* 
 
 spn_dag_digest_t spn_dag_digest(const void* data, u64 len) {
   spn_dag_digest_t digest = sp_zero;
-  spn_sha256(data, len, digest.bytes);
+  spn_digest(SPN_DIGEST_BLAKE3, data, len, digest.bytes);
   return digest;
 }
 
@@ -263,7 +262,7 @@ bool spn_dag_digest_valid(spn_dag_digest_t digest) {
 }
 
 sp_str_t spn_dag_digest_hex(sp_mem_t mem, spn_dag_digest_t digest) {
-  return spn_sha256_digest_hex(mem, digest.bytes);
+  return spn_digest_hex(mem, digest.bytes);
 }
 
 bool spn_dag_digest_parse(sp_str_t hex, spn_dag_digest_t* out) {

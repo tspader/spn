@@ -5,7 +5,7 @@
 #include "spn/core.h"
 #include "dag/types.h"
 #include "thread_pool/types.h"
-#include "sha256/sha256.h"
+#include "hash/digest/digest.h"
 
 spn_dag_t*          spn_dag_new(sp_mem_t mem, const spn_path_roots_t* roots);
 spn_dag_artifact_t* spn_dag_find_artifact(spn_dag_t* g, spn_dag_id_t id);
@@ -18,16 +18,16 @@ spn_dag_id_t        spn_dag_add_action(spn_dag_t* g, spn_dag_action_config_t con
 void                spn_dag_action_add_input(spn_dag_t* g, spn_dag_id_t action, spn_dag_id_t artifact);
 spn_err_t           spn_dag_action_add_output(spn_dag_t* g, spn_dag_id_t action, spn_dag_id_t artifact);
 
-void                spn_dag_hash_bytes(spn_sha256_ctx_t* ctx, const void* data, u64 len);
-void                spn_dag_hash_u8(spn_sha256_ctx_t* ctx, u8 value);
-void                spn_dag_hash_u64(spn_sha256_ctx_t* ctx, u64 value);
-void                spn_dag_hash_str(spn_sha256_ctx_t* ctx, sp_str_t str);
-void                spn_dag_hash_digest(spn_sha256_ctx_t* ctx, spn_dag_digest_t digest);
-void                spn_dag_hash_path(spn_sha256_ctx_t* ctx, spn_path_t path);
-void                spn_dag_hash_paths(spn_sha256_ctx_t* ctx, sp_da(spn_path_t) paths);
-void                spn_dag_hash_arg(spn_sha256_ctx_t* ctx, spn_arg_t arg);
-void                spn_dag_hash_args(spn_sha256_ctx_t* ctx, sp_da(spn_arg_t) args);
-spn_dag_digest_t    spn_dag_hash_final(spn_sha256_ctx_t* ctx);
+void                spn_dag_hash_bytes(spn_digest_ctx_t* ctx, const void* data, u64 len);
+void                spn_dag_hash_u8(spn_digest_ctx_t* ctx, u8 value);
+void                spn_dag_hash_u64(spn_digest_ctx_t* ctx, u64 value);
+void                spn_dag_hash_str(spn_digest_ctx_t* ctx, sp_str_t str);
+void                spn_dag_hash_digest(spn_digest_ctx_t* ctx, spn_dag_digest_t digest);
+void                spn_dag_hash_path(spn_digest_ctx_t* ctx, spn_path_t path);
+void                spn_dag_hash_paths(spn_digest_ctx_t* ctx, sp_da(spn_path_t) paths);
+void                spn_dag_hash_arg(spn_digest_ctx_t* ctx, spn_arg_t arg);
+void                spn_dag_hash_args(spn_digest_ctx_t* ctx, sp_da(spn_arg_t) args);
+spn_dag_digest_t    spn_dag_hash_final(spn_digest_ctx_t* ctx);
 
 
 spn_dag_digest_t    spn_dag_weak_key(spn_dag_t* g, spn_dag_id_t action);

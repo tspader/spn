@@ -5,11 +5,11 @@
 #include "graph/build.h"
 #include "paths/paths.h"
 #include "session/types.h"
-#include "sha256/sha256.h"
+#include "hash/digest/digest.h"
 #include "unit/package.h"
 #include "unit/unit.h"
 
-static void identity_hash_pin(spn_sha256_ctx_t* ctx, const spn_build_source_pin_t* pin) {
+static void identity_hash_pin(spn_digest_ctx_t* ctx, const spn_build_source_pin_t* pin) {
   spn_dag_hash_u8(ctx, (u8)pin->kind);
   spn_dag_hash_str(ctx, pin->rev);
   spn_dag_hash_str(ctx, pin->dir);
@@ -44,9 +44,9 @@ bool spn_build_copy_to_include(spn_publish_copy_t* copy, sp_str_t* rest) {
 }
 
 spn_dag_digest_t spn_build_tree_identity(spn_pkg_unit_t* unit, const spn_build_source_pin_t* pin) {
-  spn_sha256_ctx_t ctx = sp_zero;
-  spn_sha256_init(&ctx);
-  spn_dag_hash_str(&ctx, sp_str_lit("spn.build.tree.v6"));
+  spn_digest_ctx_t ctx = sp_zero;
+  spn_digest_init_blake3(&ctx);
+  spn_dag_hash_str(&ctx, sp_str_lit("spn.build.tree.v7"));
   spn_dag_hash_str(&ctx, unit->info->qualified);
   identity_hash_pin(&ctx, pin);
 
@@ -79,9 +79,9 @@ spn_dag_digest_t spn_build_tree_identity(spn_pkg_unit_t* unit, const spn_build_s
 }
 
 spn_dag_digest_t spn_build_package_identity(spn_pkg_unit_t* unit, const spn_build_source_pin_t* pin) {
-  spn_sha256_ctx_t ctx = sp_zero;
-  spn_sha256_init(&ctx);
-  spn_dag_hash_str(&ctx, sp_str_lit("spn.build.package.v2"));
+  spn_digest_ctx_t ctx = sp_zero;
+  spn_digest_init_blake3(&ctx);
+  spn_dag_hash_str(&ctx, sp_str_lit("spn.build.package.v3"));
   spn_dag_hash_str(&ctx, unit->info->qualified);
   identity_hash_pin(&ctx, pin);
   sp_da_for(unit->info->publish.copy, it) {
@@ -93,9 +93,9 @@ spn_dag_digest_t spn_build_package_identity(spn_pkg_unit_t* unit, const spn_buil
 }
 
 spn_dag_digest_t spn_build_user_identity(spn_user_node_t* node, const spn_build_source_pin_t* pin) {
-  spn_sha256_ctx_t ctx = sp_zero;
-  spn_sha256_init(&ctx);
-  spn_dag_hash_str(&ctx, sp_str_lit("spn.build.user.v5"));
+  spn_digest_ctx_t ctx = sp_zero;
+  spn_digest_init_blake3(&ctx);
+  spn_dag_hash_str(&ctx, sp_str_lit("spn.build.user.v6"));
   spn_dag_hash_str(&ctx, node->pkg->info->qualified);
   identity_hash_pin(&ctx, pin);
   spn_dag_hash_str(&ctx, node->tag);
@@ -105,7 +105,7 @@ spn_dag_digest_t spn_build_user_identity(spn_user_node_t* node, const spn_build_
   return spn_dag_hash_final(&ctx);
 }
 
-static void identity_hash_invocation(spn_sha256_ctx_t* ctx, const spn_toolchain_unit_t* toolchain, const spn_invocation_t* invocation) {
+static void identity_hash_invocation(spn_digest_ctx_t* ctx, const spn_toolchain_unit_t* toolchain, const spn_invocation_t* invocation) {
   spn_dag_hash_u64(ctx, toolchain->identity);
   spn_dag_hash_arg(ctx, invocation->program);
   spn_dag_hash_path(ctx, invocation->cwd);
@@ -114,9 +114,9 @@ static void identity_hash_invocation(spn_sha256_ctx_t* ctx, const spn_toolchain_
 
 spn_dag_digest_t spn_build_compile_identity(const spn_compile_unit_t* unit) {
   sp_assert(!spn_arg_empty(unit->invocation.program));
-  spn_sha256_ctx_t ctx = sp_zero;
-  spn_sha256_init(&ctx);
-  spn_dag_hash_str(&ctx, sp_str_lit("spn.build.compile.v5"));
+  spn_digest_ctx_t ctx = sp_zero;
+  spn_digest_init_blake3(&ctx);
+  spn_dag_hash_str(&ctx, sp_str_lit("spn.build.compile.v6"));
   identity_hash_invocation(&ctx, unit->target->pkg->build->toolchain, &unit->invocation);
   spn_dag_hash_path(&ctx, unit->paths.file);
   return spn_dag_hash_final(&ctx);
@@ -132,9 +132,9 @@ spn_err_t spn_build_link_identity(sp_mem_t mem, spn_target_unit_t* target, spn_p
   spn_invocation_t invocation = sp_zero;
   spn_try(spn_target_link_invocation(mem, target, &files, &invocation));
 
-  spn_sha256_ctx_t ctx = sp_zero;
-  spn_sha256_init(&ctx);
-  spn_dag_hash_str(&ctx, sp_str_lit("spn.build.link.v5"));
+  spn_digest_ctx_t ctx = sp_zero;
+  spn_digest_init_blake3(&ctx);
+  spn_dag_hash_str(&ctx, sp_str_lit("spn.build.link.v6"));
   identity_hash_invocation(&ctx, target->pkg->build->toolchain, &invocation);
   *identity = spn_dag_hash_final(&ctx);
   return SPN_OK;
@@ -151,9 +151,9 @@ spn_err_t spn_build_exports_identity(sp_mem_t mem, spn_target_unit_t* target, sp
   spn_try(spn_cc_render_archive(mem, &build->toolchain->cc, &build->profile, &files, &invocation));
   invocation.cwd = target->pkg->paths.work;
 
-  spn_sha256_ctx_t ctx = sp_zero;
-  spn_sha256_init(&ctx);
-  spn_dag_hash_str(&ctx, sp_str_lit("spn.build.exports.v3"));
+  spn_digest_ctx_t ctx = sp_zero;
+  spn_digest_init_blake3(&ctx);
+  spn_dag_hash_str(&ctx, sp_str_lit("spn.build.exports.v4"));
   identity_hash_invocation(&ctx, build->toolchain, &invocation);
   spn_dag_hash_u8(&ctx, (u8)target->kind);
   spn_dag_hash_u8(&ctx, (u8)build->profile.os);

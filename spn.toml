@@ -28,6 +28,7 @@ include = ["include", "source/core", "tools", "tools/gen"]
 wamr = { path = "vendor/wamr" }
 toml = "1.6.0"
 yyjson = "0.14.0"
+blake3 = "1.8.7"
 
 [deps.build]
 "spader/sp" = { path = "vendor/sp" }
@@ -196,7 +197,8 @@ source = [
   "source/core/session/invocation.c",
   "source/core/session/options.c",
   "source/core/session/session.c",
-  "source/core/sha256/sha256.c",
+  "source/core/hash/digest/digest.c",
+  "source/core/hash/sha256/sha256.c",
   "source/core/sp/fs.c",
   "source/core/sp/io.c",
   "source/core/sp/str.c",
@@ -255,6 +257,8 @@ source = [
   "source/core/git/key.c",
   "source/core/git/url.c",
   "source/core/git/patch.c",
+  "source/core/hash/digest/digest.c",
+  "source/core/hash/sha256/sha256.c",
   "source/core/when/when.c",
   "source/core/toolchain/catalog.c",
   "source/core/codegen/gen/toolchains.gen.c",
@@ -366,7 +370,8 @@ source = [
   "source/core/codegen/loader.c",
   "source/core/codegen/gen/fuzz.gen.c",
   "source/core/external/tom.c",
-  "source/core/sha256/sha256.c",
+  "source/core/hash/digest/digest.c",
+  "source/core/hash/sha256/sha256.c",
   "source/core/sp/fs.c",
   "source/core/sp/io.c",
   "source/core/intern/intern.c",
@@ -410,6 +415,8 @@ source = [
   "source/core/git/key.c",
   "source/core/git/url.c",
   "source/core/git/patch.c",
+  "source/core/hash/digest/digest.c",
+  "source/core/hash/sha256/sha256.c",
   "source/core/when/when.c",
   "source/core/toolchain/catalog.c",
   "source/core/codegen/gen/toolchains.gen.c",

@@ -189,7 +189,8 @@ add_executable(core
   ${SRC}/session/invocation.c
   ${SRC}/session/options.c
   ${SRC}/session/session.c
-  ${SRC}/sha256/sha256.c
+  ${SRC}/hash/digest/digest.c
+  ${SRC}/hash/sha256/sha256.c
   ${SRC}/sp/fs.c
   ${SRC}/sp/io.c
   ${SRC}/sp/str.c
@@ -247,7 +248,7 @@ set_source_files_properties(
   toolchain/sha256.c
   toolchain/toolchain.c
   PROPERTIES COMPILE_DEFINITIONS "TOOLCHAINS_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/toolchain/toolchains\"")
-target_link_libraries(core PRIVATE yyjson vmlib)
+target_link_libraries(core PRIVATE yyjson vmlib blake3)
 add_dependencies(core spn_embed spn_codegen_gen)
 add_test(NAME core COMMAND "$<TARGET_FILE:core>" WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
 add_test(NAME core_sim COMMAND "$<TARGET_FILE:core>" --filter "dag_*" WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")

@@ -10,12 +10,12 @@ static const digest_test_t digest_tests [] = {
   {
     .name = "empty",
     .data = "",
-    .hex = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    .hex = "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262"
   },
   {
     .name = "abc",
     .data = "abc",
-    .hex = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+    .hex = "6437b3ac38465133ffb63b75273a8db548c558465d79db03fd359c6cd5bd9d85"
   },
 };
 

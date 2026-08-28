@@ -4,7 +4,7 @@
 #include "core/core.h"
 #include "paths/paths.h"
 #include "thread_pool/thread_pool.h"
-#include "sha256/sha256.h"
+#include "hash/digest/digest.h"
 #include "sp.h"
 #include "spn/core.h"
 #include "sp/fs.h"
@@ -194,7 +194,7 @@ spn_err_t spn_dag_file_cache_digest(spn_dag_file_cache_t* c, spn_path_t path, sp
 
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
   u64 size = 0;
-  spn_err_t err = spn_sha256_file_digest(spn_path_str(c->roots, s.mem, path), digest->bytes, &size);
+  spn_err_t err = spn_digest_file(SPN_DIGEST_BLAKE3, spn_path_str(c->roots, s.mem, path), digest->bytes, &size);
   sp_mem_end_scratch(s);
   spn_try(err);
   if (c->stats) {
@@ -501,8 +501,8 @@ static spn_err_t membership_digest(sp_str_t dir, sp_str_t filter, spn_dag_digest
   }
   sp_da_sort(members, member_order);
 
-  spn_sha256_ctx_t ctx = sp_zero;
-  spn_sha256_init(&ctx);
+  spn_digest_ctx_t ctx = sp_zero;
+  spn_digest_init_blake3(&ctx);
   spn_dag_hash_str(&ctx, sp_str_lit("spn.dag.enum.v1"));
   spn_dag_hash_u64(&ctx, sp_da_size(members));
   sp_da_for(members, it) {

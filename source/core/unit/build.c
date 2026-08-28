@@ -1,6 +1,7 @@
 #include "unit/unit.h"
 
 #include "ctx/types.h"
+#include "hash/digest/digest.h"
 #include "paths/paths.h"
 #include "profile/profile.h"
 #include "sp/str.h"
@@ -38,9 +39,10 @@ spn_build_config_t spn_build_config_metaprogram(spn_triple_t host) {
 spn_build_id_t spn_build_id(const spn_build_config_t* config) {
   const spn_profile_info_t* profile = &config->profile;
   sp_hash_t parts [] = {
-    sp_hash_str(profile->name),
-    sp_hash_str(profile->toolchain),
-    spn_path_hash(profile->sysroot),
+    spn_digest_hash_str(profile->name),
+    spn_digest_hash_str(profile->toolchain),
+    (sp_hash_t)profile->sysroot.root,
+    spn_digest_hash_str(profile->sysroot.sub),
     (sp_hash_t)profile->os,
     (sp_hash_t)profile->arch,
     (sp_hash_t)profile->abi,
@@ -49,13 +51,13 @@ spn_build_id_t spn_build_id(const spn_build_config_t* config) {
     (sp_hash_t)profile->mode,
     (sp_hash_t)profile->opt,
     (sp_hash_t)profile->targeted,
-    sp_hash_bytes(&profile->sanitizers, sizeof(profile->sanitizers), 0),
+    spn_digest_hash(&profile->sanitizers, sizeof(profile->sanitizers)),
     (sp_hash_t)config->host.arch,
     (sp_hash_t)config->host.os,
     (sp_hash_t)config->host.abi,
     (sp_hash_t)config->role,
   };
-  return sp_hash_combine(parts, sp_carr_len(parts));
+  return spn_digest_hash_combine(parts, sp_carr_len(parts));
 }
 
 static bool same_triple(spn_triple_t lhs, spn_triple_t rhs) {
