@@ -24,6 +24,7 @@ typedef struct {
   const c8* target;
   bool exports;
   bool deterministic;
+  bool msvc_todo;
 } test_when_t;
 
 typedef struct {

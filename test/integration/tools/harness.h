@@ -131,6 +131,7 @@ typedef struct {
 typedef struct {
   const c8* project;
   const c8* copy [16];
+  test_when_t when;
   const c8* args [SPN_TEST_COMMAND_MAX_ARGS];
   const c8* env [SPN_TEST_COMMAND_MAX_ENV];
   const c8* output;

@@ -3,6 +3,7 @@
 sp_test(layout, staged_bin) {
   return run_command_test(t, (command_test_t) {
     .project = "test/integration/fixtures/layout/test_shared",
+    .when.msvc_todo = true,
     .copy = { "check.c", "packages/*" },
     .args = { "build" },
     .expect = {
@@ -15,6 +16,7 @@ sp_test(layout, staged_bin) {
 sp_test(layout, staged_test) {
   return run_command_test(t, (command_test_t) {
     .project = "test/integration/fixtures/layout/test_shared",
+    .when.msvc_todo = true,
     .copy = { "check.c", "packages/*" },
     .args = { "build" },
     .expect = {
@@ -30,6 +32,7 @@ sp_test(layout, staged_test) {
 sp_test(layout, staged_identity) {
   fixture_t fixture = sp_zero;
   sp_try(fixture_init(t, &fixture));
+  sp_try(test_when(t, (test_when_t) { .msvc_todo = true }));
   sp_try(run_command(t, &fixture, (command_test_t) {
     .project = "test/integration/fixtures/layout/test_shared",
     .copy = { "check.c", "packages/*" },
@@ -51,6 +54,7 @@ sp_test(layout, staged_identity) {
 sp_test(layout, staged_script) {
   return run_command_test(t, (command_test_t) {
     .project = "test/integration/fixtures/script/staged",
+    .when.msvc_todo = true,
     .args = { "build", "main" },
     .expect.exists = { exe("main") },
   });
@@ -77,6 +81,7 @@ sp_test(layout, reserved_bin_name) {
 sp_test(layout, target_triple) {
   return run_command_test(t, (command_test_t) {
     .project = "test/integration/fixtures/layout/test_shared",
+    .when.msvc_todo = true,
     .copy = { "check.c", "packages/*" },
     .args = { "build", "--target", SPN_TEST_TRIPLE },
     .expect = {

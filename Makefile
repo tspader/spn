@@ -137,10 +137,18 @@ stage0:
 
 ci-selfhost: export SPN_CONFIG_DIR := $(BUILD)/ci-config
 ci-selfhost: stage0 $(addprefix selfhost-,$(SELFHOST_PROFILES))
+ifeq ($(OS),Windows_NT)
+ci-selfhost: selfhost-msvc-matrix
+endif
 
 selfhost-%: stage0
 	@"$(STAGE0)" build -p $*
 	@"$(STAGE0)" test -p $*
+
+.PHONY: selfhost-msvc-matrix
+selfhost-msvc-matrix: export SPN_TEST_TOOLCHAIN := msvc
+selfhost-msvc-matrix: stage0
+	@"$(STAGE0)" test -p msvc integration
 
 smoke: build
 	@ctest --test-dir $(WORK) -C $(CONFIG) --output-on-failure -E "graph|integration|^fuzz"

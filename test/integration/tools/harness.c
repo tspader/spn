@@ -985,6 +985,7 @@ sp_err_t run_command(sp_test_t* t, fixture_t* fixture, command_test_t test) {
 sp_err_t run_command_test(sp_test_t* t, command_test_t test) {
   fixture_t fixture = sp_zero;
   sp_try(fixture_init(t, &fixture));
+  sp_try(test_when(t, test.when));
   if (!test.project) {
     sp_try(prepare_test(t, &fixture, SP_NULLPTR, SP_NULLPTR));
   }

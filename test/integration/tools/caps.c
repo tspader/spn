@@ -172,6 +172,10 @@ sp_str_t test_when_blocked(test_when_t when) {
       sp_fmt_cstr(toolchain->name)).value;
   }
 
+  if (when.msvc_todo && toolchain->driver == SPN_CC_DRIVER_MSVC) {
+    return sp_str_lit("not yet implemented for the msvc toolchain");
+  }
+
   return sp_str_lit("");
 }
 

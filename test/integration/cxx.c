@@ -15,6 +15,7 @@ sp_test(cxx, static_lib) {
 sp_test(cxx, shared_lib) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cxx/shared_lib",
+    .when.msvc_todo = true,
     .copy = { "packages/*" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
@@ -71,6 +72,7 @@ sp_test(cxx, rtti_off) {
 sp_test(cxx, static_into_shared) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cxx/static_into_shared",
+    .when.msvc_todo = true,
     .copy = { "packages/*" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
@@ -128,6 +130,7 @@ sp_test(cxx, script_rejected) {
 sp_test(cxx, toolchain_missing) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cxx/toolchain_missing",
+    .when.msvc_todo = true,
     .copy = { "packages/*" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },

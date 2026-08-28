@@ -384,6 +384,7 @@ sp_test(script, add_include) {
 sp_test(script, add_system_dep) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/script/add_system_dep",
+    .when.msvc_todo = true,
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
       { .kind = ACTION_RUN_BIN, .bin.name = "main" },
