@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -eu
 
-VERSION="0.4.2"
+VERSION="0.4.3"
 
 if [ "${1:-}" = "--version" ]; then
   printf '%s\n' "$VERSION"
@@ -28,9 +28,9 @@ esac
 EXE=spn
 TAR=tar
 case "$ARCH-$OS" in
-  x86_64-linux)   ASSET="spn-x86_64-linux.tar.gz"  SHA=86140cfc9e5ff4937c2e371f5fa70f8543e6fb94c2754a7fc0f2e1c46e1d44e6 ;;
-  aarch64-macos)  ASSET="spn-aarch64-macos.tar.gz" SHA=19ca2d3b638f30044fc54672f00d11f69efdd46bc32e346458c6fab1ff80454c ;;
-  x86_64-windows) ASSET="spn-x86_64-windows.zip"   SHA=55c179b4cf92251e22980dd5ae35cb1d94b69f48d97bb07b66bfab4dc14deef6 EXE=spn.exe TAR="C:/Windows/System32/tar.exe" ;;
+  x86_64-linux)   ASSET="spn-x86_64-linux.tar.gz"  SHA=1748eda999d91fe3e41d716cd3baf3a3535be2b5cfa39a36c7d4344646be44fd ;;
+  aarch64-macos)  ASSET="spn-aarch64-macos.tar.gz" SHA=f7f94610da2d8f35779c642c4ade7da8b1ca1b37c0ae63a871ec6804d3038d9a ;;
+  x86_64-windows) ASSET="spn-x86_64-windows.zip"   SHA=f186fd607e38fa9ec664ae1cf7011af572172afeb9830a61cdec0a33138ce5fe EXE=spn.exe TAR="C:/Windows/System32/tar.exe" ;;
   *) echo "stage0: no release asset for $ARCH-$OS; set SPN_STAGE0 to a spn $VERSION binary" >&2; exit 1 ;;
 esac
 
