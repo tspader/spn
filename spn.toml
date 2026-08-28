@@ -116,6 +116,7 @@ source = [
   "test/core/gen/*.c",
   "test/core/git/*.c",
   "test/core/index/*.c",
+  "test/core/install/*.c",
   "test/core/jtd/*.c",
   "test/core/lock/*.c",
   "test/core/manifest/gen/gen.c",
@@ -134,6 +135,7 @@ source = [
   "test/core/unit/*.c",
   "tools/jtd.c",
   "tools/gen/lower.c",
+  "tools/install/render.c",
   "source/core/codegen/codegen.c",
   "source/core/codegen/loader.c",
   "source/core/codegen/json.c",
@@ -230,7 +232,7 @@ source = [
   "test/tools/dag/track.c",
   "test/tools/toml.c",
 ]
-include = ["include", "source/core", "source/core/codegen/gen", "source/core/external", "test/core", "test/core/tools", "test/tools", "tools", "tools/gen"]
+include = ["include", "source/core", "source/core/codegen/gen", "source/core/external", "test/core", "test/core/tools", "test/tools", "tools", "tools/gen", "tools/install"]
 flags = [
   '-DSCHEMA_GEN_DIR="source/core/codegen/gen"',
   '-DSCHEMA_DIR="source/core/codegen/schema"',
