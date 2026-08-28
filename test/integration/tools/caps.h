@@ -23,6 +23,7 @@ typedef struct {
   spn_os_t os;
   const c8* target;
   bool exports;
+  bool deterministic;
 } test_when_t;
 
 typedef struct {

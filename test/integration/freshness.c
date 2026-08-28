@@ -113,6 +113,7 @@ sp_test(freshness, dep_header_inert) {
   return run_rebuild_test(t, (rebuild_test_t) {
     .project = "test/integration/fixtures/freshness/dep",
     .copy = { "packages/*" },
+    .when.deterministic = true,
     .first = {
       .args = { "build", "-p", "debug" },
       .expect.exists = { store_file("bin/main") },

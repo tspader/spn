@@ -89,6 +89,7 @@ void spn_msvc_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, 
   // cl reads sources in the system ANSI codepage by default; non-ASCII
   // string literals are mangled without this
   spn_cc_push_c(mem, invocation, "/utf-8");
+  spn_cc_push_c(mem, invocation, "/Brepro");
   spn_cc_flags_t flags = sp_zero;
   sp_da_init(mem, flags.compile);
   sp_da_init(mem, flags.link);

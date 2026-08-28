@@ -3,7 +3,7 @@
 
 #include "sp.h"
 
-#define spn_reflect_offset(type, field) ((u32)__builtin_offsetof(type, field))
+#define spn_reflect_offset(type, field) ((u32)(u64)&(((type*)0)->field))
 
 typedef enum {
   SPN_REFLECT_STR,

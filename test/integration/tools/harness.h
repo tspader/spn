@@ -177,6 +177,7 @@ typedef struct {
 typedef struct {
   const c8* project;
   const c8* copy [16];
+  test_when_t when;
   command_test_t first;
   rebuild_step_t rebuilds [SPN_TEST_REBUILD_MAX_STEPS];
   rebuild_watch_t watches [SPN_TEST_REBUILD_MAX_WATCHES];
