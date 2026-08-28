@@ -41,6 +41,21 @@ add_library(yyjson STATIC ${SOURCE_ROOT}/yyjson/src/yyjson.c)
 target_include_directories(yyjson PUBLIC ${SOURCE_ROOT}/yyjson/src)
 set_target_properties(yyjson PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${STORE}/lib)
 
+add_library(blake3 STATIC
+  ${SOURCE_ROOT}/blake3/c/blake3.c
+  ${SOURCE_ROOT}/blake3/c/blake3_dispatch.c
+  ${SOURCE_ROOT}/blake3/c/blake3_portable.c
+)
+target_compile_definitions(blake3 PRIVATE
+  BLAKE3_NO_SSE2
+  BLAKE3_NO_SSE41
+  BLAKE3_NO_AVX2
+  BLAKE3_NO_AVX512
+  BLAKE3_USE_NEON=0
+)
+target_include_directories(blake3 PUBLIC ${SOURCE_ROOT}/blake3/c)
+set_target_properties(blake3 PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${STORE}/lib)
+
 ########
 # WAMR #
 ########

@@ -1,4 +1,4 @@
-#include "sha256/sha256.h"
+#include "hash/sha256/sha256.h"
 
 
 static const u32 spn_sha256_k [64] = {
@@ -118,72 +118,4 @@ void spn_sha256_final(spn_sha256_ctx_t* ctx, u8 digest [32]) {
     digest[it * 4 + 2] = (u8)(ctx->state[it] >> 8);
     digest[it * 4 + 3] = (u8)(ctx->state[it]);
   }
-}
-
-sp_str_t spn_sha256_digest_hex(sp_mem_t mem, const u8 digest [32]) {
-  static const c8 hex [] = "0123456789abcdef";
-  c8* buffer = (c8*)sp_alloc(mem, 64);
-  sp_for(it, 32) {
-    buffer[it * 2] = hex[digest[it] >> 4];
-    buffer[it * 2 + 1] = hex[digest[it] & 0xf];
-  }
-  return sp_str(buffer, 64);
-}
-
-void spn_sha256(const void* data, u64 len, u8 digest [32]) {
-  spn_sha256_ctx_t ctx = sp_zero;
-  spn_sha256_init(&ctx);
-  spn_sha256_update(&ctx, (const u8*)data, len);
-  spn_sha256_final(&ctx, digest);
-}
-
-sp_str_t spn_sha256_hex(sp_mem_t mem, const void* data, u64 len) {
-  u8 digest [32];
-  spn_sha256(data, len, digest);
-  return spn_sha256_digest_hex(mem, digest);
-}
-
-spn_err_t spn_sha256_file_digest(sp_str_t path, u8 digest [32], u64* size) {
-  sp_io_file_reader_t reader = sp_zero;
-  if (sp_io_file_reader_from_path(&reader, path)) {
-    return SPN_ERROR;
-  }
-
-  spn_sha256_ctx_t ctx = sp_zero;
-  spn_sha256_init(&ctx);
-
-  *size = 0;
-  u8 chunk [65536];
-  while (true) {
-    u64 bytes_read = 0;
-    sp_err_t err = sp_io_read(&reader.base, chunk, sizeof(chunk), &bytes_read);
-    if (bytes_read) {
-      spn_sha256_update(&ctx, chunk, bytes_read);
-      *size += bytes_read;
-    }
-    if (err == SP_ERR_IO_EOF) {
-      break;
-    }
-    if (err) {
-      sp_io_file_reader_close(&reader);
-      return SPN_ERROR;
-    }
-    if (!bytes_read) {
-      break;
-    }
-  }
-
-  sp_io_file_reader_close(&reader);
-  spn_sha256_final(&ctx, digest);
-  return SPN_OK;
-}
-
-spn_err_t spn_sha256_file(sp_mem_t mem, sp_str_t path, sp_str_t* hex) {
-  u8 digest [32];
-  u64 size = 0;
-  if (spn_sha256_file_digest(path, digest, &size)) {
-    return SPN_ERROR;
-  }
-  *hex = spn_sha256_digest_hex(mem, digest);
-  return SPN_OK;
 }

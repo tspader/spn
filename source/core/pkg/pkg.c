@@ -3,6 +3,7 @@
 #include "sp/str.h"
 #include "pkg/pkg.h"
 
+#include "hash/digest/digest.h"
 #include "intern/intern.h"
 #include "paths/paths.h"
 #include "pkg/mutate.h"
@@ -11,7 +12,7 @@
 
 static sp_hash_t hash_push(sp_hash_t hash, sp_hash_t value) {
   sp_hash_t parts [] = { hash, value };
-  return sp_hash_combine(parts, sp_carr_len(parts));
+  return spn_digest_hash_combine(parts, sp_carr_len(parts));
 }
 
 sp_hash_t spn_pkg_hash_platform(spn_pkg_info_t* pkg, const spn_profile_info_t* profile) {
@@ -21,18 +22,19 @@ sp_hash_t spn_pkg_hash_platform(spn_pkg_info_t* pkg, const spn_profile_info_t* p
 
   switch (profile->os) {
     case SPN_OS_MACOS: {
-      hash = hash_push(hash, spn_path_hash(profile->sysroot));
-      hash = hash_push(hash, sp_hash_bytes(&pkg->macos.min_os, sizeof(pkg->macos.min_os), 0));
+      hash = hash_push(hash, (sp_hash_t)profile->sysroot.root);
+      hash = hash_push(hash, spn_digest_hash_str(profile->sysroot.sub));
+      hash = hash_push(hash, spn_digest_hash(&pkg->macos.min_os, sizeof(pkg->macos.min_os)));
       sp_da_for(pkg->macos.frameworks, it) {
-        hash = hash_push(hash, sp_hash_str(pkg->macos.frameworks[it]));
+        hash = hash_push(hash, spn_digest_hash_str(pkg->macos.frameworks[it]));
       }
       sp_carr_for(maps, mt) {
         sp_om_for(maps[mt], it) {
           spn_target_info_t* target = sp_str_om_at(maps[mt], it);
-          hash = hash_push(hash, sp_hash_str(target->name));
-          hash = hash_push(hash, sp_hash_bytes(&target->macos.min_os, sizeof(target->macos.min_os), 0));
+          hash = hash_push(hash, spn_digest_hash_str(target->name));
+          hash = hash_push(hash, spn_digest_hash(&target->macos.min_os, sizeof(target->macos.min_os)));
           sp_da_for(target->macos.frameworks, ft) {
-            hash = hash_push(hash, sp_hash_str(target->macos.frameworks[ft]));
+            hash = hash_push(hash, spn_digest_hash_str(target->macos.frameworks[ft]));
           }
         }
       }
@@ -43,7 +45,7 @@ sp_hash_t spn_pkg_hash_platform(spn_pkg_info_t* pkg, const spn_profile_info_t* p
         sp_om_for(maps[mt], it) {
           spn_target_info_t* target = sp_str_om_at(maps[mt], it);
           if (target->windows.subsystem == SPN_WIN_SUBSYSTEM_NONE) continue;
-          hash = hash_push(hash, sp_hash_str(target->name));
+          hash = hash_push(hash, spn_digest_hash_str(target->name));
           hash = hash_push(hash, (sp_hash_t)target->windows.subsystem);
         }
       }

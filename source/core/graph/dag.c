@@ -69,9 +69,9 @@ static sp_da(spn_path_t) dag_declared_paths(sp_mem_t mem, spn_dag_t* g, sp_da(sp
 }
 
 static spn_dag_digest_t hash_embedding(spn_target_unit_t* target) {
-  spn_sha256_ctx_t ctx = sp_zero;
-  spn_sha256_init(&ctx);
-  spn_dag_hash_str(&ctx, sp_str_lit("spn.build.embed.v6"));
+  spn_digest_ctx_t ctx = sp_zero;
+  spn_digest_init_blake3(&ctx);
+  spn_dag_hash_str(&ctx, sp_str_lit("spn.build.embed.v7"));
   spn_dag_hash_str(&ctx, target->pkg->info->qualified);
   spn_dag_hash_str(&ctx, target->info->name);
   spn_dag_hash_u8(&ctx, (u8)target->info->kind);

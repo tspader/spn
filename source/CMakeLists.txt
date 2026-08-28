@@ -99,7 +99,8 @@ set(SPN_SOURCES
   core/session/invocation.c
   core/session/options.c
   core/session/session.c
-  core/sha256/sha256.c
+  core/hash/digest/digest.c
+  core/hash/sha256/sha256.c
   core/sp/atomic_file.c
   core/sp/coff.c
   core/sp/color.c
@@ -164,7 +165,7 @@ if(SPN_STAMP_DEFS)
   target_compile_definitions(spn_version PRIVATE ${SPN_STAMP_DEFS})
 endif()
 
-target_link_libraries(spn PRIVATE m vmlib yyjson spn_version)
+target_link_libraries(spn PRIVATE m vmlib yyjson blake3 spn_version)
 # vmlib carries C++ objects (WAMR Fast JIT: asmjit + x86_64 codegen). spn's own
 # sources are all C, so CMake would link with the C driver and miss the C++
 # runtime; force the C++ driver (zig c++) to pull it in.

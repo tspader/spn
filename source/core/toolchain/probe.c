@@ -2,6 +2,7 @@
 
 #include "ctx/types.h"
 #include "error/error.h"
+#include "hash/digest/digest.h"
 #include "paths/paths.h"
 
 #if defined(SP_WIN32)
@@ -195,7 +196,7 @@ SP_PRIVATE spn_err_t probe_hash(spn_probe_cache_t* cache, sp_str_t path, sp_hash
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   sp_str_t contents = sp_zero;
   spn_err_t err = sp_io_read_file(scratch.mem, path, &contents) ? SPN_ERROR : SPN_OK;
-  sp_hash_t computed = err ? 0 : sp_hash_bytes(contents.data, contents.len, 0);
+  sp_hash_t computed = err ? 0 : spn_digest_hash_str(contents);
   sp_mem_end_scratch(scratch);
   if (err) {
     return SPN_ERROR;
@@ -252,6 +253,6 @@ spn_err_t spn_toolchain_probe(spn_cc_toolchain_t* cc, sp_da(sp_str_t) dirs, spn_
     hashes[num_hashes++] = hash;
   }
 
-  *identity = sp_hash_combine(hashes, num_hashes);
+  *identity = spn_digest_hash_combine(hashes, num_hashes);
   return SPN_OK;
 }

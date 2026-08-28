@@ -1,5 +1,6 @@
 #include "sp.h"
 #include "git/patch.h"
+#include "hash/digest/digest.h"
 
 spn_err_t spn_git_patch_set_hash(spn_git_patch_set_t* set, u32* missing) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
@@ -15,9 +16,9 @@ spn_err_t spn_git_patch_set_hash(spn_git_patch_set_t* set, u32* missing) {
     }
     sp_hash_t parts [] = {
       set->hash,
-      sp_hash_bytes(content.data, content.len, 0),
+      spn_digest_hash_str(content),
     };
-    set->hash = sp_hash_combine(parts, sp_carr_len(parts));
+    set->hash = spn_digest_hash_combine(parts, sp_carr_len(parts));
   }
 
   sp_mem_end_scratch(scratch);

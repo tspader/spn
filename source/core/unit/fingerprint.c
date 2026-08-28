@@ -1,5 +1,6 @@
 #include "unit/unit.h"
 
+#include "hash/digest/digest.h"
 #include "pkg/pkg.h"
 #include "session/session.h"
 #include "sp/str.h"
@@ -47,11 +48,11 @@ static sp_hash_t hash_options(spn_session_t* session, spn_pkg_id_t id) {
     }
     sp_hash_t parts [] = {
       hash,
-      sp_hash_str(option->name),
+      spn_digest_hash_str(option->name),
       (sp_hash_t)option->value.kind,
-      option->value.kind == SPN_OPTION_VALUE_STR ? sp_hash_str(option->value.str) : (sp_hash_t)option->value.b,
+      option->value.kind == SPN_OPTION_VALUE_STR ? spn_digest_hash_str(option->value.str) : (sp_hash_t)option->value.b,
     };
-    hash = sp_hash_combine(parts, sp_carr_len(parts));
+    hash = spn_digest_hash_combine(parts, sp_carr_len(parts));
   }
   return hash;
 }
@@ -82,10 +83,10 @@ sp_hash_t spn_unit_fingerprint(spn_session_t* session, spn_build_unit_t* build, 
   spn_pkg_info_t* pkg = loaded->info;
 
   fingerprint_input_t fingerprint = sp_zero;
-  fingerprint.qualified = sp_hash_str(pkg->qualified);
+  fingerprint.qualified = spn_digest_hash_str(pkg->qualified);
   fingerprint.options = hash_options(session, id);
   fingerprint.version = pkg->version;
-  fingerprint.commit = sp_hash_str(pkg->upstream.commit);
+  fingerprint.commit = spn_digest_hash_str(pkg->upstream.commit);
 
   spn_resolved_pkg_t* resolved = sp_ht_getp(session->resolve, id);
   if (resolved) {
@@ -103,7 +104,7 @@ sp_hash_t spn_unit_fingerprint(spn_session_t* session, spn_build_unit_t* build, 
         }));
       }
       sp_da_sort(edges, sort_fingerprint_edges);
-      fingerprint.deps = sp_hash_bytes(edges, sp_da_size(edges) * sizeof(fingerprint_edge_t), 0);
+      fingerprint.deps = spn_digest_hash(edges, sp_da_size(edges) * sizeof(fingerprint_edge_t));
       sp_mem_end_scratch(scratch);
     }
   }
@@ -120,17 +121,17 @@ sp_hash_t spn_unit_fingerprint(spn_session_t* session, spn_build_unit_t* build, 
   fingerprint.os = build->profile.os;
   fingerprint.abi = build->profile.abi;
   fingerprint.platform = spn_pkg_hash_platform(pkg, &build->profile);
-  fingerprint.toolchain.name = sp_hash_str(toolchain->name);
-  fingerprint.toolchain.cc = sp_hash_str(toolchain->compiler.program.prefix);
-  fingerprint.toolchain.ld = sp_hash_str(toolchain->linker.program.prefix);
-  fingerprint.toolchain.ar = sp_hash_str(toolchain->archiver.program.prefix);
-  fingerprint.toolchain.cxx = sp_hash_str(toolchain->cxx.program.prefix);
+  fingerprint.toolchain.name = spn_digest_hash_str(toolchain->name);
+  fingerprint.toolchain.cc = spn_digest_hash_str(toolchain->compiler.program.prefix);
+  fingerprint.toolchain.ld = spn_digest_hash_str(toolchain->linker.program.prefix);
+  fingerprint.toolchain.ar = spn_digest_hash_str(toolchain->archiver.program.prefix);
+  fingerprint.toolchain.cxx = spn_digest_hash_str(toolchain->cxx.program.prefix);
   fingerprint.toolchain.identity = build->toolchain->identity;
   if (!sp_opt_is_null(build->toolchain->artifact)) {
-    fingerprint.toolchain.url = sp_hash_str(sp_opt_get(build->toolchain->artifact).sha256);
+    fingerprint.toolchain.url = spn_digest_hash_str(sp_opt_get(build->toolchain->artifact).sha256);
   }
 
-  sp_hash_t hash = sp_hash_bytes(&fingerprint, sizeof(fingerprint), 0);
+  sp_hash_t hash = spn_digest_hash(&fingerprint, sizeof(fingerprint));
   sp_ht_insert(session->fingerprints, uid, hash);
   return hash;
 }

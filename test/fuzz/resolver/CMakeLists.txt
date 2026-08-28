@@ -19,6 +19,8 @@ add_executable(fuzz_resolver
   ${SRC}/git/key.c
   ${SRC}/git/url.c
   ${SRC}/git/patch.c
+  ${SRC}/hash/digest/digest.c
+  ${SRC}/hash/sha256/sha256.c
   ${SRC}/when/when.c
   ${SRC}/toolchain/catalog.c
   ${SRC}/codegen/gen/toolchains.gen.c
@@ -60,6 +62,6 @@ add_executable(fuzz_resolver
 )
 spn_test_binary(fuzz_resolver)
 target_include_directories(fuzz_resolver PRIVATE ${SRC}/codegen/gen ${CMAKE_SOURCE_DIR}/tools ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(fuzz_resolver PRIVATE yyjson)
+target_link_libraries(fuzz_resolver PRIVATE yyjson blake3)
 add_dependencies(fuzz_resolver spn_codegen_gen)
 add_test(NAME fuzz_resolver COMMAND "$<TARGET_FILE:fuzz_resolver>" WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")

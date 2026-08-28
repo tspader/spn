@@ -2,7 +2,7 @@
 #define SPN_TEST_TOOLCHAIN_FIXTURE_H
 
 #include "spn_test.h"
-#include "sha256/sha256.h"
+#include "hash/digest/digest.h"
 #include "paths/paths.h"
 #include "toolchain/toolchain.h"
 

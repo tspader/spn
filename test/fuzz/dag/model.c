@@ -1,5 +1,5 @@
 #include "fuzz.h"
-#include "sha256/sha256.h"
+#include "hash/sha256/sha256.h"
 #include "paths/paths.h"
 
 sp_str_t fz_content(sp_mem_t mem, u64 content) {
@@ -71,9 +71,9 @@ spn_dag_digest_t fz_model_weak(sp_mem_t mem, fz_universe_t* u, const sp_str_t* b
   fz_action_t* action = &u->actions[at];
 
   sp_str_t identity = sp_fmt(mem, "id{}", sp_fmt_uint(action->identity)).value;
-  spn_sha256_ctx_t ctx = sp_zero;
-  spn_sha256_init(&ctx);
-  spn_dag_hash_str(&ctx, sp_str_lit("spn.dag.action.v2"));
+  spn_digest_ctx_t ctx = sp_zero;
+  spn_digest_init_blake3(&ctx);
+  spn_dag_hash_str(&ctx, sp_str_lit("spn.dag.action.v3"));
   spn_dag_hash_digest(&ctx, spn_dag_digest(identity.data, identity.len));
 
   spn_dag_hash_u64(&ctx, sp_da_size(action->consumes));

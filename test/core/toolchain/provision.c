@@ -248,7 +248,7 @@ sp_test_each(provision, store, provision_test_t, tests, .setup = spn_test_ctx_se
   }
 
   sp_str_t sha = sp_zero;
-  sp_must_eq(t, (u32)SPN_OK, (u32)spn_sha256_file(mem, stub.tarball, &sha));
+  sp_must_eq(t, (u32)SPN_OK, (u32)spn_digest_file_hex(SPN_DIGEST_SHA256, mem, stub.tarball, &sha));
   sp_must_eq(t, 64u, sha.len);
 
   spn_toolchain_store_t store = {
