@@ -3,6 +3,11 @@ set -eu
 
 VERSION="0.4.2"
 
+if [ "${1:-}" = "--version" ]; then
+  printf '%s\n' "$VERSION"
+  exit 0
+fi
+
 if [ -n "${SPN_STAGE0:-}" ]; then
   printf '%s\n' "$SPN_STAGE0"
   exit 0
