@@ -72,3 +72,8 @@ jobs:
         with:
           name: spn-${{ matrix.id }}
           path: spn-${{ matrix.id }}.${{ matrix.ext }}
+      - uses: actions/upload-artifact@v4
+        if: matrix.id == 'x86_64-linux'
+        with:
+          name: installer-render
+          path: ${{ matrix.render }}

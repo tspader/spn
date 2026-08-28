@@ -28,7 +28,13 @@ If any part of your build pipeline would benefit from fast, cached, reproducible
 # installation
 
 ```sh
-curl -fsSL https://spn.spader.zone/install | bash
+curl -fsSL https://spn.spader.zone/install | sh
+```
+
+On Windows:
+
+```powershell
+irm https://spn.spader.zone/install.ps1 | iex
 ```
 
 # quickstart

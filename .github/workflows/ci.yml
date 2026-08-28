@@ -79,11 +79,17 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
+      - uses: actions/checkout@v5
       - uses: actions/download-artifact@v4
         with:
           merge-multiple: true
-      - run: sha256sum spn-* > SHASUMS256.txt
-      - run: gh release upload canary spn-* SHASUMS256.txt --clobber --repo ${{ github.repository }}
+          path: dist
+      - run: cd dist && sha256sum spn-* > SHASUMS256.txt
+      - run: |
+          chmod +x dist/installer_render
+          version="$(sed -n 's/^version = "\(.*\)"$/\1/p' spn.toml)"
+          dist/installer_render dist/SHASUMS256.txt tools/install/templates dist "${version}" canary ${{ github.repository }}
+      - run: gh release upload canary dist/spn-* dist/SHASUMS256.txt dist/install.sh dist/install.ps1 --clobber --repo ${{ github.repository }}
 
   ci:
     name: ci
