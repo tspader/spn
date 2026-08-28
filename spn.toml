@@ -100,6 +100,11 @@ include = ["include", "source/cli", "source/core"]
 deps = ["spn"]
 flags = []
 
+[[script]]
+name = "installer"
+source = ["tools/install/main.c", "tools/install/render.c"]
+include = ["tools/install", "tools/gen"]
+
 [[test]]
 name = "core"
 source = [

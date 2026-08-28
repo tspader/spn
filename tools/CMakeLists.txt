@@ -19,6 +19,16 @@ else()
   )
   target_link_libraries(jtd_gen PRIVATE yyjson m)
   add_dependencies(jtd_gen headers)
+
+  add_executable(installer_render install/main.c install/render.c)
+  set_target_properties(installer_render PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${STORE}/bin)
+  target_include_directories(installer_render PRIVATE
+    ${STORE}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/install
+    ${CMAKE_CURRENT_SOURCE_DIR}/gen
+  )
+  target_link_libraries(installer_render PRIVATE m)
+  add_dependencies(installer_render headers)
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
