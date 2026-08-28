@@ -28,6 +28,7 @@ add_executable(integration
   consume.c
   corrupt.c
   cxx.c
+  defines.c
   deps.c
   exports.c
   freshness.c

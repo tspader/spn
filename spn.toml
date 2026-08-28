@@ -331,6 +331,7 @@ source = [
   "test/integration/consume.c",
   "test/integration/corrupt.c",
   "test/integration/cxx.c",
+  "test/integration/defines.c",
   "test/integration/deps.c",
   "test/integration/exports.c",
   "test/integration/freshness.c",

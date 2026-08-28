@@ -1,6 +1,8 @@
 #include "unit.h"
 
 #include "paths/paths.h"
+#include "profile/profile.h"
+#include "when/when.h"
 
 void spn_wasm_script_init(spn_wasm_script_t* script, sp_str_t module) {
   *script = (spn_wasm_script_t) { .path = module };
@@ -63,6 +65,7 @@ static spn_build_unit_t* add_build(spn_session_t* s, spn_build_id_t id, const c8
   build->profile = profile;
   build->paths.root = spn_path_make(&spn.roots, sp_str_view(root));
   sp_da_init(s->mem, build->include);
+  build->define = spn_when_facts_to_defines(s->mem, spn_profile_facts(&profile));
   sp_da_init(s->mem, build->packages);
 
   spn_toolchain_info_t* info = sp_alloc_type(s->mem, spn_toolchain_info_t);

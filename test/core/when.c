@@ -375,3 +375,126 @@ sp_test(option, resolve_no_match) {
   sp_expect_eq(t, value.kind, SPN_OPTION_VALUE_NONE);
   return SP_OK;
 }
+
+
+typedef struct {
+  const c8* name;
+  spn_when_facts_t facts;
+  struct { const c8* defines [12]; } expect;
+} defines_t;
+
+static const defines_t defines_tests [] = {
+  {
+    .name = "linux_debug",
+    .facts = { .os = SPN_OS_LINUX, .arch = SPN_ARCH_X64, .abi = SPN_ABI_GNU, .mode = SPN_MODE_DEBUG, .opt = SPN_OPT_LEVEL_2 },
+    .expect = { .defines = {
+      "SPN_BUILD",
+      "SPN_BUILD_OS_LINUX",
+      "SPN_BUILD_ARCH_X86_64",
+      "SPN_BUILD_ABI_GNU",
+      "SPN_BUILD_MODE_DEBUG",
+      "SPN_BUILD_OPT_2",
+    } },
+  },
+  {
+    .name = "windows_release",
+    .facts = { .os = SPN_OS_WINDOWS, .arch = SPN_ARCH_X64, .abi = SPN_ABI_MSVC, .mode = SPN_MODE_RELEASE, .opt = SPN_OPT_LEVEL_2 },
+    .expect = { .defines = {
+      "SPN_BUILD",
+      "SPN_BUILD_OS_WINDOWS",
+      "SPN_BUILD_ARCH_X86_64",
+      "SPN_BUILD_ABI_MSVC",
+      "SPN_BUILD_MODE_RELEASE",
+      "SPN_BUILD_OPT_2",
+    } },
+  },
+  {
+    .name = "macos_arm64_opt_s",
+    .facts = { .os = SPN_OS_MACOS, .arch = SPN_ARCH_ARM64, .abi = SPN_ABI_APPLE, .mode = SPN_MODE_DEBUG, .opt = SPN_OPT_LEVEL_S },
+    .expect = { .defines = {
+      "SPN_BUILD",
+      "SPN_BUILD_OS_MACOS",
+      "SPN_BUILD_ARCH_AARCH64",
+      "SPN_BUILD_ABI_APPLE",
+      "SPN_BUILD_MODE_DEBUG",
+      "SPN_BUILD_OPT_S",
+    } },
+  },
+  {
+    .name = "wasi_metaprogram",
+    .facts = { .os = SPN_OS_WASI, .arch = SPN_ARCH_WASM32, .abi = SPN_ABI_MUSL, .mode = SPN_MODE_DEBUG, .opt = SPN_OPT_LEVEL_2 },
+    .expect = { .defines = {
+      "SPN_BUILD",
+      "SPN_BUILD_OS_WASI",
+      "SPN_BUILD_ARCH_WASM32",
+      "SPN_BUILD_ABI_MUSL",
+      "SPN_BUILD_MODE_DEBUG",
+      "SPN_BUILD_OPT_2",
+    } },
+  },
+  {
+    .name = "sanitize_pair",
+    .facts = {
+      .os = SPN_OS_LINUX, .arch = SPN_ARCH_X64, .abi = SPN_ABI_GNU, .mode = SPN_MODE_DEBUG, .opt = SPN_OPT_LEVEL_0,
+      .sanitizers = SPN_SANITIZER_ADDRESS | SPN_SANITIZER_UNDEFINED,
+    },
+    .expect = { .defines = {
+      "SPN_BUILD",
+      "SPN_BUILD_OS_LINUX",
+      "SPN_BUILD_ARCH_X86_64",
+      "SPN_BUILD_ABI_GNU",
+      "SPN_BUILD_MODE_DEBUG",
+      "SPN_BUILD_OPT_0",
+      "SPN_BUILD_SANITIZE_ADDRESS",
+      "SPN_BUILD_SANITIZE_UNDEFINED",
+    } },
+  },
+  {
+    .name = "sanitize_all",
+    .facts = {
+      .os = SPN_OS_LINUX, .arch = SPN_ARCH_X64, .abi = SPN_ABI_GNU, .mode = SPN_MODE_DEBUG, .opt = SPN_OPT_LEVEL_0,
+      .sanitizers = SPN_SANITIZER_ADDRESS | SPN_SANITIZER_THREAD | SPN_SANITIZER_UNDEFINED | SPN_SANITIZER_MEMORY | SPN_SANITIZER_LEAK,
+    },
+    .expect = { .defines = {
+      "SPN_BUILD",
+      "SPN_BUILD_OS_LINUX",
+      "SPN_BUILD_ARCH_X86_64",
+      "SPN_BUILD_ABI_GNU",
+      "SPN_BUILD_MODE_DEBUG",
+      "SPN_BUILD_OPT_0",
+      "SPN_BUILD_SANITIZE_ADDRESS",
+      "SPN_BUILD_SANITIZE_THREAD",
+      "SPN_BUILD_SANITIZE_UNDEFINED",
+      "SPN_BUILD_SANITIZE_MEMORY",
+      "SPN_BUILD_SANITIZE_LEAK",
+    } },
+  },
+  {
+    .name = "empty_facts",
+    .expect = { .defines = { "SPN_BUILD" } },
+  },
+  {
+    .name = "abi_none_skipped",
+    .facts = { .os = SPN_OS_LINUX, .arch = SPN_ARCH_X64, .mode = SPN_MODE_DEBUG, .opt = SPN_OPT_LEVEL_2 },
+    .expect = { .defines = {
+      "SPN_BUILD",
+      "SPN_BUILD_OS_LINUX",
+      "SPN_BUILD_ARCH_X86_64",
+      "SPN_BUILD_MODE_DEBUG",
+      "SPN_BUILD_OPT_2",
+    } },
+  },
+};
+
+sp_test_each(when, facts_to_defines, defines_t, defines_tests) {
+  sp_mem_t mem = sp_test_arena(t);
+  sp_da(sp_str_t) defines = spn_when_facts_to_defines(mem, it->facts);
+
+  u32 len = 0;
+  sp_carr_detect_len(it->expect.defines, len, it->expect.defines[len]);
+  sp_must_eq(t, sp_da_size(defines), len);
+  sp_for(dt, len) {
+    sp_expect_str_eq_c(t, defines[dt], it->expect.defines[dt]);
+  }
+  return SP_OK;
+}

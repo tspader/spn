@@ -199,3 +199,13 @@ spn_err_t spn_profile_resolve(spn_profile_table_t profiles, const spn_profile_ov
   return SPN_OK;
 }
 
+spn_when_facts_t spn_profile_facts(const spn_profile_info_t* profile) {
+  return (spn_when_facts_t) {
+    .os = profile->os,
+    .arch = profile->arch,
+    .abi = profile->abi,
+    .mode = profile->mode,
+    .opt = profile->opt,
+    .sanitizers = profile->sanitizers,
+  };
+}
