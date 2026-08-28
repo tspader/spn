@@ -216,8 +216,10 @@ static bool parse_obs_row(sp_str_t* cursor, spn_dag_obs_t* out) {
   return true;
 }
 
+#define obs_version '6'
+
 static spn_err_t write_obs(sp_io_writer_t* io, const spn_dag_obs_t* obs, u64 count) {
-  spn_try(write_header(io, '5'));
+  spn_try(write_header(io, obs_version));
   sp_for(it, count) {
     spn_try(write_obs_row(io, obs + it));
   }
@@ -226,7 +228,7 @@ static spn_err_t write_obs(sp_io_writer_t* io, const spn_dag_obs_t* obs, u64 cou
 
 static bool parse_obs(sp_str_t content, sp_da(spn_dag_obs_t)* set) {
   sp_str_t cursor = content;
-  if (!row_header(&cursor, '5')) {
+  if (!row_header(&cursor, obs_version)) {
     return false;
   }
   while (cursor.len) {

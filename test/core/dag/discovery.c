@@ -11,9 +11,14 @@ typedef struct {
 } discovery_expect_t;
 
 typedef struct {
+  const c8* key;
+  const c8* content;
+} discovery_plant_t;
+
+typedef struct {
   const c8* name;
   discovery_entry_t entries [DAG_TEST_MAX_OPS];
-  const c8* corrupt;
+  discovery_plant_t plant;
   bool reload;
   const c8* key;
   discovery_expect_t expect;
@@ -90,7 +95,16 @@ static const discovery_test_t discovery_tests [] = {
     .entries = {
       { .key = "K", .obs = { { .path = "/A" } } }
     },
-    .corrupt = "K",
+    .plant = { .key = "K", .content = r("not json") },
+    .reload = true,
+    .key = "K"
+  },
+  {
+    .name = "stale_version_misses",
+    .entries = {
+      { .key = "K", .obs = { { .path = "/A" } } }
+    },
+    .plant = { .key = "K", .content = r("5") r("file 0 /A") },
     .reload = true,
     .key = "K"
   },
@@ -174,10 +188,10 @@ sp_test_each(dag_discovery, table, discovery_test_t, discovery_tests) {
     discovery_put(&discovery, &it->entries[et]);
   }
 
-  if (it->corrupt) {
-    sp_str_t hex = spn_dag_digest_hex(mem, dag_test_digest(it->corrupt));
+  if (it->plant.key) {
+    sp_str_t hex = spn_dag_digest_hex(mem, dag_test_digest(it->plant.key));
     sp_str_t path = sp_fs_join_path(mem, dir, sp_fmt(mem, "{}.txt", sp_fmt_str(hex)).value);
-    sp_must_eq(t, SP_OK, sp_fs_create_file_cstr(path, "not json\n"));
+    sp_must_eq(t, SP_OK, sp_fs_create_file_cstr(path, it->plant.content));
   }
 
   if (it->reload) {
