@@ -63,7 +63,7 @@ void          spn_target_embed_dir_ex(spn_target_t* target, const c8* dir, const
 
 spn_profile_t*   spn_get_profile(spn_t* spn);
 spn_libc_kind_t  spn_profile_get_libc(spn_profile_t* profile);
-spn_build_mode_t spn_profile_get_mode(spn_profile_t* profile);
+spn_mode_t       spn_profile_get_mode(spn_profile_t* profile);
 spn_opt_level_t  spn_profile_get_opt(spn_profile_t* profile);
 spn_sanitizer_set_t spn_profile_get_sanitizers(spn_profile_t* profile);
 

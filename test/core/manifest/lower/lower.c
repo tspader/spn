@@ -84,7 +84,7 @@ typedef struct {
   const c8* toolchain;
   spn_linkage_t linkage;
   spn_c_standard_t standard;
-  spn_build_mode_t mode;
+  spn_mode_t mode;
   spn_opt_level_t opt;
   spn_sanitizer_set_t sanitizers;
   bool sanitizers_set;
@@ -620,7 +620,7 @@ static const test_t tests [] = {
         .toolchain = "zig",
         .linkage = SPN_LIB_KIND_SHARED,
         .standard = SPN_C99,
-        .mode = SPN_BUILD_MODE_RELEASE,
+        .mode = SPN_MODE_RELEASE,
         .opt = SPN_OPT_LEVEL_3,
         .sanitizers = SPN_SANITIZER_ADDRESS | SPN_SANITIZER_UNDEFINED,
         .sanitizers_set = true,

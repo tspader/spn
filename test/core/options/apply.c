@@ -303,9 +303,9 @@ static const apply_test_t list_tests [] = {
   },
   {
     .name = "applies_once",
-    .facts = { .os = SPN_OS_LINUX, .mode = SPN_BUILD_MODE_DEBUG },
+    .facts = { .os = SPN_OS_LINUX, .mode = SPN_MODE_DEBUG },
     .reapply = true,
-    .reapply_facts = { .os = SPN_OS_WINDOWS, .mode = SPN_BUILD_MODE_DEBUG },
+    .reapply_facts = { .os = SPN_OS_WINDOWS, .mode = SPN_MODE_DEBUG },
     .source = {
       .values = {
         { .value = "A", .when = { { "mode", "debug" } } },

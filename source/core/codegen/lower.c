@@ -361,7 +361,7 @@ static void lower_profiles(const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
       .abi = sp_opt_is_null(p->abi) ? SPN_ABI_NONE : sp_opt_get(p->abi),
       .linkage = sp_opt_is_null(p->linkage) ? SPN_LIB_KIND_NONE : sp_opt_get(p->linkage),
       .standard = sp_opt_is_null(p->standard) ? SPN_C_STANDARD_NONE : sp_opt_get(p->standard),
-      .mode = sp_opt_is_null(p->mode) ? SPN_BUILD_MODE_NONE : sp_opt_get(p->mode),
+      .mode = sp_opt_is_null(p->mode) ? SPN_MODE_NONE : sp_opt_get(p->mode),
       .opt = sp_opt_is_null(p->opt) ? SPN_OPT_LEVEL_NONE : sp_opt_get(p->opt),
       .sanitizers = lower_sanitizers(p->sanitize),
       .sanitizers_set = p->sanitize != SP_NULLPTR,
@@ -590,8 +590,8 @@ static bool when_fact_value_valid(sp_str_t key, spn_option_value_t value) {
   if (sp_str_equal_cstr(key, "arch")) return spn_arch_from_str(value.str) != SPN_ARCH_NONE;
   if (sp_str_equal_cstr(key, "abi"))  return spn_abi_from_str(value.str) != SPN_ABI_NONE;
   if (sp_str_equal_cstr(key, "opt"))  return spn_opt_level_from_str(value.str) != SPN_OPT_LEVEL_NONE;
-  return sp_str_equal(value.str, spn_build_mode_to_str(SPN_BUILD_MODE_RELEASE))
-      || sp_str_equal(value.str, spn_build_mode_to_str(SPN_BUILD_MODE_DEBUG));
+  return sp_str_equal(value.str, spn_mode_to_str(SPN_MODE_RELEASE))
+      || sp_str_equal(value.str, spn_mode_to_str(SPN_MODE_DEBUG));
 }
 
 static bool when_option_value_valid(const spn_option_info_t* option, spn_option_value_t value) {

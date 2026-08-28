@@ -9,6 +9,7 @@
 #include "toolchain/select.h"
 #include "toolchain/toolchain.h"
 #include "triple/triple.h"
+#include "when/when.h"
 
 spn_build_config_t spn_build_config_target(spn_triple_t host, spn_profile_info_t profile) {
   return (spn_build_config_t) {
@@ -28,7 +29,7 @@ spn_build_config_t spn_build_config_metaprogram(spn_triple_t host) {
       .arch = SPN_ARCH_WASM32,
       .os = SPN_OS_WASI,
       .abi = SPN_ABI_MUSL,
-      .mode = SPN_BUILD_MODE_DEBUG,
+      .mode = SPN_MODE_DEBUG,
       .opt = SPN_OPT_LEVEL_2,
       .standard = SPN_C99,
       .linkage = SPN_LIB_KIND_STATIC,
@@ -122,6 +123,7 @@ spn_err_t spn_build_add(spn_session_t* s, spn_build_config_t config, spn_build_u
   build->toolchain = toolchain;
   build->paths.root = build_root(s, &config);
   sp_da_init(s->mem, build->include);
+  build->define = spn_when_facts_to_defines(s->mem, spn_profile_facts(&build->profile));
   sp_da_init(s->mem, build->packages);
 
   *out = build;

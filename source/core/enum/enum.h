@@ -24,8 +24,8 @@ sp_str_t        spn_abi_to_str(spn_abi_t abi);
 
 spn_libc_kind_t spn_libc_kind_from_str(sp_str_t str);
 sp_str_t spn_libc_kind_to_str(spn_libc_kind_t libc);
-spn_build_mode_t spn_build_mode_from_str(sp_str_t str);
-sp_str_t spn_build_mode_to_str(spn_build_mode_t mode);
+spn_mode_t spn_mode_from_str(sp_str_t str);
+sp_str_t spn_mode_to_str(spn_mode_t mode);
 spn_opt_level_t spn_opt_level_from_str(sp_str_t str);
 sp_str_t spn_opt_level_to_str(spn_opt_level_t level);
 spn_win_subsystem_t spn_win_subsystem_from_str(sp_str_t str);

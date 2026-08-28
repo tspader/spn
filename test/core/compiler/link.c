@@ -129,7 +129,7 @@ static const link_test_t tests [] = {
       .arch = SPN_ARCH_X64,
       .os = SPN_OS_WINDOWS,
       .abi = SPN_ABI_MSVC,
-      .mode = SPN_BUILD_MODE_DEBUG,
+      .mode = SPN_MODE_DEBUG,
     },
     .kind = SPN_CC_OUTPUT_EXE,
     .expect = {

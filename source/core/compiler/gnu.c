@@ -94,11 +94,11 @@ spn_sanitizer_set_t spn_zig_supported_sanitizers(spn_triple_t target) {
 }
 
 void spn_gnu_render_flags(sp_mem_t mem, const spn_profile_info_t* profile, spn_cc_flags_t* flags) {
-  if (profile->mode == SPN_BUILD_MODE_DEBUG) {
+  if (profile->mode == SPN_MODE_DEBUG) {
     sp_da_push(flags->compile, sp_str_lit("-g"));
   }
   push_flag(&flags->compile, opt_switch(profile->opt));
-  if (profile->mode == SPN_BUILD_MODE_RELEASE) {
+  if (profile->mode == SPN_MODE_RELEASE) {
     sp_da_push(flags->compile, render_define_c(mem, "NDEBUG"));
   }
   if (profile->sanitizers) {

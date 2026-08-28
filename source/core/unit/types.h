@@ -25,6 +25,7 @@ struct spn_build_unit_t {
   spn_profile_info_t profile;
   spn_toolchain_unit_t* toolchain;
   sp_da(spn_path_t) include;
+  sp_da(sp_str_t) define;
   sp_da(spn_pkg_unit_t*) packages;
   struct {
     spn_path_t root;

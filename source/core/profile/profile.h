@@ -7,6 +7,7 @@
 #include "profile/types.h"
 #include "spn/types.h"
 
+spn_when_facts_t spn_profile_facts(const spn_profile_info_t* profile);
 void      spn_profile_populate(spn_profile_table_t* profiles, spn_pkg_info_t* pkg);
 spn_err_t spn_profile_resolve(spn_profile_table_t profiles, const spn_profile_override_t* override, spn_profile_info_t* result);
 bool      spn_profile_shared(const spn_profile_info_t* profile, bool shared_demand);
