@@ -34,6 +34,12 @@ typedef enum {
   SPN_CC_CAP_EXCLUDE_LIBS   = 1 << 2,
 } spn_cc_cap_t;
 
+typedef enum {
+  SPN_CC_DEPFILE_NONE,
+  SPN_CC_DEPFILE_OPTIONAL,
+  SPN_CC_DEPFILE_REQUIRED,
+} spn_cc_depfile_t;
+
 typedef u32 spn_cc_cap_set_t;
 
 typedef struct {

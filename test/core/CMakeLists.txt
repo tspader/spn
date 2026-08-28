@@ -22,6 +22,7 @@ add_executable(core
   compiler/harness.c
   compiler/archive.c
   compiler/compile.c
+  compiler/depfile.c
   compiler/exports/format.c
   compiler/exports/render.c
   compiler/flags.c
@@ -97,6 +98,8 @@ add_executable(core
   publish/publish.c
   queue/ops.c
   queue/smoke.c
+  reflect/read.c
+  reflect/walk.c
   schema/schema.c
   thread_pool/ops.c
   thread_pool/smoke.c
@@ -131,11 +134,13 @@ add_executable(core
   ${SRC}/codegen/gen/events.gen.c
   ${SRC}/codegen/gen/manifest.gen.c
   ${SRC}/codegen/gen/release.gen.c
+  ${SRC}/codegen/gen/source_deps.gen.c
   ${SRC}/codegen/gen/toolchains.gen.c
   ${SRC}/compiler/driver.c
   ${SRC}/compiler/exports.c
   ${SRC}/compiler/gnu.c
   ${SRC}/compiler/msvc.c
+  ${SRC}/compiler/occ.c
   ${SRC}/compiler/toc.c
   ${SRC}/core/core.c
   ${SRC}/ctx/ctx.c
@@ -177,6 +182,7 @@ add_executable(core
   ${SRC}/pkg/patch.c
   ${SRC}/pkg/pkg.c
   ${SRC}/profile/profile.c
+  ${SRC}/reflect/json.c
   ${SRC}/semver/compare.c
   ${SRC}/semver/convert.c
   ${SRC}/semver/parser.c

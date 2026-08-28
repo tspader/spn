@@ -27,6 +27,7 @@ set(SPN_SOURCES
   core/compiler/exports.c
   core/compiler/gnu.c
   core/compiler/msvc.c
+  core/compiler/occ.c
   core/compiler/toc.c
   core/ctx/ctx.c
   core/ctx/init.c
@@ -34,7 +35,6 @@ set(SPN_SOURCES
   core/dag/store.c
   core/dag/run.c
   core/dag/glob.c
-  core/dag/occ.c
   core/dag/stamp.c
   core/dag/wasi.c
   core/dag/wasi/canonicalize.c
@@ -91,6 +91,7 @@ set(SPN_SOURCES
   core/pkg/options.c
   core/pkg/pkg.c
   core/profile/profile.c
+  core/reflect/json.c
   core/resolve/resolve.c
   core/semver/compare.c
   core/semver/convert.c
@@ -144,6 +145,7 @@ add_executable(spn ${SPN_SOURCES}
   ${SRC}/codegen/gen/events.gen.c
   ${SRC}/codegen/gen/manifest.gen.c
   ${SRC}/codegen/gen/release.gen.c
+  ${SRC}/codegen/gen/source_deps.gen.c
   ${SRC}/codegen/gen/toolchains.gen.c
   ${SRC}/codegen/gen/abi.gen.c
   )

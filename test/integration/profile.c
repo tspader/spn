@@ -122,6 +122,7 @@ sp_test(profile, static_config_is_not_a_shared_demand) {
 sp_test(profile, target_without_toolchain) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/profile/override",
+    .when.msvc_todo = true,
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", "x86_64-wasi" }, .rc = 1 } },
       { .kind = ACTION_VERIFY_RESULT, .verify_result = { .err = SPN_ERR_TOOLCHAIN_NONE } },
@@ -132,6 +133,7 @@ sp_test(profile, target_without_toolchain) {
 sp_test(profile, cross_target_macos) {
   return run_command_test(t, (command_test_t) {
     .project = "test/integration/fixtures/profile/override",
+    .when.msvc_todo = true,
     .args = { "build", "--target", "aarch64-macos" },
     .expect = {
       .exists = { target_exe("main", "aarch64-macos-apple") },

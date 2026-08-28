@@ -1273,6 +1273,10 @@ static sp_str_t render_event_detail(spn_ctx_t* ctx, sp_mem_t mem, spn_event_t* e
           sp_fmt_io(&w.base, "{.cyan} was not produced by the action that declares it as an output", sp_fmt_str(get_contextual_path(ctx, mem, event->err.dag.path)));
           break;
         }
+        case SPN_ERR_DAG_DEPFILE: {
+          sp_fmt_io(&w.base, "the compiler did not write a valid dependency file for {.cyan}", sp_fmt_str(get_contextual_path(ctx, mem, event->err.dag.path)));
+          break;
+        }
         case SPN_ERR_DAG_STORE_READ: {
           sp_fmt_io(&w.base, "{.cyan} could not be read from the content store", sp_fmt_str(get_contextual_path(ctx, mem, event->err.dag.path)));
           break;

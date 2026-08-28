@@ -14,7 +14,6 @@
 #include "compiler/driver.h"
 #include "core/core.h"
 #include "cpu/cpu.h"
-#include "dag/occ.h"
 #include "dag/wasi/canonicalize.h"
 #include "enum/enum.h"
 #include "event/event.h"
@@ -108,20 +107,32 @@ static spn_path_t dag_dep_path(sp_mem_t mem, spn_path_t object) {
   return spn_path_suffix(mem, object, sp_str_lit(".d"));
 }
 
-static spn_err_t compile_object(spn_dag_t* g, spn_dag_action_t* action, void* user_data, spn_dag_env_t* env, sp_mem_t mem, sp_da(spn_dag_obs_t)* obs) {
-  spn_compile_unit_t* unit = (spn_compile_unit_t*)user_data;
-
-  spn_path_t object = dag_artifact_path(g, action->produces[0]);
-  if (spn_compile_object_run(unit, object, (spn_path_t) sp_zero)) {
-    return SPN_ERR_DAG_ACTION;
+static void observe_prereq(spn_dag_t* g, spn_compile_unit_t* unit, spn_dag_env_t* env, sp_mem_t mem, sp_da(spn_dag_obs_t)* obs, sp_str_t prereq) {
+  sp_str_t path = prereq;
+  if (!sp_fs_is_absolute(path)) {
+    path = spn_path_str(g->roots, mem, spn_path_join(mem, unit->target->pkg->paths.work, path));
   }
-  return SPN_OK;
+  sp_str_t canonical = spn_dag_file_cache_canonical(env->files, path);
+  if (sp_str_empty(canonical)) {
+    canonical = spn_dag_wasi_canonicalize(mem, path);
+  }
+  sp_assert(!sp_str_empty(canonical));
+  sp_da_push(*obs, ((spn_dag_obs_t) {
+    .kind = SPN_DAG_OBS_FILE,
+    .path = spn_path_make(g->roots, canonical),
+  }));
 }
 
-static spn_err_t compile_object_discovered(spn_dag_t* g, spn_dag_action_t* action, void* user_data, spn_dag_env_t* env, sp_mem_t mem, sp_da(spn_dag_obs_t)* obs) {
+static spn_err_t compile_object(spn_dag_t* g, spn_dag_action_t* action, void* user_data, spn_dag_env_t* env, sp_mem_t mem, sp_da(spn_dag_obs_t)* obs) {
   spn_compile_unit_t* unit = (spn_compile_unit_t*)user_data;
+  const spn_cc_toolchain_t* toolchain = &unit->target->pkg->build->toolchain->cc;
 
   spn_path_t object = dag_artifact_path(g, action->produces[0]);
+  spn_cc_depfile_t mode = spn_cc_depfile(toolchain, unit->lang);
+  if (mode == SPN_CC_DEPFILE_NONE) {
+    return spn_compile_object_run(unit, object, (spn_path_t) sp_zero) ? SPN_ERR_DAG_ACTION : SPN_OK;
+  }
+
   spn_path_t depfile = dag_dep_path(mem, object);
   if (spn_compile_object_run(unit, object, depfile)) {
     return SPN_ERR_DAG_ACTION;
@@ -129,36 +140,20 @@ static spn_err_t compile_object_discovered(spn_dag_t* g, spn_dag_action_t* actio
 
   sp_str_t dep = spn_path_str(g->roots, mem, depfile);
   if (!sp_fs_exists(dep)) {
-    return SPN_OK;
+    return mode == SPN_CC_DEPFILE_REQUIRED ? SPN_ERR_DAG_DEPFILE : SPN_OK;
   }
   sp_str_t content = sp_zero;
   if (sp_io_read_file(mem, dep, &content)) {
-    return SPN_ERROR;
+    return SPN_ERR_DAG_DEPFILE;
   }
-
-  occ_parser_t parser = sp_zero;
-  if (occ_init(&parser, content)) {
-    return SPN_ERROR;
+  sp_da(sp_str_t) prereqs = sp_zero;
+  if (spn_cc_parse_depfile(mem, toolchain, content, &prereqs)) {
+    return SPN_ERR_DAG_DEPFILE;
   }
-
-  sp_str_t prereq = sp_zero;
-  while (occ_next(&parser, &prereq)) {
-    sp_str_t path = prereq;
-    if (!sp_fs_is_absolute(path)) {
-      path = spn_path_str(g->roots, mem, spn_path_join(mem, unit->target->pkg->paths.work, path));
-    }
-    sp_str_t canonical = spn_dag_file_cache_canonical(env->files, path);
-    if (sp_str_empty(canonical)) {
-      canonical = spn_dag_wasi_canonicalize(mem, path);
-    }
-    sp_assert(!sp_str_empty(canonical));
-    sp_da_push(*obs, ((spn_dag_obs_t) {
-      .kind = SPN_DAG_OBS_FILE,
-      .path = spn_path_make(g->roots, canonical),
-    }));
+  sp_da_for(prereqs, it) {
+    observe_prereq(g, unit, env, mem, obs, prereqs[it]);
   }
-
-  return parser.err ? SPN_ERROR : SPN_OK;
+  return SPN_OK;
 }
 
 static spn_err_t dag_link_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data, spn_dag_env_t* env, sp_mem_t mem, sp_da(spn_dag_obs_t)* obs) {
@@ -520,7 +515,6 @@ static spn_err_t dag_add_user_nodes(spn_dag_build_t* b, spn_pkg_unit_t* unit, sp
 
 static spn_err_t add_object_compilation(spn_dag_build_t* b, spn_target_unit_t* target) {
   spn_dag_t* g = b->graph;
-  spn_cc_toolchain_t* toolchain = &target->pkg->build->toolchain->cc;
 
   sp_da_for(target->objects, it) {
     spn_compile_unit_t* unit = target->objects[it];
@@ -528,14 +522,11 @@ static spn_err_t add_object_compilation(spn_dag_build_t* b, spn_target_unit_t* t
     sp_assert(!exists);
 
     spn_dag_action_config_t config = {
+      .kind = SPN_DAG_ACTION_DISCOVERED,
       .identity = spn_build_compile_identity(unit),
       .execute = compile_object,
       .user_data = unit,
     };
-    if (toolchain->driver != SPN_CC_DRIVER_MSVC) {
-      config.kind = SPN_DAG_ACTION_DISCOVERED;
-      config.execute = compile_object_discovered;
-    }
 
     spn_dag_object_ids_t ids = sp_zero;
     ids.action = spn_dag_add_action(g, config);

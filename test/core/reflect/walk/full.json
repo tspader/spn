@@ -1,0 +1,10 @@
+{
+    "title": "A",
+    "head": { "name": "B", "tags": ["C"] },
+    "items": [
+        { "name": "D", "tags": ["E", "F"] },
+        42,
+        { "name": "G", "tags": [] },
+        { "tags": ["H", 7, "ź"] }
+    ]
+}

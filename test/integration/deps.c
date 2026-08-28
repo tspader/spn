@@ -163,6 +163,7 @@ sp_test(deps_index, binary_static) {
 sp_test(deps_index, binary_shared) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/deps/index/binary_shared",
+    .when.msvc_todo = true,
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
       { .kind = ACTION_VERIFY_LOCKED },

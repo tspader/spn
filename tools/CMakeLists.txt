@@ -10,7 +10,7 @@ else()
   target_link_libraries(embed PRIVATE m)
   add_dependencies(embed headers)
 
-  add_executable(jtd_gen gen/main.c gen/run.c gen/lower.c gen/bind.c gen/union.c gen/abi.c jtd.c)
+  add_executable(jtd_gen gen/main.c gen/run.c gen/lower.c gen/bind.c gen/union.c gen/abi.c gen/data.c jtd.c)
   set_target_properties(jtd_gen PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
   target_include_directories(jtd_gen PRIVATE
     ${STORE}/include
@@ -71,6 +71,9 @@ set(GEN_FILES
   ${GEN_DIR}/resolve.gen.h
   ${GEN_DIR}/resolve.gen.c
   ${GEN_DIR}/resolve.jtd.json
+  ${GEN_DIR}/source_deps.gen.h
+  ${GEN_DIR}/source_deps.gen.c
+  ${GEN_DIR}/source_deps.jtd.json
   ${GEN_DIR}/toolchains.gen.h
   ${GEN_DIR}/toolchains.gen.c
   ${GEN_DIR}/toolchains.jtd.json

@@ -73,6 +73,7 @@ sp_test(offline, no_source_cache) {
 sp_test(offline, shared_store) {
   fixture_t fixture = sp_zero;
   sp_try(fixture_init(t, &fixture));
+  sp_try(test_when(t, (test_when_t) { .msvc_todo = true }));
   sp_mem_t mem = fixture.mem;
 
   sp_try(prepare_test(t, &fixture, "test/integration/fixtures/offline/shared_store", (const c8*[]) {

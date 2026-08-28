@@ -576,7 +576,7 @@ static sp_err_t expect_event(sp_test_t* t, fixture_t* fixture, spn_event_kind_t 
 static sp_err_t expect_result(sp_test_t* t, fixture_t* fixture, spn_err_t err, const c8* file, u32 line) {
   sp_mem_t mem = fixture->mem;
 
-  const c8* actual = SP_NULLPTR;
+  sp_str_t actual = sp_zero;
   sp_da(sp_str_t) lines = sp_str_split_c8(mem, fixture->events, '\n');
   sp_da_for(lines, it) {
     if (sp_str_empty(lines[it])) continue;
@@ -588,19 +588,19 @@ static sp_err_t expect_result(sp_test_t* t, fixture_t* fixture, spn_err_t err, c
     const c8* name = yyjson_get_str(yyjson_obj_get(root, "event"));
     if (name && sp_cstr_equal(name, "result")) {
       const c8* code = yyjson_get_str(yyjson_obj_get(yyjson_obj_get(root, "data"), "err"));
-      actual = code ? sp_str_to_cstr(mem, sp_str_view(code)) : SP_NULLPTR;
+      actual = code ? sp_test_format(t, "{}", sp_fmt_cstr(code)) : (sp_str_t) sp_zero;
     }
     yyjson_doc_free(doc);
   }
 
-  if (actual && sp_str_equal_cstr(spn_err_to_str(err), actual)) return SP_OK;
+  if (!sp_str_empty(actual) && sp_str_equal(spn_err_to_str(err), actual)) return SP_OK;
 
   sp_test_kv(t, "events", fixture->events);
   sp_test_record(t, (sp_test_failure_t) {
     .file = sp_cstr_as_str(file),
     .line = line,
     .expected = spn_err_to_str(err),
-    .actual = actual ? sp_cstr_as_str(actual) : sp_str_lit("no result event"),
+    .actual = sp_str_empty(actual) ? sp_str_lit("no result event") : actual,
   });
   return SP_ERR;
 }
@@ -782,6 +782,12 @@ static sp_ps_output_t run_spn_command(sp_test_t* t, fixture_t* fixture, const c8
         break;
       }
       sp_ps_config_add_arg(mem, &config, sp_str_view(args[it]));
+    }
+    const test_toolchain_t* toolchain = test_toolchain();
+    bool takes_toolchain = sp_cstr_equal(args[0], "build") || sp_cstr_equal(args[0], "test");
+    if (takes_toolchain && !sp_cstr_equal(toolchain->name, "zig")) {
+      sp_ps_config_add_arg(mem, &config, sp_str_lit("--toolchain"));
+      sp_ps_config_add_arg(mem, &config, sp_cstr_as_str(toolchain->name));
     }
   }
 
@@ -979,6 +985,7 @@ sp_err_t run_command(sp_test_t* t, fixture_t* fixture, command_test_t test) {
 sp_err_t run_command_test(sp_test_t* t, command_test_t test) {
   fixture_t fixture = sp_zero;
   sp_try(fixture_init(t, &fixture));
+  sp_try(test_when(t, test.when));
   if (!test.project) {
     sp_try(prepare_test(t, &fixture, SP_NULLPTR, SP_NULLPTR));
   }
@@ -1029,6 +1036,8 @@ static sp_err_t apply_rebuild_change(sp_test_t* t, fixture_t* fixture, rebuild_c
 sp_err_t run_rebuild_test(sp_test_t* t, rebuild_test_t test) {
   fixture_t fixture = sp_zero;
   sp_try(fixture_init(t, &fixture));
+
+  sp_try(test_when(t, test.when));
 
   sp_try(prepare_test(t, &fixture, test.project, test.copy));
   sp_try(run_command(t, &fixture, test.first));
@@ -1381,10 +1390,6 @@ sp_err_t run_opt_test(sp_test_t* t, opt_test_t test) {
     if (target) {
       command.args[arg++] = "--target";
       command.args[arg++] = target;
-    }
-    if (!sp_str_equal_cstr(sp_str_lit("zig"), toolchain->name)) {
-      command.args[arg++] = "--toolchain";
-      command.args[arg++] = toolchain->name;
     }
     if ((command.expect.bin.name || command.expect.bin.path.len) && !test_when_runs(&when)) {
       command.expect.bin.build_only = true;

@@ -82,6 +82,7 @@ typedef struct {
 typedef enum {
   GEN_FORMAT_TOML,
   GEN_FORMAT_JSON,
+  GEN_FORMAT_DATA,
   GEN_FORMAT_ERRORS,
   GEN_FORMAT_EVENTS,
 } gen_format_t;
@@ -173,7 +174,11 @@ gen_render_t gen_render_impl(gen_t* g);
 gen_render_t gen_render_union_codes(gen_t* g);
 gen_render_t gen_render_union_decls(gen_t* g);
 gen_render_t gen_render_union_impl(gen_t* g);
+bool         gen_data_check(gen_t* g);
+gen_render_t gen_render_data_decls(gen_t* g);
+gen_render_t gen_render_data_impl(gen_t* g);
 
+sp_template_scope_t* gen_root_scope(gen_t* g);
 void gen_bind_types(gen_t* g, sp_template_scope_t* scope);
 void gen_bind_type_impls(gen_t* g, sp_template_scope_t* scope);
 void gen_bind_includes(gen_t* g, sp_template_scope_t* scope);

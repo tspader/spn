@@ -18,6 +18,7 @@ static const gen_prim_row_t GEN_PRIMS[] = {
 static const c8* GEN_FORMATS[] = {
   [GEN_FORMAT_TOML] = "toml",
   [GEN_FORMAT_JSON] = "json",
+  [GEN_FORMAT_DATA] = "data",
   [GEN_FORMAT_ERRORS] = "errors",
   [GEN_FORMAT_EVENTS] = "events",
 };
@@ -358,7 +359,7 @@ gen_render_t gen_render_common(gen_t* g) {
   return (gen_render_t) { .template = sp_str_lit("common.h"), .scope = scope };
 }
 
-static sp_template_scope_t* root_scope(gen_t* g) {
+sp_template_scope_t* gen_root_scope(gen_t* g) {
   sp_template_scope_t* scope = sp_template_scope_create(g->mem);
   sp_template_set(scope, sp_str_lit("root_name"), g->root->name);
   sp_template_set(scope, sp_str_lit("guard"), sp_str_to_upper(g->mem, g->root->name));
@@ -366,7 +367,7 @@ static sp_template_scope_t* root_scope(gen_t* g) {
 }
 
 gen_render_t gen_render_decls(gen_t* g) {
-  sp_template_scope_t* scope = root_scope(g);
+  sp_template_scope_t* scope = gen_root_scope(g);
   gen_bind_includes(g, scope);
   gen_bind_types(g, scope);
   return (gen_render_t) {
@@ -401,7 +402,7 @@ void gen_bind_type_impls(gen_t* g, sp_template_scope_t* scope) {
 }
 
 gen_render_t gen_render_impl(gen_t* g) {
-  sp_template_scope_t* scope = root_scope(g);
+  sp_template_scope_t* scope = gen_root_scope(g);
   gen_bind_type_impls(g, scope);
   sp_template_set(scope, sp_str_lit("root_write"), sp_str_lit("root_write"));
 

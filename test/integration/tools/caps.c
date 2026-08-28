@@ -127,6 +127,10 @@ static bool toolchain_enforces_exports(const test_toolchain_t* toolchain, spn_tr
   return true;
 }
 
+static bool toolchain_deterministic_objects(const test_toolchain_t* toolchain) {
+  return toolchain->driver != SPN_CC_DRIVER_MSVC;
+}
+
 sp_str_t test_when_blocked(test_when_t when) {
   sp_mem_t mem = sp_mem_os_new();
   const test_toolchain_t* toolchain = test_toolchain();
@@ -161,6 +165,15 @@ sp_str_t test_when_blocked(test_when_t when) {
     return sp_fmt(mem, "{} targeting {} accepts an export list but does not enforce it",
       sp_fmt_cstr(toolchain->name),
       sp_fmt_str(spn_triple_to_str(mem, target))).value;
+  }
+
+  if (when.deterministic && !toolchain_deterministic_objects(toolchain)) {
+    return sp_fmt(mem, "{} does not recompile objects byte-identically",
+      sp_fmt_cstr(toolchain->name)).value;
+  }
+
+  if (when.msvc_todo && toolchain->driver == SPN_CC_DRIVER_MSVC) {
+    return sp_str_lit("not yet implemented for the msvc toolchain");
   }
 
   return sp_str_lit("");

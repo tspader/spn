@@ -1,0 +1,23 @@
+#include "{{ .root_name }}.gen.h"
+
+{{ for .types }}
+static const spn_reflect_field_t {{ .name }}_fields [] = {
+{{ for .fields }}
+  {
+    .key = "{{ .key }}",
+    .offset = spn_reflect_offset({{ .owner }}, {{ .name }}),
+    .kind = {{ .kind }},
+{{ if .object }}
+    .object = &spn_reflect_{{ .object }},
+{{ end }}
+  },
+{{ end }}
+};
+
+const spn_reflect_type_t spn_reflect_{{ .name }} = {
+  .size = sizeof({{ .type }}),
+  .fields = {{ .name }}_fields,
+  .num_fields = sp_carr_len({{ .name }}_fields),
+};
+
+{{ end }}

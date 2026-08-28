@@ -1,5 +1,5 @@
-#ifndef SPN_DAG_OCC_H
-#define SPN_DAG_OCC_H
+#ifndef SPN_COMPILER_OCC_H
+#define SPN_COMPILER_OCC_H
 
 #include "sp.h"
 

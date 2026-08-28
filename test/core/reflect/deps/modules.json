@@ -1,0 +1,12 @@
+{
+    "Version": "V",
+    "Data": {
+        "Source": "A",
+        "ProvidedModule": "",
+        "ImportedModules": [],
+        "ImportedHeaderUnits": [],
+        "Includes": [
+            "B"
+        ]
+    }
+}
