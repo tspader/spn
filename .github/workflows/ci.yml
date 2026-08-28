@@ -51,6 +51,8 @@ jobs:
           key: selfhost-e${{ env.SELFHOST_EPOCH }}-s${{ steps.stage0.outputs.version }}-${{ matrix.id }}-${{ github.run_id }}
           restore-keys: selfhost-e${{ env.SELFHOST_EPOCH }}-s${{ steps.stage0.outputs.version }}-${{ matrix.id }}-
 
+      - run: test -z "${{ steps.state.outputs.cache-matched-key }}"
+
       - run: tools/devenv.ps1
         if: runner.os == 'Windows'
         shell: pwsh
