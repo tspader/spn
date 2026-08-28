@@ -79,10 +79,10 @@ typedef enum {
 } spn_option_setter_kind_t;
 
 typedef enum {
-  SPN_BUILD_MODE_NONE,
-  SPN_BUILD_MODE_DEBUG,
-  SPN_BUILD_MODE_RELEASE,
-} spn_build_mode_t;
+  SPN_MODE_NONE,
+  SPN_MODE_DEBUG,
+  SPN_MODE_RELEASE,
+} spn_mode_t;
 
 typedef enum {
   SPN_OPT_LEVEL_NONE,

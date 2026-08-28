@@ -57,7 +57,7 @@ static sp_str_t select_name(const spn_profile_override_t* override) {
     return override->name;
   }
 
-  if (override->mode == SPN_BUILD_MODE_RELEASE) {
+  if (override->mode == SPN_MODE_RELEASE) {
     return sp_str_lit("release");
   }
 
@@ -89,7 +89,7 @@ void spn_profile_populate(spn_profile_table_t* profiles, spn_pkg_info_t* pkg) {
     .name      = fallback.name,
     .toolchain = spn_intern_cstr("auto"),
     .standard  = SPN_C11,
-    .mode      = SPN_BUILD_MODE_DEBUG,
+    .mode      = SPN_MODE_DEBUG,
   };
   sp_str_ht_insert(*profiles, fallback.name, fallback.automatic);
 
@@ -109,11 +109,11 @@ void spn_profile_populate(spn_profile_table_t* profiles, spn_pkg_info_t* pkg) {
   } p = { base, base, base };
 
   p.debug.name = sp_str_lit("debug");
-  p.debug.mode = SPN_BUILD_MODE_DEBUG;
+  p.debug.mode = SPN_MODE_DEBUG;
   sp_str_ht_insert(*profiles, p.debug.name, p.debug);
 
   p.release.name = sp_str_lit("release");
-  p.release.mode = SPN_BUILD_MODE_RELEASE;
+  p.release.mode = SPN_MODE_RELEASE;
   sp_str_ht_insert(*profiles, p.release.name, p.release);
 
   // Apply overlaid fields
@@ -179,7 +179,7 @@ spn_err_t spn_profile_resolve(spn_profile_table_t profiles, const spn_profile_ov
   bool targeted = target.arch || target.os || target.abi;
 
   if (!merged.opt) {
-    merged.opt = merged.mode == SPN_BUILD_MODE_RELEASE ? SPN_OPT_LEVEL_2 : SPN_OPT_LEVEL_0;
+    merged.opt = merged.mode == SPN_MODE_RELEASE ? SPN_OPT_LEVEL_2 : SPN_OPT_LEVEL_0;
   }
 
   *result = (spn_profile_info_t) {

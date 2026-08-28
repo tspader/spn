@@ -28,7 +28,7 @@ spn_build_config_t spn_build_config_metaprogram(spn_triple_t host) {
       .arch = SPN_ARCH_WASM32,
       .os = SPN_OS_WASI,
       .abi = SPN_ABI_MUSL,
-      .mode = SPN_BUILD_MODE_DEBUG,
+      .mode = SPN_MODE_DEBUG,
       .opt = SPN_OPT_LEVEL_2,
       .standard = SPN_C99,
       .linkage = SPN_LIB_KIND_STATIC,

@@ -12,7 +12,7 @@ typedef struct {
   sp_hash_t deps;
   sp_hash_t patches;
   spn_semver_t version;
-  spn_build_mode_t mode;
+  spn_mode_t mode;
   spn_opt_level_t opt;
   spn_sanitizer_set_t sanitizers;
   spn_linkage_t linkage;

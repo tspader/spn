@@ -106,7 +106,7 @@ spn_session_t* build_session(sp_mem_t mem, unit_graph_test_t* g) {
     .name = sp_str_lit("debug"),
     .toolchain = sp_str_lit("auto"),
     .standard = SPN_C11,
-    .mode = SPN_BUILD_MODE_DEBUG,
+    .mode = SPN_MODE_DEBUG,
     .os = g->os ? g->os : SPN_OS_LINUX,
     .arch = SPN_ARCH_X64,
     .abi = g->os == SPN_OS_MACOS ? SPN_ABI_NONE : SPN_ABI_GNU,

@@ -179,26 +179,26 @@ sp_str_t spn_libc_kind_to_str(spn_libc_kind_t libc) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
-spn_build_mode_t spn_build_mode_from_str(sp_str_t str) {
+spn_mode_t spn_mode_from_str(sp_str_t str) {
   if (sp_str_equal_cstr(str, "release")) {
-    return SPN_BUILD_MODE_RELEASE;
+    return SPN_MODE_RELEASE;
   }
   if (sp_str_equal_cstr(str, "debug")) {
-    return SPN_BUILD_MODE_DEBUG;
+    return SPN_MODE_DEBUG;
   }
 
-  return SPN_BUILD_MODE_NONE;
+  return SPN_MODE_NONE;
 }
 
-sp_str_t spn_build_mode_to_str(spn_build_mode_t mode) {
+sp_str_t spn_mode_to_str(spn_mode_t mode) {
   switch (mode) {
-    case SPN_BUILD_MODE_RELEASE: {
+    case SPN_MODE_RELEASE: {
       return sp_str_lit("release");
     }
-    case SPN_BUILD_MODE_DEBUG: {
+    case SPN_MODE_DEBUG: {
       return sp_str_lit("debug");
     }
-    case SPN_BUILD_MODE_NONE: {
+    case SPN_MODE_NONE: {
       return sp_str_lit("");
     }
   }

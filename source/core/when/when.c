@@ -47,7 +47,7 @@ void spn_when_env_set_facts(spn_when_env_t* env, spn_when_facts_t facts) {
   spn_when_env_set(env, sp_str_lit("os"), spn_option_value_str(spn_os_to_str(facts.os)));
   spn_when_env_set(env, sp_str_lit("arch"), spn_option_value_str(spn_arch_to_str(facts.arch)));
   spn_when_env_set(env, sp_str_lit("abi"), spn_option_value_str(spn_abi_to_str(facts.abi)));
-  spn_when_env_set(env, sp_str_lit("mode"), spn_option_value_str(spn_build_mode_to_str(facts.mode)));
+  spn_when_env_set(env, sp_str_lit("mode"), spn_option_value_str(spn_mode_to_str(facts.mode)));
   spn_when_env_set(env, sp_str_lit("opt"), spn_option_value_str(spn_opt_level_to_str(facts.opt)));
   spn_when_env_set(env, sp_str_lit("sanitize_address"), spn_option_value_bool(facts.sanitizers & SPN_SANITIZER_ADDRESS));
   spn_when_env_set(env, sp_str_lit("sanitize_thread"), spn_option_value_bool(facts.sanitizers & SPN_SANITIZER_THREAD));

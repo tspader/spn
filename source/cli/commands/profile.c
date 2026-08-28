@@ -30,7 +30,7 @@ sp_cli_result_t spn_cli_parse_profile(sp_cli_t* cli, spn_profile_override_t* pro
     return invalid(cli, cmd->abi, "--abi", "gnu, musl, msvc, apple");
   }
 
-  spn_build_mode_t mode = spn_build_mode_from_str(cmd->mode);
+  spn_mode_t mode = spn_mode_from_str(cmd->mode);
   if (!sp_str_empty(cmd->mode) && !mode) {
     return invalid(cli, cmd->mode, "--mode", "debug, release");
   }

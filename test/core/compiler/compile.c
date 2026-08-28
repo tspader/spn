@@ -100,7 +100,7 @@ static const compile_test_t tests [] = {
       .os = SPN_OS_WINDOWS,
       .abi = SPN_ABI_MSVC,
       .standard = SPN_C11,
-      .mode = SPN_BUILD_MODE_DEBUG,
+      .mode = SPN_MODE_DEBUG,
     },
     .include = "inc",
     .define = "SPUM=1",
@@ -131,7 +131,7 @@ static const compile_test_t tests [] = {
       .os = SPN_OS_WINDOWS,
       .abi = SPN_ABI_MSVC,
       .standard = SPN_C11,
-      .mode = SPN_BUILD_MODE_DEBUG,
+      .mode = SPN_MODE_DEBUG,
       .opt = SPN_OPT_LEVEL_0,
     },
     .expect = {

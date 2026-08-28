@@ -49,7 +49,7 @@ static sp_str_t cxx_standard_switch(spn_cxx_standard_t standard) {
 }
 
 void spn_msvc_render_flags(sp_mem_t mem, const spn_profile_info_t* profile, spn_cc_flags_t* flags) {
-  if (profile->mode == SPN_BUILD_MODE_DEBUG) {
+  if (profile->mode == SPN_MODE_DEBUG) {
     // /Z7 embeds debug info in the object; /Zi would funnel every parallel
     // cl in a package's work directory into one vc140.pdb (C1041)
     sp_da_push(flags->compile, sp_str_lit("/Z7"));
@@ -58,7 +58,7 @@ void spn_msvc_render_flags(sp_mem_t mem, const spn_profile_info_t* profile, spn_
   if (!sp_str_empty(opt)) {
     sp_da_push(flags->compile, opt);
   }
-  if (profile->mode == SPN_BUILD_MODE_RELEASE) {
+  if (profile->mode == SPN_MODE_RELEASE) {
     sp_da_push(flags->compile, sp_str_lit("/DNDEBUG"));
   }
   if (profile->sanitizers) {
@@ -183,7 +183,7 @@ void spn_msvc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, con
 
   // Everything past /link goes to link.exe verbatim
   sp_da(spn_arg_t) linker = sp_da_new(mem, spn_arg_t);
-  if (profile->mode == SPN_BUILD_MODE_DEBUG) {
+  if (profile->mode == SPN_MODE_DEBUG) {
     sp_da_push(linker, spn_arg_lit(sp_str_lit("/DEBUG")));
   }
   if (!spn_path_empty(files->exports.path)) {

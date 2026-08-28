@@ -278,7 +278,7 @@ spn_libc_kind_t spn_profile_get_libc(spn_profile_t* profile) {
   }
 }
 
-spn_build_mode_t spn_profile_get_mode(spn_profile_t* profile) {
+spn_mode_t spn_profile_get_mode(spn_profile_t* profile) {
   return ((spn_profile_info_t*)profile)->mode;
 }
 

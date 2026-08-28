@@ -49,7 +49,7 @@ static spn_when_env_t make_env(sp_mem_t mem) {
     .os = SPN_OS_LINUX,
     .arch = SPN_ARCH_X64,
     .abi = SPN_ABI_GNU,
-    .mode = SPN_BUILD_MODE_DEBUG,
+    .mode = SPN_MODE_DEBUG,
     .opt = SPN_OPT_LEVEL_2,
     .sanitizers = SPN_SANITIZER_ADDRESS | SPN_SANITIZER_UNDEFINED,
   });
@@ -355,7 +355,7 @@ sp_test_each(option, resolve_first_match, resolve_t, resolve_tests) {
   spn_when_env_set_facts(&env, (spn_when_facts_t) {
     .os = it->os,
     .arch = SPN_ARCH_X64,
-    .mode = SPN_BUILD_MODE_DEBUG,
+    .mode = SPN_MODE_DEBUG,
   });
 
   spn_option_value_t value = spn_option_resolve(&tls, &env);
