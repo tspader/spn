@@ -98,6 +98,7 @@ foreach ($Case in $Cases) {
     $Content = Get-Content -Path $Case.ExpectPath.File -ErrorAction SilentlyContinue
     if ($Content -notcontains $Case.ExpectPath.Line) { $Errors += "GITHUB_PATH missing $($Case.ExpectPath.Line)" }
   }
+  if ($Out -match 'curl:\s') { $Errors += "curl reported an error" }
   $CaseRoot = $Case.Env.SPN_INSTALL
   if ($CaseRoot) {
     $Stages = Get-ChildItem -Path (Join-Path $CaseRoot "bin") -Filter ".stage-*" -Directory -ErrorAction SilentlyContinue

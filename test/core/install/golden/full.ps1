@@ -12,12 +12,17 @@ $Targets = @{
   "x86_64-windows" = @{ Asset = "spn-x86_64-windows.zip"; Sha = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"; Exe = "spn.exe" }
 }
 
-function Fetch($Url, $Path) {
-  if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
-    $Flags = if ([Console]::IsErrorRedirected) { @("-fSsL") } else { @("-fSL", "--progress-bar") }
-    & curl.exe @Flags -o $Path $Url
-    if ($LASTEXITCODE -eq 0) { return }
-  }
+function Fetch-Quiet($Url, $Path) {
+  & curl.exe -fSsL -o $Path $Url
+  if ($LASTEXITCODE -ne 0) { throw "install: failed to download $Url" }
+}
+
+function Fetch-Progress($Url, $Path) {
+  & curl.exe -fSL --progress-bar -o $Path $Url
+  if ($LASTEXITCODE -ne 0) { throw "install: failed to download $Url" }
+}
+
+function Fetch-Web($Url, $Path) {
   Invoke-RestMethod -Uri $Url -OutFile $Path
 }
 
@@ -42,6 +47,14 @@ if ($PSVersionTable.PSVersion.Major -lt 5) {
   throw "install: powershell 5 or later is required to install spn"
 }
 [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor 3072
+
+$Download = if (-not (Get-Command curl.exe -ErrorAction SilentlyContinue)) {
+  "Fetch-Web"
+} elseif ([Console]::IsErrorRedirected) {
+  "Fetch-Quiet"
+} else {
+  "Fetch-Progress"
+}
 
 $Machine = (Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment').PROCESSOR_ARCHITECTURE
 $Cpu = switch ($Machine) {
@@ -70,7 +83,7 @@ try {
   $Url = "$BaseUrl/$($Target.Asset)"
 
   Write-Output "install: downloading spn $Version ($TargetName)"
-  Fetch $Url $Archive
+  & $Download $Url $Archive
 
   $Got = (Get-FileHash -Algorithm SHA256 -Path $Archive).Hash.ToLower()
   if ($Got -ne $Target.Sha) {
