@@ -8,7 +8,8 @@ s32 spn_cli_shutdown(bool ok) {
   spn_prompt_stop(&tui, ok ? SP_PROMPT_STATE_SUBMIT : SP_PROMPT_STATE_ERROR);
   spn_ctx_close(host.ctx, ok);
   spn_tui_flush(&tui);
-  sp_io_flush(&tui.logger.err.base);
+  sp_io_flush(tui.err->io);
+  sp_io_flush(tui.out->io);
   return ok ? 0 : 1;
 }
 

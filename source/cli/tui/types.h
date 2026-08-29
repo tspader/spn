@@ -21,12 +21,6 @@ typedef enum {
 } spn_tui_mode_t;
 
 typedef struct {
-  sp_io_stream_writer_t out;
-  sp_io_stream_writer_t err;
-  spn_verbosity_t verbosity;
-} spn_logger_t;
-
-typedef struct {
   sp_io_writer_t base;
   sp_prompt_ctx_t* prompt;
   sp_io_writer_t* downstream;
@@ -49,8 +43,11 @@ typedef struct {
 typedef struct {
   spn_ctx_t* ctx;
   spn_tui_mode_t mode;
+  spn_verbosity_t verbosity;
   sp_mem_t mem;
-  spn_logger_t logger;
+  sp_tty_t* out;
+  sp_tty_t* err;
+  sp_tty_t journal;
   spn_tui_line_writer_t writer;
   sp_sys_event_t wake;
   sp_str_ht(bool) seen_url;

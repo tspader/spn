@@ -25,21 +25,19 @@ static void on_signal(sp_os_signal_t signal, void* userdata) {
   }
 }
 
-static s32 err(sp_io_writer_t* io, sp_cli_t* cli) {
-  sp_tty_t tty = { .io = io, .color = sp_tty_color_detect(sp_sys_stdout) };
-  sp_tty_fmt(&tty, "{.red}: ", sp_fmt_cstr("error"));
-  sp_cli_err_print(&tty, cli->err);
-  sp_tty_fmt(&tty, "\n");
+static s32 err(sp_tty_t* tty, sp_cli_t* cli) {
+  sp_tty_fmt(tty, "{.red}: ", sp_fmt_cstr("error"));
+  sp_cli_err_print(tty, cli->err);
+  sp_tty_fmt(tty, "\n");
   return 1;
 }
 
-static s32 help(sp_io_writer_t* io, sp_cli_t* cli) {
-  sp_tty_t tty = { .io = io, .color = sp_tty_color_detect(sp_sys_stdout) };
-  sp_cli_write_help(&tty, cli);
+static s32 help(sp_tty_t* tty, sp_cli_t* cli) {
+  sp_cli_write_help(tty, cli);
   return 0;
 }
 
-static s32 version(sp_io_writer_t* io) {
+static s32 version(sp_tty_t* tty) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   sp_da(sp_str_t) parts = sp_da_new(scratch.mem, sp_str_t);
 
@@ -54,9 +52,9 @@ static s32 version(sp_io_writer_t* io) {
   }
 
   if (sp_da_size(parts)) {
-    sp_fmt_io(io, "spn {} ({})\n", sp_fmt_cstr(SPN_VERSION), sp_fmt_str(sp_str_join_n(scratch.mem, parts, sp_da_size(parts), sp_str_lit(" "))));
+    sp_tty_fmt(tty, "spn {} ({})\n", sp_fmt_cstr(SPN_VERSION), sp_fmt_str(sp_str_join_n(scratch.mem, parts, sp_da_size(parts), sp_str_lit(" "))));
   } else {
-    sp_fmt_io(io, "spn {}\n", sp_fmt_cstr(SPN_VERSION));
+    sp_tty_fmt(tty, "spn {}\n", sp_fmt_cstr(SPN_VERSION));
   }
 
   sp_mem_end_scratch(scratch);
@@ -96,7 +94,7 @@ s32 spn_main(s32 num_args, const c8** args) {
     .wake = host.doorbell,
   });
 
-  sp_io_writer_t* io = &tui.logger.out.base;
+  sp_tty_t* io = tui.out;
 
   if (cli.status == SP_CLI_ERR) {
     return err(io, &cli);

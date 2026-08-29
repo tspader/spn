@@ -103,7 +103,6 @@ set(SPN_SOURCES
   core/hash/sha256/sha256.c
   core/sp/atomic_file.c
   core/sp/coff.c
-  core/sp/color.c
   core/sp/fs.c
   core/sp/io.c
   core/sp/macho.c
