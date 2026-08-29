@@ -74,6 +74,19 @@ static sp_str_t colored_name(sp_tty_color_t color, sp_mem_t mem, sp_str_t name) 
   return sp_io_dyn_mem_writer_take_str(&buf);
 }
 
+static sp_str_t colored_fmt(sp_tty_color_t color, sp_mem_t mem, const c8* fmt, ...) {
+  sp_io_dyn_mem_writer_t buf = sp_zero;
+  sp_io_dyn_mem_writer_init(mem, &buf);
+  sp_tty_t tty = { .io = &buf.base, .color = color };
+
+  va_list args;
+  va_start(args, fmt);
+  sp_tty_fmt_v(&tty, sp_cstr_as_str(fmt), args);
+  va_end(args);
+
+  return sp_io_dyn_mem_writer_take_str(&buf);
+}
+
 static void write_manifest_issue(sp_tty_t* w, const spn_err_issue_t* issue) {
   switch (issue->code) {
     case SPN_ERR_CODEGEN_MISSING_KEY:
@@ -167,6 +180,9 @@ static sp_str_t get_contextual_path(spn_ctx_t* ctx, sp_mem_t mem, sp_str_t path)
   spn_path_t collapsed = spn_ctx_collapse_path(ctx, path);
   if (collapsed.root == SPN_PATH_ROOT_NONE) {
     return collapsed.sub;
+  }
+  if (sp_str_empty(collapsed.sub)) {
+    return root_label(collapsed.root);
   }
   return sp_fmt(mem, "{}/{}", sp_fmt_str(root_label(collapsed.root)), sp_fmt_str(collapsed.sub)).value;
 }
@@ -913,9 +929,8 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
         case SPN_ERR_PUBLISH_PUSH: {
           sp_tty_fmt(
             &w,
-            "failed to push to {.gray}\n{}",
-            sp_fmt_str(event->err.publish.url),
-            sp_fmt_str(event->err.publish.output)
+            "failed to push to {.gray}",
+            sp_fmt_str(event->err.publish.url)
           );
           break;
         }
@@ -1522,7 +1537,7 @@ void spn_tui_log_event(spn_tui_t* tui, spn_event_t* event) {
         write_event(
           tty, verb, sp_fmt_style_green,
           get_short_name(event->sync.name),
-          sp_fmt(mem, "{.gray}", sp_fmt_str(event->sync.url)).value
+          colored_fmt(tty->color, mem, "{.gray}", sp_fmt_str(event->sync.url))
         );
       }
       break;
@@ -1538,11 +1553,11 @@ void spn_tui_log_event(spn_tui_t* tui, spn_event_t* event) {
       write_event(
         tty, verb, sp_fmt_style_green,
         sp_str_lit(""),
-        sp_fmt(mem, "{} {} in {.gray}",
+        colored_fmt(tty->color, mem, "{} {} in {.gray}",
           sp_fmt_uint(tui->num_downloads),
           sp_fmt_cstr(tui->num_downloads == 1 ? "package" : "packages"),
           sp_fmt_cstr(buffer)
-        ).value
+        )
       );
       break;
     }
@@ -1827,7 +1842,10 @@ static void prompt_start(spn_tui_t* tui) {
   tui->prompt.app = sp_app_new(tui->mem, sp_prompt_app(tui->prompt.ctx, widget));
   tui->prompt.last = sp_zero_s(spn_progress_t);
   tui->prompt.on = true;
-  attach_prompt(tui, tui->prompt.ctx);
+
+  if (sp_sys_is_tty(sp_sys_stderr)) {
+    attach_prompt(tui, tui->prompt.ctx);
+  }
 }
 
 void spn_prompt_stop(spn_tui_t* tui, sp_prompt_state_t state) {
