@@ -39,6 +39,11 @@ static cell_t cells [] = {
   },
 };
 
+static sp_str_t scrub(sp_mem_t mem, fixture_t* fixture, sp_str_t text) {
+  text = str_replace_all(mem, text, fixture->root, sp_str_lit("$FIXTURE"));
+  return str_replace_all(mem, text, sp_str_replace_c8(mem, fixture->root, '\\', '/'), sp_str_lit("$FIXTURE"));
+}
+
 sp_test_each(render, cells, cell_t, cells) {
   fixture_t fixture = sp_zero;
   sp_try(fixture_init(t, &fixture));
@@ -48,8 +53,8 @@ sp_test_each(render, cells, cell_t, cells) {
 
   sp_mem_t mem = fixture.mem;
   sp_str_t dir = sp_fs_join_path(mem, render_out_path(mem, "current"), sp_str_view(it->name));
-  write_file(sp_fs_join_path(mem, dir, sp_str_lit("stderr")), output.err);
-  write_file(sp_fs_join_path(mem, dir, sp_str_lit("stdout")), output.out);
+  write_file(sp_fs_join_path(mem, dir, sp_str_lit("stderr")), scrub(mem, &fixture, output.err));
+  write_file(sp_fs_join_path(mem, dir, sp_str_lit("stdout")), scrub(mem, &fixture, output.out));
   write_file(sp_fs_join_path(mem, dir, sp_str_lit("exit")), sp_fmt(mem, "{}\n", sp_fmt_int(output.status.exit_code)).value);
   return SP_OK;
 }

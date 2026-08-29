@@ -29,6 +29,7 @@ sp_err_t  fixture_init(sp_test_t* t, fixture_t* fixture);
 sp_str_t  fixture_path(fixture_t* fixture, sp_str_t relative);
 void      fixture_create(fixture_t* fixture, sp_str_t relative, sp_str_t content);
 void      write_file(sp_str_t path, sp_str_t content);
+sp_str_t  str_replace_all(sp_mem_t mem, sp_str_t str, sp_str_t needle, sp_str_t repl);
 
 sp_err_t prepare_test(sp_test_t* t, fixture_t* fixture, const c8* project, const c8* const* copy);
 sp_ps_output_t run_spn_command(sp_test_t* t, fixture_t* fixture, const c8* output_mode, const c8* const* args, const c8* const* env);

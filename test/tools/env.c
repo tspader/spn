@@ -80,8 +80,6 @@ typedef struct {
   sp_str_t value;
 } fixture_sub_t;
 
-static sp_str_t str_replace_all(sp_mem_t mem, sp_str_t str, sp_str_t needle, sp_str_t repl);
-
 static sp_str_t ps_command_line(sp_mem_t mem, const sp_ps_config_t* config) {
   sp_da(sp_str_t) parts = sp_da_new(mem, sp_str_t);
   sp_da_push(parts, config->command);
@@ -244,7 +242,7 @@ static sp_err_t setup_fixture_index_from_remote(sp_test_t* t, fixture_t* fixture
   return SP_OK;
 }
 
-static sp_str_t str_replace_all(sp_mem_t mem, sp_str_t str, sp_str_t needle, sp_str_t repl) {
+sp_str_t str_replace_all(sp_mem_t mem, sp_str_t str, sp_str_t needle, sp_str_t repl) {
   sp_io_dyn_mem_writer_t b = sp_zero;
   sp_io_dyn_mem_writer_init(mem, &b);
   while (true) {
