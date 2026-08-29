@@ -1312,14 +1312,7 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
       break;
     }
     case SPN_EVENT_BUILD_FAILED: {
-      sp_tty_fmt(&w, "profile {.cyan} failed with {} {}",
-        sp_fmt_str(event->build_failed.profile),
-        sp_fmt_uint(event->build_failed.num_errors),
-        sp_fmt_cstr(event->build_failed.num_errors == 1 ? "error" : "errors")
-      );
-      if (!sp_str_empty(event->build_failed.first_error)) {
-        sp_tty_fmt(&w, " ({})", sp_fmt_str(event->build_failed.first_error));
-      }
+      sp_tty_fmt(&w, "profile {.cyan}", sp_fmt_str(event->build_failed.profile));
       break;
     }
     default: {

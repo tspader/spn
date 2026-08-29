@@ -183,9 +183,7 @@
       "metadata": { "verb": "Failed", "severity": "error" },
       "properties": {
         "profile": { "type": "string" },
-        "time_ns": { "type": "uint64", "metadata": { "field": "time" } },
-        "num_errors": { "type": "uint32" },
-        "first_error": { "type": "string" }
+        "time_ns": { "type": "uint64", "metadata": { "field": "time" } }
       }
     },
     "build_summary": {
