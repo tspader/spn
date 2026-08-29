@@ -32,7 +32,7 @@ static void render_list() {
 
   sp_for(it, indexes.count) {
     spn_index_desc_t* index = &indexes.items[it];
-    spn_print(&tui, "{:>$} {:>$} {:>$} {}",
+    spn_print(&tui, "{:<$} {:<$} {:<$} {}",
       sp_fmt_uint(width.name),
       sp_fmt_str(index->name),
       sp_fmt_uint(width.kind),
