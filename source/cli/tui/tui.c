@@ -1411,6 +1411,10 @@ static void render_event_extra(sp_tty_t* w, spn_event_t* event) {
           }
           break;
         }
+        case SPN_ERR_PUBLISH_PUSH: {
+          sp_io_write_str(w->io, event->err.publish.output, SP_NULLPTR);
+          break;
+        }
         case SPN_ERR_TOOLCHAIN_TARGET:
         case SPN_ERR_TOOLCHAIN_SCRIPT_TARGET: {
           sp_da_for(event->err.toolchain.targets, it) {
