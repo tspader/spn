@@ -1395,8 +1395,8 @@ static void render_event_extra(sp_tty_t* w, spn_event_t* event) {
       break;
     }
     case SPN_EVENT_LINK_FAILED: {
-      sp_io_write_str(w->io, event->link_failed.err, SP_NULLPTR);
       sp_io_write_str(w->io, event->link_failed.out, SP_NULLPTR);
+      sp_io_write_str(w->io, event->link_failed.err, SP_NULLPTR);
       break;
     }
     case SPN_EVENT_TEST_FAILED: {
