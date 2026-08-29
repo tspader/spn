@@ -31,7 +31,7 @@ static sp_cli_result_t run_cli(sp_cli_t* cli) {
   });
 
   if (result.err) {
-    return sp_cli_set_error(cli, result.message);
+    return sp_cli_set_error(cli, installer_result_to_str(mem, result));
   }
   return SP_CLI_OK;
 }

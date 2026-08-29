@@ -7,11 +7,13 @@ typedef enum {
   INSTALLER_OK = 0,
   INSTALLER_ERR_IO,
   INSTALLER_ERR_TEMPLATES,
-  INSTALLER_ERR_MALFORMED,
+  INSTALLER_ERR_RENDER,
+  INSTALLER_ERR_FIELDS,
+  INSTALLER_ERR_SHA,
   INSTALLER_ERR_ASSET,
+  INSTALLER_ERR_PAIRING,
   INSTALLER_ERR_DUPLICATE,
   INSTALLER_ERR_EMPTY,
-  INSTALLER_ERR_RENDER,
 } installer_err_t;
 
 typedef struct {
@@ -25,9 +27,11 @@ typedef struct {
 
 typedef struct {
   installer_err_t err;
-  sp_str_t message;
+  u32 line;
+  sp_str_t subject;
 } installer_result_t;
 
 installer_result_t installer_render(sp_mem_t mem, installer_config_t config);
+sp_str_t installer_result_to_str(sp_mem_t mem, installer_result_t result);
 
 #endif

@@ -21,9 +21,8 @@ typedef struct {
   installer_result_t result;
 } installer_t;
 
-static bool fail(installer_t* in, installer_err_t err, sp_str_t message) {
-  in->result.err = err;
-  in->result.message = message;
+static bool fail(installer_t* in, installer_err_t err, u32 line, sp_str_t subject) {
+  in->result = (installer_result_t) { .err = err, .line = line, .subject = subject };
   return false;
 }
 
@@ -57,7 +56,7 @@ static bool classify(installer_t* in, u32 line, sp_str_t asset, target_t* target
 
   bool named = sp_str_starts_with(asset, prefix) && ext.len && asset.len > prefix.len + ext.len;
   if (!named) {
-    return fail(in, INSTALLER_ERR_ASSET, sp_fmt(in->mem, "shasums line {}: unrecognized asset {}", sp_fmt_uint(line), sp_fmt_str(asset)).value);
+    return fail(in, INSTALLER_ERR_ASSET, line, asset);
   }
 
   target->asset = asset;
@@ -65,9 +64,8 @@ static bool classify(installer_t* in, u32 line, sp_str_t asset, target_t* target
   target->windows = sp_str_ends_with(target->name, sp_str_lit("-windows"));
   target->exe = target->windows ? sp_str_lit("spn.exe") : sp_str_lit("spn");
 
-  bool packaged = target->windows == sp_str_equal_cstr(target->kind, "zip");
-  if (!packaged) {
-    return fail(in, INSTALLER_ERR_ASSET, sp_fmt(in->mem, "shasums line {}: {} pairs {} with {}", sp_fmt_uint(line), sp_fmt_str(asset), sp_fmt_str(target->name), sp_fmt_str(target->kind)).value);
+  if (target->windows != sp_str_equal_cstr(target->kind, "zip")) {
+    return fail(in, INSTALLER_ERR_PAIRING, line, asset);
   }
   return true;
 }
@@ -81,10 +79,10 @@ static bool parse_line(installer_t* in, u32 line, sp_str_t text) {
   }
 
   if (!asset.len) {
-    return fail(in, INSTALLER_ERR_MALFORMED, sp_fmt(in->mem, "shasums line {}: expected sha and asset", sp_fmt_uint(line)).value);
+    return fail(in, INSTALLER_ERR_FIELDS, line, text);
   }
   if (!sha_valid(sha)) {
-    return fail(in, INSTALLER_ERR_MALFORMED, sp_fmt(in->mem, "shasums line {}: invalid sha256 {}", sp_fmt_uint(line), sp_fmt_str(sha)).value);
+    return fail(in, INSTALLER_ERR_SHA, line, sha);
   }
 
   target_t target = sp_zero;
@@ -93,7 +91,7 @@ static bool parse_line(installer_t* in, u32 line, sp_str_t text) {
 
   sp_da_for(in->targets, it) {
     if (sp_str_equal(in->targets[it].name, target.name)) {
-      return fail(in, INSTALLER_ERR_DUPLICATE, sp_fmt(in->mem, "shasums line {}: duplicate target {}", sp_fmt_uint(line), sp_fmt_str(target.name)).value);
+      return fail(in, INSTALLER_ERR_DUPLICATE, line, target.name);
     }
   }
   sp_da_push(in->targets, target);
@@ -115,7 +113,7 @@ static bool parse(installer_t* in) {
   }
 
   if (sp_da_empty(in->targets)) {
-    return fail(in, INSTALLER_ERR_EMPTY, sp_str_lit("shasums has no assets"));
+    return fail(in, INSTALLER_ERR_EMPTY, 0, sp_zero_s(sp_str_t));
   }
   sp_da_sort(in->targets, sort_targets);
   return true;
@@ -150,26 +148,25 @@ static sp_template_scope_t* bind_root(installer_t* in) {
 static bool render_one(installer_t* in, sp_str_t name, sp_template_scope_t* scope) {
   sp_str_t source = sp_zero;
   if (!sp_template_get(in->reg, name, &source)) {
-    return fail(in, INSTALLER_ERR_TEMPLATES, sp_fmt(in->mem, "failed to find template {}", sp_fmt_str(name)).value);
+    return fail(in, INSTALLER_ERR_TEMPLATES, 0, name);
   }
 
   sp_io_dyn_mem_writer_t body = sp_zero;
   sp_io_dyn_mem_writer_init(in->mem, &body);
-  sp_template_err_t err = sp_template_render(&body.base, source, scope, in->reg);
-  if (err) {
-    return fail(in, INSTALLER_ERR_RENDER, sp_fmt(in->mem, "failed to render template {} with code {}", sp_fmt_str(name), sp_fmt_int(err)).value);
+  if (sp_template_render(&body.base, source, scope, in->reg)) {
+    return fail(in, INSTALLER_ERR_RENDER, 0, name);
   }
 
   sp_str_t path = sp_fs_join_path(in->mem, in->config.out, name);
   sp_str_t content = sp_io_dyn_mem_writer_as_str(&body);
   sp_io_file_writer_t file = sp_zero;
   if (sp_io_file_writer_from_path(&file, path)) {
-    return fail(in, INSTALLER_ERR_IO, sp_fmt(in->mem, "failed to open {}", sp_fmt_str(path)).value);
+    return fail(in, INSTALLER_ERR_IO, 0, path);
   }
   sp_err_t written = sp_io_write_all(&file.base, content.data, content.len, SP_NULLPTR);
   sp_err_t closed = sp_io_file_writer_close(&file);
   if (written || closed) {
-    return fail(in, INSTALLER_ERR_IO, sp_fmt(in->mem, "failed to write {}", sp_fmt_str(path)).value);
+    return fail(in, INSTALLER_ERR_IO, 0, path);
   }
   return true;
 }
@@ -177,7 +174,7 @@ static bool render_one(installer_t* in, sp_str_t name, sp_template_scope_t* scop
 static bool run(installer_t* in) {
   in->reg = sp_template_registry_create(in->mem);
   if (!sp_fs_is_dir(in->config.templates) || sp_template_load_dir(in->reg, in->config.templates)) {
-    return fail(in, INSTALLER_ERR_TEMPLATES, sp_fmt(in->mem, "failed to load templates from {}", sp_fmt_str(in->config.templates)).value);
+    return fail(in, INSTALLER_ERR_TEMPLATES, 0, in->config.templates);
   }
 
   try(parse(in));
@@ -196,4 +193,20 @@ installer_result_t installer_render(sp_mem_t mem, installer_config_t config) {
   };
   run(&in);
   return in.result;
+}
+
+sp_str_t installer_result_to_str(sp_mem_t mem, installer_result_t result) {
+  switch (result.err) {
+    case INSTALLER_OK:               return sp_str_lit("ok");
+    case INSTALLER_ERR_IO:           return sp_fmt(mem, "failed to write {}", sp_fmt_str(result.subject)).value;
+    case INSTALLER_ERR_TEMPLATES:    return sp_fmt(mem, "failed to load template {}", sp_fmt_str(result.subject)).value;
+    case INSTALLER_ERR_RENDER:       return sp_fmt(mem, "failed to render template {}", sp_fmt_str(result.subject)).value;
+    case INSTALLER_ERR_FIELDS:       return sp_fmt(mem, "line {}: expected a sha and an asset, got {}", sp_fmt_uint(result.line), sp_fmt_str(result.subject)).value;
+    case INSTALLER_ERR_SHA:          return sp_fmt(mem, "line {}: {} is not a lowercase sha256", sp_fmt_uint(result.line), sp_fmt_str(result.subject)).value;
+    case INSTALLER_ERR_ASSET:        return sp_fmt(mem, "line {}: {} is not a spn release asset", sp_fmt_uint(result.line), sp_fmt_str(result.subject)).value;
+    case INSTALLER_ERR_PAIRING:      return sp_fmt(mem, "line {}: {} pairs a platform with the wrong archive format", sp_fmt_uint(result.line), sp_fmt_str(result.subject)).value;
+    case INSTALLER_ERR_DUPLICATE:    return sp_fmt(mem, "line {}: duplicate target {}", sp_fmt_uint(result.line), sp_fmt_str(result.subject)).value;
+    case INSTALLER_ERR_EMPTY:        return sp_str_lit("no assets");
+  }
+  return sp_str_lit("unknown error");
 }
