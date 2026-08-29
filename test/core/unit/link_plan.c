@@ -8,6 +8,7 @@ typedef struct {
   spn_linkage_set_t linkages;
   const c8* source [UNIT_TEST_MAX_STRS];
   const c8* deps [UNIT_TEST_MAX_STRS];
+  const c8* system_deps [UNIT_TEST_MAX_STRS];
   const c8* frameworks [UNIT_TEST_MAX_STRS];
   spn_os_version_t min_os;
 } plan_target_t;
@@ -167,6 +168,24 @@ static const plan_test_t tests [] = {
     },
   },
   {
+    .name = "system_deps_fold_over_targets",
+    .target = { .kind = SPN_TARGET_KIND_EXE, .source = { "main.c" }, .deps = { "L1" }, .system_deps = { "m" } },
+    .graph = {
+      .pkgs = {
+        { .name = "P1", .deps = { { "D1" }, { "D2" }, { "D3" } },
+          .libs = { { "L1", STATIC_ONLY, .source = { "u.c" }, .system_deps = { "pthread" } } } },
+        { .name = "D1", .system_deps = { "dl" },
+          .libs = { { "D1", STATIC_ONLY, .source = { "a.c" }, .system_deps = { "m", "rt" } } } },
+        { .name = "D2", .libs = { { "D2", SHARED_ONLY, .source = { "s.c" }, .system_deps = { "z" } } } },
+        { .name = "D3", .libs = { { "L2", STATIC_ONLY, .no_link = true, .source = { "n.c" }, .system_deps = { "png" } } } },
+      },
+    },
+    .expect = {
+      .libs = { "L1", "D2", "D1" },
+      .system_libs = { "m", "pthread", "dl", "rt" },
+    },
+  },
+  {
     .name = "test_target_links_test_deps",
     .target = { .kind = SPN_TARGET_KIND_TEST, .source = { "main.c" } },
     .graph = {
@@ -189,6 +208,7 @@ static spn_target_info_t target_info(sp_mem_t mem, spn_tree_roots_t trees, const
   info.linkages = spec->linkages;
   info.source = test_path_list(mem, trees, spec->source, UNIT_TEST_MAX_STRS);
   info.deps = test_str_list(mem, spec->deps, UNIT_TEST_MAX_STRS);
+  info.system_deps = test_str_list(mem, spec->system_deps, UNIT_TEST_MAX_STRS);
   info.macos.frameworks = test_str_list(mem, spec->frameworks, UNIT_TEST_MAX_STRS);
   info.macos.min_os = spec->min_os;
   return info;

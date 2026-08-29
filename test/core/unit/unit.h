@@ -32,6 +32,7 @@ typedef struct {
   bool no_link;
   const c8* source [UNIT_TEST_MAX_STRS];
   const c8* deps [UNIT_TEST_MAX_STRS];
+  const c8* system_deps [UNIT_TEST_MAX_STRS];
   const c8* frameworks [UNIT_TEST_MAX_STRS];
   spn_os_version_t min_os;
 } unit_lib_t;

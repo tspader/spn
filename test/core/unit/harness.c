@@ -53,6 +53,7 @@ static spn_target_info_t lib_info(sp_mem_t mem, spn_tree_roots_t trees, const un
   info.no_link = spec->no_link;
   info.source = test_path_list(mem, trees, spec->source, UNIT_TEST_MAX_STRS);
   info.deps = test_str_list(mem, spec->deps, UNIT_TEST_MAX_STRS);
+  info.system_deps = test_str_list(mem, spec->system_deps, UNIT_TEST_MAX_STRS);
   info.macos.frameworks = test_str_list(mem, spec->frameworks, UNIT_TEST_MAX_STRS);
   info.macos.min_os = spec->min_os;
   return info;
