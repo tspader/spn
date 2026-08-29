@@ -29,7 +29,7 @@ ensure_rc_line() {
   if [ -f "$1" ] && grep -Fq "$RC_LINE" "$1"; then
     return 0
   fi
-  printf '\n%s\n' "$RC_LINE" >> "$1" || fail "failed to update $1"
+  printf '\n%s\n' "$RC_LINE" >> "$1"
 }
 
 rc_files() {
@@ -46,9 +46,10 @@ setup_path() {
   write_env_sh "${INSTALL_EXPR}/bin" "${SPN_INSTALL}/env"
   mkdir -p "${HOME}/.config/fish/conf.d"
   write_env_fish "${INSTALL_EXPR}/bin" "${HOME}/.config/fish/conf.d/spn.fish"
-  rc_files | while IFS= read -r rc; do
-    ensure_rc_line "$rc"
-  done
+  rc_files > "${TMP}/rc"
+  while IFS= read -r rc; do
+    ensure_rc_line "$rc" || printf '%s\n' "$rc" >> "${TMP}/stuck"
+  done < "${TMP}/rc"
 }
 
 if [ $# -gt 0 ]; then
@@ -152,7 +153,11 @@ case ":${PATH}:" in
       PATH_STATE=manual
     else
       setup_path
-      PATH_STATE=updated
+      if [ -f "${TMP}/stuck" ]; then
+        PATH_STATE=stuck
+      else
+        PATH_STATE=updated
+      fi
     fi
     ;;
 esac
@@ -166,6 +171,14 @@ case "$PATH_STATE" in
     ;;
   manual)
     printf 'install: add %s to your PATH\n' "$BIN_DIR"
+    ;;
+  stuck)
+    printf 'install: could not update:\n' >&2
+    while IFS= read -r rc; do
+      printf 'install:   %s\n' "$rc" >&2
+    done < "${TMP}/stuck"
+    printf 'install: add this line to your shell profile:\n' >&2
+    printf 'install:   %s\n' "$RC_LINE" >&2
     ;;
 esac
 
