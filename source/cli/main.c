@@ -104,10 +104,18 @@ s32 spn_main(s32 num_args, const c8** args) {
   sp_cli_result_t status = sp_cli_dispatch(&cli);
 
   switch (status) {
-    case SP_CLI_HELP: help(io, &cli);
-    case SP_CLI_ERR: err(io, &cli);
+    case SP_CLI_HELP: {
+      help(io, &cli);
+      break;
+    }
+    case SP_CLI_ERR: {
+      err(io, &cli);
+      break;
+    }
     case SP_CLI_OK:
-    case SP_CLI_CONTINUE: break;
+    case SP_CLI_CONTINUE: {
+      break;
+    }
   }
 
   return spn_cli_shutdown(status != SP_CLI_ERR);
