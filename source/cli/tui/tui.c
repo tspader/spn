@@ -308,8 +308,9 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
     case SPN_EVENT_RESOLVE_END: {
       c8 buffer [64] = sp_zero;
       sp_fmt_write_duration_buf(buffer, sizeof(buffer), event->resolve_end.time);
-      sp_tty_fmt(&w, "Resolved {} packages in {.gray}",
+      sp_tty_fmt(&w, "{} {} in {.gray}",
         sp_fmt_uint(event->resolve_end.num_resolved),
+        sp_fmt_cstr(event->resolve_end.num_resolved == 1 ? "package" : "packages"),
         sp_fmt_cstr(buffer)
       );
       break;
@@ -369,7 +370,7 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
       c8 buffer [64] = sp_zero;
       sp_fmt_write_duration_buf(buffer, sizeof(buffer), event->build_passed.time);
       sp_tty_fmt(&w,
-        "Compiled for profile {.cyan} in {.gray} {.gray}",
+        "profile {.cyan} in {.gray} {.gray}",
         sp_fmt_str(event->build_passed.profile),
         sp_fmt_cstr(buffer),
         sp_fmt_str(sp_fmt(mem, "({} executed, {} cached)",
@@ -1289,7 +1290,7 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
       break;
     }
     case SPN_EVENT_LINK_START: {
-      sp_tty_fmt(&w, "Linking target {.cyan}",
+      sp_tty_fmt(&w, "{.cyan}",
         sp_fmt_str(event->link_start.target)
       );
       break;
