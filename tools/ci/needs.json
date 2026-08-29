@@ -1,6 +1,0 @@
-{
-  "build": { "result": "{{ .build }}" },
-  "cold": { "result": "{{ .cold }}" },
-  "package": { "result": "{{ .package }}" },
-  "canary": { "result": "{{ .canary }}" }
-}

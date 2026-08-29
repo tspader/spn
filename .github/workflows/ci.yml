@@ -64,33 +64,8 @@ jobs:
             build
           key: ${{ steps.state.outputs.cache-primary-key }}
 
-  cold:
-    needs: [build]
-    if: ${{ failure() }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { id: x86_64-linux, os: ubuntu-latest }
-          - { id: aarch64-macos, os: macos-latest }
-          - { id: x86_64-windows, os: windows-latest }
-    name: ${{ matrix.id }}-cold
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v5
-
-      - run: tools/devenv.ps1
-        if: runner.os == 'Windows'
-        shell: pwsh
-
-      - run: make ci-selfhost
-
-      - run: echo "::warning::selfhost passed cold after failing warm; cached state is stale or stage0 mis-reads it"
-
   package:
-    if: ${{ !cancelled() && (needs.build.result == 'success' || needs.cold.result == 'success') }}
-    needs: [build, cold]
+    needs: [build]
     uses: ./.github/workflows/package.yml
     with:
       channel: canary
@@ -113,10 +88,9 @@ jobs:
   ci:
     name: ci
     if: ${{ !cancelled() }}
-    needs: [build, cold, package, canary]
+    needs: [build, package, canary]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
       - env:
           NEEDS: ${{ toJson(needs) }}
-        run: jq --exit-status --from-file .github/ci-gate.jq <<< "$NEEDS"
+        run: jq --exit-status '(.build.result == "success") and (.package.result == "success") and (.canary.result == "success" or .canary.result == "skipped")' <<< "$NEEDS"

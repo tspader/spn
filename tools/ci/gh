@@ -1,5 +1,0 @@
-#!/usr/bin/env sh
-case "$1 $2" in
-  "run list") printf '%s' "$GREENLIT_RUN" ;;
-  "run view") printf '%s' "$GREENLIT_CONCLUSION" ;;
-esac

@@ -100,11 +100,6 @@ include = ["include", "source/cli", "source/core"]
 deps = ["spn"]
 flags = []
 
-[[script]]
-name = "ci"
-source = ["tools/ci/main.c"]
-include = ["tools/gen"]
-
 [[test]]
 name = "core"
 source = [
