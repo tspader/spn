@@ -25,13 +25,17 @@ function Fetch($Url, $Path) {
 
 function Add-UserPath($Dir) {
   $Key = (Get-Item -Path 'HKCU:').OpenSubKey('Environment', $true)
-  $Path = $Key.GetValue('Path', '', 'DoNotExpandEnvironmentNames') -split ';' -ne ''
-  if ($Path -notcontains $Dir) {
-    $Kind = if ($Path) { $Key.GetValueKind('Path') } else { [Microsoft.Win32.RegistryValueKind]::String }
-    $Key.SetValue('Path', (@($Dir) + $Path) -join ';', $Kind)
-    $Dummy = "spn-install-" + [Guid]::NewGuid()
-    [Environment]::SetEnvironmentVariable($Dummy, "1", "User")
-    [Environment]::SetEnvironmentVariable($Dummy, [NullString]::Value, "User")
+  try {
+    $Path = $Key.GetValue('Path', '', 'DoNotExpandEnvironmentNames') -split ';' -ne ''
+    if ($Path -notcontains $Dir) {
+      $Kind = if ($Path) { $Key.GetValueKind('Path') } else { [Microsoft.Win32.RegistryValueKind]::String }
+      $Key.SetValue('Path', (@($Dir) + $Path) -join ';', $Kind)
+      $Dummy = "spn-install-" + [Guid]::NewGuid()
+      [Environment]::SetEnvironmentVariable($Dummy, "1", "User")
+      [Environment]::SetEnvironmentVariable($Dummy, [NullString]::Value, "User")
+    }
+  } finally {
+    $Key.Dispose()
   }
   $env:Path = "$Dir;$env:Path"
 }
@@ -62,25 +66,28 @@ $Bin = Join-Path $Root "bin"
 $Exe = Join-Path $Bin $Target.Exe
 $null = New-Item -ItemType Directory -Force -Path $Bin
 
-$Tmp = New-Item -ItemType Directory -Path (Join-Path ([IO.Path]::GetTempPath()) "spn-install-$([Guid]::NewGuid())")
-$Archive = Join-Path $Tmp $Target.Asset
-$Url = "$BaseUrl/$($Target.Asset)"
-
-Write-Output "install: downloading spn $Version ($TargetName)"
-Fetch $Url $Archive
-
-$Got = (Get-FileHash -Algorithm SHA256 -Path $Archive).Hash.ToLower()
-if ($Got -ne $Target.Sha) {
-  throw "install: sha256 mismatch for $($Target.Asset) (got $Got, want $($Target.Sha)); if a release is being published right now, retry in a minute"
-}
-
-Expand-Archive -Path $Archive -DestinationPath $Tmp -Force
+$Stage = New-Item -ItemType Directory -Path (Join-Path ([IO.Path]::GetTempPath()) "spn-install-$([Guid]::NewGuid())")
 try {
-  Move-Item -Force (Join-Path $Tmp $Target.Exe) $Exe
-} catch {
-  throw "install: failed to replace ${Exe}; close any running spn and retry ($_)"
+  $Archive = Join-Path $Stage $Target.Asset
+  $Url = "$BaseUrl/$($Target.Asset)"
+
+  Write-Output "install: downloading spn $Version ($TargetName)"
+  Fetch $Url $Archive
+
+  $Got = (Get-FileHash -Algorithm SHA256 -Path $Archive).Hash.ToLower()
+  if ($Got -ne $Target.Sha) {
+    throw "install: sha256 mismatch for $($Target.Asset) (got $Got, want $($Target.Sha)); if a release is being published right now, retry in a minute"
+  }
+
+  Expand-Archive -Path $Archive -DestinationPath $Stage -Force
+  try {
+    Move-Item -Force (Join-Path $Stage $Target.Exe) $Exe
+  } catch {
+    throw "install: failed to replace ${Exe}; close any running spn and retry ($_)"
+  }
+} finally {
+  Remove-Item -Recurse -Force $Stage -ErrorAction SilentlyContinue
 }
-Remove-Item -Recurse -Force $Tmp
 
 $VersionOut = & $Exe --version
 if ($LASTEXITCODE -ne 0) {
