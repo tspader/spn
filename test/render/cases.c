@@ -4,7 +4,9 @@
 typedef struct {
   const c8* name;
   const c8* project;
+  const c8* setup [2][SPN_TEST_COMMAND_MAX_ARGS];
   const c8* args [SPN_TEST_COMMAND_MAX_ARGS];
+  const c8* env [SPN_TEST_COMMAND_MAX_ENV];
   const c8* output;
 } cell_t;
 
@@ -37,6 +39,69 @@ static cell_t cells [] = {
     .args = { "build" },
     .output = "json",
   },
+  {
+    .name = "build_warm",
+    .project = "test/render/fixtures/ok",
+    .setup = { { "build" } },
+    .args = { "build" },
+  },
+  {
+    .name = "build_quiet",
+    .project = "test/render/fixtures/ok",
+    .args = { "build", "-q" },
+  },
+  {
+    .name = "build_verbose",
+    .project = "test/render/fixtures/ok",
+    .args = { "build", "-v" },
+  },
+  {
+    .name = "build_no_manifest",
+    .args = { "build" },
+  },
+  {
+    .name = "manifest_invalid",
+    .project = "test/render/fixtures/bad_manifest",
+    .args = { "build" },
+  },
+  {
+    .name = "output_bogus",
+    .args = { "build", "-o", "bogus" },
+  },
+  {
+    .name = "test_ok",
+    .project = "test/render/fixtures/test_ok",
+    .args = { "test" },
+  },
+  {
+    .name = "test_fail",
+    .project = "test/render/fixtures/test_error",
+    .args = { "test" },
+  },
+  {
+    .name = "index_list",
+    .args = { "index", "list" },
+  },
+  {
+    .name = "init",
+    .args = { "init", "B" },
+  },
+  {
+    .name = "version",
+    .args = { "-V" },
+  },
+  {
+    .name = "build_cold_color",
+    .project = "test/render/fixtures/ok",
+    .args = { "build" },
+    .env = { "CLICOLOR_FORCE=1" },
+  },
+  {
+    .name = "build_fail_color",
+    .project = "test/render/fixtures/compile_error",
+    .args = { "build" },
+    .env = { "CLICOLOR_FORCE=1" },
+  },
 };
 
 static sp_str_t scrub(sp_mem_t mem, fixture_t* fixture, sp_str_t text) {
@@ -49,7 +114,14 @@ sp_test_each(render, cells, cell_t, cells) {
   sp_try(fixture_init(t, &fixture));
   sp_try(prepare_test(t, &fixture, it->project, SP_NULLPTR));
 
-  sp_ps_output_t output = run_spn_command(t, &fixture, it->output, it->args, SP_NULLPTR);
+  sp_carr_for(it->setup, step) {
+    if (!it->setup[step][0]) {
+      break;
+    }
+    run_spn_command(t, &fixture, SP_NULLPTR, it->setup[step], SP_NULLPTR);
+  }
+
+  sp_ps_output_t output = run_spn_command(t, &fixture, it->output, it->args, it->env);
 
   sp_mem_t mem = fixture.mem;
   sp_str_t dir = sp_fs_join_path(mem, render_out_path(mem, "current"), sp_str_view(it->name));
