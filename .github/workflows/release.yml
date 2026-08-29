@@ -75,10 +75,19 @@ jobs:
     steps:
       - if: runner.os != 'Windows'
         run: |
-          curl -fsSL "https://github.com/${{ github.repository }}/releases/download/${TAG}/install.sh" | sh
+          url="https://github.com/${{ github.repository }}/releases/download/${TAG}/install.sh"
+          for attempt in 1 2 3 4 5; do
+            curl -fsSL "$url" | sh && break
+            test "$attempt" -lt 5 || exit 1
+            sleep 15
+          done
           "${HOME}/.spn/bin/spn" --version
       - if: runner.os == 'Windows'
         shell: powershell
         run: |
-          irm "https://github.com/${{ github.repository }}/releases/download/$env:TAG/install.ps1" | iex
+          $url = "https://github.com/${{ github.repository }}/releases/download/$env:TAG/install.ps1"
+          foreach ($attempt in 1..5) {
+            try { irm $url | iex; break }
+            catch { if ($attempt -eq 5) { throw }; Start-Sleep -Seconds 15 }
+          }
           & "$Home\.spn\bin\spn.exe" --version
