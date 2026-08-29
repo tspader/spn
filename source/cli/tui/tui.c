@@ -1501,8 +1501,11 @@ void spn_tui_log_event(spn_tui_t* tui, spn_event_t* event) {
 
     sp_str_t detail = render_event_detail(tui, mem, event);
     if (info->severity == SPN_EVENT_SEVERITY_FATAL) {
-      write_event(tty, sp_str_lit("Failed"), true, event_subject(event), sp_str_lit(""));
-      sp_io_write_c8(tty->io, '\n');
+      sp_str_t subject = event_subject(event);
+      if (!sp_str_empty(subject)) {
+        write_event(tty, sp_str_lit("Failed"), true, subject, sp_str_lit(""));
+        sp_io_write_c8(tty->io, '\n');
+      }
       write_error(tty, detail);
     } else {
       sp_str_t name = event->pkg;
