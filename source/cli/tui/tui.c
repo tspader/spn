@@ -1334,8 +1334,8 @@ static sp_str_t get_short_name(sp_str_t qualified) {
   return qualified;
 }
 
-static void write_event(sp_tty_t* tty, sp_str_t verb, bool error, sp_str_t pkg, sp_str_t detail) {
-  sp_tty_fmt(tty, "{:>12 .bold .$}", sp_fmt_style(error ? sp_fmt_style_red : sp_fmt_style_green), sp_fmt_str(verb));
+static void write_event(sp_tty_t* tty, sp_str_t verb, sp_fmt_style_t style, sp_str_t pkg, sp_str_t detail) {
+  sp_tty_fmt(tty, "{:>12 .bold .$}", sp_fmt_style(style), sp_fmt_str(verb));
 
   if (sp_str_empty(pkg)) {
     sp_tty_fmt(tty, " {.gray}", sp_fmt_cstr("▐"));
@@ -1493,7 +1493,7 @@ void spn_tui_log_event(spn_tui_t* tui, spn_event_t* event) {
   if (info->severity != SPN_EVENT_SEVERITY_INFO) {
     sp_da_for(tui->buffered_logs, it) {
       spn_tui_buffered_log_t* log = &tui->buffered_logs[it];
-      write_event(tty, sp_str_lit(""), false, log->pkg, log->message);
+      write_event(tty, sp_str_lit(""), sp_fmt_style_green, log->pkg, log->message);
     }
     sp_da_clear(tui->buffered_logs);
 
@@ -1501,12 +1501,12 @@ void spn_tui_log_event(spn_tui_t* tui, spn_event_t* event) {
     if (info->severity == SPN_EVENT_SEVERITY_FATAL) {
       sp_str_t subject = event_subject(event);
       if (!sp_str_empty(subject)) {
-        write_event(tty, sp_str_lit("Failed"), true, subject, sp_str_lit(""));
+        write_event(tty, sp_str_lit("Failed"), sp_fmt_style_red, subject, sp_str_lit(""));
         sp_io_write_c8(tty->io, '\n');
       }
       write_error(tty, detail);
     } else {
-      write_event(tty, verb, true, event->pkg, detail);
+      write_event(tty, verb, sp_fmt_style_red, event->pkg, detail);
     }
     render_event_extra(tty, event);
     flush_writer(&tui->writer);
@@ -1520,7 +1520,7 @@ void spn_tui_log_event(spn_tui_t* tui, spn_event_t* event) {
         sp_str_ht_insert(tui->seen_url, sp_str_copy(tui->mem, event->sync.url), true);
         tui->num_downloads++;
         write_event(
-          tty, verb, false,
+          tty, verb, sp_fmt_style_green,
           get_short_name(event->sync.name),
           sp_fmt(mem, "{.gray}", sp_fmt_str(event->sync.url)).value
         );
@@ -1536,7 +1536,7 @@ void spn_tui_log_event(spn_tui_t* tui, spn_event_t* event) {
       c8 buffer [64] = sp_zero;
       sp_fmt_write_duration_buf(buffer, sizeof(buffer), event->sync_end.time);
       write_event(
-        tty, verb, false,
+        tty, verb, sp_fmt_style_green,
         sp_str_lit(""),
         sp_fmt(mem, "{} {} in {.gray}",
           sp_fmt_uint(tui->num_downloads),
@@ -1550,12 +1550,12 @@ void spn_tui_log_event(spn_tui_t* tui, spn_event_t* event) {
     case SPN_EVENT_RESOLVE_END:
     case SPN_EVENT_BUILD_PASSED:
     case SPN_EVENT_TEST_SUMMARY: {
-      write_event(tty, verb, false, sp_str_lit(""), render_event_detail(tui, mem, event));
+      write_event(tty, verb, sp_fmt_style_green, sp_str_lit(""), render_event_detail(tui, mem, event));
       break;
     }
 
     case SPN_EVENT_TEST_PASSED: {
-      write_event(tty, verb, false, event->test_passed.name, render_event_detail(tui, mem, event));
+      write_event(tty, verb, sp_fmt_style_green, event->test_passed.name, render_event_detail(tui, mem, event));
       break;
     }
 
@@ -1564,19 +1564,19 @@ void spn_tui_log_event(spn_tui_t* tui, spn_event_t* event) {
       if (sp_str_empty(name)) {
         name = event->pkg;
       }
-      write_event(tty, verb, false, name, render_event_detail(tui, mem, event));
+      write_event(tty, verb, sp_fmt_style_green, name, render_event_detail(tui, mem, event));
       break;
     }
 
     case SPN_EVENT_USER_LOG: {
       sp_str_t name = event->pkg;
-      write_event(tty, sp_str_lit(""), false, name, event->user_log.message);
+      write_event(tty, sp_str_lit(""), sp_fmt_style_green, name, event->user_log.message);
       break;
     }
 
     default: {
       sp_str_t name = event->pkg;
-      write_event(tty, verb, false, name, render_event_detail(tui, mem, event));
+      write_event(tty, verb, sp_fmt_style_green, name, render_event_detail(tui, mem, event));
       break;
     }
   }
