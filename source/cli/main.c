@@ -80,24 +80,24 @@ s32 spn_main(s32 num_args, const c8** args) {
     .wake = host.doorbell,
   });
 
-  sp_tty_t* io = tui.out;
+  sp_tty_t* out = tui.out;
 
   if (cli.status == SP_CLI_ERR) {
     spn_tui_usage(&tui, cli.err);
     return spn_cli_shutdown(false);
   }
   if (host.args.version) {
-    version(io);
+    version(out);
     return spn_cli_shutdown(true);
   }
   if (cli.status == SP_CLI_HELP) {
-    help(io, &cli);
+    help(out, &cli);
     return spn_cli_shutdown(true);
   }
 
   sp_cli_result_t status = sp_cli_dispatch(&cli);
   if (status == SP_CLI_HELP) {
-    help(io, &cli);
+    help(out, &cli);
   }
 
   return spn_cli_shutdown(status != SP_CLI_ERR);
