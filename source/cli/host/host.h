@@ -19,13 +19,13 @@
 typedef struct {
   sp_str_t name;
   sp_str_t toolchain;
-  sp_str_t mode;
-  sp_str_t opt;
+  sp_cli_choice_t mode;
+  sp_cli_choice_t opt;
   sp_str_t sanitize;
   sp_str_t target;
-  sp_str_t os;
-  sp_str_t arch;
-  sp_str_t abi;
+  sp_cli_choice_t os;
+  sp_cli_choice_t arch;
+  sp_cli_choice_t abi;
 } spn_cli_profile_t;
 
 typedef struct {

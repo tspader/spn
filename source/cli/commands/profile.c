@@ -16,29 +16,10 @@ sp_cli_result_t spn_cli_parse_profile(sp_cli_t* cli, spn_profile_override_t* pro
   }
 
   spn_triple_t parts = {
-    .arch = spn_arch_from_str(cmd->arch),
-    .os = spn_os_from_str(cmd->os),
-    .abi = spn_abi_from_str(cmd->abi),
+    .arch = (spn_arch_t)cmd->arch.value,
+    .os = (spn_os_t)cmd->os.value,
+    .abi = (spn_abi_t)cmd->abi.value,
   };
-  if (!sp_str_empty(cmd->arch) && !parts.arch) {
-    return invalid(cli, cmd->arch, "--arch", "x86_64, aarch64, wasm32");
-  }
-  if (!sp_str_empty(cmd->os) && !parts.os) {
-    return invalid(cli, cmd->os, "--os", "linux, macos, windows, wasi");
-  }
-  if (!sp_str_empty(cmd->abi) && !parts.abi) {
-    return invalid(cli, cmd->abi, "--abi", "gnu, musl, msvc, apple");
-  }
-
-  spn_mode_t mode = spn_mode_from_str(cmd->mode);
-  if (!sp_str_empty(cmd->mode) && !mode) {
-    return invalid(cli, cmd->mode, "--mode", "debug, release");
-  }
-
-  spn_opt_level_t opt = spn_opt_level_from_str(cmd->opt);
-  if (!sp_str_empty(cmd->opt) && !opt) {
-    return invalid(cli, cmd->opt, "--opt", "0, 1, 2, 3, s, z");
-  }
 
   spn_sanitizer_set_t sanitizers = sp_zero;
   bool sanitizers_set = false;
@@ -65,8 +46,8 @@ sp_cli_result_t spn_cli_parse_profile(sp_cli_t* cli, spn_profile_override_t* pro
   *profile = (spn_profile_override_t) {
     .name = cmd->name,
     .toolchain = cmd->toolchain,
-    .mode = mode,
-    .opt = opt,
+    .mode = (spn_mode_t)cmd->mode.value,
+    .opt = (spn_opt_level_t)cmd->opt.value,
     .sanitizers = sanitizers,
     .sanitizers_set = sanitizers_set,
     .triple = spn_triple_merge(target, parts),

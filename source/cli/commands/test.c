@@ -41,17 +41,29 @@ sp_cli_cmd_t spn_cmd_test = {
     {
       .brief = 'm',
       .name = "mode",
-      .kind = SP_CLI_OPT_STR,
-      .summary = "Override build mode (debug, release)",
+      .kind = SP_CLI_OPT_CHOICE,
+      .summary = "Override build mode",
       .placeholder = "MODE",
       .ptr = &host.args.profile.mode,
+      .choices = {
+        { .name = "debug", .value = SPN_MODE_DEBUG },
+        { .name = "release", .value = SPN_MODE_RELEASE },
+      },
     },
     {
       .name = "opt",
-      .kind = SP_CLI_OPT_STR,
-      .summary = "Override optimization level (0, 1, 2, 3, s, z)",
+      .kind = SP_CLI_OPT_CHOICE,
+      .summary = "Override optimization level",
       .placeholder = "LEVEL",
       .ptr = &host.args.profile.opt,
+      .choices = {
+        { .name = "0", .value = SPN_OPT_LEVEL_0 },
+        { .name = "1", .value = SPN_OPT_LEVEL_1 },
+        { .name = "2", .value = SPN_OPT_LEVEL_2 },
+        { .name = "3", .value = SPN_OPT_LEVEL_3 },
+        { .name = "s", .value = SPN_OPT_LEVEL_S },
+        { .name = "z", .value = SPN_OPT_LEVEL_Z },
+      },
     },
     {
       .name = "sanitize",
