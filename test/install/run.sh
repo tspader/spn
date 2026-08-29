@@ -143,6 +143,7 @@ run_case() {
       set -- "OS=Windows_NT"
       printf '#!/bin/sh\nprintf %%s "$*" > ps-args\n' > "$CASE/bin/powershell"
       ;;
+    unsafe_install) set -- "SPN_INSTALL=$CASE/say\"hi" ;;
     github_path) set -- "GITHUB_PATH=$CASE/gh" ;;
     no_modify) set -- "SPN_INSTALL_NO_MODIFY_PATH=1" ;;
     custom_install)
@@ -227,6 +228,10 @@ run_case() {
       grep -Fq "install.ps1" "$CASE/ps-args" || die "$NAME: powershell was not invoked with install.ps1"
       assert_no_file "$BIN_DIR/spn"
       ;;
+    unsafe_install)
+      assert_fails
+      assert_out "SPN_INSTALL may not contain"
+      ;;
     github_path)
       assert_rc 0
       grep -Fxq "$BIN_DIR" "$CASE/gh" || die "$NAME: GITHUB_PATH does not contain $BIN_DIR"
@@ -273,7 +278,7 @@ run_case() {
   printf 'run.sh: %s ok\n' "$NAME"
 }
 
-CASES="linux idempotent mismatch unsupported_arch no_build intel_mac rosetta trampoline trampoline_msys github_path no_modify custom_install zdotdir shasum_fallback no_downloader wget_fallback shadow"
+CASES="linux idempotent mismatch unsupported_arch no_build intel_mac rosetta trampoline trampoline_msys unsafe_install github_path no_modify custom_install zdotdir shasum_fallback no_downloader wget_fallback shadow"
 for name in $CASES; do
   run_case "$name"
 done

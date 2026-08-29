@@ -83,6 +83,9 @@ if [ -z "${SPN_INSTALL:-}" ] && [ -z "${HOME:-}" ]; then
   fail "HOME is not set; set SPN_INSTALL to choose an install directory"
 fi
 if [ -n "${SPN_INSTALL:-}" ]; then
+  case "$SPN_INSTALL" in
+    *'"'*|*'$'*|*'`'*|*\\*) fail 'SPN_INSTALL may not contain a quote, dollar sign, backtick, or backslash' ;;
+  esac
   INSTALL_EXPR="$SPN_INSTALL"
 else
   SPN_INSTALL="${HOME}/.spn"
