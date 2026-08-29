@@ -63,7 +63,8 @@ jobs:
           echo "expected: ${expected}"
           echo "actual:   ${actual}"
           test "${actual}" = "${expected}"
-      - run: test/install/run.sh ${{ matrix.render }} --assets .
+      - if: runner.os != 'Windows'
+        run: test/install/run.sh ${{ matrix.render }} --assets .
       - if: runner.os == 'Windows'
         shell: pwsh
         run: test/install/run.ps1 -Renderer ${{ matrix.render }} -Assets . -Registry

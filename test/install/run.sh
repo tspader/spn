@@ -138,6 +138,11 @@ run_case() {
       set -- "OS=Windows_NT"
       printf '#!/bin/sh\nprintf %%s "$*" > ps-args\n' > "$CASE/bin/powershell"
       ;;
+    trampoline_msys)
+      UNAME_S="MINGW64_NT-10.0"
+      set -- "OS=Windows_NT"
+      printf '#!/bin/sh\nprintf %%s "$*" > ps-args\n' > "$CASE/bin/powershell"
+      ;;
     github_path) set -- "GITHUB_PATH=$CASE/gh" ;;
     no_modify) set -- "SPN_INSTALL_NO_MODIFY_PATH=1" ;;
     custom_install)
@@ -217,7 +222,7 @@ run_case() {
       assert_out "(aarch64-macos)"
       assert_file "$BIN_DIR/spn"
       ;;
-    trampoline)
+    trampoline|trampoline_msys)
       assert_rc 0
       grep -Fq "install.ps1" "$CASE/ps-args" || die "$NAME: powershell was not invoked with install.ps1"
       assert_no_file "$BIN_DIR/spn"
@@ -268,17 +273,10 @@ run_case() {
   printf 'run.sh: %s ok\n' "$NAME"
 }
 
-CASES="linux idempotent mismatch unsupported_arch no_build intel_mac rosetta trampoline github_path no_modify custom_install zdotdir shasum_fallback no_downloader wget_fallback shadow"
-case "$(uname -s)" in
-  MINGW*|MSYS*|CYGWIN*)
-    printf 'run.sh: fixture cases skipped on windows; stubbed tools cannot load outside the msys root\n'
-    ;;
-  *)
-    for name in $CASES; do
-      run_case "$name"
-    done
-    ;;
-esac
+CASES="linux idempotent mismatch unsupported_arch no_build intel_mac rosetta trampoline trampoline_msys github_path no_modify custom_install zdotdir shasum_fallback no_downloader wget_fallback shadow"
+for name in $CASES; do
+  run_case "$name"
+done
 
 if [ -n "$ASSETS" ]; then
   REAL="$WORK/real"
@@ -294,11 +292,7 @@ if [ -n "$ASSETS" ]; then
   CASE="$WORK/case-real"
   HOME_DIR="$CASE/home"
   mkdir -p "$HOME_DIR"
-  if has cygpath; then
-    ASSETS_URL="file:///$(cygpath -m "$ASSETS")"
-  else
-    ASSETS_URL="file://$ASSETS"
-  fi
+  ASSETS_URL="file://$ASSETS"
   if (cd "$CASE" && HOME="$HOME_DIR" GITHUB_PATH='' SPN_INSTALL_DOWNLOAD_URL="$ASSETS_URL" sh "$REAL/install.sh" > "$CASE/out" 2>&1); then
     RC=0
   else

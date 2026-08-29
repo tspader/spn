@@ -30,6 +30,10 @@ static const render_test_t tests [] = {
     .shasums = r(SHA_B "  spn-x86_64-linux.tar.gz"),
   },
   {
+    .name = "windows_only",
+    .shasums = r(SHA_C "  spn-x86_64-windows.zip"),
+  },
+  {
     .name = "binary_marker",
     .shasums = r(SHA_B " *spn-x86_64-linux.tar.gz"),
     .expect = { .golden = "unix_only" },

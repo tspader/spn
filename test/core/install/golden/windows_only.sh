@@ -75,9 +75,7 @@ fi
 TARGET="${CPU}-${SYS}"
 
 case "$TARGET" in
-  aarch64-macos) ASSET="spn-aarch64-macos.tar.gz" SHA="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" EXE="spn" ;;
-  x86_64-linux) ASSET="spn-x86_64-linux.tar.gz" SHA="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" EXE="spn" ;;
-  *) fail "spn ${VERSION} has no build for ${TARGET}; it ships for: aarch64-macos x86_64-linux" ;;
+  *) fail "spn ${VERSION} has no build for ${TARGET}; it ships for:" ;;
 esac
 
 if [ -z "${SPN_INSTALL:-}" ] && [ -z "${HOME:-}" ]; then

@@ -16,8 +16,6 @@ download_curl_tty() { curl -fSL --progress-bar -o "$2" "$1"; }
 download_wget() { wget -q -O "$2" "$1"; }
 checksum_sha256sum() { sha256sum "$1" | cut -d' ' -f1; }
 checksum_shasum() { shasum -a 256 "$1" | cut -d' ' -f1; }
-extract_tar() { tar -xzf "$1" -C "$2"; }
-extract_zip() { "C:/Windows/System32/tar.exe" -xf "$1" -C "$2"; }
 
 write_env_sh() {
   printf 'case ":${PATH}:" in\n  *:"%s":*) ;;\n  *) export PATH="%s:${PATH}" ;;\nesac\n' "$1" "$1" > "$2"
@@ -58,16 +56,12 @@ if [ $# -gt 0 ]; then
 fi
 
 if [ "${OS:-}" = "Windows_NT" ]; then
-  case "$(uname -s 2>/dev/null || echo unknown)" in
-    MINGW*|MSYS*|CYGWIN*) ;;
-    *) exec powershell -NoProfile -Command "irm '${BASE_URL}/install.ps1' | iex" ;;
-  esac
+  exec powershell -NoProfile -Command "irm '${BASE_URL}/install.ps1' | iex"
 fi
 
 case "$(uname -s)" in
   Linux) SYS=linux ;;
   Darwin) SYS=macos ;;
-  MINGW*|MSYS*|CYGWIN*) SYS=windows ;;
   *) fail "unsupported operating system $(uname -s)" ;;
 esac
 case "$(uname -m)" in
@@ -81,7 +75,7 @@ fi
 TARGET="${CPU}-${SYS}"
 
 case "$TARGET" in
-  x86_64-linux) ASSET="spn-x86_64-linux.tar.gz" SHA="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" EXE="spn" EXTRACT=extract_tar ;;
+  x86_64-linux) ASSET="spn-x86_64-linux.tar.gz" SHA="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" EXE="spn" ;;
   *) fail "spn ${VERSION} has no build for ${TARGET}; it ships for: x86_64-linux" ;;
 esac
 
@@ -97,17 +91,9 @@ fi
 BIN_DIR="${SPN_INSTALL}/bin"
 RC_LINE=". \"${INSTALL_EXPR}/env\""
 
-for tool in mktemp mkdir mv chmod rm grep cut; do
+for tool in mktemp mkdir mv chmod rm grep cut tar; do
   command -v "$tool" >/dev/null 2>&1 || fail "$tool is required to install spn"
 done
-case "$EXTRACT" in
-  extract_tar)
-    command -v tar >/dev/null 2>&1 || fail "tar is required to install spn"
-    ;;
-  extract_zip)
-    [ -x "C:/Windows/System32/tar.exe" ] || fail "C:/Windows/System32/tar.exe is required to extract ${ASSET}; it ships with Windows 10 1803 and later"
-    ;;
-esac
 
 if command -v curl >/dev/null 2>&1; then
   if [ -t 2 ]; then
@@ -141,7 +127,7 @@ if [ "$GOT" != "$SHA" ]; then
   fail "sha256 mismatch for ${ASSET} (got ${GOT}, want ${SHA}); if a release is being published right now, retry in a minute"
 fi
 
-"$EXTRACT" "${TMP}/${ASSET}" "$TMP" || fail "failed to extract ${ASSET}"
+tar -xzf "${TMP}/${ASSET}" -C "$TMP" || fail "failed to extract ${ASSET}"
 
 mkdir -p "$BIN_DIR"
 STAGE="$(mktemp -d "${BIN_DIR}/.stage.XXXXXX")"

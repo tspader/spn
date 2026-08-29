@@ -4,12 +4,17 @@
 
 #define try(expr) do { if (!(expr)) return false; } while (0)
 
+typedef enum {
+  TARGET_TAR,
+  TARGET_ZIP,
+} target_kind_t;
+
 typedef struct {
   sp_str_t name;
   sp_str_t asset;
   sp_str_t sha;
   sp_str_t exe;
-  sp_str_t kind;
+  target_kind_t kind;
   bool windows;
 } target_t;
 
@@ -47,11 +52,11 @@ static bool classify(installer_t* in, u32 line, sp_str_t asset, target_t* target
   sp_str_t ext = sp_zero;
   if (sp_str_ends_with(asset, tar)) {
     ext = tar;
-    target->kind = sp_str_lit("tar");
+    target->kind = TARGET_TAR;
   }
   else if (sp_str_ends_with(asset, zip)) {
     ext = zip;
-    target->kind = sp_str_lit("zip");
+    target->kind = TARGET_ZIP;
   }
 
   bool named = sp_str_starts_with(asset, prefix) && ext.len && asset.len > prefix.len + ext.len;
@@ -64,7 +69,7 @@ static bool classify(installer_t* in, u32 line, sp_str_t asset, target_t* target
   target->windows = sp_str_ends_with(target->name, sp_str_lit("-windows"));
   target->exe = target->windows ? sp_str_lit("spn.exe") : sp_str_lit("spn");
 
-  if (target->windows != sp_str_equal_cstr(target->kind, "zip")) {
+  if (target->windows != (target->kind == TARGET_ZIP)) {
     return fail(in, INSTALLER_ERR_PAIRING, line, asset);
   }
   return true;
@@ -124,7 +129,6 @@ static void bind_target(sp_template_scope_t* scope, target_t* target) {
   sp_template_set(scope, sp_str_lit("asset"), target->asset);
   sp_template_set(scope, sp_str_lit("sha"), target->sha);
   sp_template_set(scope, sp_str_lit("exe"), target->exe);
-  sp_template_set(scope, sp_str_lit("kind"), target->kind);
 }
 
 static sp_template_scope_t* bind_root(installer_t* in) {
@@ -132,15 +136,13 @@ static sp_template_scope_t* bind_root(installer_t* in) {
   sp_template_set(root, sp_str_lit("version"), in->config.version);
   sp_template_set(root, sp_str_lit("tag"), in->config.tag);
   sp_template_set(root, sp_str_lit("repo"), in->config.repo);
-  sp_template_list(root, sp_str_lit("targets"));
+  sp_template_list(root, sp_str_lit("unix_targets"));
   sp_template_list(root, sp_str_lit("windows_targets"));
 
   sp_da_for(in->targets, it) {
     target_t* target = &in->targets[it];
-    bind_target(sp_template_push(root, sp_str_lit("targets")), target);
-    if (target->windows) {
-      bind_target(sp_template_push(root, sp_str_lit("windows_targets")), target);
-    }
+    sp_str_t list = target->windows ? sp_str_lit("windows_targets") : sp_str_lit("unix_targets");
+    bind_target(sp_template_push(root, list), target);
   }
   return root;
 }
