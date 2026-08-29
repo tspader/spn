@@ -1,0 +1,19 @@
+[package]
+name = "lib_system_deps"
+version = "0.1.0"
+
+[[lib]]
+name = "mathy"
+kinds = ["static"]
+source = ["mathy.c"]
+system_deps = ["m"]
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+deps = ["mathy"]
+
+[[bin]]
+name = "direct"
+source = ["direct.c"]
+system_deps = ["m"]

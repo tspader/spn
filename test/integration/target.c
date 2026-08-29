@@ -216,3 +216,16 @@ sp_test(target, system_deps) {
     },
   });
 }
+
+sp_test(target, lib_system_deps) {
+  return run_test(t, (test_t) {
+    .project = "test/integration/fixtures/target/lib_system_deps",
+    .copy = { "mathy.c", "direct.c" },
+    .when.msvc_todo = true,
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { "build" } },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = exe("main") },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = exe("direct") },
+    },
+  });
+}

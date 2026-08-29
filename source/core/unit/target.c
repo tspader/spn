@@ -266,15 +266,15 @@ static spn_path_t static_archive_path(sp_mem_t mem, spn_target_unit_t* lib) {
   return path;
 }
 
-typedef sp_str_ht(u8) link_framework_set_t;
+typedef sp_str_ht(u8) link_str_set_t;
 
-static void push_frameworks(link_framework_set_t* seen, sp_da(sp_str_t)* frameworks, sp_da(sp_str_t) values) {
+static void push_unique(link_str_set_t* seen, sp_da(sp_str_t)* result, sp_da(sp_str_t) values) {
   sp_da_for(values, it) {
     if (sp_str_ht_exists(*seen, values[it])) {
       continue;
     }
     sp_str_ht_insert(*seen, values[it], (u8)true);
-    sp_da_push(*frameworks, values[it]);
+    sp_da_push(*result, values[it]);
   }
 }
 
@@ -345,21 +345,41 @@ static spn_lang_t link_plan_lang(spn_target_unit_t* target, sp_da(spn_link_lib_t
 
 static void link_plan_frameworks(spn_target_unit_t* target, sp_da(spn_closure_entry_t) closure, sp_da(sp_str_t)* frameworks) {
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-  link_framework_set_t seen;
+  link_str_set_t seen;
   sp_str_ht_init(s.mem, seen);
 
-  push_frameworks(&seen, frameworks, target->info->macos.frameworks);
+  push_unique(&seen, frameworks, target->info->macos.frameworks);
 
   sp_da_for(closure, it) {
     spn_closure_entry_t* entry = &closure[it];
     if (entry->links_code) {
-      push_frameworks(&seen, frameworks, entry->pkg->info->macos.frameworks);
+      push_unique(&seen, frameworks, entry->pkg->info->macos.frameworks);
     }
     sp_da_for(entry->targets, lt) {
       spn_target_unit_t* lib = entry->targets[lt];
       if (lib->info->no_link) continue;
       if (lib->lib_kind == SPN_LIB_KIND_SHARED) continue;
-      push_frameworks(&seen, frameworks, lib->info->macos.frameworks);
+      push_unique(&seen, frameworks, lib->info->macos.frameworks);
+    }
+  }
+  sp_mem_end_scratch(s);
+}
+
+static void link_plan_system_libs(spn_target_unit_t* target, sp_da(spn_closure_entry_t) closure, sp_da(sp_str_t)* system_libs) {
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+  link_str_set_t seen;
+  sp_str_ht_init(s.mem, seen);
+
+  push_unique(&seen, system_libs, target->info->system_deps);
+
+  sp_da_for(closure, it) {
+    spn_closure_entry_t* entry = &closure[it];
+    push_unique(&seen, system_libs, entry->pkg->info->system_deps);
+    sp_da_for(entry->targets, lt) {
+      spn_target_unit_t* lib = entry->targets[lt];
+      if (lib->info->no_link) continue;
+      if (lib->lib_kind == SPN_LIB_KIND_SHARED) continue;
+      push_unique(&seen, system_libs, lib->info->system_deps);
     }
   }
   sp_mem_end_scratch(s);
@@ -391,6 +411,7 @@ static spn_link_plan_t link_plan(spn_target_unit_t* target) {
   sp_da_init(mem, plan.cc.frameworks);
 
   link_plan_frameworks(target, closure, &plan.cc.frameworks);
+  link_plan_system_libs(target, closure, &plan.cc.system_libs);
 
   sp_da_for(plan.libs, it) {
     spn_link_lib_t* lib = &plan.libs[it];
@@ -412,12 +433,6 @@ static spn_link_plan_t link_plan(spn_target_unit_t* target) {
         sp_da_push(plan.archives, static_archive_path(mem, lib->lib));
         break;
       }
-    }
-  }
-
-  sp_da_for(closure, it) {
-    sp_da_for(closure[it].pkg->info->system_deps, st) {
-      sp_da_push(plan.cc.system_libs, closure[it].pkg->info->system_deps[st]);
     }
   }
 
