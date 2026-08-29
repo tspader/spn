@@ -117,9 +117,9 @@ else
   fail "sha256sum or shasum is required to install spn"
 fi
 
-TMP="$(mktemp -d)"
-STAGE=""
-trap 'rm -rf "$TMP" ${STAGE:+"$STAGE"}' EXIT
+mkdir -p "$BIN_DIR"
+TMP="$(mktemp -d "${BIN_DIR}/.stage.XXXXXX")"
+trap 'rm -rf "$TMP"' EXIT
 
 printf 'install: downloading spn %s (%s)\n' "$VERSION" "$TARGET"
 "$DOWNLOAD" "${BASE_URL}/${ASSET}" "${TMP}/${ASSET}" || fail "failed to download ${BASE_URL}/${ASSET}"
@@ -130,12 +130,8 @@ if [ "$GOT" != "$SHA" ]; then
 fi
 
 tar -xzf "${TMP}/${ASSET}" -C "$TMP" || fail "failed to extract ${ASSET}"
-
-mkdir -p "$BIN_DIR"
-STAGE="$(mktemp -d "${BIN_DIR}/.stage.XXXXXX")"
-mv "${TMP}/${EXE}" "${STAGE}/${EXE}"
-chmod +x "${STAGE}/${EXE}"
-mv -f "${STAGE}/${EXE}" "${BIN_DIR}/${EXE}" || fail "failed to replace ${BIN_DIR}/${EXE}; close any running spn and retry"
+chmod +x "${TMP}/${EXE}"
+mv -f "${TMP}/${EXE}" "${BIN_DIR}/${EXE}" || fail "failed to replace ${BIN_DIR}/${EXE}; close any running spn and retry"
 
 VERSION_OUT="$("${BIN_DIR}/${EXE}" --version)" || fail "the installed spn failed to run"
 

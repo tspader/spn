@@ -98,6 +98,11 @@ foreach ($Case in $Cases) {
     $Content = Get-Content -Path $Case.ExpectPath.File -ErrorAction SilentlyContinue
     if ($Content -notcontains $Case.ExpectPath.Line) { $Errors += "GITHUB_PATH missing $($Case.ExpectPath.Line)" }
   }
+  $CaseRoot = $Case.Env.SPN_INSTALL
+  if ($CaseRoot) {
+    $Stages = Get-ChildItem -Path (Join-Path $CaseRoot "bin") -Filter ".stage-*" -Directory -ErrorAction SilentlyContinue
+    if ($Stages) { $Errors += "staging directories left behind: $($Stages.Name -join ', ')" }
+  }
   if ($Case.ExpectRegistry) {
     $RegPath = (Get-Item -Path 'HKCU:\Environment').GetValue('Path', '', 'DoNotExpandEnvironmentNames') -split ';'
     if ($RegPath -notcontains $Case.ExpectRegistry) { $Errors += "registry PATH missing $($Case.ExpectRegistry)" }
