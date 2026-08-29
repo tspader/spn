@@ -25,19 +25,11 @@ static void on_signal(sp_os_signal_t signal, void* userdata) {
   }
 }
 
-static s32 err(sp_tty_t* tty, sp_cli_t* cli) {
-  sp_tty_fmt(tty, "{.red}: ", sp_fmt_cstr("error"));
-  sp_cli_err_print(tty, cli->err);
-  sp_tty_fmt(tty, "\n");
-  return 1;
-}
-
-static s32 help(sp_tty_t* tty, sp_cli_t* cli) {
+static void help(sp_tty_t* tty, sp_cli_t* cli) {
   sp_cli_write_help(tty, cli);
-  return 0;
 }
 
-static s32 version(sp_tty_t* tty) {
+static void version(sp_tty_t* tty) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   sp_da(sp_str_t) parts = sp_da_new(scratch.mem, sp_str_t);
 
@@ -58,7 +50,6 @@ static s32 version(sp_tty_t* tty) {
   }
 
   sp_mem_end_scratch(scratch);
-  return 0;
 }
 
 s32 spn_main(s32 num_args, const c8** args) {
@@ -92,30 +83,21 @@ s32 spn_main(s32 num_args, const c8** args) {
   sp_tty_t* io = tui.out;
 
   if (cli.status == SP_CLI_ERR) {
-    return err(io, &cli);
+    spn_tui_usage(&tui, cli.err);
+    return spn_cli_shutdown(false);
   }
   if (host.args.version) {
-    return version(io);
+    version(io);
+    return spn_cli_shutdown(true);
   }
   if (cli.status == SP_CLI_HELP) {
-    return help(io, &cli);
+    help(io, &cli);
+    return spn_cli_shutdown(true);
   }
 
   sp_cli_result_t status = sp_cli_dispatch(&cli);
-
-  switch (status) {
-    case SP_CLI_HELP: {
-      help(io, &cli);
-      break;
-    }
-    case SP_CLI_ERR: {
-      err(io, &cli);
-      break;
-    }
-    case SP_CLI_OK:
-    case SP_CLI_CONTINUE: {
-      break;
-    }
+  if (status == SP_CLI_HELP) {
+    help(io, &cli);
   }
 
   return spn_cli_shutdown(status != SP_CLI_ERR);

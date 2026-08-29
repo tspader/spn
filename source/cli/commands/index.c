@@ -62,7 +62,7 @@ static sp_cli_result_t path(sp_cli_t* cli) {
 
   spn_index_desc_t index = sp_zero;
   if (!spn_get_index(host.ctx, args.name, &index)) {
-    return spn_cli_error(cli, "unknown index: {.cyan}", sp_fmt_str(args.name));
+    return spn_cli_usage("unknown index: {.cyan}", sp_fmt_str(args.name));
   }
 
   spn_tui_handoff(&tui);

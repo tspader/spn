@@ -1585,6 +1585,36 @@ void spn_tui_log_event(spn_tui_t* tui, spn_event_t* event) {
   sp_mem_end_scratch(scratch);
 }
 
+void spn_tui_error_v(spn_tui_t* tui, const c8* fmt, va_list args) {
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_io_dyn_mem_writer_t buf = sp_zero;
+  sp_io_dyn_mem_writer_init(scratch.mem, &buf);
+  sp_tty_t tty = { .io = &buf.base, .color = tui->journal.color };
+  sp_tty_fmt_v(&tty, sp_cstr_as_str(fmt), args);
+
+  write_error(&tui->journal, sp_io_dyn_mem_writer_as_str(&buf));
+  flush_writer(&tui->writer);
+  sp_mem_end_scratch(scratch);
+}
+
+void spn_tui_error(spn_tui_t* tui, const c8* fmt, ...) {
+  va_list args;
+  va_start(args, fmt);
+  spn_tui_error_v(tui, fmt, args);
+  va_end(args);
+}
+
+void spn_tui_usage(spn_tui_t* tui, sp_cli_err_t err) {
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_io_dyn_mem_writer_t buf = sp_zero;
+  sp_io_dyn_mem_writer_init(scratch.mem, &buf);
+  sp_tty_t tty = { .io = &buf.base, .color = tui->journal.color };
+  sp_cli_err_print(&tty, err);
+
+  spn_tui_error(tui, "{}", sp_fmt_str(sp_io_dyn_mem_writer_as_str(&buf)));
+  sp_mem_end_scratch(scratch);
+}
+
 static void write_line(spn_tui_line_writer_t* writer, sp_str_t line) {
   if (writer->prompt) {
     sp_prompt_log_str(writer->prompt, line);
