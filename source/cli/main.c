@@ -26,15 +26,16 @@ static void on_signal(sp_os_signal_t signal, void* userdata) {
 }
 
 static s32 err(sp_io_writer_t* io, sp_cli_t* cli) {
-  sp_cli_err_t err = cli->err;
-  sp_fmt_io(io, "{.red}: ", sp_fmt_cstr("error"));
-  sp_cli_err_print(io, err);
-  sp_fmt_io(io, "\n");
+  sp_tty_t tty = { .io = io, .color = sp_tty_color_detect(sp_sys_stdout) };
+  sp_tty_fmt(&tty, "{.red}: ", sp_fmt_cstr("error"));
+  sp_cli_err_print(&tty, cli->err);
+  sp_tty_fmt(&tty, "\n");
   return 1;
 }
 
 static s32 help(sp_io_writer_t* io, sp_cli_t* cli) {
-  sp_cli_write_help(io, cli);
+  sp_tty_t tty = { .io = io, .color = sp_tty_color_detect(sp_sys_stdout) };
+  sp_cli_write_help(&tty, cli);
   return 0;
 }
 
