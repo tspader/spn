@@ -489,7 +489,7 @@ sp_err_t run_command(sp_test_t* t, fixture_t* fixture, command_test_t test) {
   if (test.project) {
     sp_try(prepare_test(t, fixture, test.project, test.copy));
   }
-  sp_ps_output_t output = run_spn_command(t, fixture, test.output ? test.output : "json", test.args, test.env);
+  sp_ps_output_t output = (test.human ? run_spn : run_spn_json)(t, fixture, test.args, test.env);
   sp_expect_eq(t, test.expect.rc, output.status.exit_code);
 
   sp_str_t streams = sp_str_concat(fixture->mem, output.out, output.err);
@@ -752,7 +752,7 @@ sp_err_t run_actions(sp_test_t* t, fixture_t* fixture, const action_t* actions) 
           }
           args[it + 1] = action.cli.args[it];
         }
-        sp_ps_output_t output = run_spn_command(t, fixture, "json", args, action.cli.env);
+        sp_ps_output_t output = run_spn_json(t, fixture, args, action.cli.env);
         sp_expect_eq(t, action.cli.rc, output.status.exit_code);
         break;
       }

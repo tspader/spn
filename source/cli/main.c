@@ -75,7 +75,8 @@ s32 spn_main(s32 num_args, const c8** args) {
 
   spn_tui_init(&tui, (spn_tui_desc_t) {
     .ctx = host.ctx,
-    .mode = (spn_tui_mode_t)host.args.output.value,
+    .json = host.args.json,
+    .no_color = host.args.no_color,
     .verbosity = verbosity,
     .wake = host.doorbell,
   });

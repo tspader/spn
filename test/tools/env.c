@@ -111,8 +111,7 @@ static sp_err_t fixture_publish(sp_test_t* t, fixture_t* fixture, sp_str_t repo,
       },
     },
   };
-  sp_ps_config_add_arg(mem, &config, sp_str_lit("-o"));
-  sp_ps_config_add_arg(mem, &config, sp_str_lit("json"));
+  sp_ps_config_add_arg(mem, &config, sp_str_lit("--json"));
   sp_ps_config_add_arg(mem, &config, sp_str_lit("publish"));
   sp_ps_config_add_arg(mem, &config, sp_str_lit("--source-url"));
   sp_ps_config_add_arg(mem, &config, sp_str_replace_c8(mem, url, '\\', '/'));
@@ -437,7 +436,7 @@ sp_err_t prepare_test(sp_test_t* t, fixture_t* fixture, const c8* project, const
   return SP_OK;
 }
 
-sp_ps_output_t run_spn_command(sp_test_t* t, fixture_t* fixture, const c8* output_mode, const c8* const* args, const c8* const* env) {
+static sp_ps_output_t run_spn_ex(sp_test_t* t, fixture_t* fixture, const c8* format, const c8* const* args, const c8* const* env) {
   sp_mem_t mem = fixture->mem;
   sp_ps_config_t config = {
     .command = fixture->paths.spn,
@@ -471,9 +470,8 @@ sp_ps_output_t run_spn_command(sp_test_t* t, fixture_t* fixture, const c8* outpu
     }
   }
 
-  if (output_mode) {
-    sp_ps_config_add_arg(mem, &config, sp_str_lit("-o"));
-    sp_ps_config_add_arg(mem, &config, sp_cstr_as_str(output_mode));
+  if (format) {
+    sp_ps_config_add_arg(mem, &config, sp_cstr_as_str(format));
   }
 
   if (args) {
@@ -497,4 +495,12 @@ sp_ps_output_t run_spn_command(sp_test_t* t, fixture_t* fixture, const c8* outpu
   sp_test_kv(t, "stdout", output.out);
   sp_test_kv(t, "stderr", output.err);
   return output;
+}
+
+sp_ps_output_t run_spn(sp_test_t* t, fixture_t* fixture, const c8* const* args, const c8* const* env) {
+  return run_spn_ex(t, fixture, SP_NULLPTR, args, env);
+}
+
+sp_ps_output_t run_spn_json(sp_test_t* t, fixture_t* fixture, const c8* const* args, const c8* const* env) {
+  return run_spn_ex(t, fixture, "--json", args, env);
 }

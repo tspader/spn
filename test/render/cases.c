@@ -7,7 +7,6 @@ typedef struct {
   const c8* setup [2][SPN_TEST_COMMAND_MAX_ARGS];
   const c8* args [SPN_TEST_COMMAND_MAX_ARGS];
   const c8* env [SPN_TEST_COMMAND_MAX_ENV];
-  const c8* output;
 } cell_t;
 
 static cell_t cells [] = {
@@ -36,8 +35,7 @@ static cell_t cells [] = {
   {
     .name = "build_json",
     .project = "test/render/fixtures/ok",
-    .args = { "build" },
-    .output = "json",
+    .args = { "build", "--json" },
   },
   {
     .name = "build_warm",
@@ -65,8 +63,8 @@ static cell_t cells [] = {
     .args = { "build" },
   },
   {
-    .name = "output_bogus",
-    .args = { "build", "-o", "bogus" },
+    .name = "usage_bad_choice",
+    .args = { "build", "--mode", "bogus" },
   },
   {
     .name = "test_ok",
@@ -102,6 +100,12 @@ static cell_t cells [] = {
     .args = { "build" },
     .env = { "CLICOLOR_FORCE=1" },
   },
+  {
+    .name = "build_no_color",
+    .project = "test/render/fixtures/ok",
+    .args = { "build", "--no-color" },
+    .env = { "CLICOLOR_FORCE=1" },
+  },
 };
 
 static sp_str_t scrub(sp_mem_t mem, fixture_t* fixture, sp_str_t text) {
@@ -118,10 +122,10 @@ sp_test_each(render, cells, cell_t, cells) {
     if (!it->setup[step][0]) {
       break;
     }
-    run_spn_command(t, &fixture, SP_NULLPTR, it->setup[step], SP_NULLPTR);
+    run_spn(t, &fixture, it->setup[step], SP_NULLPTR);
   }
 
-  sp_ps_output_t output = run_spn_command(t, &fixture, it->output, it->args, it->env);
+  sp_ps_output_t output = run_spn(t, &fixture, it->args, it->env);
 
   sp_mem_t mem = fixture.mem;
   sp_str_t dir = sp_fs_join_path(mem, render_out_path(mem, "current"), sp_str_view(it->name));

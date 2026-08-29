@@ -1469,7 +1469,7 @@ static void render_event_extra(sp_tty_t* w, spn_event_t* event) {
 }
 
 void spn_tui_log_event(spn_tui_t* tui, spn_event_t* event) {
-  if (tui->mode == SPN_OUTPUT_MODE_JSON) {
+  if (tui->json) {
     spn_event_log_jsonl(tui->out->io, event);
     return;
   }
@@ -1678,7 +1678,7 @@ static void detach_prompt(spn_tui_t* tui) {
 
 void spn_tui_init(spn_tui_t* tui, spn_tui_desc_t desc) {
   tui->ctx = desc.ctx;
-  tui->mode = desc.mode;
+  tui->json = desc.json;
   tui->verbosity = desc.verbosity;
   tui->wake = desc.wake;
 
@@ -1686,6 +1686,11 @@ void spn_tui_init(spn_tui_t* tui, spn_tui_desc_t desc) {
 
   tui->out = sp_tty_std_out();
   tui->err = sp_tty_std_err();
+  if (desc.no_color) {
+    tui->out->color = SP_TTY_COLOR_NONE;
+    tui->err->color = SP_TTY_COLOR_NONE;
+  }
+  tui->interactive = !desc.json && sp_sys_is_tty(sp_sys_stdout);
 #ifdef SP_WIN32
   if (sp_sys_is_tty(sp_sys_stdout) || sp_sys_is_tty(sp_sys_stderr)) {
     SetConsoleCP(CP_UTF8);
@@ -1756,7 +1761,7 @@ static void print_line(sp_tty_t* tty, const c8* fmt, va_list args) {
 }
 
 static sp_tty_t* print_tty(spn_tui_t* tui) {
-  if (tui->mode == SPN_OUTPUT_MODE_JSON) {
+  if (tui->json) {
     return tui->err;
   }
   return tui->out;
@@ -1802,10 +1807,7 @@ static void prompt_start(spn_tui_t* tui) {
   }
   tui->prompt.started = true;
 
-  if (tui->mode != SPN_OUTPUT_MODE_INTERACTIVE) {
-    return;
-  }
-  if (!sp_sys_is_tty(sp_sys_stdout)) {
+  if (!tui->interactive) {
     return;
   }
 

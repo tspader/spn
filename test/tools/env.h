@@ -32,6 +32,7 @@ void      write_file(sp_str_t path, sp_str_t content);
 sp_str_t  str_replace_all(sp_mem_t mem, sp_str_t str, sp_str_t needle, sp_str_t repl);
 
 sp_err_t prepare_test(sp_test_t* t, fixture_t* fixture, const c8* project, const c8* const* copy);
-sp_ps_output_t run_spn_command(sp_test_t* t, fixture_t* fixture, const c8* output_mode, const c8* const* args, const c8* const* env);
+sp_ps_output_t run_spn(sp_test_t* t, fixture_t* fixture, const c8* const* args, const c8* const* env);
+sp_ps_output_t run_spn_json(sp_test_t* t, fixture_t* fixture, const c8* const* args, const c8* const* env);
 
 #endif

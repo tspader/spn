@@ -133,7 +133,7 @@ typedef struct {
   test_when_t when;
   const c8* args [SPN_TEST_COMMAND_MAX_ARGS];
   const c8* env [SPN_TEST_COMMAND_MAX_ENV];
-  const c8* output;
+  bool human;
   command_expect_t expect;
 } command_test_t;
 

@@ -124,7 +124,7 @@ static spn_err_t scaffold(sp_mem_t mem, sp_str_t project) {
   }));
 
   sp_str_t name = sp_fs_get_name(dir);
-  if (tui.mode == SPN_OUTPUT_MODE_INTERACTIVE && sp_sys_is_tty(sp_sys_stdout) && sp_str_empty(args.path)) {
+  if (tui.interactive && sp_str_empty(args.path)) {
     return run_prompt(mem, dir, name);
   }
 
