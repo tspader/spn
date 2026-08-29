@@ -340,7 +340,7 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
       break;
     }
     case SPN_EVENT_TEST_FAILED: {
-      sp_tty_fmt(&w, "{.yellow} failed with exit code {}",
+      sp_tty_fmt(&w, "{.yellow} exited with code {}",
         sp_fmt_str(event->test_failed.name),
         sp_fmt_int(event->test_failed.code)
       );
@@ -388,11 +388,11 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
       break;
     }
     case SPN_EVENT_SCRIPT_COMPILE_FAILED: {
-      sp_tty_fmt(&w, "{.cyan} failed to compile", sp_fmt_str(get_contextual_path(ctx, mem, event->compile_failed.script_path)));
+      sp_tty_fmt(&w, "could not compile {.cyan}", sp_fmt_str(get_contextual_path(ctx, mem, event->compile_failed.script_path)));
       break;
     }
     case SPN_EVENT_TARGET_BUILD_FAILED: {
-      sp_tty_fmt(&w, "{.cyan} failed to compile", sp_fmt_str(get_contextual_path(ctx, mem, event->target_failed.source_file)));
+      sp_tty_fmt(&w, "could not compile {.cyan}", sp_fmt_str(get_contextual_path(ctx, mem, event->target_failed.source_file)));
       break;
     }
     case SPN_EVENT_NODE_FAILED: {
@@ -1295,7 +1295,7 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
       break;
     }
     case SPN_EVENT_LINK_FAILED: {
-      sp_tty_fmt(&w, "Failed to link target {.cyan}", sp_fmt_str(event->link_failed.target));
+      sp_tty_fmt(&w, "could not link {.cyan}", sp_fmt_str(event->link_failed.target));
       break;
     }
     case SPN_EVENT_CONFIGURE_OK: {
@@ -1508,8 +1508,7 @@ void spn_tui_log_event(spn_tui_t* tui, spn_event_t* event) {
       }
       write_error(tty, detail);
     } else {
-      sp_str_t name = event->pkg;
-      write_event(tty, sp_str_lit("error"), true, name, detail);
+      write_event(tty, verb, true, event->pkg, detail);
     }
     render_event_extra(tty, event);
     flush_writer(&tui->writer);
