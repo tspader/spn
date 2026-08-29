@@ -5,7 +5,7 @@
 
 typedef struct {
   const c8* shasums;
-  const c8* templates;
+  const c8* scripts;
   const c8* out;
   const c8* version;
   const c8* tag;
@@ -23,7 +23,7 @@ static sp_cli_result_t run_cli(sp_cli_t* cli) {
 
   installer_result_t result = installer_render(mem, (installer_config_t) {
     .shasums = shasums,
-    .templates = sp_cstr_as_str(args->templates),
+    .scripts = sp_cstr_as_str(args->scripts),
     .out = sp_cstr_as_str(args->out),
     .version = sp_cstr_as_str(args->version),
     .tag = sp_cstr_as_str(args->tag),
@@ -41,7 +41,7 @@ s32 main(s32 num_args, const c8** args) {
 
   sp_cli_cmd_t root = {
     .name = "installer",
-    .summary = "Render the release installers from a SHASUMS256.txt",
+    .summary = "Fill the release data blocks of install.sh and install.ps1 from a SHASUMS256.txt",
     .args = {
       {
         .name = "shasums",
@@ -49,9 +49,9 @@ s32 main(s32 num_args, const c8** args) {
         .ptr = &parsed.shasums,
       },
       {
-        .name = "templates",
-        .summary = "Path to the template root directory",
-        .ptr = &parsed.templates,
+        .name = "scripts",
+        .summary = "Path to the directory containing install.sh and install.ps1",
+        .ptr = &parsed.scripts,
       },
       {
         .name = "out",

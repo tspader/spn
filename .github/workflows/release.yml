@@ -57,7 +57,7 @@ jobs:
       - run: |
           chmod +x dist/installer_render
           version="$(sed -n 's/^version = "\(.*\)"$/\1/p' spn.toml)"
-          dist/installer_render dist/SHASUMS256.txt tools/install/templates dist "${version}" "${TAG}" ${{ github.repository }}
+          dist/installer_render dist/SHASUMS256.txt tools/install dist "${version}" "${TAG}" ${{ github.repository }}
       - run: gh release create "${TAG}" dist/spn-* dist/SHASUMS256.txt dist/install.sh dist/install.ps1 --repo ${{ github.repository }} --target ${{ github.sha }} --title "${TAG}" --generate-notes
 
   smoke:

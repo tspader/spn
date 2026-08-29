@@ -64,10 +64,43 @@ jobs:
           echo "actual:   ${actual}"
           test "${actual}" = "${expected}"
       - if: runner.os != 'Windows'
-        run: test/install/run.sh ${{ matrix.render }} --assets .
+        run: |
+          mkdir -p dist dist/home
+          cp spn-${{ matrix.id }}.${{ matrix.ext }} dist/
+          (cd dist && shasum -a 256 spn-* > SHASUMS256.txt)
+          ${{ matrix.render }} dist/SHASUMS256.txt tools/install dist 0.0.0 v0.0.0 ${{ github.repository }}
+          if [ "$RUNNER_OS" = "Linux" ]; then shellcheck -s sh dist/install.sh; fi
+          HOME="$PWD/dist/home" GITHUB_PATH= SPN_INSTALL_DOWNLOAD_URL="file://$PWD/dist" sh dist/install.sh
+          test -x dist/home/.spn/bin/spn
+          grep -Fq '. "$HOME/.spn/env"' dist/home/.profile
+          dist/home/.spn/bin/spn --version
       - if: runner.os == 'Windows'
         shell: pwsh
-        run: test/install/run.ps1 -Renderer ${{ matrix.render }} -Assets . -Registry
+        run: |
+          mkdir dist | Out-Null
+          Copy-Item spn-${{ matrix.id }}.${{ matrix.ext }} dist/
+          $Hash = (Get-FileHash -Algorithm SHA256 "dist/spn-${{ matrix.id }}.${{ matrix.ext }}").Hash.ToLower()
+          Set-Content -Path dist/SHASUMS256.txt -Value "$Hash  spn-${{ matrix.id }}.${{ matrix.ext }}"
+          & ${{ matrix.render }} dist/SHASUMS256.txt tools/install dist 0.0.0 v0.0.0 ${{ github.repository }}
+          if ($LASTEXITCODE -ne 0) { throw "installer_render failed" }
+          $Saved = (Get-Item -Path 'HKCU:\Environment').GetValue('Path', '', 'DoNotExpandEnvironmentNames')
+          Remove-Item -Path env:GITHUB_PATH -ErrorAction SilentlyContinue
+          $env:SPN_INSTALL_DOWNLOAD_URL = "file:///" + ("$PWD/dist" -replace '\\', '/')
+          try {
+            & powershell -NoProfile -ExecutionPolicy Bypass -Command "iex (Get-Content -Raw 'dist/install.ps1')"
+            if ($LASTEXITCODE -ne 0) { throw "install.ps1 failed" }
+            $Exe = Join-Path $env:USERPROFILE ".spn\bin\spn.exe"
+            if (-not (Test-Path $Exe)) { throw "spn.exe was not installed" }
+            & $Exe --version
+            if ($LASTEXITCODE -ne 0) { throw "the installed spn failed to run" }
+            $Reg = (Get-Item -Path 'HKCU:\Environment').GetValue('Path', '', 'DoNotExpandEnvironmentNames') -split ';'
+            $Bin = Join-Path $env:USERPROFILE ".spn\bin"
+            if ($Reg -notcontains $Bin) { throw "registry PATH missing $Bin" }
+          } finally {
+            $Key = (Get-Item -Path 'HKCU:').OpenSubKey('Environment', $true)
+            $Key.SetValue('Path', $Saved, $Key.GetValueKind('Path'))
+            $Key.Dispose()
+          }
 
       - uses: actions/upload-artifact@v4
         with:

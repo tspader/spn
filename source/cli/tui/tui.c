@@ -2,7 +2,7 @@
 
 #include "sp/io.h"
 #include "sp/macro.h"
-#include "sp/prompt.h"
+#include "sp/sp_prompt.h"
 #include "sp/str.h"
 
 #include "tui/tui.h"

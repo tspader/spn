@@ -1,2 +1,2 @@
 #define SP_PROMPT_IMPLEMENTATION
-#include "sp/prompt.h"
+#include "sp/sp_prompt.h"

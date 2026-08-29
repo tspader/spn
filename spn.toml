@@ -35,7 +35,10 @@ blake3 = "1.8.7"
 yyjson = "0.14.0"
 
 [patch."spader/sp"]
-files = ["tools/patches/sp-test-num-cpus.patch"]
+files = [
+  "tools/patches/sp-test-num-cpus.patch",
+  "tools/patches/sp-prompt-external-wake.patch",
+]
 
 [patch.wamr]
 files = [
@@ -96,14 +99,14 @@ include = ["include", "source/core", "source/core/external", "source/core/codege
 [[bin]]
 name = "spn"
 source = ["source/cli/**/*.c"]
-include = ["include", "source/cli", "source/core"]
+include = ["include", "source/cli"] # @spader removed the core include
 deps = ["spn"]
 flags = []
 
 [[script]]
 name = "installer"
 source = ["tools/install/main.c", "tools/install/render.c"]
-include = ["tools/install", "tools/gen"]
+include = ["tools/install"]
 
 [[test]]
 name = "core"
@@ -182,6 +185,11 @@ source = [
   "source/core/index/jsonl.c",
   "source/core/index/publish.c",
   "source/core/index/release.c",
+  "source/core/install/exec.c",
+  "source/core/install/plan.c",
+  "source/core/install/probe.c",
+  "source/core/install/report.c",
+  "source/core/install/resolve.c",
   "source/core/intern/context.c",
   "source/core/intern/intern.c",
   "source/core/thread_pool/thread_pool.c",
@@ -208,6 +216,7 @@ source = [
   "source/core/hash/sha256/sha256.c",
   "source/core/sp/fs.c",
   "source/core/sp/io.c",
+  "source/core/sp/os.c",
   "source/core/sp/str.c",
   "source/core/target/mutate.c",
   "source/core/target/select.c",

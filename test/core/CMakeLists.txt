@@ -8,6 +8,7 @@ add_executable(core
   identity.c
   intern.c
   lazy.c
+  os.c
   stable_map.c
   triple.c
   version.c
@@ -65,7 +66,14 @@ add_executable(core
   index/release.c
   index/sync.c
   index/transaction.c
+  install/exec.c
+  install/harness.c
+  install/plan.c
+  install/probe.c
   install/render.c
+  install/report.c
+  install/resolve.c
+  install/shim.c
   jtd/harness.c
   jtd/conformance.c
   jtd/discriminator.c
@@ -171,6 +179,11 @@ add_executable(core
   ${SRC}/index/jsonl.c
   ${SRC}/index/json.c
   ${SRC}/index/publish.c
+  ${SRC}/install/exec.c
+  ${SRC}/install/plan.c
+  ${SRC}/install/probe.c
+  ${SRC}/install/report.c
+  ${SRC}/install/resolve.c
   ${SRC}/intern/context.c
   ${SRC}/intern/intern.c
   ${SRC}/lock/lock.c
@@ -195,6 +208,7 @@ add_executable(core
   ${SRC}/hash/sha256/sha256.c
   ${SRC}/sp/fs.c
   ${SRC}/sp/io.c
+  ${SRC}/sp/os.c
   ${SRC}/sp/str.c
   ${SRC}/target/mutate.c
   ${SRC}/target/select.c

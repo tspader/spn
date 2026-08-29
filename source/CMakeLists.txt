@@ -14,6 +14,7 @@ set(SPN_SOURCES
   cli/commands/init.c
   cli/commands/profile.c
   cli/commands/publish.c
+  cli/commands/self.c
   cli/commands/test.c
   cli/host/host.c
   cli/main.c
@@ -62,6 +63,11 @@ set(SPN_SOURCES
   core/index/jsonl.c
   core/index/json.c
   core/index/publish.c
+  core/install/exec.c
+  core/install/plan.c
+  core/install/probe.c
+  core/install/report.c
+  core/install/resolve.c
   core/intern/context.c
   core/intern/intern.c
   core/lock/lock.c

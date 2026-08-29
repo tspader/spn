@@ -25,7 +25,6 @@ else()
   target_include_directories(installer_render PRIVATE
     ${STORE}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/install
-    ${CMAKE_CURRENT_SOURCE_DIR}/gen
   )
   target_link_libraries(installer_render PRIVATE m)
   add_dependencies(installer_render headers)

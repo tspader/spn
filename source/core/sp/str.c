@@ -1,5 +1,17 @@
 #include "str.h"
 
+bool sp_str_iequal(sp_str_t a, sp_str_t b) {
+  if (a.len != b.len) {
+    return false;
+  }
+  sp_str_for(a, it) {
+    if (sp_c8_to_lower(a.data[it]) != sp_c8_to_lower(b.data[it])) {
+      return false;
+    }
+  }
+  return true;
+}
+
 bool sp_str_line_it_valid(const sp_str_line_it_t* it) {
   return !it->done;
 }

@@ -3,11 +3,14 @@
 
 #include "sp.h"
 
+#define INSTALLER_DATA_BEGIN "# >>> spn release data"
+#define INSTALLER_DATA_END   "# <<< spn release data"
+
 typedef enum {
   INSTALLER_OK = 0,
   INSTALLER_ERR_IO,
-  INSTALLER_ERR_TEMPLATES,
-  INSTALLER_ERR_RENDER,
+  INSTALLER_ERR_SCRIPT,
+  INSTALLER_ERR_MARKERS,
   INSTALLER_ERR_FIELDS,
   INSTALLER_ERR_SHA,
   INSTALLER_ERR_ASSET,
@@ -18,7 +21,7 @@ typedef enum {
 
 typedef struct {
   sp_str_t shasums;
-  sp_str_t templates;
+  sp_str_t scripts;
   sp_str_t out;
   sp_str_t version;
   sp_str_t tag;

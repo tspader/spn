@@ -88,7 +88,7 @@ jobs:
       - run: |
           chmod +x dist/installer_render
           version="$(sed -n 's/^version = "\(.*\)"$/\1/p' spn.toml)"
-          dist/installer_render dist/SHASUMS256.txt tools/install/templates dist "${version}" canary ${{ github.repository }}
+          dist/installer_render dist/SHASUMS256.txt tools/install dist "${version}" canary ${{ github.repository }}
       - run: gh release upload canary dist/spn-* dist/SHASUMS256.txt dist/install.sh dist/install.ps1 --clobber --repo ${{ github.repository }}
 
   ci:

@@ -12,6 +12,7 @@ typedef struct {
 } sp_str_line_it_t;
 
 sp_str_t  sp_str_repeat(sp_mem_t mem, c8 c, u32 len);
+bool      sp_str_iequal(sp_str_t a, sp_str_t b);
 sp_hash_t sp_hash_str(sp_str_t str);
 
 bool             sp_str_line_it_valid(const sp_str_line_it_t* it);

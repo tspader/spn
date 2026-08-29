@@ -1,6 +1,6 @@
 #include "host/host.h"
 
-#include "sp/prompt.h"
+#include "sp/sp_prompt.h"
 
 #include "tui/tui.h"
 

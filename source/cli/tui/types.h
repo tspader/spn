@@ -1,11 +1,11 @@
 #ifndef SPN_TUI_TYPES_H
 #define SPN_TUI_TYPES_H
 
-#include "sp/macro.h"
+// #include "sp/macro.h"
 
 #include "sp.h"
 #include "sp/sp_math.h"
-#include "sp/prompt.h"
+#include "sp/sp_prompt.h"
 
 #include "spn/host.h"
 
