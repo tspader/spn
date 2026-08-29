@@ -82,14 +82,9 @@ s32 spn_main(s32 num_args, const c8** args) {
     verbosity = SPN_VERBOSITY_VERBOSE;
   }
 
-  spn_tui_mode_t mode = SPN_OUTPUT_MODE_INTERACTIVE;
-  if (!sp_str_empty(host.args.output)) {
-    mode = spn_output_mode_from_str(host.args.output);
-  }
-
   spn_tui_init(&tui, (spn_tui_desc_t) {
     .ctx = host.ctx,
-    .mode = mode,
+    .mode = (spn_tui_mode_t)host.args.output.value,
     .verbosity = verbosity,
     .wake = host.doorbell,
   });

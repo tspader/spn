@@ -31,23 +31,6 @@ sp_prompt_widget_t sp_prompt_progress_widget(sp_prompt_ctx_t* ctx, sp_prompt_pro
 static void write_name(sp_tty_t* tty, sp_str_t name);
 static void flush_writer(spn_tui_line_writer_t* writer);
 
-spn_tui_mode_t spn_output_mode_from_str(sp_str_t str) {
-  if (sp_str_equal_cstr(str, "interactive")) {
-    return SPN_OUTPUT_MODE_INTERACTIVE;
-  } else if (sp_str_equal_cstr(str, "noninteractive")) {
-    return SPN_OUTPUT_MODE_NONINTERACTIVE;
-  } else if (sp_str_equal_cstr(str, "quiet")) {
-    return SPN_OUTPUT_MODE_QUIET;
-  } else if (sp_str_equal_cstr(str, "none")) {
-    return SPN_OUTPUT_MODE_NONE;
-  } else if (sp_str_equal_cstr(str, "json")) {
-    return SPN_OUTPUT_MODE_JSON;
-  }
-
-  sp_fatal("Unknown output mode {.yellow}; options are [interactive, noninteractive, quiet, none, json]", sp_fmt_str(str));
-  sp_unreachable_return(SPN_OUTPUT_MODE_NONE);
-}
-
 static sp_color_t name_to_color(sp_str_t name) {
   static const f32 hues [] = {
     30, 40, 50, 60,

@@ -32,7 +32,7 @@ typedef struct {
   struct {
     sp_str_t project_dir;
     sp_str_t project_file;
-    sp_str_t output;
+    sp_cli_choice_t output;
     bool verbose;
     bool quiet;
     bool version;
