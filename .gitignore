@@ -33,3 +33,4 @@ compile_commands.json
 /tools/wip
 *.actual
 /.spn
+/test/render/.out

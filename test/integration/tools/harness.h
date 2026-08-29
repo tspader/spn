@@ -5,6 +5,7 @@
 #include "sp/sp_test.h"
 #include "fixture.h"
 #include "caps.h"
+#include "env.h"
 #include "event/types.h"
 
 #define SPN_TEST_MAX_ACTIONS 32
@@ -75,8 +76,6 @@ typedef struct {
   action_t actions [SPN_TEST_MAX_ACTIONS];
 } test_t;
 
-#define SPN_TEST_COMMAND_MAX_ARGS 9
-#define SPN_TEST_COMMAND_MAX_ENV 4
 #define SPN_TEST_COMMAND_MAX_CONTAINS 4
 #define SPN_TEST_COMMAND_MAX_EVENTS 4
 #define SPN_TEST_COMMAND_MAX_FILES 4
@@ -201,27 +200,6 @@ typedef struct {
   opt_build_t builds [3];
 } opt_test_t;
 
-typedef struct {
-  sp_mem_t mem;
-  sp_str_t root;
-  sp_str_t events;
-  struct {
-    sp_str_t root;
-    sp_str_t spn;
-    sp_str_t storage;
-    sp_str_t toolchain;
-    sp_str_t config;
-    sp_str_t index;
-    sp_str_t include;
-    sp_str_t patches;
-  } paths;
-} fixture_t;
-
-fixture_t fixture_new(sp_test_t* t);
-sp_err_t  fixture_init(sp_test_t* t, fixture_t* fixture);
-sp_str_t  fixture_path(fixture_t* fixture, sp_str_t relative);
-void      fixture_create(fixture_t* fixture, sp_str_t relative, sp_str_t content);
-
 sp_str_t shared_lib(const c8* name);
 sp_str_t static_lib(const c8* name);
 sp_str_t profile_static_lib(const c8* profile, const c8* name);
@@ -238,7 +216,6 @@ sp_str_t target_store_file(const c8* rest, const c8* triple);
 
 sp_err_t expect_exists(sp_test_t* t, fixture_t* fixture, sp_str_t path, bool expected, const c8* file, u32 line);
 
-sp_err_t prepare_test(sp_test_t* t, fixture_t* fixture, const c8* project, const c8* const* copy);
 sp_err_t test_when(sp_test_t* t, test_when_t when);
 sp_err_t run_command(sp_test_t* t, fixture_t* fixture, command_test_t test);
 sp_err_t run_command_test(sp_test_t* t, command_test_t test);
