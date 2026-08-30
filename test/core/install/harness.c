@@ -29,7 +29,7 @@ sp_err_t install_build(sp_test_t* t, install_world_t* world, spn_install_layout_
     facts->rc[it] = world->rc[it];
   }
   facts->registry.path = world->registry.path ? sp_cstr_as_str(world->registry.path) : sp_zero_s(sp_str_t);
-  facts->registry.expand = world->registry.expand;
+  facts->registry.kind = world->registry.kind;
   return SP_OK;
 }
 
@@ -41,7 +41,7 @@ sp_err_t install_expect_actions(sp_test_t* t, const spn_install_action_t* actual
     sp_expect_str_eq_c(t, actual[it].path, expect[it].path ? expect[it].path : "");
     sp_expect_str_eq_c(t, actual[it].src, expect[it].src ? expect[it].src : "");
     sp_expect_str_eq_c(t, actual[it].text, expect[it].text ? expect[it].text : "");
-    sp_expect_eq(t, expect[it].expand, actual[it].expand);
+    sp_expect_eq(t, (u32)expect[it].reg, (u32)actual[it].reg);
   }
   return SP_OK;
 }

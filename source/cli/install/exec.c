@@ -54,7 +54,7 @@ static sp_err_t set_user_path(spn_install_action_t* action) {
   if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Environment", 0, KEY_SET_VALUE, &key)) {
     goto done;
   }
-  DWORD kind = action->expand ? REG_EXPAND_SZ : REG_SZ;
+  DWORD kind = action->reg == SPN_INSTALL_REG_EXPAND ? REG_EXPAND_SZ : REG_SZ;
   if (!RegSetValueExW(key, L"Path", 0, kind, (const BYTE*)value.data, (DWORD)((value.len + 1) * sizeof(u16)))) {
     err = SP_OK;
   }

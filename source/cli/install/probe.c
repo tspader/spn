@@ -1,6 +1,33 @@
 #include "install/install.h"
 
 #if defined(SP_WIN32)
+static spn_install_reg_t probe_registry_value(sp_mem_t mem, HKEY key, DWORD type, DWORD size, sp_str_t* out) {
+  spn_install_reg_t kind = SPN_INSTALL_REG_NONE;
+  switch (type) {
+    case REG_SZ: kind = SPN_INSTALL_REG_SZ; break;
+    case REG_EXPAND_SZ: kind = SPN_INSTALL_REG_EXPAND; break;
+    default: return SPN_INSTALL_REG_OTHER;
+  }
+  if (size < sizeof(u16)) {
+    return kind;
+  }
+
+  u16* buffer = (u16*)sp_mem_allocator_alloc(mem, size);
+  if (RegQueryValueExW(key, L"Path", SP_NULLPTR, &type, (BYTE*)buffer, &size) != ERROR_SUCCESS) {
+    return SPN_INSTALL_REG_OTHER;
+  }
+  u32 len = (u32)(size / sizeof(u16));
+  while (len && !buffer[len - 1]) {
+    len--;
+  }
+  sp_str_t value = sp_zero;
+  if (sp_wtf16_to_wtf8(mem, (sp_wide_str_t) { .data = buffer, .len = len }, &value)) {
+    return SPN_INSTALL_REG_OTHER;
+  }
+  *out = value;
+  return kind;
+}
+
 static void probe_registry(sp_mem_t mem, spn_install_facts_t* facts) {
   HKEY key = SP_NULLPTR;
   if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Environment", 0, KEY_QUERY_VALUE, &key)) {
@@ -9,19 +36,8 @@ static void probe_registry(sp_mem_t mem, spn_install_facts_t* facts) {
 
   DWORD type = 0;
   DWORD size = 0;
-  if (RegQueryValueExW(key, L"Path", SP_NULLPTR, &type, SP_NULLPTR, &size) == ERROR_SUCCESS && size >= sizeof(u16)) {
-    u16* buffer = (u16*)sp_mem_allocator_alloc(mem, size);
-    if (RegQueryValueExW(key, L"Path", SP_NULLPTR, &type, (BYTE*)buffer, &size) == ERROR_SUCCESS) {
-      u32 len = (u32)(size / sizeof(u16));
-      while (len && !buffer[len - 1]) {
-        len--;
-      }
-      sp_str_t value = sp_zero;
-      if (!sp_wtf16_to_wtf8(mem, (sp_wide_str_t) { .data = buffer, .len = len }, &value)) {
-        facts->registry.path = value;
-        facts->registry.expand = type == REG_EXPAND_SZ;
-      }
-    }
+  if (RegQueryValueExW(key, L"Path", SP_NULLPTR, &type, SP_NULLPTR, &size) == ERROR_SUCCESS) {
+    facts->registry.kind = probe_registry_value(mem, key, type, size, &facts->registry.path);
   }
   RegCloseKey(key);
 }

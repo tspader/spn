@@ -33,7 +33,7 @@ typedef struct {
   const c8* path;
   const c8* src;
   const c8* text;
-  bool expand;
+  spn_install_reg_t reg;
 } install_action_spec_t;
 
 typedef struct {
@@ -44,7 +44,7 @@ typedef struct {
   spn_install_rc_state_t rc [SPN_INSTALL_MAX_RC];
   struct {
     const c8* path;
-    bool expand;
+    spn_install_reg_t kind;
   } registry;
 } install_world_t;
 

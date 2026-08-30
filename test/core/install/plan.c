@@ -235,7 +235,7 @@ static const test_t tests [] = {
         { SPN_INSTALL_ACTION_INSTALL_EXE, "C:/u/.spn/bin/spn.exe", .src = WIN_EXE },
       },
       .path = {
-        { SPN_INSTALL_ACTION_SET_USER_PATH, .text = WIN_BIN },
+        { SPN_INSTALL_ACTION_SET_USER_PATH, .text = WIN_BIN, .reg = SPN_INSTALL_REG_SZ },
       },
     },
   },
@@ -243,7 +243,7 @@ static const test_t tests [] = {
     .name = "windows_prepend",
     .world = {
       INSTALL_WORLD_WINDOWS,
-      .registry = { .path = "C:\\old" },
+      .registry = { .path = "C:\\old", .kind = SPN_INSTALL_REG_SZ },
     },
     .expect = {
       .state = SPN_INSTALL_PATH_UPDATED,
@@ -252,7 +252,7 @@ static const test_t tests [] = {
         { SPN_INSTALL_ACTION_INSTALL_EXE, "C:/u/.spn/bin/spn.exe", .src = WIN_EXE },
       },
       .path = {
-        { SPN_INSTALL_ACTION_SET_USER_PATH, .text = WIN_BIN ";C:\\old" },
+        { SPN_INSTALL_ACTION_SET_USER_PATH, .text = WIN_BIN ";C:\\old", .reg = SPN_INSTALL_REG_SZ },
       },
     },
   },
@@ -260,7 +260,7 @@ static const test_t tests [] = {
     .name = "windows_registry_present",
     .world = {
       INSTALL_WORLD_WINDOWS,
-      .registry = { .path = "c:\\U\\.spn\\BIN;C:\\old" },
+      .registry = { .path = "c:\\U\\.spn\\BIN;C:\\old", .kind = SPN_INSTALL_REG_SZ },
     },
     .expect = {
       .state = SPN_INSTALL_PATH_UPDATED,
@@ -274,7 +274,7 @@ static const test_t tests [] = {
     .name = "windows_expand",
     .world = {
       INSTALL_WORLD_WINDOWS,
-      .registry = { .path = "%X%;C:\\old", .expand = true },
+      .registry = { .path = "%X%;C:\\old", .kind = SPN_INSTALL_REG_EXPAND },
     },
     .expect = {
       .state = SPN_INSTALL_PATH_UPDATED,
@@ -283,7 +283,21 @@ static const test_t tests [] = {
         { SPN_INSTALL_ACTION_INSTALL_EXE, "C:/u/.spn/bin/spn.exe", .src = WIN_EXE },
       },
       .path = {
-        { SPN_INSTALL_ACTION_SET_USER_PATH, .text = WIN_BIN ";%X%;C:\\old", .expand = true },
+        { SPN_INSTALL_ACTION_SET_USER_PATH, .text = WIN_BIN ";%X%;C:\\old", .reg = SPN_INSTALL_REG_EXPAND },
+      },
+    },
+  },
+  {
+    .name = "windows_registry_other",
+    .world = {
+      INSTALL_WORLD_WINDOWS,
+      .registry = { .kind = SPN_INSTALL_REG_OTHER },
+    },
+    .expect = {
+      .state = SPN_INSTALL_PATH_MANUAL,
+      .install = {
+        { SPN_INSTALL_ACTION_CREATE_DIR, "C:/u/.spn/bin" },
+        { SPN_INSTALL_ACTION_INSTALL_EXE, "C:/u/.spn/bin/spn.exe", .src = WIN_EXE },
       },
     },
   },
@@ -297,7 +311,7 @@ static const test_t tests [] = {
     .expect = {
       .state = SPN_INSTALL_PATH_UPDATED,
       .path = {
-        { SPN_INSTALL_ACTION_SET_USER_PATH, .text = WIN_BIN },
+        { SPN_INSTALL_ACTION_SET_USER_PATH, .text = WIN_BIN, .reg = SPN_INSTALL_REG_SZ },
       },
     },
   },

@@ -19,6 +19,13 @@ typedef enum {
   SPN_INSTALL_ERR_ROOT_CHARS,
 } spn_install_err_t;
 
+typedef enum {
+  SPN_INSTALL_REG_NONE = 0,
+  SPN_INSTALL_REG_SZ,
+  SPN_INSTALL_REG_EXPAND,
+  SPN_INSTALL_REG_OTHER,
+} spn_install_reg_t;
+
 typedef struct {
   sp_str_t path;
   bool always;
@@ -54,7 +61,7 @@ typedef struct {
   spn_install_rc_state_t rc [SPN_INSTALL_MAX_RC];
   struct {
     sp_str_t path;
-    bool expand;
+    spn_install_reg_t kind;
   } registry;
 } spn_install_facts_t;
 
@@ -72,7 +79,7 @@ typedef struct {
   sp_str_t path;
   sp_str_t src;
   sp_str_t text;
-  bool expand;
+  spn_install_reg_t reg;
 } spn_install_action_t;
 
 typedef enum {

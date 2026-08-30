@@ -44,7 +44,7 @@ static bool registry_contains(sp_str_t value, sp_str_t bin_native) {
   return false;
 }
 
-static spn_install_path_state_t path_state(spn_install_layout_t* layout) {
+static spn_install_path_state_t path_state(spn_install_layout_t* layout, spn_install_facts_t* facts) {
   if (layout->on_path) {
     return SPN_INSTALL_PATH_OK;
   }
@@ -54,11 +54,13 @@ static spn_install_path_state_t path_state(spn_install_layout_t* layout) {
   if (!sp_str_empty(layout->github_path)) {
     return SPN_INSTALL_PATH_CI;
   }
-  if (layout->os == SPN_INSTALL_OS_WINDOWS) {
-    return SPN_INSTALL_PATH_UPDATED;
-  }
-  if (layout->num_rc) {
-    return SPN_INSTALL_PATH_UPDATED;
+  switch (layout->os) {
+    case SPN_INSTALL_OS_UNIX: {
+      return layout->num_rc ? SPN_INSTALL_PATH_UPDATED : SPN_INSTALL_PATH_MANUAL;
+    }
+    case SPN_INSTALL_OS_WINDOWS: {
+      return facts->registry.kind == SPN_INSTALL_REG_OTHER ? SPN_INSTALL_PATH_MANUAL : SPN_INSTALL_PATH_UPDATED;
+    }
   }
   return SPN_INSTALL_PATH_MANUAL;
 }
@@ -88,7 +90,8 @@ static void plan_windows(sp_mem_t mem, spn_install_layout_t* layout, spn_install
   if (!sp_str_empty(facts->registry.path)) {
     value = sp_fmt(mem, "{};{}", sp_fmt_str(layout->bin_native), sp_fmt_str(facts->registry.path)).value;
   }
-  push(plan, (spn_install_action_t) { .kind = SPN_INSTALL_ACTION_SET_USER_PATH, .text = value, .expand = facts->registry.expand });
+  spn_install_reg_t reg = facts->registry.kind == SPN_INSTALL_REG_EXPAND ? SPN_INSTALL_REG_EXPAND : SPN_INSTALL_REG_SZ;
+  push(plan, (spn_install_action_t) { .kind = SPN_INSTALL_ACTION_SET_USER_PATH, .text = value, .reg = reg });
 }
 
 static void github(sp_mem_t mem, spn_install_layout_t* layout, spn_install_plan_t* plan) {
@@ -108,7 +111,7 @@ spn_install_plan_t spn_install_plan(sp_mem_t mem, spn_install_layout_t* layout, 
     plan.install[plan.num_install++] = (spn_install_action_t) { .kind = SPN_INSTALL_ACTION_INSTALL_EXE, .path = layout->exe, .src = facts->exe };
   }
 
-  plan.state = path_state(layout);
+  plan.state = path_state(layout, facts);
   switch (plan.state) {
     case SPN_INSTALL_PATH_OK:
     case SPN_INSTALL_PATH_MANUAL: {
