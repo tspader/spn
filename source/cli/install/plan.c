@@ -1,6 +1,6 @@
 #include "install/install.h"
 
-#include "sp/str.h"
+#include "str/str.h"
 
 static void put(sp_io_writer_t* io, sp_str_t text) {
   sp_io_write_all(io, text.data, text.len, SP_NULLPTR);

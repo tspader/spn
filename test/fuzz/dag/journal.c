@@ -1,7 +1,7 @@
 #include "fuzz.h"
 #include "sp.h"
 #include "spn/core.h"
-#include "sp/io.h"
+#include "io/io.h"
 
 void fz_journal_init(fz_journal_t* j, sp_mem_t mem) {
   j->mem = mem;

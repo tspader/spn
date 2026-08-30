@@ -1,7 +1,7 @@
 #include "spn_test.h"
 
 #include "external/tom.h"
-#include "version.h"
+#include "version/version.h"
 
 sp_test(core, version_matches_manifest) {
   sp_mem_t mem = sp_test_arena(t);

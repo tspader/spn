@@ -2,7 +2,7 @@
 #include "dag/types.h"
 #include "paths/paths.h"
 #include "sp.h"
-#include "sp/macro.h"
+#include "macro/macro.h"
 #include "spn/core.h"
 
 

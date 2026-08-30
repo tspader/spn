@@ -2,7 +2,7 @@
 
 #include "install/install.h"
 #include "tui/tui.h"
-#include "version.h"
+#include "version/version.h"
 
 static void print_msg(spn_install_msg_t* msg) {
   switch (msg->kind) {

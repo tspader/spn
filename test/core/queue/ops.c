@@ -1,6 +1,6 @@
 #include "spn_test.h"
 
-#include "sp/queue.h"
+#include "queue/queue.h"
 
 #define QUEUE_TEST_MAX_OPS 16
 #define QUEUE_TEST_MAX_NODES 8

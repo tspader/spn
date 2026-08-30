@@ -2,7 +2,7 @@
 #define SPN_GIT_TYPES_H
 
 #include "sp.h"
-#include "sp/sp_om.h"
+#include "sp_om/sp_om.h"
 
 #include "intern/types.h"
 #include "spn/core.h"

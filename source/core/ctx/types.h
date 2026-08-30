@@ -2,7 +2,7 @@
 #define SPN_CTX_TYPES_H
 
 #include "sp.h"
-#include "sp/queue.h"
+#include "queue/queue.h"
 #include "spn/core.h"
 
 #include "event/types.h"

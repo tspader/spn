@@ -1,4 +1,4 @@
-#include "version.h"
+#include "version/version.h"
 
 #ifndef SPN_BUILD_CHANNEL
   #define SPN_BUILD_CHANNEL "dev"

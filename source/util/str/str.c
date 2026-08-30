@@ -1,4 +1,4 @@
-#include "str.h"
+#include "str/str.h"
 
 bool sp_str_iequal(sp_str_t a, sp_str_t b) {
   if (a.len != b.len) {

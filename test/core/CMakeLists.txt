@@ -179,15 +179,15 @@ add_executable(core
   ${SRC}/index/jsonl.c
   ${SRC}/index/json.c
   ${SRC}/index/publish.c
-  ${SRC}/install/exec.c
-  ${SRC}/install/plan.c
-  ${SRC}/install/probe.c
-  ${SRC}/install/report.c
-  ${SRC}/install/resolve.c
+  ${CLI}/install/exec.c
+  ${CLI}/install/plan.c
+  ${CLI}/install/probe.c
+  ${CLI}/install/report.c
+  ${CLI}/install/resolve.c
   ${SRC}/intern/context.c
   ${SRC}/intern/intern.c
   ${SRC}/lock/lock.c
-  ${SRC}/log/lazy/lazy.c
+  ${UTIL}/lazy/lazy.c
   ${SRC}/graph/build.c
   ${SRC}/graph/identity.c
   ${SRC}/paths/paths.c
@@ -206,13 +206,13 @@ add_executable(core
   ${SRC}/session/session.c
   ${SRC}/hash/digest/digest.c
   ${SRC}/hash/sha256/sha256.c
-  ${SRC}/sp/fs.c
-  ${SRC}/sp/io.c
-  ${SRC}/sp/os.c
-  ${SRC}/sp/str.c
+  ${UTIL}/fs/fs.c
+  ${UTIL}/io/io.c
+  ${UTIL}/os/os.c
+  ${UTIL}/str/str.c
   ${SRC}/target/mutate.c
   ${SRC}/target/select.c
-  ${SRC}/thread_pool/thread_pool.c
+  ${UTIL}/thread_pool/thread_pool.c
   ${SRC}/toml/edit.c
   ${SRC}/pkg/load.c
   ${SRC}/toolchain/catalog.c
@@ -227,7 +227,7 @@ add_executable(core
   ${SRC}/unit/link.c
   ${SRC}/unit/paths.c
   ${SRC}/unit/target.c
-  ${SRC}/version.c
+  ${UTIL}/version/version.c
   ${SRC}/when/when.c
   ${TEST_TOOLS}/fixture.c
   ${TEST_TOOLS}/sim/sim.c
@@ -240,6 +240,7 @@ set_source_files_properties(${EMBED_OBJ} PROPERTIES EXTERNAL_OBJECT TRUE GENERAT
 spn_test_binary(core)
 target_include_directories(core PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}
+  ${CLI}
   ${CMAKE_CURRENT_SOURCE_DIR}/tools
   ${SRC}/codegen/gen
   ${SRC}/external

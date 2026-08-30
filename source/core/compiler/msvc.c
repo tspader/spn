@@ -5,7 +5,7 @@
 #include "paths/paths.h"
 #include "reflect/reflect.h"
 #include "source_deps.gen.h"
-#include "sp/macro.h"
+#include "macro/macro.h"
 
 spn_sanitizer_set_t spn_msvc_supported_sanitizers(spn_triple_t target) {
   return target.os == SPN_OS_WINDOWS && target.abi == SPN_ABI_MSVC && target.arch == SPN_ARCH_X64 ? SPN_SANITIZER_ADDRESS : 0;

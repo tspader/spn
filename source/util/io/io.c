@@ -1,4 +1,4 @@
-#include "io.h"
+#include "io/io.h"
 
 void sp_io_write_new_line(sp_io_writer_t* io) {
   sp_io_write_str(io, sp_str_lit("\n"), SP_NULLPTR);

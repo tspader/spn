@@ -3,8 +3,8 @@
 #include "paths/paths.h"
 #include "sp.h"
 #include "spn/core.h"
-#include "sp/io.h"
-#include "sp/atomic_file.h"
+#include "io/io.h"
+#include "atomic_file/atomic_file.h"
 
 
 static sp_str_t format_obs_kind(spn_dag_obs_kind_t kind) {

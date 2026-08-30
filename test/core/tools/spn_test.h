@@ -2,7 +2,7 @@
 #define SPN_TEST_H
 
 #include "sp.h"
-#include "sp/macro.h"
+#include "macro/macro.h"
 #include "sp/sp_test.h"
 #include "fixture.h"
 

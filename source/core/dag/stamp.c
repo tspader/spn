@@ -1,6 +1,6 @@
 #include "dag/stamp.h"
 
-#include "sp/fs.h"
+#include "fs/fs.h"
 
 bool spn_dag_stamp_fenced(sp_sys_timespec_t fence, sp_sys_timespec_t mtime) {
   if (mtime.tv_sec != fence.tv_sec) {

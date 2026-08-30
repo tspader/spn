@@ -1,6 +1,6 @@
 #include "spn_test.h"
 
-#include "sp/os.h"
+#include "os/os.h"
 
 #define OS_MAX_VARS 2
 

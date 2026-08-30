@@ -3,7 +3,7 @@
 #include "ctx/types.h"
 #include "error/error.h"
 #include "hash/digest/digest.h"
-#include "sp/fs.h"
+#include "fs/fs.h"
 
 spn_err_t spn_fetch_curl(sp_str_t url, sp_str_t dest, void* user_data) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();

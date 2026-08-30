@@ -4,7 +4,7 @@
 #include "hash/digest/digest.h"
 #include "paths/paths.h"
 #include "profile/profile.h"
-#include "sp/str.h"
+#include "str/str.h"
 #include "spn/core.h"
 #include "toolchain/select.h"
 #include "toolchain/toolchain.h"

@@ -1,7 +1,7 @@
 #include "semver/parser.h"
 #include "semver/convert.h"
 #include "semver/compare.h"
-#include "sp/macro.h"
+#include "macro/macro.h"
 
 c8 spn_semver_parser_peek(spn_semver_parser_t* parser) {
   if (spn_semver_parser_is_done(parser)) return '\0';

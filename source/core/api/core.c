@@ -1,5 +1,5 @@
 #include "sp.h"
-#include "sp/macro.h"
+#include "macro/macro.h"
 #include "sp/sp_glob.h"
 #include "spn.h"
 
@@ -24,7 +24,7 @@
 #include "target/mutate.h"
 #include "pkg/pkg.h"
 #include "session/session.h"
-#include "sp/io.h"
+#include "io/io.h"
 #include "target/target.h"
 
 spn_pkg_unit_t* spn_api_unit(const void* opaque) {

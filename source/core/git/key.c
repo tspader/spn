@@ -1,5 +1,5 @@
 #include "sp.h"
-#include "sp/macro.h"
+#include "macro/macro.h"
 #include "git/key.h"
 #include "git/url.h"
 #include "hash/digest/digest.h"

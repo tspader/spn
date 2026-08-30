@@ -1,5 +1,5 @@
-#include "os.h"
-#include "str.h"
+#include "os/os.h"
+#include "str/str.h"
 
 #if defined(SP_WIN32)
 sp_str_t sp_fs_get_home_path(sp_mem_t mem) {

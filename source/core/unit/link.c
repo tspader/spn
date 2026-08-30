@@ -1,7 +1,7 @@
 #include "unit/unit.h"
 
 #include "core/types.h"
-#include "sp/sp_om.h"
+#include "sp_om/sp_om.h"
 #include "unit/types.h"
 #include "target/types.h"
 

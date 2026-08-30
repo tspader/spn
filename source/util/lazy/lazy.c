@@ -1,4 +1,4 @@
-#include "log/lazy/lazy.h"
+#include "lazy/lazy.h"
 
 static sp_err_t lazy_write(sp_io_writer_t* w, const void* ptr, u64 size, u64* bytes_written) {
   spn_lazy_log_t* log = (spn_lazy_log_t*)w;

@@ -4,7 +4,7 @@
 #include "codegen/types.h"
 #include "core/types.h"
 #include "spn/types.h"
-#include "sp/sp_om.h"
+#include "sp_om/sp_om.h"
 #include "pkg/types.h"
 #include "semver/types.h"
 

@@ -71,6 +71,8 @@ if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif()
 
 set(SRC         ${CMAKE_SOURCE_DIR}/source/core)
+set(UTIL        ${CMAKE_SOURCE_DIR}/source/util)
+set(CLI         ${CMAKE_SOURCE_DIR}/source/cli)
 set(SOURCE_ROOT ${CMAKE_SOURCE_DIR}/.build/source)
 set(STORE       ${CMAKE_SOURCE_DIR}/.build/store/${TRIPLE}${SPN_FLAVOR})
 

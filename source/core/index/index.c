@@ -1,5 +1,5 @@
 #include "spn/host.h"
-#include "sp/macro.h"
+#include "macro/macro.h"
 #include "sp.h"
 
 #include "ctx/types.h"
@@ -16,7 +16,7 @@
 #include "pkg/id.h"
 #include "semver/compare.h"
 #include "semver/convert.h"
-#include "sp/io.h"
+#include "io/io.h"
 
 static bool git_index_stale(spn_index_info_t* index) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();

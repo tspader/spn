@@ -2,9 +2,9 @@
 #define SPN_OBJ_H
 
 #include "sp.h"
-#include "sp/coff.h"
-#include "sp/sp_elf.h"
-#include "sp/macho.h"
+#include "coff/coff.h"
+#include "sp_elf/sp_elf.h"
+#include "macho/macho.h"
 #include "spn/core.h"
 
 typedef enum {

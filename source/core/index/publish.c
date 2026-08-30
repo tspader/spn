@@ -1,5 +1,5 @@
 #include "sp.h"
-#include "sp/macro.h"
+#include "macro/macro.h"
 #include "ctx/types.h"
 #include "spn/errors.h"
 #include "codegen/lower.h"

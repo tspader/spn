@@ -1,10 +1,10 @@
 #include "sp.h"
-#include "sp/macro.h"
+#include "macro/macro.h"
 #include "git/cache.h"
 
 #include "external/git.h"
 #include "git/key.h"
-#include "sp/fs.h"
+#include "fs/fs.h"
 
 void spn_git_cache_init(spn_git_cache_t* cache, sp_mem_t mem, sp_intern_t* intern, sp_str_t root) {
   *cache = (spn_git_cache_t) {

@@ -1,6 +1,6 @@
 #include "semver/convert.h"
 #include "semver/parser.h"
-#include "sp/macro.h"
+#include "macro/macro.h"
 
 spn_semver_range_t spn_semver_caret_to_range(spn_semver_parsed_t parsed) {
   spn_semver_range_t range = {

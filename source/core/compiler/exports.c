@@ -1,7 +1,7 @@
 #include "compiler/exports.h"
 
-#include "sp/io.h"
-#include "sp/macro.h"
+#include "io/io.h"
+#include "macro/macro.h"
 
 void spn_exports_render_version_script(sp_io_writer_t* io, sp_da(sp_str_t) symbols) {
   sp_io_write_cstr(io, "{", SP_NULLPTR);

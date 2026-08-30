@@ -2,7 +2,7 @@
 #define SPN_FIXTURE_H
 
 #include "sp.h"
-#include "sp/macro.h"
+#include "macro/macro.h"
 
 sp_str_t test_repo_root(sp_mem_t mem);
 sp_str_t test_repo_path(sp_mem_t mem, sp_str_t rel);

@@ -1,6 +1,6 @@
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
   ${CMAKE_SOURCE_DIR}/spn.toml
-  ${CMAKE_SOURCE_DIR}/source/core/version.h
+  ${CMAKE_SOURCE_DIR}/source/util/version/version.h
 )
 
 file(STRINGS ${CMAKE_SOURCE_DIR}/spn.toml SPN_MANIFEST_VERSION_LINE REGEX "^version = ")
@@ -9,10 +9,10 @@ if(NOT SPN_MANIFEST_VERSION MATCHES "^[0-9]+\\.[0-9]+\\.[0-9]+$")
   message(FATAL_ERROR "failed to read version from spn.toml (matched: '${SPN_MANIFEST_VERSION_LINE}')")
 endif()
 
-file(STRINGS ${CMAKE_SOURCE_DIR}/source/core/version.h SPN_HEADER_VERSION_LINE REGEX "^#define SPN_VERSION ")
+file(STRINGS ${CMAKE_SOURCE_DIR}/source/util/version/version.h SPN_HEADER_VERSION_LINE REGEX "^#define SPN_VERSION ")
 string(REGEX REPLACE "^#define SPN_VERSION \"([^\"]+)\"$" "\\1" SPN_HEADER_VERSION "${SPN_HEADER_VERSION_LINE}")
 if(NOT SPN_HEADER_VERSION STREQUAL SPN_MANIFEST_VERSION)
-  message(FATAL_ERROR "spn.toml version is ${SPN_MANIFEST_VERSION} but source/core/version.h defines SPN_VERSION as '${SPN_HEADER_VERSION}'; they must match")
+  message(FATAL_ERROR "spn.toml version is ${SPN_MANIFEST_VERSION} but source/util/version/version.h defines SPN_VERSION as '${SPN_HEADER_VERSION}'; they must match")
 endif()
 
 set(SPN_STAMP_DEFS "")

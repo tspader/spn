@@ -1,6 +1,6 @@
 #include "spn_test.h"
 
-#include "sp/fs.h"
+#include "fs/fs.h"
 
 
 #define FS_LOCK_MAX_SLOTS 4

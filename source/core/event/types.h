@@ -5,7 +5,7 @@
 
 #include "core/types.h"
 #include "spn/events.h"
-#include "log/lazy/types.h"
+#include "lazy/types.h"
 
 struct spn_event_buffer_t {
   sp_rb(spn_event_t) buffer;

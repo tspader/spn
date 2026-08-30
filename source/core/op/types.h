@@ -2,7 +2,7 @@
 #define SPN_OP_TYPES_H
 
 #include "sp.h"
-#include "sp/queue.h"
+#include "queue/queue.h"
 #include "spn/types.h"
 
 #include "core/types.h"

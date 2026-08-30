@@ -1,6 +1,6 @@
 #include "spn_test.h"
 
-#include "log/lazy/lazy.h"
+#include "lazy/lazy.h"
 
 
 #define LAZY_TEST_MAX_WRITES 8

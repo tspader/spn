@@ -1,6 +1,6 @@
 #include "sp.h"
-#include "sp/macro.h"
-#include "sp/str.h"
+#include "macro/macro.h"
+#include "str/str.h"
 #include "pkg/pkg.h"
 
 #include "hash/digest/digest.h"

@@ -1,7 +1,7 @@
 #include "sp.h"
-#include "sp/macro.h"
+#include "macro/macro.h"
 #include "external/cc.h"
-#include "sp/io.h"
+#include "io/io.h"
 
 sp_str_t spn_cc_symbol_from_embedded_file(sp_mem_t mem, sp_str_t file_path) {
   c8* data = sp_alloc_n(mem, c8, file_path.len);

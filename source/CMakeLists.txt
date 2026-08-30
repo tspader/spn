@@ -2,7 +2,7 @@ set(SPN_SOURCES
   core/api/api.c
   core/api/core.c
   core/core/core.c
-  core/cpu/cpu.c
+  util/cpu/cpu.c
   core/api/node/node.c
   core/project/project.c
   core/host/host.c
@@ -63,15 +63,15 @@ set(SPN_SOURCES
   core/index/jsonl.c
   core/index/json.c
   core/index/publish.c
-  core/install/exec.c
-  core/install/plan.c
-  core/install/probe.c
-  core/install/report.c
-  core/install/resolve.c
+  cli/install/exec.c
+  cli/install/plan.c
+  cli/install/probe.c
+  cli/install/report.c
+  cli/install/resolve.c
   core/intern/context.c
   core/intern/intern.c
   core/lock/lock.c
-  core/log/lazy/lazy.c
+  util/lazy/lazy.c
   core/graph/build.c
   core/graph/dag.c
   core/graph/identity.c
@@ -107,25 +107,25 @@ set(SPN_SOURCES
   core/session/session.c
   core/hash/digest/digest.c
   core/hash/sha256/sha256.c
-  core/sp/atomic_file.c
-  core/sp/coff.c
-  core/sp/fs.c
-  core/sp/io.c
-  core/sp/macho.c
-  core/sp/os.c
-  core/sp/prompt.c
-  core/sp/queue.c
-  core/sp/sp.c
-  core/sp/sp_cli.c
-  core/sp/sp_elf.c
-  core/sp/sp_glob.c
-  core/sp/sp_math.c
-  core/sp/sp_template.c
-  core/sp/str.c
+  util/atomic_file/atomic_file.c
+  util/coff/coff.c
+  util/fs/fs.c
+  util/io/io.c
+  util/macho/macho.c
+  util/os/os.c
+  cli/sp/prompt.c
+  util/queue/queue.c
+  util/sp/sp.c
+  util/sp/sp_cli.c
+  util/sp_elf/sp_elf.c
+  util/sp/sp_glob.c
+  util/sp/sp_math.c
+  util/sp_template/sp_template.c
+  util/str/str.c
   core/target/mutate.c
   core/target/select.c
   core/target/target.c
-  core/thread_pool/thread_pool.c
+  util/thread_pool/thread_pool.c
   core/toml/edit.c
   core/pkg/load.c
   core/toolchain/catalog.c
@@ -157,14 +157,15 @@ add_executable(spn ${SPN_SOURCES}
   )
 target_include_directories(spn PRIVATE
   ${SRC}
+  ${UTIL}
   ${SRC}/external
   ${CMAKE_CURRENT_SOURCE_DIR}/cli
   ${CMAKE_SOURCE_DIR}/include
   ${SRC}/codegen/gen
   ${STORE}/include
 )
-add_library(spn_version STATIC core/version.c)
-target_include_directories(spn_version PRIVATE ${SRC} ${STORE}/include)
+add_library(spn_version STATIC util/version/version.c)
+target_include_directories(spn_version PRIVATE ${UTIL} ${STORE}/include)
 add_dependencies(spn_version headers)
 if(SPN_STAMP_DEFS)
   target_compile_definitions(spn_version PRIVATE ${SPN_STAMP_DEFS})

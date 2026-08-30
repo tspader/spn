@@ -1,6 +1,6 @@
 #include "spn_test.h"
 
-#include "sp/sp_om.h"
+#include "sp_om/sp_om.h"
 
 
 // ---- s32 key tests (flat scalar key, default hash/compare) ----

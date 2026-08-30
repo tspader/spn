@@ -1,6 +1,6 @@
 #include "install/install.h"
 
-#include "sp/atomic_file.h"
+#include "atomic_file/atomic_file.h"
 
 static sp_err_t install_exe(spn_install_action_t* action) {
   sp_err_t err = SP_OK;

@@ -1,4 +1,4 @@
-#include "sp/macro.h"
+#include "macro/macro.h"
 #include "index/json.h"
 
 #include "release.gen.h"
@@ -6,7 +6,7 @@
 #include "semver/convert.h"
 #include "semver/parser.h"
 #include "sp.h"
-#include "sp/str.h"
+#include "str/str.h"
 
 static spn_err_t spn_index_parse_rel(sp_mem_t mem, spn_pkg_name_t id, sp_str_t json, spn_index_release_t* release) {
   spn_cg_release_t rel = sp_zero;

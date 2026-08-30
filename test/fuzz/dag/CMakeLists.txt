@@ -5,15 +5,15 @@ add_executable(fuzz_dag
   ${SRC}/dag/run.c
   ${SRC}/dag/glob.c
   ${SRC}/dag/stamp.c
-  ${SRC}/thread_pool/thread_pool.c
+  ${UTIL}/thread_pool/thread_pool.c
   ${SRC}/codegen/json.c
   ${SRC}/codegen/loader.c
   ${SRC}/codegen/gen/fuzz.gen.c
   ${SRC}/external/tom.c
   ${SRC}/hash/digest/digest.c
   ${SRC}/hash/sha256/sha256.c
-  ${SRC}/sp/fs.c
-  ${SRC}/sp/io.c
+  ${UTIL}/fs/fs.c
+  ${UTIL}/io/io.c
   ${SRC}/intern/intern.c
   ${SRC}/paths/paths.c
   main.c

@@ -1,2 +1,2 @@
 #define SP_MACHO_IMPLEMENTATION
-#include "sp/macho.h"
+#include "macho/macho.h"

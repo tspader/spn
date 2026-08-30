@@ -1,9 +1,9 @@
 #define SP_IMPLEMENTATION
 #include "sp.h"
 #include "sp/sp_cli.h"
-#include "sp/sp_elf.h"
-#include "sp/coff.h"
-#include "sp/macho.h"
+#include "sp_elf/sp_elf.h"
+#include "coff/coff.h"
+#include "macho/macho.h"
 
 typedef enum {
   EMBED_FORMAT_ELF,

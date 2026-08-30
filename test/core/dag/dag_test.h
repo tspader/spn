@@ -2,7 +2,7 @@
 
 #include "spn_test.h"
 
-#include "sp/atomic_file.h"
+#include "atomic_file/atomic_file.h"
 #include "dag/dag.h"
 #include "dag/stamp.h"
 #include "paths/paths_test.h"

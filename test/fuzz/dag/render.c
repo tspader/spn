@@ -1,5 +1,5 @@
 #include "fuzz.h"
-#include "sp/io.h"
+#include "io/io.h"
 
 static void line(sp_io_writer_t* io, sp_str_t line) {
   sp_io_write_str(io, line, SP_NULLPTR);

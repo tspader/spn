@@ -6,7 +6,7 @@ if(SPN_HOST_TOOLS)
 else()
   add_executable(embed embed.c)
   set_target_properties(embed PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
-  target_include_directories(embed PRIVATE ${STORE}/include)
+  target_include_directories(embed PRIVATE ${STORE}/include ${UTIL})
   target_link_libraries(embed PRIVATE m)
   add_dependencies(embed headers)
 
@@ -14,6 +14,7 @@ else()
   set_target_properties(jtd_gen PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
   target_include_directories(jtd_gen PRIVATE
     ${STORE}/include
+    ${UTIL}
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}/gen
   )
@@ -24,6 +25,7 @@ else()
   set_target_properties(installer_render PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${STORE}/bin)
   target_include_directories(installer_render PRIVATE
     ${STORE}/include
+    ${UTIL}
     ${CMAKE_CURRENT_SOURCE_DIR}/install
   )
   target_link_libraries(installer_render PRIVATE m)
@@ -57,7 +59,7 @@ add_custom_target(spn_embed ALL DEPENDS ${EMBED_OBJ} ${EMBED_HDR})
 
 add_executable(toolchain toolchain.c)
 set_target_properties(toolchain PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${STORE}/bin)
-target_include_directories(toolchain PRIVATE ${STORE}/include)
+target_include_directories(toolchain PRIVATE ${STORE}/include ${UTIL})
 target_link_libraries(toolchain PRIVATE yyjson m)
 add_dependencies(toolchain headers)
 

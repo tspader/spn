@@ -1,7 +1,7 @@
 #define SP_IMPLEMENTATION
 #include "sp.h"
 #include "sp/sp_cli.h"
-#include "sp/atomic_file.h"
+#include "atomic_file/atomic_file.h"
 #include "sp/sp_glob.h"
 #include "sp/sp_prompt.h"
 

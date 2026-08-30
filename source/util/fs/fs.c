@@ -1,5 +1,5 @@
 #define SP_PRIVATE_HEADER
-#include "fs.h"
+#include "fs/fs.h"
 
 #if defined(SP_MACOS) || defined(SP_COSMO)
   #include <sys/file.h>

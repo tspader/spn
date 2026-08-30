@@ -1,8 +1,8 @@
 #include "unit/unit.h"
 
 #include "sp.h"
-#include "sp/macro.h"
-#include "sp/str.h"
+#include "macro/macro.h"
+#include "str/str.h"
 
 #include "ctx/types.h"
 

@@ -1,8 +1,8 @@
 #include "install/install.h"
 
 #include "sp.h"
-#include "sp/os.h"
-#include "sp/str.h"
+#include "os/os.h"
+#include "str/str.h"
 
 spn_install_os_t spn_install_os_host() {
 #if defined(SP_WIN32)
