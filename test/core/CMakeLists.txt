@@ -1,5 +1,6 @@
 add_executable(core
-  main.c
+  tools/ctx.c
+  tools/main/sim.c
   drain.c
   fs.c
   filter.c
@@ -93,7 +94,6 @@ add_executable(core
   options/merge.c
   options/apply.c
   options/session.c
-  paths/harness.c
   paths/anchor.c
   paths/canonicalize.c
   paths/label.c
@@ -167,6 +167,7 @@ add_executable(core
   ${SRC}/event/event.c
   ${SRC}/external/git.c
   ${SRC}/external/tom.c
+  ${SRC}/external/wasm/script.c
   ${SRC}/filter/filter.c
   ${SRC}/git/cache.c
   ${SRC}/git/key.c
@@ -206,9 +207,11 @@ add_executable(core
   ${SRC}/session/session.c
   ${SRC}/hash/digest/digest.c
   ${SRC}/hash/sha256/sha256.c
+  ${UTIL}/atomic_file/atomic_file.c
   ${UTIL}/fs/fs.c
   ${UTIL}/io/io.c
   ${UTIL}/os/os.c
+  ${UTIL}/queue/queue.c
   ${UTIL}/str/str.c
   ${SRC}/target/mutate.c
   ${SRC}/target/select.c
@@ -230,6 +233,7 @@ add_executable(core
   ${UTIL}/version/version.c
   ${SRC}/when/when.c
   ${TEST_TOOLS}/fixture.c
+  ${TEST_TOOLS}/path_roots.c
   ${TEST_TOOLS}/sim/sim.c
   ${TEST_TOOLS}/dag/track.c
   ${TEST_TOOLS}/toml.c

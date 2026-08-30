@@ -50,6 +50,7 @@ set(SPN_SOURCES
   core/external/toml.c
   core/external/wasm/abi.c
   core/external/wasm/guest.c
+  core/external/wasm/script.c
   core/external/wasm/wasm.c
   core/filter/filter.c
   core/git/cache.c

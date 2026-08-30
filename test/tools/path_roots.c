@@ -1,4 +1,4 @@
-#include "paths/paths_test.h"
+#include "path_roots.h"
 
 const spn_path_roots_t* paths_test_roots_build(paths_test_roots_t spec, spn_path_roots_t* storage) {
   const c8* dirs [SPN_PATH_ROOT_COUNT] = {

@@ -4,9 +4,6 @@
 #include "profile/profile.h"
 #include "when/when.h"
 
-void spn_wasm_script_init(spn_wasm_script_t* script, sp_str_t module) {
-  *script = (spn_wasm_script_t) { .path = module };
-}
 
 sp_da(sp_str_t) test_str_list(sp_mem_t mem, const c8* const* items, u32 max) {
   sp_da(sp_str_t) list = sp_da_new(mem, sp_str_t);

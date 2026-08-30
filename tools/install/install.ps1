@@ -1,3 +1,7 @@
+param(
+  [switch]$NoModifyPath
+)
+
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 
@@ -70,10 +74,19 @@ try {
   }
 
   Expand-Archive -Path $Archive -DestinationPath $Stage -Force
+  if ($NoModifyPath) {
+    $env:SPN_INSTALL_NO_MODIFY_PATH = "1"
+  }
   & (Join-Path $Stage $Target.Exe) self install
   if ($LASTEXITCODE -ne 0) {
     throw "install: spn self install failed"
   }
 } finally {
   Remove-Item -Recurse -Force $Stage -ErrorAction SilentlyContinue
+}
+
+$Root = if ($env:SPN_INSTALL) { $env:SPN_INSTALL } else { Join-Path $Home ".spn" }
+$Bin = Join-Path $Root "bin"
+if (-not $env:SPN_INSTALL_NO_MODIFY_PATH -and (($env:Path -split ';') -notcontains $Bin)) {
+  $env:Path = "$Bin;$env:Path"
 }
