@@ -195,15 +195,6 @@ spn_install_choices_t spn_install_choices(spn_install_layout_t* layout, spn_inst
   return choices;
 }
 
-static bool has_shell(spn_install_choices_t* choices, spn_install_shell_t kind) {
-  sp_for(it, choices->num_path) {
-    if (choices->path[it].kind == kind) {
-      return true;
-    }
-  }
-  return false;
-}
-
 spn_install_path_state_t spn_install_path_state(spn_install_layout_t* layout, spn_install_facts_t* facts, spn_install_choices_t* choices) {
   if (layout->on_path) {
     return SPN_INSTALL_PATH_OK;
@@ -310,42 +301,86 @@ static void plan_posix_hook(spn_install_plan_t* plan, sp_str_t path) {
   }
 }
 
-static void plan_unix_hooks(spn_install_layout_t* layout, spn_install_facts_t* facts, spn_install_choices_t* choices, spn_install_plan_t* plan) {
-  if (has_shell(choices, SPN_INSTALL_SHELL_FISH)) {
-    if (facts->fish_current) {
-      plan->live++;
+u32 spn_install_shell_hooks(spn_install_layout_t* layout, spn_install_facts_t* facts, spn_install_shell_t kind, sp_str_t* paths) {
+  u32 count = 0;
+  sp_for(it, layout->num_rc) {
+    if (layout->rc[it].shell != kind || facts->rc[it].has_line) {
+      continue;
     }
-    else {
-      push_action(plan, fish_action(layout));
+    switch (layout->rc[it].role) {
+      case SPN_INSTALL_RC_HOOK_EXISTING: {
+        if (facts->rc[it].exists) {
+          paths[count++] = layout->rc[it].path;
+        }
+        break;
+      }
+      case SPN_INSTALL_RC_HOOK_ALWAYS: {
+        paths[count++] = layout->rc[it].path;
+        break;
+      }
+      case SPN_INSTALL_RC_PROBE: {
+        break;
+      }
     }
   }
+  return count;
+}
 
+static bool rc_live(spn_install_layout_t* layout, spn_install_facts_t* facts, sp_str_t path) {
   sp_for(it, layout->num_rc) {
-    // a file already sourcing env carries us whether or not its shell was
-    // picked, so it counts even when there is nothing to write
+    if (facts->rc[it].has_line && sp_str_equal(layout->rc[it].path, path)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static void plan_unix_hooks(spn_install_layout_t* layout, spn_install_facts_t* facts, spn_install_choices_t* choices, spn_install_plan_t* plan) {
+  // a file already sourcing env carries us whether or not its shell was
+  // picked, so it counts even when there is nothing to write
+  sp_for(it, layout->num_rc) {
     if (facts->rc[it].has_line) {
       plan->live++;
       plan->posix = true;
-      continue;
-    }
-    if (layout->rc[it].role == SPN_INSTALL_RC_PROBE || !has_shell(choices, layout->rc[it].shell)) {
-      continue;
-    }
-    if (layout->rc[it].role == SPN_INSTALL_RC_HOOK_ALWAYS || facts->rc[it].exists) {
-      plan_posix_hook(plan, layout->rc[it].path);
     }
   }
+
   sp_for(it, choices->num_path) {
     spn_install_path_choice_t* choice = &choices->path[it];
-    if (choice->kind != SPN_INSTALL_SHELL_CUSTOM || sp_str_empty(choice->custom)) {
-      continue;
+    switch (choice->kind) {
+      case SPN_INSTALL_SHELL_NONE: {
+        break;
+      }
+      case SPN_INSTALL_SHELL_BASH:
+      case SPN_INSTALL_SHELL_ZSH: {
+        sp_str_t hooks [SPN_INSTALL_MAX_RC];
+        u32 num_hooks = spn_install_shell_hooks(layout, facts, choice->kind, hooks);
+        sp_for(at, num_hooks) {
+          plan_posix_hook(plan, hooks[at]);
+        }
+        break;
+      }
+      case SPN_INSTALL_SHELL_FISH: {
+        if (facts->fish_current) {
+          plan->live++;
+        }
+        else {
+          push_action(plan, fish_action(layout));
+        }
+        break;
+      }
+      case SPN_INSTALL_SHELL_CUSTOM: {
+        if (choice->has_line) {
+          if (!rc_live(layout, facts, choice->custom)) {
+            plan->live++;
+          }
+          plan->posix = true;
+          break;
+        }
+        plan_posix_hook(plan, choice->custom);
+        break;
+      }
     }
-    if (choice->has_line) {
-      plan->live++;
-      plan->posix = true;
-      continue;
-    }
-    plan_posix_hook(plan, choice->custom);
   }
 }
 

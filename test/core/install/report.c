@@ -23,9 +23,9 @@ typedef struct {
 enum {
   UNIX_EXE,
   UNIX_ENV,
-  UNIX_FISH,
   UNIX_PROFILE,
   UNIX_ZSHENV,
+  UNIX_FISH,
 };
 
 // a home that shows bash, zsh and fish all in use, so the default plan hooks
@@ -82,12 +82,12 @@ static const test_t tests [] = {
   {
     .name = "every_hook_stuck",
     .world = { INSTALL_WORLD_UNIX, UNIX_SHELLS },
-    .stuck = { UNIX_FISH, UNIX_PROFILE, UNIX_ZSHENV },
+    .stuck = { UNIX_PROFILE, UNIX_ZSHENV, UNIX_FISH },
     .num_stuck = 3,
     .expect = {
-      { SPN_INSTALL_MSG_STUCK_WRITE, "/h/.config/fish/conf.d/spn.fish" },
       { SPN_INSTALL_MSG_STUCK_APPEND, "/h/.profile", RC_LINE },
       { SPN_INSTALL_MSG_STUCK_APPEND, "/h/.zshenv", RC_LINE },
+      { SPN_INSTALL_MSG_STUCK_WRITE, "/h/.config/fish/conf.d/spn.fish" },
       { SPN_INSTALL_MSG_MANUAL, "/h/.spn/bin" },
     },
   },
@@ -112,7 +112,8 @@ static const test_t tests [] = {
     },
   },
   {
-    // the rc files already carry us, so a stuck fish conf is not a broken PATH
+    // the rc files already carry us, so a stuck fish conf is not a broken
+    // PATH; the plan here is exe, env, fish
     .name = "fish_stuck_rc_configured",
     .world = {
       INSTALL_WORLD_UNIX,
@@ -122,7 +123,7 @@ static const test_t tests [] = {
         [INSTALL_RC_ZSHENV] = { .exists = true, .has_line = true },
       },
     },
-    .stuck = { UNIX_FISH },
+    .stuck = { 2 },
     .num_stuck = 1,
     .expect = {
       { SPN_INSTALL_MSG_STUCK_WRITE, "/h/.config/fish/conf.d/spn.fish" },

@@ -69,9 +69,9 @@ static const test_t tests [] = {
       .actions = {
         EXE_UNIX,
         ENV_UNIX,
-        FISH_UNIX,
         RC_UNIX("/h/.profile"),
         RC_UNIX("/h/.zshenv"),
+        FISH_UNIX,
       },
     },
   },
@@ -172,26 +172,8 @@ static const test_t tests [] = {
       .actions = {
         EXE_UNIX,
         ENV_UNIX,
+        RC_UNIX("/h/.zshenv"),
         FISH_UNIX,
-        RC_UNIX("/h/.zshenv"),
-      },
-    },
-  },
-  {
-    // an older spn hooked .zshrc; it still carries us, and .zshenv takes over
-    .name = "zshrc_has_line",
-    .world = {
-      INSTALL_WORLD_UNIX,
-      .rc = { [INSTALL_RC_ZSHRC] = { .exists = true, .has_line = true } },
-    },
-    .expect = {
-      .state = SPN_INSTALL_PATH_UPDATED,
-      .live = 1,
-      .posix = true,
-      .actions = {
-        EXE_UNIX,
-        ENV_UNIX,
-        RC_UNIX("/h/.zshenv"),
       },
     },
   },
@@ -226,6 +208,24 @@ static const test_t tests [] = {
       .state = SPN_INSTALL_PATH_UPDATED,
       .live = 1,
       .actions = { EXE_UNIX },
+    },
+  },
+  {
+    // an older spn hooked .zshrc; it still carries us, and .zshenv takes over
+    .name = "zshrc_has_line",
+    .world = {
+      INSTALL_WORLD_UNIX,
+      .rc = { [INSTALL_RC_ZSHRC] = { .exists = true, .has_line = true } },
+    },
+    .expect = {
+      .state = SPN_INSTALL_PATH_UPDATED,
+      .live = 1,
+      .posix = true,
+      .actions = {
+        EXE_UNIX,
+        ENV_UNIX,
+        RC_UNIX("/h/.zshenv"),
+      },
     },
   },
   {
@@ -388,9 +388,9 @@ static const test_t tests [] = {
       .posix = true,
       .actions = {
         ENV_UNIX,
-        FISH_UNIX,
         RC_UNIX("/h/.profile"),
         RC_UNIX("/h/.zshenv"),
+        FISH_UNIX,
       },
     },
   },

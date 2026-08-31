@@ -222,23 +222,18 @@ static sp_str_t custom_choice(spn_install_choices_t* choices) {
 
 static const c8* shell_hint(sp_mem_t mem, spn_install_layout_t* layout, spn_install_facts_t* facts, spn_install_shell_t kind) {
   if (kind == SPN_INSTALL_SHELL_FISH) {
+    if (facts->fish_current) {
+      return "already configured";
+    }
     return sp_str_to_cstr(mem, layout->fish_conf);
   }
 
-  sp_da(sp_str_t) parts = sp_da_new(mem, sp_str_t);
-  sp_for(it, layout->num_rc) {
-    if (layout->rc[it].role == SPN_INSTALL_RC_PROBE || layout->rc[it].shell != kind) {
-      continue;
-    }
-    bool wanted = layout->rc[it].role == SPN_INSTALL_RC_HOOK_ALWAYS || facts->rc[it].exists;
-    if (wanted && !facts->rc[it].has_line) {
-      sp_da_push(parts, layout->rc[it].path);
-    }
-  }
-  if (sp_da_empty(parts)) {
+  sp_str_t hooks [SPN_INSTALL_MAX_RC];
+  u32 num_hooks = spn_install_shell_hooks(layout, facts, kind, hooks);
+  if (!num_hooks) {
     return "already configured";
   }
-  return sp_str_to_cstr(mem, sp_str_join_n(mem, parts, sp_da_size(parts), sp_str_lit(", ")));
+  return sp_str_to_cstr(mem, sp_str_join_n(mem, hooks, num_hooks, sp_str_lit(", ")));
 }
 
 static sp_str_t expand_path(sp_mem_t mem, sp_str_t path, sp_str_t home) {
