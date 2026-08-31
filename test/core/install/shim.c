@@ -274,7 +274,7 @@ static sp_str_t expect_err(const test_t* it, fixture_t* fx) {
       return sp_str_lit("");
     }
     case SHIM_ERR_ARGS: {
-      return sp_str_lit("install: the spn installer takes no arguments; configure it with SPN_INSTALL_DOWNLOAD_URL and SPN_INSTALL_NO_MODIFY_PATH\n");
+      return sp_str_lit("install: the spn installer takes no arguments; configure it with SPN_INSTALL_AUTO, SPN_INSTALL_NO_MODIFY_PATH and SPN_INSTALL_DOWNLOAD_URL\n");
     }
     case SHIM_ERR_UNSUPPORTED_OS: {
       return sp_fmt(fx->mem, "install: unsupported operating system {}\n", sp_fmt_cstr(it->uname_s)).value;

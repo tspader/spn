@@ -456,7 +456,18 @@ static bool use_prompt() {
   if (tui.mode != SPN_OUTPUT_MODE_INTERACTIVE) {
     return false;
   }
-  return sp_sys_is_tty(sp_sys_stdout) && sp_sys_is_tty(sp_sys_stdin);
+  if (!sp_sys_is_tty(sp_sys_stdout) || !sp_sys_is_tty(sp_sys_stdin)) {
+    return false;
+  }
+
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+  sp_env_t env = sp_env_capture(s.mem);
+  // SPN_INSTALL_AUTO is how a curl | sh with a terminal says yes to
+  // defaults; a dumb terminal cannot render the prompt at all
+  bool prompt = sp_str_empty(sp_env_get_c(&env, "SPN_INSTALL_AUTO"))
+    && !sp_str_equal(sp_env_get_c(&env, "TERM"), sp_str_lit("dumb"));
+  sp_mem_end_scratch(s);
+  return prompt;
 }
 
 static sp_cli_result_t run_unattended(sp_cli_t* cli) {

@@ -22,7 +22,7 @@ checksum_sha256sum() { sha256sum "$1" | cut -d' ' -f1; }
 checksum_shasum() { shasum -a 256 "$1" | cut -d' ' -f1; }
 
 if [ $# -gt 0 ]; then
-  fail "the spn installer takes no arguments; configure it with SPN_INSTALL_DOWNLOAD_URL and SPN_INSTALL_NO_MODIFY_PATH"
+  fail "the spn installer takes no arguments; configure it with SPN_INSTALL_AUTO, SPN_INSTALL_NO_MODIFY_PATH and SPN_INSTALL_DOWNLOAD_URL"
 fi
 
 if [ "${OS:-}" = "Windows_NT" ]; then

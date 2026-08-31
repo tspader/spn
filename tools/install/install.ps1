@@ -1,5 +1,6 @@
 param(
-  [switch]$NoModifyPath
+  [switch]$NoModifyPath,
+  [switch]$Auto
 )
 
 $ErrorActionPreference = "Stop"
@@ -61,9 +62,11 @@ if (-not $Targets.ContainsKey($TargetName)) {
 }
 $Target = $Targets[$TargetName]
 
-# irm | iex runs in the caller's session, so the switch must not outlive us
+# irm | iex runs in the caller's session, so the switches must not outlive us
 $SavedNoModifyPath = $env:SPN_INSTALL_NO_MODIFY_PATH
 $SkipPath = $NoModifyPath -or $SavedNoModifyPath
+$SavedAuto = $env:SPN_INSTALL_AUTO
+$Unattended = $Auto -or $SavedAuto
 
 $Stage = New-Item -ItemType Directory -Path (Join-Path ([IO.Path]::GetTempPath()) "spn-install-$([Guid]::NewGuid())")
 try {
@@ -81,12 +84,16 @@ try {
   if ($SkipPath) {
     $env:SPN_INSTALL_NO_MODIFY_PATH = "1"
   }
-  & (Join-Path $Stage $Target.Exe) self install --auto
+  if ($Unattended) {
+    $env:SPN_INSTALL_AUTO = "1"
+  }
+  & (Join-Path $Stage $Target.Exe) self install
   if ($LASTEXITCODE -ne 0) {
     throw "install: spn self install failed"
   }
 } finally {
   $env:SPN_INSTALL_NO_MODIFY_PATH = $SavedNoModifyPath
+  $env:SPN_INSTALL_AUTO = $SavedAuto
   Remove-Item -Recurse -Force $Stage -ErrorAction SilentlyContinue
 }
 
