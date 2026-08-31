@@ -184,8 +184,6 @@ source = [
   "source/core/index/publish.c",
   "source/core/index/release.c",
   "source/cli/install/plan.c",
-  "source/cli/install/report.c",
-  "source/cli/install/resolve.c",
   "source/core/intern/context.c",
   "source/core/intern/intern.c",
   "source/util/thread_pool/thread_pool.c",

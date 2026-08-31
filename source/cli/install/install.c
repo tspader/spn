@@ -1,5 +1,6 @@
 #include "install/install.h"
 
+#include "install/plan.h"
 #include "atomic_file/atomic_file.h"
 #include "fs/fs.h"
 

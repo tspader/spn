@@ -179,8 +179,6 @@ add_executable(core
   ${SRC}/index/json.c
   ${SRC}/index/publish.c
   ${CLI}/install/plan.c
-  ${CLI}/install/report.c
-  ${CLI}/install/resolve.c
   ${SRC}/intern/context.c
   ${SRC}/intern/intern.c
   ${SRC}/lock/lock.c

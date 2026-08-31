@@ -66,8 +66,6 @@ set(SPN_SOURCES
   core/index/publish.c
   cli/install/install.c
   cli/install/plan.c
-  cli/install/report.c
-  cli/install/resolve.c
   core/intern/context.c
   core/intern/intern.c
   core/lock/lock.c

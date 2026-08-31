@@ -2,7 +2,7 @@
 #define SPN_INSTALL_TEST_HARNESS_H
 
 #include "spn_test.h"
-#include "install/install.h"
+#include "install/plan.h"
 
 #define INSTALL_MAX_VARS 6
 
