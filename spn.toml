@@ -1,7 +1,7 @@
 [package]
 namespace = "spader"
 name = "spn"
-version = "0.4.5"
+version = "0.4.6"
 repo = "tspader/spn"
 include = ["include"]
 system_deps = [
