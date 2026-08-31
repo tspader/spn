@@ -4,6 +4,13 @@ name = "spn"
 version = "0.4.5"
 repo = "tspader/spn"
 include = ["include"]
+system_deps = [
+  # spn self install reads and writes HKCU\Environment and broadcasts
+  # WM_SETTINGCHANGE. these sit on the package, not the bin, because stage0 is
+  # 0.4.3 and only applies package system deps
+  { lib = "advapi32", when = { os = "windows" } },
+  { lib = "user32", when = { os = "windows" } },
+]
 
 [package.configure]
 source = ["tools/spn/configure.c", "tools/spn/wasi.c"]
@@ -102,12 +109,6 @@ name = "spn"
 source = ["source/cli/**/*.c"]
 include = ["include", "source/cli", "source/util"] # @spader removed the core include
 deps = ["spn"]
-system_deps = [
-  # spn self install reads and writes HKCU\Environment and broadcasts
-  # WM_SETTINGCHANGE, which msvc will not resolve without these
-  { value = "advapi32", when = { os = "windows" } },
-  { value = "user32", when = { os = "windows" } },
-]
 flags = []
 
 [[script]]
