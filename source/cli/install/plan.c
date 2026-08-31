@@ -118,13 +118,13 @@ spn_install_layout_t spn_install_resolve(sp_mem_t mem, spn_install_os_t os, sp_e
     return layout;
   }
 
-  sp_str_t root = sp_fs_join_path(mem, layout.home, sp_str_lit(".spn"));
-  layout.bin = sp_fs_join_path(mem, root, sp_str_lit("bin"));
+  layout.root = sp_fs_join_path(mem, layout.home, sp_str_lit(".spn"));
+  layout.bin = sp_fs_join_path(mem, layout.root, sp_str_lit("bin"));
   layout.bin_native = to_native(mem, os, layout.bin);
   layout.exe = sp_fs_join_path(mem, layout.bin, os == SPN_INSTALL_OS_WINDOWS ? sp_str_lit("spn.exe") : sp_str_lit("spn"));
 
   if (os == SPN_INSTALL_OS_UNIX) {
-    layout.env_file = sp_fs_join_path(mem, root, sp_str_lit("env"));
+    layout.env_file = sp_fs_join_path(mem, layout.root, sp_str_lit("env"));
     resolve_shells(mem, env, layout.home, &layout);
   }
 

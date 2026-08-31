@@ -145,7 +145,7 @@ static void prose_error(sp_prompt_ctx_t* prompt, const c8* fmt, ...) {
   va_end(args);
 }
 
-static void prompt_shadow(sp_prompt_ctx_t* prompt, spn_install_layout_t* layout, spn_install_facts_t* facts) {
+static void prompt_shadow(sp_prompt_ctx_t* prompt, spn_install_facts_t* facts) {
   prose_warn(
     prompt,
     "{.cyan} is already installed ({.yellow})",
@@ -237,7 +237,10 @@ static const c8* shell_hint(sp_mem_t mem, spn_install_layout_t* layout, spn_inst
 }
 
 static sp_str_t expand_path(sp_mem_t mem, sp_str_t path, sp_str_t home) {
-  if (sp_str_starts_with(path, sp_str_lit("~/")) && !sp_str_empty(home)) {
+  if (sp_str_equal(path, sp_str_lit("~"))) {
+    path = home;
+  }
+  else if (sp_str_starts_with(path, sp_str_lit("~/")) && !sp_str_empty(home)) {
     path = sp_fs_join_path(mem, home, sp_str_sub(path, 2, (s32)path.len - 2));
   }
   path = sp_fs_normalize_path(mem, path);
@@ -269,8 +272,8 @@ static spn_install_path_choice_t custom_file(sp_prompt_ctx_t* prompt, sp_mem_t m
       prose_error(prompt, "{.yellow} is a directory", sp_fmt_str(path));
       continue;
     }
-    if (sp_str_equal(path, layout->env_file)) {
-      prose_error(prompt, "{.yellow} is written by spn", sp_fmt_str(path));
+    if (sp_str_equal(path, layout->root) || sp_str_starts_with(path, sp_str_concat(mem, layout->root, sp_str_lit("/")))) {
+      prose_error(prompt, "{.yellow} is managed by spn", sp_fmt_str(path));
       continue;
     }
 
@@ -390,7 +393,7 @@ static sp_cli_result_t run_prompt(sp_cli_t* cli, sp_prompt_ctx_t* prompt, spn_in
   sp_prompt_intro(prompt, "spn");
 
   if (spn_install_shadowed(&probe->layout, &probe->facts)) {
-    prompt_shadow(prompt, &probe->layout, &probe->facts);
+    prompt_shadow(prompt, &probe->facts);
   }
 
   spn_install_choices_t choices = spn_install_choices(&probe->layout, &probe->facts);

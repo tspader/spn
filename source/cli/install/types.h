@@ -68,6 +68,7 @@ typedef struct {
   spn_install_err_t err;
   spn_install_os_t os;
   sp_str_t home;
+  sp_str_t root;
   sp_str_t bin;
   sp_str_t bin_native;
   sp_str_t exe;
