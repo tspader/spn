@@ -1,9 +1,9 @@
 #include "spn/host.h"
 
-#include "sp/io.h"
-#include "sp/macro.h"
-#include "sp/prompt.h"
-#include "sp/str.h"
+#include "io/io.h"
+#include "macro/macro.h"
+#include "sp/sp_prompt.h"
+#include "str/str.h"
 
 #include "tui/tui.h"
 

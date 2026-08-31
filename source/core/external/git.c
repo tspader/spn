@@ -1,5 +1,5 @@
 #include "sp.h"
-#include "sp/macro.h"
+#include "macro/macro.h"
 #include "git.h"
 
 spn_err_t spn_git_clone(sp_str_t url, sp_str_t path) {

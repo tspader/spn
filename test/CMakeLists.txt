@@ -4,6 +4,7 @@ function(spn_test_binary target)
   set_target_properties(${target} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${STORE}/test)
   target_include_directories(${target} PRIVATE
     ${SRC}
+    ${UTIL}
     ${CMAKE_SOURCE_DIR}/include
     ${TEST_TOOLS}
     ${SOURCE_ROOT}/sp/tools

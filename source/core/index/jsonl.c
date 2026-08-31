@@ -2,7 +2,7 @@
 
 #include "index/json.h"
 #include "pkg/id.h"
-#include "sp/io.h"
+#include "io/io.h"
 
 sp_str_t spn_index_jsonl_path(sp_mem_t mem, spn_index_info_t* index, spn_pkg_name_t id) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch_for(mem);

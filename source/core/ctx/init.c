@@ -10,14 +10,14 @@
 #include "hash/digest/digest.h"
 #include "index/index.h"
 #include "intern/intern.h"
-#include "log/lazy/lazy.h"
+#include "lazy/lazy.h"
 #include "op/op.h"
 #include "paths/paths.h"
 #include "project/project.h"
 #include "project/types.h"
 #include "session/session.h"
-#include "sp/fs.h"
-#include "sp/os.h"
+#include "fs/fs.h"
+#include "os/os.h"
 #include "sp/sp_glob.h"
 #include "spn.embed.h"
 #include "toml/issue.h"
@@ -26,7 +26,7 @@
 #include "toolchain/probe.h"
 #include "toolchain/provision.h"
 #include "triple/triple.h"
-#include "version.h"
+#include "version/version.h"
 
 static sp_str_t join_path(spn_ctx_t* ctx, sp_str_t base, const c8* dir) {
   return sp_fs_join_path(ctx->heap, base, sp_cstr_as_str(dir));

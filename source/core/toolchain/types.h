@@ -6,7 +6,7 @@
 
 #include "core/types.h"
 #include "paths/types.h"
-#include "sp/sp_om.h"
+#include "sp_om/sp_om.h"
 
 typedef enum {
   SPN_CC_DRIVER_NONE,

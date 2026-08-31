@@ -3,7 +3,7 @@
 #include "intern/intern.h"
 #include "pkg/id.h"
 #include "semver/compare.h"
-#include "sp/macro.h"
+#include "macro/macro.h"
 
 spn_pkg_id_t spn_pkg_id(sp_intern_t* intern, sp_str_t qualified) {
   return (spn_pkg_id_t) {

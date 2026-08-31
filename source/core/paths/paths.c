@@ -1,7 +1,7 @@
 #include "paths/paths.h"
 
 #include "sp.h"
-#include "sp/macro.h"
+#include "macro/macro.h"
 #include "spn/core.h"
 
 static sp_str_t canonical_dir(sp_mem_t mem, sp_str_t dir) {

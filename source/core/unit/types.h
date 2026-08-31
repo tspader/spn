@@ -9,7 +9,7 @@
 #include "spn/types.h"
 #include "intern/types.h"
 #include "pkg/types.h"
-#include "sp/macro.h"
+#include "macro/macro.h"
 #include "profile/types.h"
 #include "target/types.h"
 #include "external/wasm/types.h"

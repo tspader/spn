@@ -1,5 +1,5 @@
 #include "sp.h"
-#include "sp/macro.h"
+#include "macro/macro.h"
 #include "paths/paths.h"
 #include "toolchain/toolchain.h"
 

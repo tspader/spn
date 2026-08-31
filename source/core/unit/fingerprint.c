@@ -3,7 +3,7 @@
 #include "hash/digest/digest.h"
 #include "pkg/pkg.h"
 #include "session/session.h"
-#include "sp/str.h"
+#include "str/str.h"
 
 typedef struct {
   sp_hash_t qualified;

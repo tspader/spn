@@ -6,7 +6,6 @@
 #include "compiler/types.h"
 #include "toolchain/types.h"
 
-sp_str_t spn_probe_env_path(sp_env_t* env);
 sp_da(sp_str_t) spn_probe_split_path(sp_mem_t mem, sp_str_t path);
 void spn_probe_cache_load(spn_probe_cache_t* cache, sp_str_t file, sp_mem_t mem);
 spn_err_t spn_probe_cache_flush(spn_probe_cache_t* cache);

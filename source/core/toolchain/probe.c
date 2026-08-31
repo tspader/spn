@@ -13,39 +13,6 @@
 
 #define SPN_PROBE_CACHE_HEADER "spn-probe-cache 1"
 
-SP_PRIVATE bool is_path_name(sp_str_t name) {
-  const c8* path = "path";
-  if (name.len != 4) {
-    return false;
-  }
-  sp_for(it, name.len) {
-    c8 c = name.data[it];
-    if (c >= 'A' && c <= 'Z') {
-      c = (c8)(c + ('a' - 'A'));
-    }
-    if (c != path[it]) {
-      return false;
-    }
-  }
-  return true;
-}
-
-sp_str_t spn_probe_env_path(sp_env_t* env) {
-  sp_str_t exact = sp_env_get(env, sp_str_lit("PATH"));
-  if (!sp_str_empty(exact)) {
-    return exact;
-  }
-  if (!env->vars) {
-    return sp_str_lit("");
-  }
-  sp_ht_for_kv(env->vars, it) {
-    if (is_path_name(*it.key)) {
-      return *it.val;
-    }
-  }
-  return sp_str_lit("");
-}
-
 sp_da(sp_str_t) spn_probe_split_path(sp_mem_t mem, sp_str_t path) {
   sp_da(sp_str_t) dirs = sp_da_new(mem, sp_str_t);
   sp_str_t remaining = path;

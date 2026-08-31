@@ -2,7 +2,7 @@
 
 #include "intern/intern.h"
 #include "semver/compare.h"
-#include "sp/str.h"
+#include "str/str.h"
 
 typedef struct {
   spn_resolved_pkg_t* node;

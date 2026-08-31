@@ -12,8 +12,8 @@
 #include "semver/convert.h"
 #include "semver/parser.h"
 #include "semver/types.h"
-#include "sp/io.h"
-#include "sp/str.h"
+#include "io/io.h"
+#include "str/str.h"
 
 static inline u32 index_test_count_lines(sp_str_t content) {
   u32 count = 0;

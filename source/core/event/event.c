@@ -4,7 +4,7 @@
 
 #include "core/core.h"
 #include "ctx/types.h"
-#include "log/lazy/lazy.h"
+#include "lazy/lazy.h"
 
 #if defined(SP_POSIX)
   #include <pthread.h>

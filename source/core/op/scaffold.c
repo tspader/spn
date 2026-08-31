@@ -3,7 +3,7 @@
 #include "ctx/types.h"
 #include "error/error.h"
 #include "op/op.h"
-#include "sp/sp_template.h"
+#include "sp_template/sp_template.h"
 #include "spn.embed.h"
 
 typedef struct {

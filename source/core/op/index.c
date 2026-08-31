@@ -1,5 +1,5 @@
 #include "sp.h"
-#include "sp/macro.h"
+#include "macro/macro.h"
 
 #include "cpu/cpu.h"
 #include "ctx/ctx.h"

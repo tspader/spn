@@ -1,6 +1,7 @@
 #include "spn_test.h"
 
-#include "sp/fs.h"
+#include "atomic_file/atomic_file.h"
+#include "fs/fs.h"
 
 
 #define FS_LOCK_MAX_SLOTS 4
@@ -200,5 +201,118 @@ sp_test(fs_staging, fails_when_parent_is_file) {
   sp_expect_ne(t, sp_fs_staging_dir(mem, path, sp_str_lit("tmp"), &dir), SP_OK);
   sp_expect(t, sp_str_empty(dir));
 
+  return SP_OK;
+}
+
+sp_test(fs_append, creates) {
+  sp_mem_t mem = sp_test_arena(t);
+  sp_str_t path = sp_fs_join_path(mem, sp_test_dir(t), sp_str_lit("rc"));
+
+  sp_must_ok(t, sp_fs_append(path, sp_str_lit("\nL\n")));
+
+  sp_str_t content = sp_zero;
+  sp_must_ok(t, sp_io_read_file(mem, path, &content));
+  sp_expect_str_eq_c(t, content, "\nL\n");
+  return SP_OK;
+}
+
+sp_test(fs_append, appends) {
+  sp_mem_t mem = sp_test_arena(t);
+  sp_str_t path = sp_fs_join_path(mem, sp_test_dir(t), sp_str_lit("rc"));
+  sp_must_ok(t, sp_fs_create_file_cstr(path, "A\n"));
+
+  sp_must_ok(t, sp_fs_append(path, sp_str_lit("\nL\n")));
+
+  sp_str_t content = sp_zero;
+  sp_must_ok(t, sp_io_read_file(mem, path, &content));
+  sp_expect_str_eq_c(t, content, "A\n\nL\n");
+  return SP_OK;
+}
+
+sp_test(fs_copy_atomic, replaces) {
+  sp_mem_t mem = sp_test_arena(t);
+  sp_str_t src = sp_fs_join_path(mem, sp_test_dir(t), sp_str_lit("src"));
+  sp_str_t dst = sp_fs_join_path(mem, sp_test_dir(t), sp_str_lit("dst"));
+  sp_must_ok(t, sp_fs_create_file_cstr(src, "NEW"));
+  sp_must_ok(t, sp_fs_create_file_cstr(dst, "OLD"));
+
+  sp_must_ok(t, sp_fs_copy_atomic(dst, src));
+
+  sp_str_t content = sp_zero;
+  sp_must_ok(t, sp_io_read_file(mem, dst, &content));
+  sp_expect_str_eq_c(t, content, "NEW");
+  sp_must_ok(t, sp_io_read_file(mem, src, &content));
+  sp_expect_str_eq_c(t, content, "NEW");
+  return SP_OK;
+}
+
+sp_test(fs_copy_atomic, missing_source) {
+  sp_mem_t mem = sp_test_arena(t);
+  sp_str_t src = sp_fs_join_path(mem, sp_test_dir(t), sp_str_lit("absent"));
+  sp_str_t dst = sp_fs_join_path(mem, sp_test_dir(t), sp_str_lit("dst"));
+
+  sp_expect_ne(t, sp_fs_copy_atomic(dst, src), SP_OK);
+  sp_expect(t, !sp_fs_exists(dst));
+  return SP_OK;
+}
+
+sp_test(fs_copy_atomic, preserves_mode) {
+  sp_test_skip_on_win32();
+
+  sp_mem_t mem = sp_test_arena(t);
+  sp_str_t src = sp_fs_join_path(mem, sp_test_dir(t), sp_str_lit("src"));
+  sp_str_t dst = sp_fs_join_path(mem, sp_test_dir(t), sp_str_lit("dst"));
+  sp_must_ok(t, sp_fs_create_file_cstr(src, "X"));
+  sp_ps_output_t chmod = sp_ps_run(mem, (sp_ps_config_t) {
+    .command = sp_str_lit("chmod"),
+    .args = { sp_str_lit("+x"), src },
+  });
+  sp_must_eq(t, 0, chmod.status.exit_code);
+
+  sp_must_ok(t, sp_fs_copy_atomic(dst, src));
+
+  sp_sys_file_meta_t meta = sp_zero;
+  sp_must_ok(t, sp_sys_get_path_metadata_s(sp_sys_get_root(0), dst, &meta));
+  sp_expect(t, (meta.raw_attrs & 0111) != 0);
+  return SP_OK;
+}
+
+sp_test(fs_copy_atomic, busy) {
+  sp_test_skip_on_win32();
+
+  sp_mem_t mem = sp_test_arena(t);
+  sp_str_t dir = sp_test_dir(t);
+
+  sp_ps_output_t which = sp_ps_run(mem, (sp_ps_config_t) {
+    .command = sp_str_lit("sh"),
+    .args = { sp_str_lit("-c"), sp_str_lit("command -v sleep") },
+  });
+  sp_must_eq(t, 0, which.status.exit_code);
+  sp_str_t sleep_bin = sp_str_trim_right(which.out);
+
+  sp_str_t target = sp_fs_join_path(mem, dir, sp_str_lit("bin/spn"));
+  sp_must_ok(t, sp_fs_create_dir(sp_fs_parent_path(target)));
+  sp_must_ok(t, sp_fs_copy_file(sleep_bin, target));
+
+  sp_ps_t running = sp_ps_create(mem, (sp_ps_config_t) {
+    .command = target,
+    .args = { sp_str_lit("30") },
+    .io = SP_PS_NO_STDIO,
+  });
+  sp_must(t, running.os);
+
+  sp_str_t source = sp_fs_join_path(mem, dir, sp_str_lit("src"));
+  sp_must_ok(t, sp_fs_create_file_cstr(source, "N"));
+
+  sp_err_t err = sp_fs_copy_atomic(target, source);
+
+  sp_ps_kill(&running);
+  sp_ps_wait(&running);
+  sp_ps_free(&running);
+
+  sp_must_ok(t, err);
+  sp_str_t content = sp_zero;
+  sp_must_ok(t, sp_io_read_file(mem, target, &content));
+  sp_expect_str_eq_c(t, content, "N");
   return SP_OK;
 }

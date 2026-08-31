@@ -1,7 +1,7 @@
 #include "fuzz.h"
 
 #include "paths/paths.h"
-#include "sp/io.h"
+#include "io/io.h"
 
 typedef struct {
   fz_lowered_t* low;

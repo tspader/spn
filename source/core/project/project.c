@@ -5,7 +5,7 @@
 #include "lock/lock.h"
 #include "pkg/load.h"
 #include "toml/issue.h"
-#include "sp/atomic_file.h"
+#include "atomic_file/atomic_file.h"
 
 sp_str_t spn_project_manifest_path(sp_mem_t mem, sp_str_t root) {
   return sp_fs_join_path(mem, root, sp_str_lit("spn.toml"));

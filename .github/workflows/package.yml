@@ -25,9 +25,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { id: x86_64-linux, os: ubuntu-latest, triple: x86_64-linux-musl, ext: tar.gz, exe: spn, tar: tar }
-          - { id: aarch64-macos, os: macos-latest, triple: aarch64-macos-none, ext: tar.gz, exe: spn, tar: tar }
-          - { id: x86_64-windows, os: windows-latest, triple: x86_64-windows-msvc, ext: zip, exe: spn.exe, tar: C:/Windows/System32/tar.exe }
+          - { id: x86_64-linux, os: ubuntu-latest, triple: x86_64-linux-musl, ext: tar.gz, exe: spn, tar: tar, render: .build/store/x86_64-linux-gnu/bin/installer_render }
+          - { id: aarch64-macos, os: macos-latest, triple: aarch64-macos-none, ext: tar.gz, exe: spn, tar: tar, render: .build/store/aarch64-macos-none-release/bin/installer_render }
+          - { id: x86_64-windows, os: windows-latest, triple: x86_64-windows-msvc, ext: zip, exe: spn.exe, tar: C:/Windows/System32/tar.exe, render: .build/store/x86_64-windows-msvc-release/bin/installer_render.exe }
     name: package-${{ matrix.id }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
@@ -63,7 +63,51 @@ jobs:
           echo "expected: ${expected}"
           echo "actual:   ${actual}"
           test "${actual}" = "${expected}"
+      - if: runner.os != 'Windows'
+        run: |
+          mkdir -p dist dist/home
+          cp spn-${{ matrix.id }}.${{ matrix.ext }} dist/
+          (cd dist && shasum -a 256 spn-* > SHASUMS256.txt)
+          ${{ matrix.render }} dist/SHASUMS256.txt tools/install dist 0.0.0 v0.0.0 ${{ github.repository }}
+          if [ "$RUNNER_OS" = "Linux" ]; then shellcheck -s sh dist/install.sh; fi
+          HOME="$PWD/dist/home" GITHUB_PATH= SPN_INSTALL_DOWNLOAD_URL="file://$PWD/dist" sh dist/install.sh
+          test -x dist/home/.spn/bin/spn
+          grep -Fq '. "$HOME/.spn/env"' dist/home/.profile
+          dist/home/.spn/bin/spn --version
+      - if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          mkdir dist | Out-Null
+          Copy-Item spn-${{ matrix.id }}.${{ matrix.ext }} dist/
+          $Hash = (Get-FileHash -Algorithm SHA256 "dist/spn-${{ matrix.id }}.${{ matrix.ext }}").Hash.ToLower()
+          Set-Content -Path dist/SHASUMS256.txt -Value "$Hash  spn-${{ matrix.id }}.${{ matrix.ext }}"
+          & ${{ matrix.render }} dist/SHASUMS256.txt tools/install dist 0.0.0 v0.0.0 ${{ github.repository }}
+          if ($LASTEXITCODE -ne 0) { throw "installer_render failed" }
+          $Saved = (Get-Item -Path 'HKCU:\Environment').GetValue('Path', '', 'DoNotExpandEnvironmentNames')
+          Remove-Item -Path env:GITHUB_PATH -ErrorAction SilentlyContinue
+          $env:SPN_INSTALL_DOWNLOAD_URL = "file:///" + ("$PWD/dist" -replace '\\', '/')
+          try {
+            & powershell -NoProfile -ExecutionPolicy Bypass -Command "iex (Get-Content -Raw 'dist/install.ps1')"
+            if ($LASTEXITCODE -ne 0) { throw "install.ps1 failed" }
+            $Exe = Join-Path $env:USERPROFILE ".spn\bin\spn.exe"
+            if (-not (Test-Path $Exe)) { throw "spn.exe was not installed" }
+            & $Exe --version
+            if ($LASTEXITCODE -ne 0) { throw "the installed spn failed to run" }
+            $Reg = (Get-Item -Path 'HKCU:\Environment').GetValue('Path', '', 'DoNotExpandEnvironmentNames') -split ';'
+            $Bin = Join-Path $env:USERPROFILE ".spn\bin"
+            if ($Reg -notcontains $Bin) { throw "registry PATH missing $Bin" }
+          } finally {
+            $Key = (Get-Item -Path 'HKCU:').OpenSubKey('Environment', $true)
+            $Key.SetValue('Path', $Saved, $Key.GetValueKind('Path'))
+            $Key.Dispose()
+          }
+
       - uses: actions/upload-artifact@v4
         with:
           name: spn-${{ matrix.id }}
           path: spn-${{ matrix.id }}.${{ matrix.ext }}
+      - uses: actions/upload-artifact@v4
+        if: matrix.id == 'x86_64-linux'
+        with:
+          name: installer-render
+          path: ${{ matrix.render }}

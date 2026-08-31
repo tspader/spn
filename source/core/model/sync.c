@@ -1,5 +1,6 @@
 #include "sp.h"
-#include "sp/str.h"
+#include "os/os.h"
+#include "str/str.h"
 #include "cpu/cpu.h"
 #include "ctx/ctx.h"
 #include "ctx/types.h"
@@ -10,7 +11,7 @@
 #include "core/types.h"
 #include "git/cache.h"
 #include "intern/intern.h"
-#include "log/lazy/lazy.h"
+#include "lazy/lazy.h"
 #include "op/op.h"
 #include "paths/paths.h"
 #include "pkg/id.h"
@@ -103,7 +104,7 @@ static spn_err_t setup_toolchain_unit(spn_toolchain_store_t* store, spn_toolchai
 
   switch (toolchain->source) {
     case SPN_TOOLCHAIN_SOURCE_LOCAL: {
-      spn_try(spn_toolchain_probe(&unit->cc, spn_probe_split_path(spn.mem, spn_probe_env_path(spn.env)), &store->probes, spn.mem, &unit->identity));
+      spn_try(spn_toolchain_probe(&unit->cc, spn_probe_split_path(spn.mem, sp_env_get_path(spn.env)), &store->probes, spn.mem, &unit->identity));
       spn_probe_cache_flush(&store->probes);
       break;
     }

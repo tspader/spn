@@ -3,7 +3,7 @@
 #include "compiler/push.h"
 
 #include "enum/enum.h"
-#include "sp/macro.h"
+#include "macro/macro.h"
 #include "paths/paths.h"
 #include "triple/triple.h"
 

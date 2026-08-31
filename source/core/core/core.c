@@ -1,5 +1,5 @@
 #include "core/core.h"
-#include "sp/io.h"
+#include "io/io.h"
 
 static bool file_matches(sp_str_t path, sp_mem_slice_t content) {
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();

@@ -10,17 +10,17 @@ add_executable(render
   ${SRC}/codegen/json.c
   ${SRC}/codegen/loader.c
   ${SRC}/core/core.c
-  ${SRC}/sp/io.c
+  ${UTIL}/io/io.c
   ${SRC}/ctx/ctx.c
   ${SRC}/enum/enum.c
   ${SRC}/error/error.c
   ${SRC}/error/json.c
   ${SRC}/event/event.c
-  ${SRC}/log/lazy/lazy.c
+  ${UTIL}/lazy/lazy.c
   ${SRC}/external/tom.c
   ${SRC}/intern/intern.c
   ${SRC}/paths/paths.c
-  ${SRC}/sp/str.c
+  ${UTIL}/str/str.c
   ${SRC}/triple/triple.c
   main.c
   cases.c

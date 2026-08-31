@@ -7,7 +7,7 @@ add_executable(resolver
   ${SRC}/error/error.c
   ${SRC}/error/json.c
   ${SRC}/event/event.c
-  ${SRC}/log/lazy/lazy.c
+  ${UTIL}/lazy/lazy.c
   ${SRC}/external/git.c
   ${SRC}/external/tom.c
   ${SRC}/codegen/codegen.c
@@ -35,7 +35,7 @@ add_executable(resolver
   ${SRC}/index/index.c
   ${SRC}/index/jsonl.c
   ${SRC}/index/json.c
-  ${SRC}/sp/io.c
+  ${UTIL}/io/io.c
   ${SRC}/paths/paths.c
   ${SRC}/pkg/id.c
   ${SRC}/pkg/pkg.c
@@ -47,7 +47,7 @@ add_executable(resolver
   ${SRC}/resolve/resolve.c
   ${SRC}/resolve/dump.c
   ${SRC}/codegen/gen/resolve.gen.c
-  ${SRC}/sp/str.c
+  ${UTIL}/str/str.c
   ${SRC}/semver/compare.c
   ${SRC}/semver/convert.c
   ${SRC}/semver/parser.c

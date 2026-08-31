@@ -5,7 +5,7 @@
 #include "commands/commands.h"
 #include "host/host.h"
 #include "tui/tui.h"
-#include "version.h"
+#include "version/version.h"
 
 static void on_wake(void* user_data) {
   sp_sys_event_signal(host.doorbell);

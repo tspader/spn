@@ -54,13 +54,6 @@ void spn_wasm_thread_exit(void) {
   }
 }
 
-void spn_wasm_script_init(spn_wasm_script_t* script, sp_str_t module) {
-  *script = (spn_wasm_script_t) {
-    .state = SPN_WASM_SCRIPT_CLOSED,
-    .path = module,
-  };
-}
-
 static spn_err_t script_fail(spn_pkg_unit_t* unit, spn_err_t err, spn_err_wasm_t wasm) {
   wasm.path = sp_str_copy(spn.mem, wasm.path);
   wasm.error = sp_str_copy(spn.mem, wasm.error);

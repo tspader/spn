@@ -4,7 +4,7 @@
 #include "intern/intern.h"
 #include "manifest.gen.h"
 #include "sp.h"
-#include "sp/macro.h"
+#include "macro/macro.h"
 #include "spn/core.h"
 
 static bool spn_toml_loader_read_version_part(spn_toml_loader_t* ctx, toml_table_t* table, const c8* key, s64 min, u16* out) {

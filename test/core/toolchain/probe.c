@@ -412,37 +412,3 @@ sp_test_each(probe, split_path, split_t, split_tests) {
   sp_must_strs_eq(t, dirs, sp_da_size(dirs), it->expect);
   return SP_OK;
 }
-
-
-#define PROBE_MAX_VARS 2
-
-typedef struct {
-  const c8* name;
-  struct {
-    const c8* name;
-    const c8* value;
-  } vars [PROBE_MAX_VARS];
-  const c8* expect;
-} env_path_t;
-
-static const env_path_t env_path_tests [] = {
-  { "exact",        { { "PATH", "A" } },                 "A" },
-  { "windows_case", { { "Path", "A" } },                 "A" },
-  { "lowercase",    { { "path", "A" } },                 "A" },
-  { "exact_wins",   { { "Path", "B" }, { "PATH", "A" } }, "A" },
-  { "missing",      { { "HOME", "B" } },                 "" },
-  { "empty",        sp_zero,                             "" },
-};
-
-sp_test_each(probe, env_path, env_path_t, env_path_tests) {
-  sp_env_t env = sp_zero;
-  sp_env_init(sp_test_arena(t), &env);
-  sp_carr_for(it->vars, at) {
-    if (!it->vars[at].name) {
-      break;
-    }
-    sp_env_insert(&env, sp_cstr_as_str(it->vars[at].name), sp_cstr_as_str(it->vars[at].value));
-  }
-  sp_expect_str_eq_c(t, spn_probe_env_path(&env), it->expect);
-  return SP_OK;
-}

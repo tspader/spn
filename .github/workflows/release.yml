@@ -48,8 +48,46 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       TAG: ${{ inputs.tag }}
     steps:
+      - uses: actions/checkout@v5
       - uses: actions/download-artifact@v4
         with:
           merge-multiple: true
-      - run: sha256sum spn-* > SHASUMS256.txt
-      - run: gh release create "${TAG}" spn-* SHASUMS256.txt --repo ${{ github.repository }} --target ${{ github.sha }} --title "${TAG}" --generate-notes
+          path: dist
+      - run: cd dist && sha256sum spn-* > SHASUMS256.txt
+      - run: |
+          chmod +x dist/installer_render
+          version="$(sed -n 's/^version = "\(.*\)"$/\1/p' spn.toml)"
+          dist/installer_render dist/SHASUMS256.txt tools/install dist "${version}" "${TAG}" ${{ github.repository }}
+      - run: gh release create "${TAG}" dist/spn-* dist/SHASUMS256.txt dist/install.sh dist/install.ps1 --repo ${{ github.repository }} --target ${{ github.sha }} --title "${TAG}" --generate-notes
+
+  smoke:
+    needs: [release]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest }
+          - { os: macos-latest }
+          - { os: windows-latest }
+    runs-on: ${{ matrix.os }}
+    env:
+      TAG: ${{ inputs.tag }}
+    steps:
+      - if: runner.os != 'Windows'
+        run: |
+          url="https://github.com/${{ github.repository }}/releases/download/${TAG}/install.sh"
+          for attempt in 1 2 3 4 5; do
+            curl -fsSL "$url" | sh && break
+            test "$attempt" -lt 5 || exit 1
+            sleep 15
+          done
+          "${HOME}/.spn/bin/spn" --version
+      - if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $url = "https://github.com/${{ github.repository }}/releases/download/$env:TAG/install.ps1"
+          foreach ($attempt in 1..5) {
+            try { irm $url | iex; break }
+            catch { if ($attempt -eq 5) { throw }; Start-Sleep -Seconds 15 }
+          }
+          & "$Home\.spn\bin\spn.exe" --version

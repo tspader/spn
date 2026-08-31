@@ -2,7 +2,7 @@
 #include "ctx/types.h"
 #include "error/error.h"
 #include "core/types.h"
-#include "sp/macro.h"
+#include "macro/macro.h"
 #include "intern/intern.h"
 #include "pkg/types.h"
 #include "spn/core.h"

@@ -2,7 +2,7 @@
 #include "sim/sim.h"
 #include "dag/track.h"
 #include "paths/paths.h"
-#include "sp/io.h"
+#include "io/io.h"
 
 typedef enum {
   MEMO_SURE,

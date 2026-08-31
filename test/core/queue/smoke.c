@@ -1,6 +1,6 @@
-#include "spn_test.h"
+#include "unit.h"
 
-#include "sp/queue.h"
+#include "queue/queue.h"
 
 #define SMOKE_MAX_PRODUCERS 16
 #define SMOKE_PING_ROUNDS 8192

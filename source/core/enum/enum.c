@@ -1,7 +1,7 @@
 #include "spn/host.h"
 #include "enum/enum.h"
 
-#include "sp/macro.h"
+#include "macro/macro.h"
 #include "spn/core.h"
 
 spn_arch_t spn_arch_from_str(sp_str_t str) {

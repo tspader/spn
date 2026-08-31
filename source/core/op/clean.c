@@ -7,7 +7,7 @@
 #include "op/op.h"
 #include "paths/paths.h"
 #include "profile/profile.h"
-#include "sp/os.h"
+#include "os/os.h"
 
 static spn_err_t remove_path(spn_ctx_t* ctx, sp_str_t path) {
   if (sp_fs_remove(path) != SP_OK) {

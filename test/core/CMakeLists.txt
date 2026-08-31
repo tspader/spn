@@ -1,5 +1,6 @@
 add_executable(core
-  main.c
+  tools/ctx.c
+  tools/main/sim.c
   drain.c
   fs.c
   filter.c
@@ -8,6 +9,7 @@ add_executable(core
   identity.c
   intern.c
   lazy.c
+  os.c
   stable_map.c
   triple.c
   version.c
@@ -65,6 +67,12 @@ add_executable(core
   index/release.c
   index/sync.c
   index/transaction.c
+  install/harness.c
+  install/plan.c
+  install/render.c
+  install/report.c
+  install/resolve.c
+  install/shim.c
   jtd/harness.c
   jtd/conformance.c
   jtd/discriminator.c
@@ -84,7 +92,6 @@ add_executable(core
   options/merge.c
   options/apply.c
   options/session.c
-  paths/harness.c
   paths/anchor.c
   paths/canonicalize.c
   paths/label.c
@@ -123,6 +130,7 @@ add_executable(core
   unit/paths.c
   ${CMAKE_SOURCE_DIR}/tools/jtd.c
   ${CMAKE_SOURCE_DIR}/tools/gen/lower.c
+  ${CMAKE_SOURCE_DIR}/tools/install/render.c
   ${SRC}/codegen/codegen.c
   ${SRC}/codegen/loader.c
   ${SRC}/codegen/json.c
@@ -157,6 +165,7 @@ add_executable(core
   ${SRC}/event/event.c
   ${SRC}/external/git.c
   ${SRC}/external/tom.c
+  ${SRC}/external/wasm/script.c
   ${SRC}/filter/filter.c
   ${SRC}/git/cache.c
   ${SRC}/git/key.c
@@ -169,10 +178,11 @@ add_executable(core
   ${SRC}/index/jsonl.c
   ${SRC}/index/json.c
   ${SRC}/index/publish.c
+  ${CLI}/install/plan.c
   ${SRC}/intern/context.c
   ${SRC}/intern/intern.c
   ${SRC}/lock/lock.c
-  ${SRC}/log/lazy/lazy.c
+  ${UTIL}/lazy/lazy.c
   ${SRC}/graph/build.c
   ${SRC}/graph/identity.c
   ${SRC}/paths/paths.c
@@ -191,12 +201,15 @@ add_executable(core
   ${SRC}/session/session.c
   ${SRC}/hash/digest/digest.c
   ${SRC}/hash/sha256/sha256.c
-  ${SRC}/sp/fs.c
-  ${SRC}/sp/io.c
-  ${SRC}/sp/str.c
+  ${UTIL}/atomic_file/atomic_file.c
+  ${UTIL}/fs/fs.c
+  ${UTIL}/io/io.c
+  ${UTIL}/os/os.c
+  ${UTIL}/queue/queue.c
+  ${UTIL}/str/str.c
   ${SRC}/target/mutate.c
   ${SRC}/target/select.c
-  ${SRC}/thread_pool/thread_pool.c
+  ${UTIL}/thread_pool/thread_pool.c
   ${SRC}/toml/edit.c
   ${SRC}/pkg/load.c
   ${SRC}/toolchain/catalog.c
@@ -211,9 +224,10 @@ add_executable(core
   ${SRC}/unit/link.c
   ${SRC}/unit/paths.c
   ${SRC}/unit/target.c
-  ${SRC}/version.c
+  ${UTIL}/version/version.c
   ${SRC}/when/when.c
   ${TEST_TOOLS}/fixture.c
+  ${TEST_TOOLS}/path_roots.c
   ${TEST_TOOLS}/sim/sim.c
   ${TEST_TOOLS}/dag/track.c
   ${TEST_TOOLS}/toml.c
@@ -224,12 +238,14 @@ set_source_files_properties(${EMBED_OBJ} PROPERTIES EXTERNAL_OBJECT TRUE GENERAT
 spn_test_binary(core)
 target_include_directories(core PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}
+  ${CLI}
   ${CMAKE_CURRENT_SOURCE_DIR}/tools
   ${SRC}/codegen/gen
   ${SRC}/external
   ${SOURCE_ROOT}/wamr/core/iwasm/include
   ${CMAKE_SOURCE_DIR}/tools
   ${CMAKE_SOURCE_DIR}/tools/gen
+  ${CMAKE_SOURCE_DIR}/tools/install
   ${STORE}/include/sp
 )
 set_source_files_properties(schema/schema.c PROPERTIES COMPILE_DEFINITIONS

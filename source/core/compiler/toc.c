@@ -1,6 +1,6 @@
 #include "compiler/toc.h"
 
-#include "sp/macro.h"
+#include "macro/macro.h"
 
 static u32 toc_u32be(const u8* p) {
   return ((u32)p[0] << 24) | ((u32)p[1] << 16) | ((u32)p[2] << 8) | (u32)p[3];
