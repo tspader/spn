@@ -60,11 +60,14 @@ sp_str_t spn_dag_file_cache_canonical(spn_dag_file_cache_t* c, sp_str_t path) {
   }
   sp_mutex_unlock(&c->mutex);
 
-  sp_str_t canonical = sp_fs_canonicalize_path(c->mem, path);
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+  sp_str_t canonical = sp_fs_canonicalize_path(s.mem, path);
 
   sp_mutex_lock(&c->mutex);
+  canonical = sp_str_copy(c->mem, canonical);
   sp_ht_insert(c->canonical, sp_str_copy(c->mem, path), canonical);
   sp_mutex_unlock(&c->mutex);
+  sp_mem_end_scratch(s);
   return canonical;
 }
 
