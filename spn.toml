@@ -390,14 +390,14 @@ source = [
   "source/core/ctx/ctx.c",
   "source/core/enum/enum.c",
   "source/core/event/event.c",
-  "source/core/log/lazy/lazy.c",
+  "source/util/lazy/lazy.c",
   "source/core/error/error.c",
   "source/core/error/json.c",
   "source/core/external/tom.c",
   "source/core/intern/intern.c",
   "source/core/paths/paths.c",
-  "source/core/sp/io.c",
-  "source/core/sp/str.c",
+  "source/util/io/io.c",
+  "source/util/str/str.c",
   "source/core/triple/triple.c",
   "test/render/main.c",
   "test/render/cases.c",
@@ -406,7 +406,7 @@ source = [
   "test/tools/fixture.c",
   "test/tools/toml.c",
 ]
-include = ["include", "source/core", "source/core/codegen/gen", "source/core/external", "test/render", "test/tools"]
+include = ["include", "source/core", "source/util", "source/core/codegen/gen", "source/core/external", "test/render", "test/tools"]
 flags = []
 
 [[test]]

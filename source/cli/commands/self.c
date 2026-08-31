@@ -54,16 +54,16 @@ static void print_msg(spn_install_msg_t* msg) {
   }
 }
 
-static sp_cli_result_t install_error(sp_cli_t* cli, spn_install_t* result) {
+static sp_cli_result_t install_error(spn_install_t* result) {
   switch (result->err) {
     case SPN_INSTALL_OK: {
       return SP_CLI_OK;
     }
     case SPN_INSTALL_ERR_NO_HOME: {
-      return spn_cli_error(cli, "HOME is not set");
+      return spn_cli_usage("HOME is not set");
     }
     case SPN_INSTALL_ERR_EXE: {
-      return spn_cli_error(cli, "failed to write {}; close any running spn and retry", sp_fmt_str(result->failed.path));
+      return spn_cli_usage("failed to write {}; close any running spn and retry", sp_fmt_str(result->failed.path));
     }
     case SPN_INSTALL_ERR_STUCK: {
       return SP_CLI_ERR;
@@ -386,7 +386,7 @@ static void prompt_choices(sp_prompt_ctx_t* prompt, sp_mem_t mem, spn_install_pr
   }
 }
 
-static sp_cli_result_t run_prompt(sp_cli_t* cli, sp_prompt_ctx_t* prompt, spn_install_probe_t* probe) {
+static sp_cli_result_t run_prompt(sp_prompt_ctx_t* prompt, spn_install_probe_t* probe) {
   sp_mem_arena_marker_t s = sp_mem_begin_scratch_for(host.mem);
   sp_cli_result_t status = SP_CLI_OK;
 
@@ -429,7 +429,7 @@ static sp_cli_result_t run_prompt(sp_cli_t* cli, sp_prompt_ctx_t* prompt, spn_in
   spn_install_t result = spn_install_execute(probe, &plan);
   if (result.err == SPN_INSTALL_ERR_EXE) {
     sp_prompt_cancel(prompt, "install failed");
-    status = install_error(cli, &result);
+    status = install_error(&result);
     goto cleanup;
   }
 
@@ -439,7 +439,7 @@ static sp_cli_result_t run_prompt(sp_cli_t* cli, sp_prompt_ctx_t* prompt, spn_in
 
   if (result.stuck) {
     sp_prompt_outro(prompt, cfmt(s.mem, "{} of {} changes failed", sp_fmt_uint(result.stuck), sp_fmt_uint(result.changes)));
-    status = install_error(cli, &result);
+    status = install_error(&result);
     goto cleanup;
   }
   sp_prompt_outro(prompt, result.changes ? "spn " SPN_VERSION " installed" : "spn " SPN_VERSION " already installed");
@@ -453,7 +453,7 @@ static bool use_prompt() {
   if (args.unattended) {
     return false;
   }
-  if (tui.mode != SPN_OUTPUT_MODE_INTERACTIVE) {
+  if (!tui.interactive) {
     return false;
   }
   if (!sp_sys_is_tty(sp_sys_stdout) || !sp_sys_is_tty(sp_sys_stdin)) {
@@ -470,7 +470,7 @@ static bool use_prompt() {
   return prompt;
 }
 
-static sp_cli_result_t run_unattended(sp_cli_t* cli) {
+static sp_cli_result_t run_unattended() {
   spn_install_t result = spn_install(host.mem);
   if (result.err != SPN_INSTALL_ERR_EXE && !sp_str_empty(result.exe)) {
     if (result.changes) {
@@ -483,7 +483,7 @@ static sp_cli_result_t run_unattended(sp_cli_t* cli) {
   sp_for(it, result.msgs.count) {
     print_msg(&result.msgs.items[it]);
   }
-  return install_error(cli, &result);
+  return install_error(&result);
 }
 
 static sp_cli_result_t install(sp_cli_t* cli) {
@@ -493,18 +493,18 @@ static sp_cli_result_t install(sp_cli_t* cli) {
     spn_install_probe_t probe = spn_install_probe(host.mem);
     if (probe.layout.err) {
       spn_install_t result = { .err = probe.layout.err };
-      return install_error(cli, &result);
+      return install_error(&result);
     }
 
     sp_prompt_ctx_t* prompt = sp_prompt_begin(host.mem);
     if (prompt) {
-      sp_cli_result_t result = run_prompt(cli, prompt, &probe);
+      sp_cli_result_t result = run_prompt(prompt, &probe);
       sp_prompt_end(prompt);
       return result;
     }
   }
 
-  return run_unattended(cli);
+  return run_unattended();
 }
 
 static sp_cli_cmd_t spn_cmd_self_install = {
