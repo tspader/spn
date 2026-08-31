@@ -170,6 +170,32 @@ sp_test_each(install_resolve, rc, rc_test_t, rc_tests) {
 }
 
 
+typedef struct {
+  const c8* name;
+  install_var_t vars [INSTALL_MAX_VARS];
+  spn_install_shell_t expect;
+} login_test_t;
+
+static const login_test_t login_tests [] = {
+  { .name = "unset", .vars = { { "HOME", "/h" } } },
+  { .name = "bash", .vars = { { "HOME", "/h" }, { "SHELL", "/bin/bash" } }, .expect = SPN_INSTALL_SHELL_BASH },
+  { .name = "sh", .vars = { { "HOME", "/h" }, { "SHELL", "/bin/sh" } }, .expect = SPN_INSTALL_SHELL_BASH },
+  { .name = "dash", .vars = { { "HOME", "/h" }, { "SHELL", "/bin/dash" } }, .expect = SPN_INSTALL_SHELL_BASH },
+  { .name = "zsh", .vars = { { "HOME", "/h" }, { "SHELL", "/bin/zsh" } }, .expect = SPN_INSTALL_SHELL_ZSH },
+  { .name = "fish", .vars = { { "HOME", "/h" }, { "SHELL", "/usr/bin/fish" } }, .expect = SPN_INSTALL_SHELL_FISH },
+  { .name = "unknown", .vars = { { "HOME", "/h" }, { "SHELL", "/usr/bin/nu" } } },
+  { .name = "not_a_path", .vars = { { "HOME", "/h" }, { "SHELL", "zsh" } }, .expect = SPN_INSTALL_SHELL_ZSH },
+};
+
+sp_test_each(install_resolve, login, login_test_t, login_tests) {
+  sp_mem_t mem = sp_test_arena(t);
+  sp_env_t env = install_env(mem, it->vars);
+  spn_install_layout_t layout = spn_install_resolve(mem, SPN_INSTALL_OS_UNIX, &env);
+  sp_must_eq(t, (u32)SPN_INSTALL_OK, (u32)layout.err);
+  sp_expect_eq(t, (u32)it->expect, (u32)layout.login);
+  return SP_OK;
+}
+
 
 typedef struct {
   const c8* name;

@@ -193,6 +193,7 @@ static void prompt_msg(sp_prompt_ctx_t* prompt, spn_install_msg_t* msg) {
 
 static const c8* shell_label(spn_install_shell_t kind) {
   switch (kind) {
+    case SPN_INSTALL_SHELL_NONE: return "";
     case SPN_INSTALL_SHELL_BASH: return "bash";
     case SPN_INSTALL_SHELL_ZSH: return "zsh";
     case SPN_INSTALL_SHELL_FISH: return "fish";

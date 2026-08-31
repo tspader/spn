@@ -76,6 +76,38 @@ static const test_t tests [] = {
     },
   },
   {
+    // a fresh macos account: no config files at all, but $SHELL says zsh
+    .name = "fresh_macos",
+    .world = {
+      .vars = { { "HOME", "/h" }, { "PATH", "/p" }, { "SHELL", "/bin/zsh" } },
+      .exe = "/s/spn",
+    },
+    .expect = {
+      .state = SPN_INSTALL_PATH_UPDATED,
+      .posix = true,
+      .actions = {
+        EXE_UNIX,
+        ENV_UNIX,
+        RC_UNIX("/h/.zshenv"),
+      },
+    },
+  },
+  {
+    .name = "login_fish",
+    .world = {
+      .vars = { { "HOME", "/h" }, { "PATH", "/p" }, { "SHELL", "/usr/bin/fish" } },
+      .exe = "/s/spn",
+    },
+    .expect = {
+      .state = SPN_INSTALL_PATH_UPDATED,
+      .actions = {
+        EXE_UNIX,
+        ENV_UNIX,
+        FISH_UNIX,
+      },
+    },
+  },
+  {
     .name = "default_zsh_only",
     .world = {
       INSTALL_WORLD_UNIX,

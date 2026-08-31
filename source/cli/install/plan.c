@@ -46,7 +46,30 @@ static sp_str_t to_native(sp_mem_t mem, spn_install_os_t os, sp_str_t path) {
   return path;
 }
 
-static void resolve_rc(sp_mem_t mem, sp_env_t* env, sp_str_t home, spn_install_layout_t* layout) {
+static spn_install_shell_t parse_login(sp_str_t shell) {
+  sp_str_t name = sp_fs_get_name(shell);
+  const struct { sp_str_t name; spn_install_shell_t shell; } logins [] = {
+    { sp_str_lit("bash"), SPN_INSTALL_SHELL_BASH },
+    // every other posix sh reads .profile, which is what the bash hook set
+    // falls back to
+    { sp_str_lit("sh"),   SPN_INSTALL_SHELL_BASH },
+    { sp_str_lit("dash"), SPN_INSTALL_SHELL_BASH },
+    { sp_str_lit("ash"),  SPN_INSTALL_SHELL_BASH },
+    { sp_str_lit("ksh"),  SPN_INSTALL_SHELL_BASH },
+    { sp_str_lit("zsh"),  SPN_INSTALL_SHELL_ZSH },
+    { sp_str_lit("fish"), SPN_INSTALL_SHELL_FISH },
+  };
+  sp_carr_for(logins, it) {
+    if (sp_str_equal(name, logins[it].name)) {
+      return logins[it].shell;
+    }
+  }
+  return SPN_INSTALL_SHELL_NONE;
+}
+
+static void resolve_shells(sp_mem_t mem, sp_env_t* env, sp_str_t home, spn_install_layout_t* layout) {
+  layout->login = parse_login(sp_env_get(env, sp_str_lit("SHELL")));
+
   layout->rc[layout->num_rc++] = (spn_install_rc_t) { .path = sp_fs_join_path(mem, home, sp_str_lit(".profile")), .role = SPN_INSTALL_RC_HOOK_ALWAYS, .shell = SPN_INSTALL_SHELL_BASH };
   layout->rc[layout->num_rc++] = (spn_install_rc_t) { .path = sp_fs_join_path(mem, home, sp_str_lit(".bashrc")), .shell = SPN_INSTALL_SHELL_BASH };
   layout->rc[layout->num_rc++] = (spn_install_rc_t) { .path = sp_fs_join_path(mem, home, sp_str_lit(".bash_profile")), .shell = SPN_INSTALL_SHELL_BASH };
@@ -102,7 +125,7 @@ spn_install_layout_t spn_install_resolve(sp_mem_t mem, spn_install_os_t os, sp_e
 
   if (os == SPN_INSTALL_OS_UNIX) {
     layout.env_file = sp_fs_join_path(mem, root, sp_str_lit("env"));
-    resolve_rc(mem, env, layout.home, &layout);
+    resolve_shells(mem, env, layout.home, &layout);
   }
 
   resolve_path(mem, os, env, &layout);
@@ -144,6 +167,9 @@ static bool registry_contains(sp_str_t value, sp_str_t bin_native) {
 }
 
 static bool shell_present(spn_install_layout_t* layout, spn_install_facts_t* facts, spn_install_shell_t kind) {
+  if (layout->login == kind) {
+    return true;
+  }
   if (kind == SPN_INSTALL_SHELL_FISH) {
     return facts->fish;
   }

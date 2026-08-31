@@ -31,7 +31,8 @@ typedef enum {
 } spn_install_reg_t;
 
 typedef enum {
-  SPN_INSTALL_SHELL_BASH = 0,
+  SPN_INSTALL_SHELL_NONE = 0,
+  SPN_INSTALL_SHELL_BASH,
   SPN_INSTALL_SHELL_ZSH,
   SPN_INSTALL_SHELL_FISH,
   SPN_INSTALL_SHELL_CUSTOM,
@@ -62,6 +63,9 @@ typedef struct {
   sp_str_t env_file;
   sp_str_t fish_dir;
   sp_str_t fish_conf;
+  // the login shell from $SHELL; evidence a shell is in use even when it has
+  // no config files yet, which is exactly a fresh macos account
+  spn_install_shell_t login;
   spn_install_rc_t rc [SPN_INSTALL_MAX_RC];
   u32 num_rc;
   sp_da(sp_str_t) shadows;
