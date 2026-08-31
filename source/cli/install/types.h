@@ -37,12 +37,18 @@ typedef enum {
   SPN_INSTALL_SHELL_CUSTOM,
 } spn_install_shell_t;
 
+typedef enum {
+  // hook it only if the user already has one
+  SPN_INSTALL_RC_HOOK_EXISTING = 0,
+  // hook it, creating it if missing
+  SPN_INSTALL_RC_HOOK_ALWAYS,
+  // evidence its shell is in use; never written
+  SPN_INSTALL_RC_PROBE,
+} spn_install_rc_role_t;
+
 typedef struct {
   sp_str_t path;
-  // create it even if it is not there
-  bool always;
-  // evidence that this shell is in use; never written
-  bool probe;
+  spn_install_rc_role_t role;
   spn_install_shell_t shell;
 } spn_install_rc_t;
 

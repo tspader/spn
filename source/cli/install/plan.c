@@ -47,7 +47,7 @@ static sp_str_t to_native(sp_mem_t mem, spn_install_os_t os, sp_str_t path) {
 }
 
 static void resolve_rc(sp_mem_t mem, sp_env_t* env, sp_str_t home, spn_install_layout_t* layout) {
-  layout->rc[layout->num_rc++] = (spn_install_rc_t) { .path = sp_fs_join_path(mem, home, sp_str_lit(".profile")), .always = true, .shell = SPN_INSTALL_SHELL_BASH };
+  layout->rc[layout->num_rc++] = (spn_install_rc_t) { .path = sp_fs_join_path(mem, home, sp_str_lit(".profile")), .role = SPN_INSTALL_RC_HOOK_ALWAYS, .shell = SPN_INSTALL_SHELL_BASH };
   layout->rc[layout->num_rc++] = (spn_install_rc_t) { .path = sp_fs_join_path(mem, home, sp_str_lit(".bashrc")), .shell = SPN_INSTALL_SHELL_BASH };
   layout->rc[layout->num_rc++] = (spn_install_rc_t) { .path = sp_fs_join_path(mem, home, sp_str_lit(".bash_profile")), .shell = SPN_INSTALL_SHELL_BASH };
   layout->rc[layout->num_rc++] = (spn_install_rc_t) { .path = sp_fs_join_path(mem, home, sp_str_lit(".bash_login")), .shell = SPN_INSTALL_SHELL_BASH };
@@ -57,8 +57,8 @@ static void resolve_rc(sp_mem_t mem, sp_env_t* env, sp_str_t home, spn_install_l
   // zsh is in use, and the file an older spn would have written into
   sp_str_t zdotdir = sp_env_get(env, sp_str_lit("ZDOTDIR"));
   zdotdir = sp_str_empty(zdotdir) ? home : sp_fs_normalize_path(mem, zdotdir);
-  layout->rc[layout->num_rc++] = (spn_install_rc_t) { .path = sp_fs_join_path(mem, zdotdir, sp_str_lit(".zshenv")), .always = true, .shell = SPN_INSTALL_SHELL_ZSH };
-  layout->rc[layout->num_rc++] = (spn_install_rc_t) { .path = sp_fs_join_path(mem, zdotdir, sp_str_lit(".zshrc")), .probe = true, .shell = SPN_INSTALL_SHELL_ZSH };
+  layout->rc[layout->num_rc++] = (spn_install_rc_t) { .path = sp_fs_join_path(mem, zdotdir, sp_str_lit(".zshenv")), .role = SPN_INSTALL_RC_HOOK_ALWAYS, .shell = SPN_INSTALL_SHELL_ZSH };
+  layout->rc[layout->num_rc++] = (spn_install_rc_t) { .path = sp_fs_join_path(mem, zdotdir, sp_str_lit(".zshrc")), .role = SPN_INSTALL_RC_PROBE, .shell = SPN_INSTALL_SHELL_ZSH };
 
   sp_str_t config = sp_env_get(env, sp_str_lit("XDG_CONFIG_HOME"));
   config = sp_str_empty(config) ? sp_fs_join_path(mem, home, sp_str_lit(".config")) : sp_fs_normalize_path(mem, config);
@@ -318,10 +318,10 @@ static void plan_unix_hooks(spn_install_layout_t* layout, spn_install_facts_t* f
       plan->posix = true;
       continue;
     }
-    if (layout->rc[it].probe || !has_shell(choices, layout->rc[it].shell)) {
+    if (layout->rc[it].role == SPN_INSTALL_RC_PROBE || !has_shell(choices, layout->rc[it].shell)) {
       continue;
     }
-    if (layout->rc[it].always || facts->rc[it].exists) {
+    if (layout->rc[it].role == SPN_INSTALL_RC_HOOK_ALWAYS || facts->rc[it].exists) {
       plan_posix_hook(plan, layout->rc[it].path);
     }
   }

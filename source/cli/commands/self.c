@@ -226,10 +226,10 @@ static const c8* shell_hint(sp_mem_t mem, spn_install_layout_t* layout, spn_inst
 
   sp_da(sp_str_t) parts = sp_da_new(mem, sp_str_t);
   sp_for(it, layout->num_rc) {
-    if (layout->rc[it].probe || layout->rc[it].shell != kind) {
+    if (layout->rc[it].role == SPN_INSTALL_RC_PROBE || layout->rc[it].shell != kind) {
       continue;
     }
-    bool wanted = layout->rc[it].always || facts->rc[it].exists;
+    bool wanted = layout->rc[it].role == SPN_INSTALL_RC_HOOK_ALWAYS || facts->rc[it].exists;
     if (wanted && !facts->rc[it].has_line) {
       sp_da_push(parts, layout->rc[it].path);
     }
