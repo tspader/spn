@@ -136,6 +136,11 @@ sp_err_t sp_fs_staging_dir(sp_mem_t mem, sp_str_t path, sp_str_t extension, sp_s
 }
 
 sp_err_t sp_fs_append(sp_str_t path, sp_str_t str) {
+  sp_str_t parent = sp_fs_parent_path(path);
+  if (!sp_str_empty(parent)) {
+    sp_try(sp_fs_create_dir(parent));
+  }
+
   sp_sys_fd_t fd = SP_SYS_INVALID_FD;
   sp_try(sp_sys_open_s(sp_sys_get_root(0), path, SP_SYS_OPEN_MODE_WO, SP_SYS_OPEN_CREATE | SP_SYS_OPEN_APPEND, &fd));
   sp_io_file_writer_t io = sp_zero;
