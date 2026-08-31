@@ -104,8 +104,8 @@ tar -xzf "${TMP}/${ASSET}" -C "$TMP" || fail "failed to extract ${ASSET}"
 # can prompt, exactly the way rustup does
 if [ -t 0 ]; then
   "${TMP}/${EXE}" self install
-elif [ -t 1 ] && (exec < /dev/tty) 2>/dev/null; then
-  "${TMP}/${EXE}" self install < /dev/tty
+elif [ -t 1 ] && TTY=$(tty <&2 2>/dev/null) && [ -n "$TTY" ]; then
+  "${TMP}/${EXE}" self install < "$TTY"
 else
   "${TMP}/${EXE}" self install --auto
 fi

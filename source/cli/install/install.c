@@ -98,6 +98,9 @@ static spn_install_facts_t probe_facts(sp_mem_t mem, spn_install_layout_t* layou
   facts.exe = sp_fs_get_exe_path(mem);
 
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch_for(mem);
+  if (sp_str_equal(sp_fs_canonicalize_path(scratch.mem, layout->exe), facts.exe)) {
+    facts.exe = layout->exe;
+  }
   sp_for(it, layout->num_rc) {
     facts.rc[it].exists = sp_fs_is_file(layout->rc[it].path);
     if (facts.rc[it].exists) {

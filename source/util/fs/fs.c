@@ -137,7 +137,7 @@ sp_err_t sp_fs_staging_dir(sp_mem_t mem, sp_str_t path, sp_str_t extension, sp_s
 
 sp_err_t sp_fs_append(sp_str_t path, sp_str_t str) {
   sp_str_t parent = sp_fs_parent_path(path);
-  if (!sp_str_empty(parent)) {
+  if (!sp_str_empty(parent) && !sp_fs_exists(parent)) {
     sp_try(sp_fs_create_dir(parent));
   }
 
