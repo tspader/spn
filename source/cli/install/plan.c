@@ -52,13 +52,18 @@ static void resolve_rc(sp_mem_t mem, sp_env_t* env, sp_str_t home, spn_install_l
   layout->rc[layout->num_rc++] = (spn_install_rc_t) { .path = sp_fs_join_path(mem, home, sp_str_lit(".bash_profile")), .shell = SPN_INSTALL_SHELL_BASH };
   layout->rc[layout->num_rc++] = (spn_install_rc_t) { .path = sp_fs_join_path(mem, home, sp_str_lit(".bash_login")), .shell = SPN_INSTALL_SHELL_BASH };
 
+  // zsh reads .zshenv for every shell, interactive or not, so that is where the
+  // hook goes. Almost nobody has one though; .zshrc is the file that tells us
+  // zsh is in use, and the file an older spn would have written into
   sp_str_t zdotdir = sp_env_get(env, sp_str_lit("ZDOTDIR"));
   zdotdir = sp_str_empty(zdotdir) ? home : sp_fs_normalize_path(mem, zdotdir);
-  layout->rc[layout->num_rc++] = (spn_install_rc_t) { .path = sp_fs_join_path(mem, zdotdir, sp_str_lit(".zshrc")), .always = true, .shell = SPN_INSTALL_SHELL_ZSH };
+  layout->rc[layout->num_rc++] = (spn_install_rc_t) { .path = sp_fs_join_path(mem, zdotdir, sp_str_lit(".zshenv")), .always = true, .shell = SPN_INSTALL_SHELL_ZSH };
+  layout->rc[layout->num_rc++] = (spn_install_rc_t) { .path = sp_fs_join_path(mem, zdotdir, sp_str_lit(".zshrc")), .probe = true, .shell = SPN_INSTALL_SHELL_ZSH };
 
   sp_str_t config = sp_env_get(env, sp_str_lit("XDG_CONFIG_HOME"));
   config = sp_str_empty(config) ? sp_fs_join_path(mem, home, sp_str_lit(".config")) : sp_fs_normalize_path(mem, config);
-  layout->fish_conf = sp_fs_join_path(mem, config, sp_str_lit("fish/conf.d/spn.fish"));
+  layout->fish_dir = sp_fs_join_path(mem, config, sp_str_lit("fish"));
+  layout->fish_conf = sp_fs_join_path(mem, layout->fish_dir, sp_str_lit("conf.d/spn.fish"));
 }
 
 static void resolve_path(sp_mem_t mem, spn_install_os_t os, sp_env_t* env, spn_install_layout_t* layout) {
@@ -138,13 +143,33 @@ static bool registry_contains(sp_str_t value, sp_str_t bin_native) {
   return false;
 }
 
-spn_install_choices_t spn_install_choices(spn_install_layout_t* layout) {
+static bool shell_present(spn_install_layout_t* layout, spn_install_facts_t* facts, spn_install_shell_t kind) {
+  if (kind == SPN_INSTALL_SHELL_FISH) {
+    return facts->fish;
+  }
+  sp_for(it, layout->num_rc) {
+    if (layout->rc[it].shell == kind && facts->rc[it].exists) {
+      return true;
+    }
+  }
+  return false;
+}
+
+spn_install_choices_t spn_install_choices(spn_install_layout_t* layout, spn_install_facts_t* facts) {
   spn_install_choices_t choices = sp_zero;
   switch (layout->os) {
     case SPN_INSTALL_OS_UNIX: {
-      choices.path[choices.num_path++] = (spn_install_path_choice_t) { .kind = SPN_INSTALL_SHELL_BASH };
-      choices.path[choices.num_path++] = (spn_install_path_choice_t) { .kind = SPN_INSTALL_SHELL_ZSH };
-      choices.path[choices.num_path++] = (spn_install_path_choice_t) { .kind = SPN_INSTALL_SHELL_FISH };
+      spn_install_shell_t kinds [] = { SPN_INSTALL_SHELL_BASH, SPN_INSTALL_SHELL_ZSH, SPN_INSTALL_SHELL_FISH };
+      sp_carr_for(kinds, it) {
+        if (shell_present(layout, facts, kinds[it])) {
+          choices.path[choices.num_path++] = (spn_install_path_choice_t) { .kind = kinds[it] };
+        }
+      }
+      // a home with no shell config at all still gets .profile, which every
+      // posix login shell reads
+      if (!choices.num_path) {
+        choices.path[choices.num_path++] = (spn_install_path_choice_t) { .kind = SPN_INSTALL_SHELL_BASH };
+      }
       break;
     }
     case SPN_INSTALL_OS_WINDOWS: {
@@ -164,6 +189,16 @@ static bool has_shell(spn_install_choices_t* choices, spn_install_shell_t kind) 
   return false;
 }
 
+bool spn_install_can_path(spn_install_layout_t* layout, spn_install_facts_t* facts) {
+  if (layout->on_path || layout->no_modify_path || !sp_str_empty(layout->github_path)) {
+    return false;
+  }
+  if (layout->os == SPN_INSTALL_OS_WINDOWS && facts->registry.kind == SPN_INSTALL_REG_OTHER) {
+    return false;
+  }
+  return true;
+}
+
 static spn_install_path_state_t path_state(spn_install_layout_t* layout, spn_install_facts_t* facts, spn_install_choices_t* choices) {
   if (layout->on_path) {
     return SPN_INSTALL_PATH_OK;
@@ -174,15 +209,15 @@ static spn_install_path_state_t path_state(spn_install_layout_t* layout, spn_ins
   if (!sp_str_empty(layout->github_path)) {
     return SPN_INSTALL_PATH_CI;
   }
+  if (!spn_install_can_path(layout, facts)) {
+    return SPN_INSTALL_PATH_MANUAL;
+  }
   switch (layout->os) {
     case SPN_INSTALL_OS_UNIX: {
       return choices->num_path ? SPN_INSTALL_PATH_UPDATED : SPN_INSTALL_PATH_MANUAL;
     }
     case SPN_INSTALL_OS_WINDOWS: {
-      if (!choices->registry) {
-        return SPN_INSTALL_PATH_MANUAL;
-      }
-      return facts->registry.kind == SPN_INSTALL_REG_OTHER ? SPN_INSTALL_PATH_MANUAL : SPN_INSTALL_PATH_UPDATED;
+      return choices->registry ? SPN_INSTALL_PATH_UPDATED : SPN_INSTALL_PATH_MANUAL;
     }
   }
   return SPN_INSTALL_PATH_MANUAL;
@@ -263,18 +298,31 @@ static bool planned(spn_install_plan_t* plan, sp_str_t path) {
   return false;
 }
 
+static void plan_posix_hook(spn_install_plan_t* plan, sp_str_t path) {
+  plan->posix = true;
+  if (!planned(plan, path)) {
+    push_action(plan, rc_action(path));
+  }
+}
+
 static void plan_unix_hooks(spn_install_layout_t* layout, spn_install_facts_t* facts, spn_install_choices_t* choices, spn_install_plan_t* plan) {
   if (has_shell(choices, SPN_INSTALL_SHELL_FISH) && !sp_str_empty(layout->fish_conf)) {
     push_action(plan, fish_action(layout));
   }
 
   sp_for(it, layout->num_rc) {
-    if (!has_shell(choices, layout->rc[it].shell)) {
+    // a file already sourcing env carries us whether or not its shell was
+    // picked, so it counts even when there is nothing to write
+    if (facts->rc[it].has_line) {
+      plan->live++;
+      plan->posix = true;
       continue;
     }
-    bool wanted = layout->rc[it].always || facts->rc[it].exists;
-    if (wanted && !facts->rc[it].has_line) {
-      push_action(plan, rc_action(layout->rc[it].path));
+    if (layout->rc[it].probe || !has_shell(choices, layout->rc[it].shell)) {
+      continue;
+    }
+    if (layout->rc[it].always || facts->rc[it].exists) {
+      plan_posix_hook(plan, layout->rc[it].path);
     }
   }
   sp_for(it, choices->num_path) {
@@ -282,9 +330,12 @@ static void plan_unix_hooks(spn_install_layout_t* layout, spn_install_facts_t* f
     if (choice->kind != SPN_INSTALL_SHELL_CUSTOM || sp_str_empty(choice->custom)) {
       continue;
     }
-    if (!choice->has_line && !planned(plan, choice->custom)) {
-      push_action(plan, rc_action(choice->custom));
+    if (choice->has_line) {
+      plan->live++;
+      plan->posix = true;
+      continue;
     }
+    plan_posix_hook(plan, choice->custom);
   }
 }
 
@@ -323,7 +374,10 @@ spn_install_plan_t spn_install_plan(sp_mem_t mem, spn_install_layout_t* layout, 
           break;
         }
         case SPN_INSTALL_OS_WINDOWS: {
-          if (!registry_contains(facts->registry.path, layout->bin_native)) {
+          if (registry_contains(facts->registry.path, layout->bin_native)) {
+            plan.live++;
+          }
+          else {
             push_action(&plan, registry_action(mem, layout, facts));
           }
           break;
@@ -335,30 +389,11 @@ spn_install_plan_t spn_install_plan(sp_mem_t mem, spn_install_layout_t* layout, 
   return plan;
 }
 
-static bool path_broken(spn_install_layout_t* layout, spn_install_facts_t* facts, spn_install_plan_t* plan, spn_install_result_t* result) {
-  u32 hooks = 0;
+static bool path_broken(spn_install_plan_t* plan, spn_install_result_t* result) {
+  u32 hooks = plan->live;
   sp_for(it, plan->count) {
     if (plan->actions[it].role == SPN_INSTALL_ROLE_HOOK) {
       hooks++;
-    }
-  }
-
-  if (plan->state == SPN_INSTALL_PATH_UPDATED) {
-    switch (layout->os) {
-      case SPN_INSTALL_OS_UNIX: {
-        sp_for(it, layout->num_rc) {
-          if (facts->rc[it].has_line) {
-            hooks++;
-          }
-        }
-        break;
-      }
-      case SPN_INSTALL_OS_WINDOWS: {
-        if (registry_contains(facts->registry.path, layout->bin_native)) {
-          hooks++;
-        }
-        break;
-      }
     }
   }
 
@@ -413,7 +448,7 @@ spn_install_msgs_t spn_install_report(spn_install_layout_t* layout, spn_install_
     push_stuck(&msgs, &plan->actions[result->stuck[it]]);
   }
 
-  bool broken = path_broken(layout, facts, plan, result);
+  bool broken = path_broken(plan, result);
   spn_install_msg_t manual = { .kind = SPN_INSTALL_MSG_MANUAL, .subject = layout->bin_native };
 
   switch (plan->state) {
@@ -437,7 +472,10 @@ spn_install_msgs_t spn_install_report(spn_install_layout_t* layout, spn_install_
       }
       switch (layout->os) {
         case SPN_INSTALL_OS_UNIX: {
-          push_msg(&msgs, (spn_install_msg_t) { .kind = SPN_INSTALL_MSG_RESTART_SHELL, .subject = sp_str_lit(SPN_INSTALL_RC_LINE) });
+          push_msg(&msgs, (spn_install_msg_t) {
+            .kind = SPN_INSTALL_MSG_RESTART_SHELL,
+            .subject = plan->posix ? sp_str_lit(SPN_INSTALL_RC_LINE) : sp_zero_s(sp_str_t),
+          });
           break;
         }
         case SPN_INSTALL_OS_WINDOWS: {

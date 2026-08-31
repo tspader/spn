@@ -89,7 +89,9 @@ typedef struct {
     struct {
       const c8* path;
       bool always;
+      bool probe;
     } rc [SPN_INSTALL_MAX_RC];
+    const c8* fish_dir;
     const c8* fish_conf;
   } expect;
 } rc_test_t;
@@ -104,8 +106,10 @@ static const rc_test_t rc_tests [] = {
         { "/h/.bashrc" },
         { "/h/.bash_profile" },
         { "/h/.bash_login" },
-        { "/h/.zshrc", .always = true },
+        { "/h/.zshenv", .always = true },
+        { "/h/.zshrc", .probe = true },
       },
+      .fish_dir = "/h/.config/fish",
       .fish_conf = "/h/.config/fish/conf.d/spn.fish",
     },
   },
@@ -118,8 +122,10 @@ static const rc_test_t rc_tests [] = {
         { "/h/.bashrc" },
         { "/h/.bash_profile" },
         { "/h/.bash_login" },
-        { "/z/.zshrc", .always = true },
+        { "/z/.zshenv", .always = true },
+        { "/z/.zshrc", .probe = true },
       },
+      .fish_dir = "/h/.config/fish",
       .fish_conf = "/h/.config/fish/conf.d/spn.fish",
     },
   },
@@ -132,8 +138,10 @@ static const rc_test_t rc_tests [] = {
         { "/h/.bashrc" },
         { "/h/.bash_profile" },
         { "/h/.bash_login" },
-        { "/h/.zshrc", .always = true },
+        { "/h/.zshenv", .always = true },
+        { "/h/.zshrc", .probe = true },
       },
+      .fish_dir = "/x/fish",
       .fish_conf = "/x/fish/conf.d/spn.fish",
     },
   },
@@ -156,7 +164,9 @@ sp_test_each(install_resolve, rc, rc_test_t, rc_tests) {
   sp_for(at, num_expect) {
     sp_expect_str_eq_c(t, layout.rc[at].path, it->expect.rc[at].path);
     sp_expect_eq(t, it->expect.rc[at].always, layout.rc[at].always);
+    sp_expect_eq(t, it->expect.rc[at].probe, layout.rc[at].probe);
   }
+  sp_expect_str_eq_c(t, layout.fish_dir, it->expect.fish_dir ? it->expect.fish_dir : "");
   sp_expect_str_eq_c(t, layout.fish_conf, it->expect.fish_conf ? it->expect.fish_conf : "");
   return SP_OK;
 }

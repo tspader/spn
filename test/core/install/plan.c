@@ -17,6 +17,13 @@
 #define WIN_EXE "C:/s/spn.exe"
 #define WIN_BIN "C:\\u\\.spn\\bin"
 
+#define UNIX_SHELLS \
+  .fish = true, \
+  .rc = { \
+    [INSTALL_RC_PROFILE] = { .exists = true }, \
+    [INSTALL_RC_ZSHRC] = { .exists = true }, \
+  }
+
 #define EXE_UNIX { SPN_INSTALL_ACTION_INSTALL_EXE, SPN_INSTALL_ROLE_EXE, "/h/.spn/bin/spn", .src = "/s/spn" }
 #define EXE_WINDOWS { SPN_INSTALL_ACTION_INSTALL_EXE, SPN_INSTALL_ROLE_EXE, "C:/u/.spn/bin/spn.exe", .src = WIN_EXE }
 #define ENV_UNIX { SPN_INSTALL_ACTION_WRITE_FILE, SPN_INSTALL_ROLE_ENV, "/h/.spn/env", .text = ENV_SH }
@@ -32,22 +39,67 @@ typedef struct {
   } choices;
   struct {
     spn_install_path_state_t state;
+    u32 live;
+    bool posix;
     install_action_spec_t actions [SPN_INSTALL_MAX_ACTIONS + 1];
   } expect;
 } test_t;
 
 static const test_t tests [] = {
   {
+    // nothing in $HOME says which shell this is, so .profile carries it
     .name = "fresh",
     .world = { INSTALL_WORLD_UNIX },
+    .expect = {
+      .state = SPN_INSTALL_PATH_UPDATED,
+      .posix = true,
+      .actions = {
+        EXE_UNIX,
+        ENV_UNIX,
+        RC_UNIX("/h/.profile"),
+      },
+    },
+  },
+  {
+    .name = "fresh_every_shell",
+    .world = { INSTALL_WORLD_UNIX, UNIX_SHELLS },
+    .expect = {
+      .state = SPN_INSTALL_PATH_UPDATED,
+      .posix = true,
+      .actions = {
+        EXE_UNIX,
+        ENV_UNIX,
+        FISH_UNIX,
+        RC_UNIX("/h/.profile"),
+        RC_UNIX("/h/.zshenv"),
+      },
+    },
+  },
+  {
+    .name = "default_zsh_only",
+    .world = {
+      INSTALL_WORLD_UNIX,
+      .rc = { [INSTALL_RC_ZSHRC] = { .exists = true } },
+    },
+    .expect = {
+      .state = SPN_INSTALL_PATH_UPDATED,
+      .posix = true,
+      .actions = {
+        EXE_UNIX,
+        ENV_UNIX,
+        RC_UNIX("/h/.zshenv"),
+      },
+    },
+  },
+  {
+    .name = "default_fish_only",
+    .world = { INSTALL_WORLD_UNIX, .fish = true },
     .expect = {
       .state = SPN_INSTALL_PATH_UPDATED,
       .actions = {
         EXE_UNIX,
         ENV_UNIX,
         FISH_UNIX,
-        RC_UNIX("/h/.profile"),
-        RC_UNIX("/h/.zshrc"),
       },
     },
   },
@@ -62,13 +114,12 @@ static const test_t tests [] = {
     },
     .expect = {
       .state = SPN_INSTALL_PATH_UPDATED,
+      .posix = true,
       .actions = {
         EXE_UNIX,
         ENV_UNIX,
-        FISH_UNIX,
         RC_UNIX("/h/.profile"),
         RC_UNIX("/h/.bashrc"),
-        RC_UNIX("/h/.zshrc"),
       },
     },
   },
@@ -76,17 +127,39 @@ static const test_t tests [] = {
     .name = "has_line",
     .world = {
       INSTALL_WORLD_UNIX,
+      .fish = true,
       .rc = {
         [INSTALL_RC_PROFILE] = { .exists = true, .has_line = true },
+        [INSTALL_RC_ZSHRC] = { .exists = true },
       },
     },
     .expect = {
       .state = SPN_INSTALL_PATH_UPDATED,
+      .live = 1,
+      .posix = true,
       .actions = {
         EXE_UNIX,
         ENV_UNIX,
         FISH_UNIX,
-        RC_UNIX("/h/.zshrc"),
+        RC_UNIX("/h/.zshenv"),
+      },
+    },
+  },
+  {
+    // an older spn hooked .zshrc; it still carries us, and .zshenv takes over
+    .name = "zshrc_has_line",
+    .world = {
+      INSTALL_WORLD_UNIX,
+      .rc = { [INSTALL_RC_ZSHRC] = { .exists = true, .has_line = true } },
+    },
+    .expect = {
+      .state = SPN_INSTALL_PATH_UPDATED,
+      .live = 1,
+      .posix = true,
+      .actions = {
+        EXE_UNIX,
+        ENV_UNIX,
+        RC_UNIX("/h/.zshenv"),
       },
     },
   },
@@ -195,6 +268,7 @@ static const test_t tests [] = {
     },
     .expect = {
       .state = SPN_INSTALL_PATH_UPDATED,
+      .live = 1,
       .actions = { EXE_WINDOWS },
     },
   },
@@ -242,14 +316,16 @@ static const test_t tests [] = {
     .world = {
       .vars = { { "HOME", "/h" }, { "PATH", "/p" } },
       .exe = "/h/.spn/bin/spn",
+      UNIX_SHELLS,
     },
     .expect = {
       .state = SPN_INSTALL_PATH_UPDATED,
+      .posix = true,
       .actions = {
         ENV_UNIX,
         FISH_UNIX,
         RC_UNIX("/h/.profile"),
-        RC_UNIX("/h/.zshrc"),
+        RC_UNIX("/h/.zshenv"),
       },
     },
   },
@@ -260,7 +336,7 @@ static const test_t tests [] = {
       .exe = "/h/.spn/bin/spn",
       .rc = {
         [INSTALL_RC_PROFILE] = { .exists = true, .has_line = true },
-        [INSTALL_RC_ZSHRC] = { .exists = true, .has_line = true },
+        [INSTALL_RC_ZSHENV] = { .exists = true, .has_line = true },
       },
     },
   },
@@ -297,6 +373,7 @@ static const test_t tests [] = {
     .choices = { .set = true, .value = { .path = { { .kind = SPN_INSTALL_SHELL_BASH } }, .num_path = 1 } },
     .expect = {
       .state = SPN_INSTALL_PATH_UPDATED,
+      .posix = true,
       .actions = {
         EXE_UNIX,
         ENV_UNIX,
@@ -311,10 +388,11 @@ static const test_t tests [] = {
     .choices = { .set = true, .value = { .path = { { .kind = SPN_INSTALL_SHELL_ZSH } }, .num_path = 1 } },
     .expect = {
       .state = SPN_INSTALL_PATH_UPDATED,
+      .posix = true,
       .actions = {
         EXE_UNIX,
         ENV_UNIX,
-        RC_UNIX("/h/.zshrc"),
+        RC_UNIX("/h/.zshenv"),
       },
     },
   },
@@ -324,6 +402,7 @@ static const test_t tests [] = {
     .choices = { .set = true, .value = { .path = { { .kind = SPN_INSTALL_SHELL_CUSTOM, .custom = { .data = "/c/rc", .len = 5 } } }, .num_path = 1 } },
     .expect = {
       .state = SPN_INSTALL_PATH_UPDATED,
+      .posix = true,
       .actions = {
         EXE_UNIX,
         ENV_UNIX,
@@ -337,6 +416,8 @@ static const test_t tests [] = {
     .choices = { .set = true, .value = { .path = { { .kind = SPN_INSTALL_SHELL_CUSTOM, .custom = { .data = "/c/rc", .len = 5 }, .has_line = true } }, .num_path = 1 } },
     .expect = {
       .state = SPN_INSTALL_PATH_UPDATED,
+      .live = 1,
+      .posix = true,
       .actions = {
         EXE_UNIX,
         ENV_UNIX,
@@ -351,17 +432,18 @@ static const test_t tests [] = {
       .value = {
         .path = {
           { .kind = SPN_INSTALL_SHELL_ZSH },
-          { .kind = SPN_INSTALL_SHELL_CUSTOM, .custom = { .data = "/h/.zshrc", .len = 9 } },
+          { .kind = SPN_INSTALL_SHELL_CUSTOM, .custom = { .data = "/h/.zshenv", .len = 10 } },
         },
         .num_path = 2,
       },
     },
     .expect = {
       .state = SPN_INSTALL_PATH_UPDATED,
+      .posix = true,
       .actions = {
         EXE_UNIX,
         ENV_UNIX,
-        RC_UNIX("/h/.zshrc"),
+        RC_UNIX("/h/.zshenv"),
       },
     },
   },
@@ -382,10 +464,12 @@ sp_test_each(install_plan, actions, test_t, tests) {
   install_world_t world = it->world;
   sp_try(install_build(t, &world, &layout, &facts));
 
-  spn_install_choices_t choices = it->choices.set ? it->choices.value : spn_install_choices(&layout);
+  spn_install_choices_t choices = it->choices.set ? it->choices.value : spn_install_choices(&layout, &facts);
   spn_install_plan_t plan = spn_install_plan(sp_test_arena(t), &layout, &facts, &choices);
 
   sp_expect_eq(t, (u32)it->expect.state, (u32)plan.state);
+  sp_expect_eq(t, it->expect.live, plan.live);
+  sp_expect_eq(t, it->expect.posix, plan.posix);
   install_expect_action_arr(t, plan.actions, plan.count, it->expect.actions);
   return SP_OK;
 }

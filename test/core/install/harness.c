@@ -25,6 +25,7 @@ sp_err_t install_build(sp_test_t* t, install_world_t* world, spn_install_layout_
   *facts = sp_zero_s(spn_install_facts_t);
   facts->exe = sp_cstr_as_str(world->exe);
   facts->shadow = world->shadow ? sp_cstr_as_str(world->shadow) : sp_zero_s(sp_str_t);
+  facts->fish = world->fish;
   sp_carr_for(world->rc, it) {
     facts->rc[it] = world->rc[it];
   }

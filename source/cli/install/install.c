@@ -101,6 +101,8 @@ static spn_install_facts_t probe_facts(sp_mem_t mem, spn_install_layout_t* layou
   }
   sp_mem_end_scratch(scratch);
 
+  facts.fish = sp_fs_is_dir(layout->fish_dir);
+
   sp_da_for(layout->shadows, it) {
     if (sp_fs_is_target_file(layout->shadows[it])) {
       facts.shadow = layout->shadows[it];
@@ -174,7 +176,7 @@ spn_install_t spn_install(sp_mem_t mem) {
     return (spn_install_t) { .err = probe.layout.err };
   }
 
-  spn_install_choices_t choices = spn_install_choices(&probe.layout);
+  spn_install_choices_t choices = spn_install_choices(&probe.layout, &probe.facts);
   spn_install_plan_t plan = spn_install_plan(mem, &probe.layout, &probe.facts, &choices);
   return spn_install_execute(&probe, &plan);
 }

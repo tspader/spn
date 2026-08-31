@@ -3,7 +3,7 @@
 
 #include "sp.h"
 
-#define SPN_INSTALL_MAX_RC 5
+#define SPN_INSTALL_MAX_RC 6
 #define SPN_INSTALL_MAX_PATH_CHOICES 4
 #define SPN_INSTALL_MAX_ACTIONS 12
 #define SPN_INSTALL_MAX_MSGS 12
@@ -39,7 +39,10 @@ typedef enum {
 
 typedef struct {
   sp_str_t path;
+  // create it even if it is not there
   bool always;
+  // evidence that this shell is in use; never written
+  bool probe;
   spn_install_shell_t shell;
 } spn_install_rc_t;
 
@@ -51,6 +54,7 @@ typedef struct {
   sp_str_t bin_native;
   sp_str_t exe;
   sp_str_t env_file;
+  sp_str_t fish_dir;
   sp_str_t fish_conf;
   spn_install_rc_t rc [SPN_INSTALL_MAX_RC];
   u32 num_rc;
@@ -80,6 +84,7 @@ typedef struct {
 typedef struct {
   sp_str_t exe;
   sp_str_t shadow;
+  bool fish;
   spn_install_rc_state_t rc [SPN_INSTALL_MAX_RC];
   struct {
     sp_str_t path;
@@ -128,6 +133,10 @@ typedef struct {
   spn_install_action_t actions [SPN_INSTALL_MAX_ACTIONS];
   u32 count;
   spn_install_path_state_t state;
+  // hooks that already carry us and so are not in the plan
+  u32 live;
+  // at least one hook, planned or live, is read by a posix shell
+  bool posix;
 } spn_install_plan_t;
 
 typedef struct {

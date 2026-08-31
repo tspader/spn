@@ -20,6 +20,7 @@ enum {
   INSTALL_RC_BASHRC,
   INSTALL_RC_BASH_PROFILE,
   INSTALL_RC_BASH_LOGIN,
+  INSTALL_RC_ZSHENV,
   INSTALL_RC_ZSHRC,
 };
 
@@ -43,6 +44,7 @@ typedef struct {
   spn_install_os_t os;
   const c8* exe;
   const c8* shadow;
+  bool fish;
   spn_install_rc_state_t rc [SPN_INSTALL_MAX_RC];
   struct {
     const c8* path;

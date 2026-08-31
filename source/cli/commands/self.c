@@ -31,6 +31,10 @@ static void print_msg(spn_install_msg_t* msg) {
       break;
     }
     case SPN_INSTALL_MSG_RESTART_SHELL: {
+      if (sp_str_empty(msg->subject)) {
+        spn_print(&tui, "install: restart your shell to use spn");
+        break;
+      }
       spn_print(&tui, "install: restart your shell, or run:");
       spn_print(&tui, "install:   {}", sp_fmt_str(msg->subject));
       break;
@@ -169,6 +173,10 @@ static void prompt_msg(sp_prompt_ctx_t* prompt, spn_install_msg_t* msg) {
       break;
     }
     case SPN_INSTALL_MSG_RESTART_SHELL: {
+      if (sp_str_empty(msg->subject)) {
+        prose_info(prompt, "restart your shell to use {.cyan}", sp_fmt_cstr("spn"));
+        break;
+      }
       prose_info(prompt, "restart your shell, or run  {.cyan}", sp_fmt_str(msg->subject));
       break;
     }
@@ -218,7 +226,7 @@ static const c8* shell_hint(sp_mem_t mem, spn_install_layout_t* layout, spn_inst
 
   sp_da(sp_str_t) parts = sp_da_new(mem, sp_str_t);
   sp_for(it, layout->num_rc) {
-    if (layout->rc[it].shell != kind) {
+    if (layout->rc[it].probe || layout->rc[it].shell != kind) {
       continue;
     }
     bool wanted = layout->rc[it].always || facts->rc[it].exists;
@@ -246,41 +254,49 @@ static sp_str_t expand_path(sp_mem_t mem, sp_str_t path, sp_str_t home) {
 static spn_install_path_choice_t custom_file(sp_prompt_ctx_t* prompt, sp_mem_t mem, spn_install_layout_t* layout, sp_str_t current) {
   spn_install_path_choice_t choice = { .kind = SPN_INSTALL_SHELL_CUSTOM };
 
-  const c8* entered = sp_prompt_text(prompt, "custom file", sp_str_to_cstr(mem, current));
-  if (sp_prompt_cancelled(prompt)) {
-    return choice;
-  }
-
-  sp_str_t path = sp_cstr_as_str(entered);
-  if (sp_str_empty(path)) {
-    return choice;
-  }
-  path = expand_path(mem, path, layout->home);
-
-  if (sp_fs_is_dir(path)) {
-    prose_error(prompt, "{.yellow} is a directory", sp_fmt_str(path));
-    return choice;
-  }
-  if (sp_str_equal(path, layout->env_file)) {
-    prose_error(prompt, "{.yellow} is written by spn", sp_fmt_str(path));
-    return choice;
-  }
-
-  if (sp_fs_exists(path)) {
-    sp_str_t content = sp_zero;
-    if (!sp_io_read_file(mem, path, &content)) {
-      choice.has_line = sp_str_contains(content, sp_str_lit(SPN_INSTALL_RC_LINE));
-    }
-  }
-  else {
-    bool create = sp_prompt_confirm(prompt, cfmt(mem, "{} does not exist; create it?", sp_fmt_str(path)), true);
-    if (sp_prompt_cancelled(prompt) || !create) {
+  while (true) {
+    const c8* entered = sp_prompt_text(prompt, "custom file", sp_str_to_cstr(mem, current));
+    if (sp_prompt_cancelled(prompt)) {
       return choice;
     }
-  }
 
-  choice.custom = path;
-  return choice;
+    sp_str_t path = sp_cstr_as_str(entered);
+    if (sp_str_empty(path)) {
+      return choice;
+    }
+    current = path;
+    path = expand_path(mem, path, layout->home);
+
+    // a rejection is a typo, not a change of mind; ask again rather than
+    // quietly dropping the file the user asked for
+    if (sp_fs_is_dir(path)) {
+      prose_error(prompt, "{.yellow} is a directory", sp_fmt_str(path));
+      continue;
+    }
+    if (sp_str_equal(path, layout->env_file)) {
+      prose_error(prompt, "{.yellow} is written by spn", sp_fmt_str(path));
+      continue;
+    }
+
+    if (sp_fs_exists(path)) {
+      sp_str_t content = sp_zero;
+      if (!sp_io_read_file(mem, path, &content)) {
+        choice.has_line = sp_str_contains(content, sp_str_lit(SPN_INSTALL_RC_LINE));
+      }
+    }
+    else {
+      bool create = sp_prompt_confirm(prompt, cfmt(mem, "{} does not exist; create it?", sp_fmt_str(path)), true);
+      if (sp_prompt_cancelled(prompt)) {
+        return choice;
+      }
+      if (!create) {
+        continue;
+      }
+    }
+
+    choice.custom = path;
+    return choice;
+  }
 }
 
 static void prompt_path(sp_prompt_ctx_t* prompt, sp_mem_t mem, spn_install_probe_t* probe, spn_install_choices_t* choices) {
@@ -381,8 +397,8 @@ static sp_cli_result_t run_prompt(sp_cli_t* cli, sp_prompt_ctx_t* prompt, spn_in
     prompt_shadow(prompt, &probe->layout, &probe->facts);
   }
 
-  spn_install_choices_t choices = spn_install_choices(&probe->layout);
-  bool can_path = spn_install_plan(s.mem, &probe->layout, &probe->facts, &choices).state == SPN_INSTALL_PATH_UPDATED;
+  spn_install_choices_t choices = spn_install_choices(&probe->layout, &probe->facts);
+  bool can_path = spn_install_can_path(&probe->layout, &probe->facts);
 
   spn_install_plan_t plan = sp_zero;
   while (true) {

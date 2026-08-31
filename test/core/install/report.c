@@ -11,6 +11,10 @@ typedef struct {
 typedef struct {
   const c8* name;
   install_world_t world;
+  struct {
+    bool set;
+    spn_install_choices_t value;
+  } choices;
   u32 stuck [4];
   u32 num_stuck;
   msg_spec_t expect [SPN_INSTALL_MAX_MSGS];
@@ -21,13 +25,22 @@ enum {
   UNIX_ENV,
   UNIX_FISH,
   UNIX_PROFILE,
-  UNIX_ZSHRC,
+  UNIX_ZSHENV,
 };
+
+// a home that shows bash, zsh and fish all in use, so the default plan hooks
+// every one of them
+#define UNIX_SHELLS \
+  .fish = true, \
+  .rc = { \
+    [INSTALL_RC_PROFILE] = { .exists = true }, \
+    [INSTALL_RC_ZSHRC] = { .exists = true }, \
+  }
 
 static const test_t tests [] = {
   {
     .name = "updated",
-    .world = { INSTALL_WORLD_UNIX },
+    .world = { INSTALL_WORLD_UNIX, UNIX_SHELLS },
     .expect = {
       { SPN_INSTALL_MSG_RESTART_SHELL, RC_LINE },
     },
@@ -58,7 +71,7 @@ static const test_t tests [] = {
   },
   {
     .name = "one_rc_stuck",
-    .world = { INSTALL_WORLD_UNIX },
+    .world = { INSTALL_WORLD_UNIX, UNIX_SHELLS },
     .stuck = { UNIX_PROFILE },
     .num_stuck = 1,
     .expect = {
@@ -68,19 +81,19 @@ static const test_t tests [] = {
   },
   {
     .name = "every_hook_stuck",
-    .world = { INSTALL_WORLD_UNIX },
-    .stuck = { UNIX_FISH, UNIX_PROFILE, UNIX_ZSHRC },
+    .world = { INSTALL_WORLD_UNIX, UNIX_SHELLS },
+    .stuck = { UNIX_FISH, UNIX_PROFILE, UNIX_ZSHENV },
     .num_stuck = 3,
     .expect = {
       { SPN_INSTALL_MSG_STUCK_WRITE, "/h/.config/fish/conf.d/spn.fish" },
       { SPN_INSTALL_MSG_STUCK_APPEND, "/h/.profile", RC_LINE },
-      { SPN_INSTALL_MSG_STUCK_APPEND, "/h/.zshrc", RC_LINE },
+      { SPN_INSTALL_MSG_STUCK_APPEND, "/h/.zshenv", RC_LINE },
       { SPN_INSTALL_MSG_MANUAL, "/h/.spn/bin" },
     },
   },
   {
     .name = "env_stuck",
-    .world = { INSTALL_WORLD_UNIX },
+    .world = { INSTALL_WORLD_UNIX, UNIX_SHELLS },
     .stuck = { UNIX_ENV },
     .num_stuck = 1,
     .expect = {
@@ -90,7 +103,7 @@ static const test_t tests [] = {
   },
   {
     .name = "fish_stuck",
-    .world = { INSTALL_WORLD_UNIX },
+    .world = { INSTALL_WORLD_UNIX, UNIX_SHELLS },
     .stuck = { UNIX_FISH },
     .num_stuck = 1,
     .expect = {
@@ -99,19 +112,45 @@ static const test_t tests [] = {
     },
   },
   {
+    // the rc files already carry us, so a stuck fish conf is not a broken PATH
     .name = "fish_stuck_rc_configured",
     .world = {
       INSTALL_WORLD_UNIX,
+      .fish = true,
       .rc = {
         [INSTALL_RC_PROFILE] = { .exists = true, .has_line = true },
-        [INSTALL_RC_ZSHRC] = { .exists = true, .has_line = true },
+        [INSTALL_RC_ZSHENV] = { .exists = true, .has_line = true },
       },
     },
-    .stuck = { 2 },
+    .stuck = { UNIX_FISH },
     .num_stuck = 1,
     .expect = {
       { SPN_INSTALL_MSG_STUCK_WRITE, "/h/.config/fish/conf.d/spn.fish" },
       { SPN_INSTALL_MSG_RESTART_SHELL, RC_LINE },
+    },
+  },
+  {
+    // same, for a custom file the user already hooked by hand
+    .name = "custom_file_live",
+    .world = { INSTALL_WORLD_UNIX },
+    .choices = {
+      .set = true,
+      .value = {
+        .path = { { .kind = SPN_INSTALL_SHELL_CUSTOM, .custom = { .data = "/c/rc", .len = 5 }, .has_line = true } },
+        .num_path = 1,
+      },
+    },
+    .expect = {
+      { SPN_INSTALL_MSG_RESTART_SHELL, RC_LINE },
+    },
+  },
+  {
+    // nothing a posix shell reads was hooked, so there is no line to offer
+    .name = "fish_only",
+    .world = { INSTALL_WORLD_UNIX, .fish = true },
+    .choices = { .set = true, .value = { .path = { { .kind = SPN_INSTALL_SHELL_FISH } }, .num_path = 1 } },
+    .expect = {
+      { SPN_INSTALL_MSG_RESTART_SHELL },
     },
   },
   {
@@ -173,7 +212,7 @@ sp_test_each(install_report, messages, test_t, tests) {
   install_world_t world = it->world;
   sp_try(install_build(t, &world, &layout, &facts));
 
-  spn_install_choices_t choices = spn_install_choices(&layout);
+  spn_install_choices_t choices = it->choices.set ? it->choices.value : spn_install_choices(&layout, &facts);
   spn_install_plan_t plan = spn_install_plan(sp_test_arena(t), &layout, &facts, &choices);
 
   spn_install_result_t result = sp_zero;
