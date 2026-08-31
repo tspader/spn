@@ -34,6 +34,7 @@ typedef struct {
   const c8* src;
   const c8* text;
   spn_install_reg_t reg;
+  spn_install_role_t role;
 } install_action_spec_t;
 
 typedef struct {

@@ -65,42 +65,59 @@ static spn_install_path_state_t path_state(spn_install_layout_t* layout, spn_ins
   return SPN_INSTALL_PATH_MANUAL;
 }
 
-static void push(spn_install_plan_t* plan, spn_install_action_t action) {
+static void push_action(spn_install_plan_t* plan, spn_install_action_t action) {
   SP_ASSERT(plan->num_path < SPN_INSTALL_MAX_PATH_ACTIONS);
+  SP_ASSERT(action.role != SPN_INSTALL_ROLE_NONE);
   plan->path[plan->num_path++] = action;
 }
 
-static void plan_unix(sp_mem_t mem, spn_install_layout_t* layout, spn_install_facts_t* facts, spn_install_plan_t* plan) {
-  sp_str_t rc_append = sp_fmt(mem, "\n{}\n", sp_fmt_str(layout->rc_line)).value;
-  push(plan, (spn_install_action_t) { .kind = SPN_INSTALL_ACTION_WRITE_FILE, .path = layout->env_file, .text = env_sh(mem, layout->root_expr) });
-  push(plan, (spn_install_action_t) { .kind = SPN_INSTALL_ACTION_WRITE_FILE, .path = layout->fish_conf, .text = fish_sh(mem, layout->root_expr) });
-  sp_for(it, layout->num_rc) {
-    bool wanted = layout->rc[it].always || facts->rc[it].exists;
-    if (wanted && !facts->rc[it].has_line) {
-      push(plan, (spn_install_action_t) { .kind = SPN_INSTALL_ACTION_APPEND_LINE, .path = layout->rc[it].path, .text = rc_append });
-    }
-  }
+static spn_install_action_t env_action(sp_mem_t mem, spn_install_layout_t* layout) {
+  return (spn_install_action_t) {
+    .kind = SPN_INSTALL_ACTION_WRITE_FILE,
+    .path = layout->env_file,
+    .text = env_sh(mem, layout->root_expr),
+    .role = SPN_INSTALL_ROLE_PATH,
+  };
 }
 
-static void plan_windows(sp_mem_t mem, spn_install_layout_t* layout, spn_install_facts_t* facts, spn_install_plan_t* plan) {
-  if (registry_contains(facts->registry.path, layout->bin_native)) {
-    return;
-  }
+static spn_install_action_t fish_action(sp_mem_t mem, spn_install_layout_t* layout) {
+  return (spn_install_action_t) {
+    .kind = SPN_INSTALL_ACTION_WRITE_FILE,
+    .path = layout->fish_conf,
+    .text = fish_sh(mem, layout->root_expr),
+    .role = SPN_INSTALL_ROLE_FISH,
+  };
+}
+
+static spn_install_action_t rc_action(sp_str_t path, sp_str_t text) {
+  return (spn_install_action_t) {
+    .kind = SPN_INSTALL_ACTION_APPEND_LINE,
+    .path = path,
+    .text = text,
+    .role = SPN_INSTALL_ROLE_RC,
+  };
+}
+
+static spn_install_action_t github_action(sp_mem_t mem, spn_install_layout_t* layout) {
+  return (spn_install_action_t) {
+    .kind = SPN_INSTALL_ACTION_APPEND_LINE,
+    .path = layout->github_path,
+    .text = sp_fmt(mem, "{}\n", sp_fmt_str(layout->bin_native)).value,
+    .role = SPN_INSTALL_ROLE_PATH,
+  };
+}
+
+static spn_install_action_t registry_action(sp_mem_t mem, spn_install_layout_t* layout, spn_install_facts_t* facts) {
   sp_str_t value = layout->bin_native;
   if (!sp_str_empty(facts->registry.path)) {
     value = sp_fmt(mem, "{};{}", sp_fmt_str(layout->bin_native), sp_fmt_str(facts->registry.path)).value;
   }
-  spn_install_reg_t reg = facts->registry.kind == SPN_INSTALL_REG_EXPAND ? SPN_INSTALL_REG_EXPAND : SPN_INSTALL_REG_SZ;
-  push(plan, (spn_install_action_t) { .kind = SPN_INSTALL_ACTION_SET_USER_PATH, .text = value, .reg = reg });
-}
-
-static void github(sp_mem_t mem, spn_install_layout_t* layout, spn_install_plan_t* plan) {
-  push(plan, (spn_install_action_t) { .kind = SPN_INSTALL_ACTION_APPEND_LINE, .path = layout->github_path, .text = sp_fmt(mem, "{}\n", sp_fmt_str(layout->bin_native)).value });
-}
-
-static void plan_ci_unix(sp_mem_t mem, spn_install_layout_t* layout, spn_install_plan_t* plan) {
-  push(plan, (spn_install_action_t) { .kind = SPN_INSTALL_ACTION_WRITE_FILE, .path = layout->env_file, .text = env_sh(mem, layout->root_expr) });
-  github(mem, layout, plan);
+  return (spn_install_action_t) {
+    .kind = SPN_INSTALL_ACTION_SET_USER_PATH,
+    .text = value,
+    .reg = facts->registry.kind == SPN_INSTALL_REG_EXPAND ? SPN_INSTALL_REG_EXPAND : SPN_INSTALL_REG_SZ,
+    .role = SPN_INSTALL_ROLE_PATH,
+  };
 }
 
 spn_install_plan_t spn_install_plan(sp_mem_t mem, spn_install_layout_t* layout, spn_install_facts_t* facts) {
@@ -119,15 +136,38 @@ spn_install_plan_t spn_install_plan(sp_mem_t mem, spn_install_layout_t* layout, 
     }
     case SPN_INSTALL_PATH_CI: {
       switch (layout->os) {
-        case SPN_INSTALL_OS_UNIX: plan_ci_unix(mem, layout, &plan); break;
-        case SPN_INSTALL_OS_WINDOWS: github(mem, layout, &plan); break;
+        case SPN_INSTALL_OS_UNIX: {
+          push_action(&plan, env_action(mem, layout));
+          push_action(&plan, github_action(mem, layout));
+          break;
+        }
+        case SPN_INSTALL_OS_WINDOWS: {
+          push_action(&plan, github_action(mem, layout));
+          break;
+        }
       }
       break;
     }
     case SPN_INSTALL_PATH_UPDATED: {
       switch (layout->os) {
-        case SPN_INSTALL_OS_UNIX: plan_unix(mem, layout, facts, &plan); break;
-        case SPN_INSTALL_OS_WINDOWS: plan_windows(mem, layout, facts, &plan); break;
+        case SPN_INSTALL_OS_UNIX: {
+          push_action(&plan, env_action(mem, layout));
+          push_action(&plan, fish_action(mem, layout));
+          sp_str_t rc_append = sp_fmt(mem, "\n{}\n", sp_fmt_str(layout->rc_line)).value;
+          sp_for(it, layout->num_rc) {
+            bool wanted = layout->rc[it].always || facts->rc[it].exists;
+            if (wanted && !facts->rc[it].has_line) {
+              push_action(&plan, rc_action(layout->rc[it].path, rc_append));
+            }
+          }
+          break;
+        }
+        case SPN_INSTALL_OS_WINDOWS: {
+          if (!registry_contains(facts->registry.path, layout->bin_native)) {
+            push_action(&plan, registry_action(mem, layout, facts));
+          }
+          break;
+        }
       }
       break;
     }

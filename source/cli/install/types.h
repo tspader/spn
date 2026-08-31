@@ -74,12 +74,20 @@ typedef enum {
   SPN_INSTALL_ACTION_SET_USER_PATH,
 } spn_install_action_kind_t;
 
+typedef enum {
+  SPN_INSTALL_ROLE_NONE = 0,
+  SPN_INSTALL_ROLE_PATH,
+  SPN_INSTALL_ROLE_RC,
+  SPN_INSTALL_ROLE_FISH,
+} spn_install_role_t;
+
 typedef struct {
   spn_install_action_kind_t kind;
   sp_str_t path;
   sp_str_t src;
   sp_str_t text;
   spn_install_reg_t reg;
+  spn_install_role_t role;
 } spn_install_action_t;
 
 typedef enum {
