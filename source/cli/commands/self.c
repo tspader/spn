@@ -399,7 +399,7 @@ static sp_cli_result_t run_prompt(sp_cli_t* cli, sp_prompt_ctx_t* prompt, spn_in
   }
 
   spn_install_choices_t choices = spn_install_choices(&probe->layout, &probe->facts);
-  bool can_path = spn_install_can_path(&probe->layout, &probe->facts);
+  bool can_path = spn_install_path_state(&probe->layout, &probe->facts, &choices) == SPN_INSTALL_PATH_UPDATED;
 
   spn_install_plan_t plan = sp_zero;
   while (true) {

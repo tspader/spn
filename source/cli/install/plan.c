@@ -204,17 +204,7 @@ static bool has_shell(spn_install_choices_t* choices, spn_install_shell_t kind) 
   return false;
 }
 
-bool spn_install_can_path(spn_install_layout_t* layout, spn_install_facts_t* facts) {
-  if (layout->on_path || layout->no_modify_path || !sp_str_empty(layout->github_path)) {
-    return false;
-  }
-  if (layout->os == SPN_INSTALL_OS_WINDOWS && facts->registry.kind == SPN_INSTALL_REG_OTHER) {
-    return false;
-  }
-  return true;
-}
-
-static spn_install_path_state_t path_state(spn_install_layout_t* layout, spn_install_facts_t* facts, spn_install_choices_t* choices) {
+spn_install_path_state_t spn_install_path_state(spn_install_layout_t* layout, spn_install_facts_t* facts, spn_install_choices_t* choices) {
   if (layout->on_path) {
     return SPN_INSTALL_PATH_OK;
   }
@@ -224,14 +214,14 @@ static spn_install_path_state_t path_state(spn_install_layout_t* layout, spn_ins
   if (!sp_str_empty(layout->github_path)) {
     return SPN_INSTALL_PATH_CI;
   }
-  if (!spn_install_can_path(layout, facts)) {
-    return SPN_INSTALL_PATH_MANUAL;
-  }
   switch (layout->os) {
     case SPN_INSTALL_OS_UNIX: {
       return choices->num_path ? SPN_INSTALL_PATH_UPDATED : SPN_INSTALL_PATH_MANUAL;
     }
     case SPN_INSTALL_OS_WINDOWS: {
+      if (facts->registry.kind == SPN_INSTALL_REG_OTHER) {
+        return SPN_INSTALL_PATH_MANUAL;
+      }
       return choices->registry ? SPN_INSTALL_PATH_UPDATED : SPN_INSTALL_PATH_MANUAL;
     }
   }
@@ -366,7 +356,7 @@ spn_install_plan_t spn_install_plan(sp_mem_t mem, spn_install_layout_t* layout, 
     push_action(&plan, exe_action(layout, facts));
   }
 
-  plan.state = path_state(layout, facts, choices);
+  plan.state = spn_install_path_state(layout, facts, choices);
   switch (plan.state) {
     case SPN_INSTALL_PATH_OK:
     case SPN_INSTALL_PATH_MANUAL: {
