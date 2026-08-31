@@ -170,6 +170,10 @@ if(SPN_STAMP_DEFS)
 endif()
 
 target_link_libraries(spn PRIVATE m vmlib yyjson blake3 spn_version)
+if(WIN32)
+  # cli/install/install.c touches HKCU\Environment and WM_SETTINGCHANGE
+  target_link_libraries(spn PRIVATE advapi32 user32)
+endif()
 # vmlib carries C++ objects (WAMR Fast JIT: asmjit + x86_64 codegen). spn's own
 # sources are all C, so CMake would link with the C driver and miss the C++
 # runtime; force the C++ driver (zig c++) to pull it in.

@@ -102,6 +102,12 @@ name = "spn"
 source = ["source/cli/**/*.c"]
 include = ["include", "source/cli", "source/util"] # @spader removed the core include
 deps = ["spn"]
+system_deps = [
+  # spn self install reads and writes HKCU\Environment and broadcasts
+  # WM_SETTINGCHANGE, which msvc will not resolve without these
+  { value = "advapi32", when = { os = "windows" } },
+  { value = "user32", when = { os = "windows" } },
+]
 flags = []
 
 [[script]]
