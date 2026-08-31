@@ -134,3 +134,16 @@ sp_err_t sp_fs_staging_dir(sp_mem_t mem, sp_str_t path, sp_str_t extension, sp_s
   *dir = sp_fs_join_path(mem, sp_fs_parent_path(path), name);
   return SP_OK;
 }
+
+sp_err_t sp_fs_append(sp_str_t path, sp_str_t str) {
+  sp_sys_fd_t fd = SP_SYS_INVALID_FD;
+  sp_try(sp_sys_open_s(sp_sys_get_root(0), path, SP_SYS_OPEN_MODE_WO, SP_SYS_OPEN_CREATE | SP_SYS_OPEN_APPEND, &fd));
+  sp_io_file_writer_t io = sp_zero;
+  sp_try(sp_io_file_writer_from_fd(&io, fd, SP_IO_CLOSE_MODE_AUTO));
+  sp_err_t written = sp_io_file_writer_seek(&io, 0, SP_IO_SEEK_END, SP_NULLPTR);
+  if (!written) {
+    written = sp_io_write_all(&io.base, str.data, str.len, SP_NULLPTR);
+  }
+  sp_err_t closed = sp_io_file_writer_close(&io);
+  return written ? written : closed;
+}

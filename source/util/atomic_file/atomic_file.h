@@ -26,6 +26,7 @@ SP_API sp_err_t        sp_fs_write_atomic(sp_str_t path, sp_str_t str);
 SP_API sp_err_t        sp_fs_write_atomic_slice(sp_str_t path, sp_mem_slice_t slice);
 SP_API sp_err_t        sp_fs_write_atomic_slice_staged(sp_str_t path, sp_str_t staging, sp_mem_slice_t slice);
 SP_API sp_err_t        sp_fs_write_atomic_cstr(sp_str_t path, const c8* str);
+SP_API sp_err_t        sp_fs_copy_atomic(sp_str_t path, sp_str_t src);
 
 #endif // SP_FS_ATOMIC_H
 
@@ -175,6 +176,33 @@ sp_err_t sp_fs_write_atomic(sp_str_t path, sp_str_t str) {
 
 sp_err_t sp_fs_write_atomic_cstr(sp_str_t path, const c8* str) {
   return sp_fs_write_atomic(path, sp_str_view(str));
+}
+
+sp_err_t sp_fs_copy_atomic(sp_str_t path, sp_str_t src) {
+  sp_err_t err = SP_OK;
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+
+  sp_sys_file_meta_t meta = sp_zero;
+  sp_try_goto(sp_sys_get_path_metadata_s(sp_sys_get_root(0), src, &meta), err, done);
+
+  sp_str_t content = sp_zero;
+  sp_try_goto(sp_io_read_file(scratch.mem, src, &content), err, done);
+
+  sp_fs_atomic_t file = sp_zero;
+  sp_try_goto(sp_fs_atomic_open(&file, path), err, done);
+  err = sp_io_write_all(sp_fs_atomic_writer(&file), content.data, content.len, SP_NULLPTR);
+  if (!err) {
+    err = sp_sys_chmod_s(sp_sys_get_root(0), file.temp, &meta);
+  }
+  if (err) {
+    sp_fs_atomic_abort(&file);
+    goto done;
+  }
+  err = sp_fs_atomic_commit(&file, SP_FS_ATOMIC_REPLACE);
+
+done:
+  sp_mem_end_scratch(scratch);
+  return err;
 }
 
 #endif // SP_FS_ATOMIC_IMPLEMENTATION

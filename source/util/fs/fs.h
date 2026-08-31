@@ -28,4 +28,6 @@ sp_str_t sp_fs_staging_path(sp_mem_t mem, sp_str_t path, sp_str_t extension);
 sp_err_t sp_fs_staging_dir(sp_mem_t mem, sp_str_t path, sp_str_t extension, sp_str_t* dir);
 sp_err_t sp_fs_staging_dir_name(sp_mem_t mem, sp_str_t path, sp_str_t extension, sp_str_t* name);
 
+sp_err_t sp_fs_append(sp_str_t path, sp_str_t str);
+
 #endif
