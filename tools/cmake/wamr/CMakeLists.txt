@@ -44,12 +44,18 @@ set(WAMR_BUILD_MULTI_MODULE 0)
 
 include(${WAMR_ROOT_DIR}/build-scripts/runtime_lib.cmake)
 
+# asmjit emits this warning like a motherfucker
+include(CheckCXXCompilerFlag)
+check_cxx_compiler_flag(-Wnontrivial-memcall HAVE_NONTRIVIAL_MEMCALL)
+
 # WAMR adds every -D to every source file, even their ASM trampolines which
 # are treated as already assembled and not run through the preprocessor. That
 # makes the defines show up as a warning, but it's just noise
 foreach(src ${WAMR_RUNTIME_LIB_SOURCE})
   if(src MATCHES "\\.s$")
     set_source_files_properties(${src} PROPERTIES COMPILE_OPTIONS "-Wno-unused-command-line-argument")
+  elseif(HAVE_NONTRIVIAL_MEMCALL AND src MATCHES "asmjit.*\\.cpp$")
+    set_source_files_properties(${src} PROPERTIES COMPILE_OPTIONS "-Wno-nontrivial-memcall")
   endif()
 endforeach()
 
