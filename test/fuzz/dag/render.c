@@ -112,6 +112,9 @@ sp_str_t fz_render_iteration(sp_mem_t mem, sp_str_t root, fz_universe_t* u, fz_t
   if (!sp_io_file_writer_from_path(&steps, sp_fs_join_path(mem, dir, sp_str_lit("trace.txt")))) {
     sp_da_for(trace->steps, st) {
       fz_step_t* step = &trace->steps[st];
+      if (step->tick) {
+        line(&steps.base, sp_fmt(mem, "tick {}", sp_fmt_uint(step->tick)).value);
+      }
       switch (step->kind) {
         case FZ_STEP_RUN: {
           line(&steps.base, sp_str_lit("run"));

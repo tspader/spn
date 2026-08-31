@@ -86,8 +86,17 @@ void fz_executor_init(fz_executor_t* ex, sp_mem_t mem, sp_sim_t* sim, sp_fuzz_pr
   sp_da_init(mem, ex->log);
 }
 
-static s32 entry_order(const void* a, const void* b) {
-  return sp_str_compare_alphabetical(((const sp_fs_entry_t*)a)->name, ((const sp_fs_entry_t*)b)->name);
+static s32 digest_order(const void* a, const void* b) {
+  return sp_sys_memcmp(a, b, sizeof(spn_dag_digest_t));
+}
+
+static sp_da(spn_dag_digest_t) table_digests(sp_mem_t mem, sp_dag_track_table_t table) {
+  sp_da(spn_dag_digest_t) digests = sp_da_new(mem, spn_dag_digest_t);
+  sp_ht_for_kv(table, it) {
+    sp_da_push(digests, *it.key);
+  }
+  sp_da_sort(digests, digest_order);
+  return digests;
 }
 
 static bool covered_write(fz_universe_t* u, world_t* w, sp_mem_t mem, u64 at, u64 lo, u64 hi) {
@@ -129,18 +138,6 @@ static u64 action_requeues(fz_universe_t* u, world_t* w, sp_mem_t mem, u64 log_s
     prev = (s64)it;
   }
   return requeues;
-}
-
-static bool parse_blob_digest(sp_str_t path, spn_dag_digest_t* out) {
-  return spn_dag_digest_parse(sp_fs_get_name(sp_fs_parent_path(path)), out);
-}
-
-static bool parse_entry_key(sp_str_t path, spn_dag_digest_t* out) {
-  sp_str_t name = sp_fs_get_name(path);
-  if (!sp_str_ends_with(name, sp_str_lit(".txt"))) {
-    return false;
-  }
-  return spn_dag_digest_parse(sp_str_prefix(name, (s32)(name.len - 4)), out);
 }
 
 static void reset_discovery(world_t* w) {
@@ -811,6 +808,7 @@ static fz_err_t trace_body(sp_mem_t mem, sp_sim_t* sim, fz_universe_t* u, fz_tra
 
   sp_da_for(trace->steps, st) {
     fz_step_t* step = &trace->steps[st];
+    sp_sim_advance(w.sim, step->tick);
     fz_journal_step(w.j, step, st);
     switch (step->kind) {
       case FZ_STEP_MUTATE:
@@ -862,52 +860,36 @@ static fz_err_t trace_body(sp_mem_t mem, sp_sim_t* sim, fz_universe_t* u, fz_tra
         if (!u->profile.store_fs) {
           break;
         }
-        sp_da(sp_fs_entry_t) entries = sp_zero;
-        sp_fs_collect_recursive(mem, sp_str_lit("/store"), &entries);
-        sp_da(sp_fs_entry_t) blobs = sp_da_new(mem, sp_fs_entry_t);
-        sp_da_for(entries, et) {
-          if (entries[et].kind == SP_FS_KIND_FILE && !sp_str_contains(entries[et].path, sp_str_lit("/.staging/"))) {
-            sp_da_push(blobs, entries[et]);
-          }
-        }
+        sp_da(spn_dag_digest_t) blobs = table_digests(mem, w.track.blobs);
         if (sp_da_empty(blobs)) {
           break;
         }
-        sp_da_sort(blobs, entry_order);
-        sp_fs_entry_t* blob = &blobs[step->entropy % sp_da_size(blobs)];
-        sp_fs_remove_file(blob->path);
-        spn_dag_digest_t digest = sp_zero;
-        bool parsed = parse_blob_digest(blob->path, &digest);
-        sp_assert(parsed);
+        spn_dag_digest_t digest = blobs[step->entropy % sp_da_size(blobs)];
+        sp_str_t dir = sp_fmt(mem, "/store/{}", sp_fmt_str(spn_dag_digest_hex(mem, digest))).value;
+        sp_da(sp_fs_entry_t) entries = sp_zero;
+        sp_fs_collect(mem, dir, &entries);
+        sp_da_for(entries, et) {
+          sp_fs_remove_file(entries[et].path);
+          fz_journal_drop(w.j, sp_str_lit("blob"), entries[et].path);
+        }
         sp_dag_track_drop_blob(&w.track, digest);
-        fz_journal_drop(w.j, sp_str_lit("blob"), blob->path);
         break;
       }
       case FZ_STEP_EVICT: {
         if (!u->profile.cache_fs) {
           break;
         }
-        sp_da(sp_fs_entry_t) entries = sp_zero;
-        sp_fs_collect(mem, w.cache_dir, &entries);
-        sp_da(sp_fs_entry_t) cached = sp_da_new(mem, sp_fs_entry_t);
-        sp_da_for(entries, et) {
-          if (entries[et].kind == SP_FS_KIND_FILE) {
-            sp_da_push(cached, entries[et]);
-          }
-        }
-        if (sp_da_empty(cached)) {
+        sp_da(spn_dag_digest_t) keys = table_digests(mem, w.track.entries);
+        if (sp_da_empty(keys)) {
           break;
         }
-        sp_da_sort(cached, entry_order);
-        sp_str_t evicted = cached[step->entropy % sp_da_size(cached)].path;
+        spn_dag_digest_t key = keys[step->entropy % sp_da_size(keys)];
+        sp_str_t evicted = sp_fs_join_path(mem, w.cache_dir, sp_fmt(mem, "{}.txt", sp_fmt_str(spn_dag_digest_hex(mem, key))).value);
         sp_fs_remove_file(evicted);
         spn_dag_action_cache_init(&w.cache, mem, w.cache_dir);
         sp_dag_track_reset_entries(&w.track);
         degrade_memo(&w);
-        spn_dag_digest_t key = sp_zero;
-        if (parse_entry_key(evicted, &key)) {
-          sp_dag_track_drop_entry(&w.track, key);
-        }
+        sp_dag_track_drop_entry(&w.track, key);
         fz_journal_drop(w.j, sp_str_lit("cache"), evicted);
         break;
       }
@@ -938,6 +920,7 @@ static fz_err_t trace_pass(sp_mem_t mem, fz_universe_t* u, fz_trace_t* trace, sp
   sp_sim_t sim = sp_zero;
   sp_sim_init(&sim, mem);
   sim.granularity = u->profile.granularity;
+  sim.autotick = 0;
   sp_sim_install(&sim);
   fz_err_t err = trace_body(mem, &sim, u, trace, schedule, sweep, final, j);
   sp_sim_remove(&sim);
