@@ -30,11 +30,12 @@ typedef struct {
 
 typedef struct {
   spn_install_action_kind_t kind;
+  spn_install_role_t role;
   const c8* path;
   const c8* src;
   const c8* text;
+  const c8* line;
   spn_install_reg_t reg;
-  spn_install_role_t role;
 } install_action_spec_t;
 
 typedef struct {

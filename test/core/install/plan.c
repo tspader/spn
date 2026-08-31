@@ -11,30 +11,28 @@
   "  set --export PATH \"$HOME/.spn/bin\" $PATH\n" \
   "end\n"
 
-#define CUSTOM_ENV_SH \
-  "case \":${PATH}:\" in\n" \
-  "  *:\"/o/bin\":*) ;;\n" \
-  "  *) export PATH=\"/o/bin:${PATH}\" ;;\n" \
-  "esac\n"
-
-#define CUSTOM_FISH_SH \
-  "if not contains \"/o/bin\" $PATH\n" \
-  "  set --export PATH \"/o/bin\" $PATH\n" \
-  "end\n"
-
-#define RC_APPEND "\n. \"$HOME/.spn/env\"\n"
-#define CUSTOM_RC_APPEND "\n. \"/o/env\"\n"
+#define RC_LINE ". \"$HOME/.spn/env\""
+#define RC_APPEND "\n" RC_LINE "\n"
 
 #define WIN_EXE "C:/s/spn.exe"
 #define WIN_BIN "C:\\u\\.spn\\bin"
+
+#define EXE_UNIX { SPN_INSTALL_ACTION_INSTALL_EXE, SPN_INSTALL_ROLE_EXE, "/h/.spn/bin/spn", .src = "/s/spn" }
+#define EXE_WINDOWS { SPN_INSTALL_ACTION_INSTALL_EXE, SPN_INSTALL_ROLE_EXE, "C:/u/.spn/bin/spn.exe", .src = WIN_EXE }
+#define ENV_UNIX { SPN_INSTALL_ACTION_WRITE_FILE, SPN_INSTALL_ROLE_ENV, "/h/.spn/env", .text = ENV_SH }
+#define FISH_UNIX { SPN_INSTALL_ACTION_WRITE_FILE, SPN_INSTALL_ROLE_HOOK, "/h/.config/fish/conf.d/spn.fish", .text = FISH_SH }
+#define RC_UNIX(path) { SPN_INSTALL_ACTION_APPEND_LINE, SPN_INSTALL_ROLE_HOOK, path, .text = RC_APPEND, .line = RC_LINE }
 
 typedef struct {
   const c8* name;
   install_world_t world;
   struct {
+    bool set;
+    spn_install_choices_t value;
+  } choices;
+  struct {
     spn_install_path_state_t state;
-    install_action_spec_t install [SPN_INSTALL_MAX_INSTALL_ACTIONS + 1];
-    install_action_spec_t path [SPN_INSTALL_MAX_PATH_ACTIONS + 1];
+    install_action_spec_t actions [SPN_INSTALL_MAX_ACTIONS + 1];
   } expect;
 } test_t;
 
@@ -44,35 +42,12 @@ static const test_t tests [] = {
     .world = { INSTALL_WORLD_UNIX },
     .expect = {
       .state = SPN_INSTALL_PATH_UPDATED,
-      .install = {
-        { SPN_INSTALL_ACTION_CREATE_DIR, "/h/.spn/bin" },
-        { SPN_INSTALL_ACTION_INSTALL_EXE, "/h/.spn/bin/spn", .src = "/s/spn" },
-      },
-      .path = {
-        { SPN_INSTALL_ACTION_WRITE_FILE, "/h/.spn/env", .text = ENV_SH, .role = SPN_INSTALL_ROLE_PATH },
-        { SPN_INSTALL_ACTION_WRITE_FILE, "/h/.config/fish/conf.d/spn.fish", .text = FISH_SH, .role = SPN_INSTALL_ROLE_FISH },
-        { SPN_INSTALL_ACTION_APPEND_LINE, "/h/.profile", .text = RC_APPEND, .role = SPN_INSTALL_ROLE_RC },
-        { SPN_INSTALL_ACTION_APPEND_LINE, "/h/.zshrc", .text = RC_APPEND, .role = SPN_INSTALL_ROLE_RC },
-      },
-    },
-  },
-  {
-    .name = "custom",
-    .world = {
-      .vars = { { "HOME", "/h" }, { "PATH", "/p" }, { "SPN_INSTALL", "/o" } },
-      .exe = "/s/spn",
-    },
-    .expect = {
-      .state = SPN_INSTALL_PATH_UPDATED,
-      .install = {
-        { SPN_INSTALL_ACTION_CREATE_DIR, "/o/bin" },
-        { SPN_INSTALL_ACTION_INSTALL_EXE, "/o/bin/spn", .src = "/s/spn" },
-      },
-      .path = {
-        { SPN_INSTALL_ACTION_WRITE_FILE, "/o/env", .text = CUSTOM_ENV_SH, .role = SPN_INSTALL_ROLE_PATH },
-        { SPN_INSTALL_ACTION_WRITE_FILE, "/h/.config/fish/conf.d/spn.fish", .text = CUSTOM_FISH_SH, .role = SPN_INSTALL_ROLE_FISH },
-        { SPN_INSTALL_ACTION_APPEND_LINE, "/h/.profile", .text = CUSTOM_RC_APPEND, .role = SPN_INSTALL_ROLE_RC },
-        { SPN_INSTALL_ACTION_APPEND_LINE, "/h/.zshrc", .text = CUSTOM_RC_APPEND, .role = SPN_INSTALL_ROLE_RC },
+      .actions = {
+        EXE_UNIX,
+        ENV_UNIX,
+        FISH_UNIX,
+        RC_UNIX("/h/.profile"),
+        RC_UNIX("/h/.zshrc"),
       },
     },
   },
@@ -87,16 +62,13 @@ static const test_t tests [] = {
     },
     .expect = {
       .state = SPN_INSTALL_PATH_UPDATED,
-      .install = {
-        { SPN_INSTALL_ACTION_CREATE_DIR, "/h/.spn/bin" },
-        { SPN_INSTALL_ACTION_INSTALL_EXE, "/h/.spn/bin/spn", .src = "/s/spn" },
-      },
-      .path = {
-        { SPN_INSTALL_ACTION_WRITE_FILE, "/h/.spn/env", .text = ENV_SH, .role = SPN_INSTALL_ROLE_PATH },
-        { SPN_INSTALL_ACTION_WRITE_FILE, "/h/.config/fish/conf.d/spn.fish", .text = FISH_SH, .role = SPN_INSTALL_ROLE_FISH },
-        { SPN_INSTALL_ACTION_APPEND_LINE, "/h/.profile", .text = RC_APPEND, .role = SPN_INSTALL_ROLE_RC },
-        { SPN_INSTALL_ACTION_APPEND_LINE, "/h/.bashrc", .text = RC_APPEND, .role = SPN_INSTALL_ROLE_RC },
-        { SPN_INSTALL_ACTION_APPEND_LINE, "/h/.zshrc", .text = RC_APPEND, .role = SPN_INSTALL_ROLE_RC },
+      .actions = {
+        EXE_UNIX,
+        ENV_UNIX,
+        FISH_UNIX,
+        RC_UNIX("/h/.profile"),
+        RC_UNIX("/h/.bashrc"),
+        RC_UNIX("/h/.zshrc"),
       },
     },
   },
@@ -110,14 +82,11 @@ static const test_t tests [] = {
     },
     .expect = {
       .state = SPN_INSTALL_PATH_UPDATED,
-      .install = {
-        { SPN_INSTALL_ACTION_CREATE_DIR, "/h/.spn/bin" },
-        { SPN_INSTALL_ACTION_INSTALL_EXE, "/h/.spn/bin/spn", .src = "/s/spn" },
-      },
-      .path = {
-        { SPN_INSTALL_ACTION_WRITE_FILE, "/h/.spn/env", .text = ENV_SH, .role = SPN_INSTALL_ROLE_PATH },
-        { SPN_INSTALL_ACTION_WRITE_FILE, "/h/.config/fish/conf.d/spn.fish", .text = FISH_SH, .role = SPN_INSTALL_ROLE_FISH },
-        { SPN_INSTALL_ACTION_APPEND_LINE, "/h/.zshrc", .text = RC_APPEND, .role = SPN_INSTALL_ROLE_RC },
+      .actions = {
+        EXE_UNIX,
+        ENV_UNIX,
+        FISH_UNIX,
+        RC_UNIX("/h/.zshrc"),
       },
     },
   },
@@ -128,10 +97,7 @@ static const test_t tests [] = {
       .exe = "/s/spn",
     },
     .expect = {
-      .install = {
-        { SPN_INSTALL_ACTION_CREATE_DIR, "/h/.spn/bin" },
-        { SPN_INSTALL_ACTION_INSTALL_EXE, "/h/.spn/bin/spn", .src = "/s/spn" },
-      },
+      .actions = { EXE_UNIX },
     },
   },
   {
@@ -142,10 +108,7 @@ static const test_t tests [] = {
     },
     .expect = {
       .state = SPN_INSTALL_PATH_MANUAL,
-      .install = {
-        { SPN_INSTALL_ACTION_CREATE_DIR, "/h/.spn/bin" },
-        { SPN_INSTALL_ACTION_INSTALL_EXE, "/h/.spn/bin/spn", .src = "/s/spn" },
-      },
+      .actions = { EXE_UNIX },
     },
   },
   {
@@ -156,10 +119,7 @@ static const test_t tests [] = {
     },
     .expect = {
       .state = SPN_INSTALL_PATH_MANUAL,
-      .install = {
-        { SPN_INSTALL_ACTION_CREATE_DIR, "/h/.spn/bin" },
-        { SPN_INSTALL_ACTION_INSTALL_EXE, "/h/.spn/bin/spn", .src = "/s/spn" },
-      },
+      .actions = { EXE_UNIX },
     },
   },
   {
@@ -169,10 +129,7 @@ static const test_t tests [] = {
       .exe = "/s/spn",
     },
     .expect = {
-      .install = {
-        { SPN_INSTALL_ACTION_CREATE_DIR, "/h/.spn/bin" },
-        { SPN_INSTALL_ACTION_INSTALL_EXE, "/h/.spn/bin/spn", .src = "/s/spn" },
-      },
+      .actions = { EXE_UNIX },
     },
   },
   {
@@ -183,13 +140,10 @@ static const test_t tests [] = {
     },
     .expect = {
       .state = SPN_INSTALL_PATH_CI,
-      .install = {
-        { SPN_INSTALL_ACTION_CREATE_DIR, "/h/.spn/bin" },
-        { SPN_INSTALL_ACTION_INSTALL_EXE, "/h/.spn/bin/spn", .src = "/s/spn" },
-      },
-      .path = {
-        { SPN_INSTALL_ACTION_WRITE_FILE, "/h/.spn/env", .text = ENV_SH, .role = SPN_INSTALL_ROLE_PATH },
-        { SPN_INSTALL_ACTION_APPEND_LINE, "/gh", .text = "/h/.spn/bin\n", .role = SPN_INSTALL_ROLE_PATH },
+      .actions = {
+        EXE_UNIX,
+        ENV_UNIX,
+        { SPN_INSTALL_ACTION_APPEND_LINE, SPN_INSTALL_ROLE_HOOK, "/gh", .text = "/h/.spn/bin\n", .line = "/h/.spn/bin" },
       },
     },
   },
@@ -202,26 +156,9 @@ static const test_t tests [] = {
     },
     .expect = {
       .state = SPN_INSTALL_PATH_CI,
-      .install = {
-        { SPN_INSTALL_ACTION_CREATE_DIR, "C:/u/.spn/bin" },
-        { SPN_INSTALL_ACTION_INSTALL_EXE, "C:/u/.spn/bin/spn.exe", .src = WIN_EXE },
-      },
-      .path = {
-        { SPN_INSTALL_ACTION_APPEND_LINE, "C:/gh", .text = WIN_BIN "\n", .role = SPN_INSTALL_ROLE_PATH },
-      },
-    },
-  },
-  {
-    .name = "manual_no_home",
-    .world = {
-      .vars = { { "SPN_INSTALL", "/o" }, { "PATH", "/p" } },
-      .exe = "/s/spn",
-    },
-    .expect = {
-      .state = SPN_INSTALL_PATH_MANUAL,
-      .install = {
-        { SPN_INSTALL_ACTION_CREATE_DIR, "/o/bin" },
-        { SPN_INSTALL_ACTION_INSTALL_EXE, "/o/bin/spn", .src = "/s/spn" },
+      .actions = {
+        EXE_WINDOWS,
+        { SPN_INSTALL_ACTION_APPEND_LINE, SPN_INSTALL_ROLE_HOOK, "C:/gh", .text = WIN_BIN "\n", .line = WIN_BIN },
       },
     },
   },
@@ -230,12 +167,9 @@ static const test_t tests [] = {
     .world = { INSTALL_WORLD_WINDOWS },
     .expect = {
       .state = SPN_INSTALL_PATH_UPDATED,
-      .install = {
-        { SPN_INSTALL_ACTION_CREATE_DIR, "C:/u/.spn/bin" },
-        { SPN_INSTALL_ACTION_INSTALL_EXE, "C:/u/.spn/bin/spn.exe", .src = WIN_EXE },
-      },
-      .path = {
-        { SPN_INSTALL_ACTION_SET_USER_PATH, .text = WIN_BIN, .reg = SPN_INSTALL_REG_SZ, .role = SPN_INSTALL_ROLE_PATH },
+      .actions = {
+        EXE_WINDOWS,
+        { SPN_INSTALL_ACTION_SET_USER_PATH, SPN_INSTALL_ROLE_HOOK, .text = WIN_BIN, .reg = SPN_INSTALL_REG_SZ },
       },
     },
   },
@@ -247,12 +181,9 @@ static const test_t tests [] = {
     },
     .expect = {
       .state = SPN_INSTALL_PATH_UPDATED,
-      .install = {
-        { SPN_INSTALL_ACTION_CREATE_DIR, "C:/u/.spn/bin" },
-        { SPN_INSTALL_ACTION_INSTALL_EXE, "C:/u/.spn/bin/spn.exe", .src = WIN_EXE },
-      },
-      .path = {
-        { SPN_INSTALL_ACTION_SET_USER_PATH, .text = WIN_BIN ";C:\\old", .reg = SPN_INSTALL_REG_SZ, .role = SPN_INSTALL_ROLE_PATH },
+      .actions = {
+        EXE_WINDOWS,
+        { SPN_INSTALL_ACTION_SET_USER_PATH, SPN_INSTALL_ROLE_HOOK, .text = WIN_BIN ";C:\\old", .reg = SPN_INSTALL_REG_SZ },
       },
     },
   },
@@ -264,10 +195,7 @@ static const test_t tests [] = {
     },
     .expect = {
       .state = SPN_INSTALL_PATH_UPDATED,
-      .install = {
-        { SPN_INSTALL_ACTION_CREATE_DIR, "C:/u/.spn/bin" },
-        { SPN_INSTALL_ACTION_INSTALL_EXE, "C:/u/.spn/bin/spn.exe", .src = WIN_EXE },
-      },
+      .actions = { EXE_WINDOWS },
     },
   },
   {
@@ -278,12 +206,9 @@ static const test_t tests [] = {
     },
     .expect = {
       .state = SPN_INSTALL_PATH_UPDATED,
-      .install = {
-        { SPN_INSTALL_ACTION_CREATE_DIR, "C:/u/.spn/bin" },
-        { SPN_INSTALL_ACTION_INSTALL_EXE, "C:/u/.spn/bin/spn.exe", .src = WIN_EXE },
-      },
-      .path = {
-        { SPN_INSTALL_ACTION_SET_USER_PATH, .text = WIN_BIN ";%X%;C:\\old", .reg = SPN_INSTALL_REG_EXPAND, .role = SPN_INSTALL_ROLE_PATH },
+      .actions = {
+        EXE_WINDOWS,
+        { SPN_INSTALL_ACTION_SET_USER_PATH, SPN_INSTALL_ROLE_HOOK, .text = WIN_BIN ";%X%;C:\\old", .reg = SPN_INSTALL_REG_EXPAND },
       },
     },
   },
@@ -295,10 +220,7 @@ static const test_t tests [] = {
     },
     .expect = {
       .state = SPN_INSTALL_PATH_MANUAL,
-      .install = {
-        { SPN_INSTALL_ACTION_CREATE_DIR, "C:/u/.spn/bin" },
-        { SPN_INSTALL_ACTION_INSTALL_EXE, "C:/u/.spn/bin/spn.exe", .src = WIN_EXE },
-      },
+      .actions = { EXE_WINDOWS },
     },
   },
   {
@@ -310,8 +232,8 @@ static const test_t tests [] = {
     },
     .expect = {
       .state = SPN_INSTALL_PATH_UPDATED,
-      .path = {
-        { SPN_INSTALL_ACTION_SET_USER_PATH, .text = WIN_BIN, .reg = SPN_INSTALL_REG_SZ, .role = SPN_INSTALL_ROLE_PATH },
+      .actions = {
+        { SPN_INSTALL_ACTION_SET_USER_PATH, SPN_INSTALL_ROLE_HOOK, .text = WIN_BIN, .reg = SPN_INSTALL_REG_SZ },
       },
     },
   },
@@ -323,11 +245,11 @@ static const test_t tests [] = {
     },
     .expect = {
       .state = SPN_INSTALL_PATH_UPDATED,
-      .path = {
-        { SPN_INSTALL_ACTION_WRITE_FILE, "/h/.spn/env", .text = ENV_SH, .role = SPN_INSTALL_ROLE_PATH },
-        { SPN_INSTALL_ACTION_WRITE_FILE, "/h/.config/fish/conf.d/spn.fish", .text = FISH_SH, .role = SPN_INSTALL_ROLE_FISH },
-        { SPN_INSTALL_ACTION_APPEND_LINE, "/h/.profile", .text = RC_APPEND, .role = SPN_INSTALL_ROLE_RC },
-        { SPN_INSTALL_ACTION_APPEND_LINE, "/h/.zshrc", .text = RC_APPEND, .role = SPN_INSTALL_ROLE_RC },
+      .actions = {
+        ENV_UNIX,
+        FISH_UNIX,
+        RC_UNIX("/h/.profile"),
+        RC_UNIX("/h/.zshrc"),
       },
     },
   },
@@ -342,6 +264,116 @@ static const test_t tests [] = {
       },
     },
   },
+  {
+    .name = "opt_out",
+    .world = { INSTALL_WORLD_UNIX },
+    .choices = { .set = true },
+    .expect = {
+      .state = SPN_INSTALL_PATH_MANUAL,
+      .actions = { EXE_UNIX },
+    },
+  },
+  {
+    .name = "fish_only",
+    .world = { INSTALL_WORLD_UNIX },
+    .choices = { .set = true, .value = { .path = { { .kind = SPN_INSTALL_SHELL_FISH } }, .num_path = 1 } },
+    .expect = {
+      .state = SPN_INSTALL_PATH_UPDATED,
+      .actions = {
+        EXE_UNIX,
+        ENV_UNIX,
+        FISH_UNIX,
+      },
+    },
+  },
+  {
+    .name = "bash_only",
+    .world = {
+      INSTALL_WORLD_UNIX,
+      .rc = {
+        [INSTALL_RC_BASHRC] = { .exists = true },
+      },
+    },
+    .choices = { .set = true, .value = { .path = { { .kind = SPN_INSTALL_SHELL_BASH } }, .num_path = 1 } },
+    .expect = {
+      .state = SPN_INSTALL_PATH_UPDATED,
+      .actions = {
+        EXE_UNIX,
+        ENV_UNIX,
+        RC_UNIX("/h/.profile"),
+        RC_UNIX("/h/.bashrc"),
+      },
+    },
+  },
+  {
+    .name = "zsh_only",
+    .world = { INSTALL_WORLD_UNIX },
+    .choices = { .set = true, .value = { .path = { { .kind = SPN_INSTALL_SHELL_ZSH } }, .num_path = 1 } },
+    .expect = {
+      .state = SPN_INSTALL_PATH_UPDATED,
+      .actions = {
+        EXE_UNIX,
+        ENV_UNIX,
+        RC_UNIX("/h/.zshrc"),
+      },
+    },
+  },
+  {
+    .name = "custom_file",
+    .world = { INSTALL_WORLD_UNIX },
+    .choices = { .set = true, .value = { .path = { { .kind = SPN_INSTALL_SHELL_CUSTOM, .custom = { .data = "/c/rc", .len = 5 } } }, .num_path = 1 } },
+    .expect = {
+      .state = SPN_INSTALL_PATH_UPDATED,
+      .actions = {
+        EXE_UNIX,
+        ENV_UNIX,
+        RC_UNIX("/c/rc"),
+      },
+    },
+  },
+  {
+    .name = "custom_file_has_line",
+    .world = { INSTALL_WORLD_UNIX },
+    .choices = { .set = true, .value = { .path = { { .kind = SPN_INSTALL_SHELL_CUSTOM, .custom = { .data = "/c/rc", .len = 5 }, .has_line = true } }, .num_path = 1 } },
+    .expect = {
+      .state = SPN_INSTALL_PATH_UPDATED,
+      .actions = {
+        EXE_UNIX,
+        ENV_UNIX,
+      },
+    },
+  },
+  {
+    .name = "custom_file_is_rc",
+    .world = { INSTALL_WORLD_UNIX },
+    .choices = {
+      .set = true,
+      .value = {
+        .path = {
+          { .kind = SPN_INSTALL_SHELL_ZSH },
+          { .kind = SPN_INSTALL_SHELL_CUSTOM, .custom = { .data = "/h/.zshrc", .len = 9 } },
+        },
+        .num_path = 2,
+      },
+    },
+    .expect = {
+      .state = SPN_INSTALL_PATH_UPDATED,
+      .actions = {
+        EXE_UNIX,
+        ENV_UNIX,
+        RC_UNIX("/h/.zshrc"),
+      },
+    },
+  },
+  {
+    .name = "windows_opt_out",
+    .world = { INSTALL_WORLD_WINDOWS },
+    .choices = { .set = true },
+    .expect = {
+      .state = SPN_INSTALL_PATH_MANUAL,
+      .actions = { EXE_WINDOWS },
+    },
+  },
 };
 
 sp_test_each(install_plan, actions, test_t, tests) {
@@ -350,10 +382,10 @@ sp_test_each(install_plan, actions, test_t, tests) {
   install_world_t world = it->world;
   sp_try(install_build(t, &world, &layout, &facts));
 
-  spn_install_plan_t plan = spn_install_plan(sp_test_arena(t), &layout, &facts);
+  spn_install_choices_t choices = it->choices.set ? it->choices.value : spn_install_choices(&layout);
+  spn_install_plan_t plan = spn_install_plan(sp_test_arena(t), &layout, &facts, &choices);
 
   sp_expect_eq(t, (u32)it->expect.state, (u32)plan.state);
-  install_expect_action_arr(t, plan.install, plan.num_install, it->expect.install);
-  install_expect_action_arr(t, plan.path, plan.num_path, it->expect.path);
+  install_expect_action_arr(t, plan.actions, plan.count, it->expect.actions);
   return SP_OK;
 }

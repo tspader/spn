@@ -41,6 +41,7 @@ sp_err_t install_expect_actions(sp_test_t* t, const spn_install_action_t* actual
     sp_expect_str_eq_c(t, actual[it].path, expect[it].path ? expect[it].path : "");
     sp_expect_str_eq_c(t, actual[it].src, expect[it].src ? expect[it].src : "");
     sp_expect_str_eq_c(t, actual[it].text, expect[it].text ? expect[it].text : "");
+    sp_expect_str_eq_c(t, actual[it].line, expect[it].line ? expect[it].line : "");
     sp_expect_eq(t, (u32)expect[it].reg, (u32)actual[it].reg);
     sp_expect_eq(t, (u32)expect[it].role, (u32)actual[it].role);
   }

@@ -6,13 +6,10 @@ typedef struct {
   spn_install_os_t os;
   struct {
     spn_install_err_t err;
-    const c8* root;
-    const c8* root_expr;
     const c8* bin;
     const c8* bin_native;
     const c8* exe;
     const c8* env_file;
-    const c8* rc_line;
   } expect;
 } root_test_t;
 
@@ -21,78 +18,16 @@ static const root_test_t root_tests [] = {
     .name = "home",
     .vars = { { "HOME", "/h" } },
     .expect = {
-      .root = "/h/.spn",
-      .root_expr = "$HOME/.spn",
       .bin = "/h/.spn/bin",
       .bin_native = "/h/.spn/bin",
       .exe = "/h/.spn/bin/spn",
       .env_file = "/h/.spn/env",
-      .rc_line = ". \"$HOME/.spn/env\"",
-    },
-  },
-  {
-    .name = "custom",
-    .vars = { { "HOME", "/h" }, { "SPN_INSTALL", "/opt/spn" } },
-    .expect = {
-      .root = "/opt/spn",
-      .root_expr = "/opt/spn",
-      .bin = "/opt/spn/bin",
-      .bin_native = "/opt/spn/bin",
-      .exe = "/opt/spn/bin/spn",
-      .env_file = "/opt/spn/env",
-      .rc_line = ". \"/opt/spn/env\"",
-    },
-  },
-  {
-    .name = "custom_no_home",
-    .vars = { { "SPN_INSTALL", "/opt/spn" } },
-    .expect = {
-      .root = "/opt/spn",
-      .root_expr = "/opt/spn",
-      .bin = "/opt/spn/bin",
-      .bin_native = "/opt/spn/bin",
-      .exe = "/opt/spn/bin/spn",
-      .env_file = "/opt/spn/env",
-      .rc_line = ". \"/opt/spn/env\"",
     },
   },
   {
     .name = "no_home",
     .vars = { { "PATH", "/p" } },
     .expect = { .err = SPN_INSTALL_ERR_NO_HOME },
-  },
-  {
-    .name = "quote",
-    .vars = { { "HOME", "/h" }, { "SPN_INSTALL", "/o\"k" } },
-    .expect = { .err = SPN_INSTALL_ERR_ROOT_CHARS },
-  },
-  {
-    .name = "dollar",
-    .vars = { { "HOME", "/h" }, { "SPN_INSTALL", "/o$k" } },
-    .expect = { .err = SPN_INSTALL_ERR_ROOT_CHARS },
-  },
-  {
-    .name = "backtick",
-    .vars = { { "HOME", "/h" }, { "SPN_INSTALL", "/o`k" } },
-    .expect = { .err = SPN_INSTALL_ERR_ROOT_CHARS },
-  },
-  {
-    .name = "backslash",
-    .vars = { { "HOME", "/h" }, { "SPN_INSTALL", "/o\\k" } },
-    .expect = { .err = SPN_INSTALL_ERR_ROOT_CHARS },
-  },
-  {
-    .name = "install_empty",
-    .vars = { { "HOME", "/h" }, { "SPN_INSTALL", "" } },
-    .expect = {
-      .root = "/h/.spn",
-      .root_expr = "$HOME/.spn",
-      .bin = "/h/.spn/bin",
-      .bin_native = "/h/.spn/bin",
-      .exe = "/h/.spn/bin/spn",
-      .env_file = "/h/.spn/env",
-      .rc_line = ". \"$HOME/.spn/env\"",
-    },
   },
   {
     .name = "home_empty",
@@ -104,7 +39,6 @@ static const root_test_t root_tests [] = {
     .vars = { { "USERPROFILE", "C:\\Users\\u" } },
     .os = SPN_INSTALL_OS_WINDOWS,
     .expect = {
-      .root = "C:/Users/u/.spn",
       .bin = "C:/Users/u/.spn/bin",
       .bin_native = "C:\\Users\\u\\.spn\\bin",
       .exe = "C:/Users/u/.spn/bin/spn.exe",
@@ -115,7 +49,6 @@ static const root_test_t root_tests [] = {
     .vars = { { "HOMEDRIVE", "C:" }, { "HOMEPATH", "\\Users\\u" } },
     .os = SPN_INSTALL_OS_WINDOWS,
     .expect = {
-      .root = "C:/Users/u/.spn",
       .bin = "C:/Users/u/.spn/bin",
       .bin_native = "C:\\Users\\u\\.spn\\bin",
       .exe = "C:/Users/u/.spn/bin/spn.exe",
@@ -127,18 +60,8 @@ static const root_test_t root_tests [] = {
     .os = SPN_INSTALL_OS_WINDOWS,
     .expect = { .err = SPN_INSTALL_ERR_NO_HOME },
   },
-  {
-    .name = "windows_backslash_install",
-    .vars = { { "USERPROFILE", "C:\\Users\\u" }, { "SPN_INSTALL", "C:\\opt\\spn" } },
-    .os = SPN_INSTALL_OS_WINDOWS,
-    .expect = {
-      .root = "C:/opt/spn",
-      .bin = "C:/opt/spn/bin",
-      .bin_native = "C:\\opt\\spn\\bin",
-      .exe = "C:/opt/spn/bin/spn.exe",
-    },
-  },
 };
+
 
 sp_test_each(install_resolve, root, root_test_t, root_tests) {
   sp_mem_t mem = sp_test_arena(t);
@@ -150,13 +73,10 @@ sp_test_each(install_resolve, root, root_test_t, root_tests) {
     return SP_OK;
   }
 
-  sp_expect_str_eq_c(t, layout.root, it->expect.root);
-  sp_expect_str_eq_c(t, layout.root_expr, it->expect.root_expr ? it->expect.root_expr : "");
   sp_expect_str_eq_c(t, layout.bin, it->expect.bin);
   sp_expect_str_eq_c(t, layout.bin_native, it->expect.bin_native);
   sp_expect_str_eq_c(t, layout.exe, it->expect.exe);
   sp_expect_str_eq_c(t, layout.env_file, it->expect.env_file ? it->expect.env_file : "");
-  sp_expect_str_eq_c(t, layout.rc_line, it->expect.rc_line ? it->expect.rc_line : "");
   return SP_OK;
 }
 
@@ -216,24 +136,6 @@ static const rc_test_t rc_tests [] = {
       },
       .fish_conf = "/x/fish/conf.d/spn.fish",
     },
-  },
-  {
-    .name = "custom_home",
-    .vars = { { "HOME", "/h" }, { "SPN_INSTALL", "/opt/spn" } },
-    .expect = {
-      .rc = {
-        { "/h/.profile", .always = true },
-        { "/h/.bashrc" },
-        { "/h/.bash_profile" },
-        { "/h/.bash_login" },
-        { "/h/.zshrc", .always = true },
-      },
-      .fish_conf = "/h/.config/fish/conf.d/spn.fish",
-    },
-  },
-  {
-    .name = "custom_no_home",
-    .vars = { { "SPN_INSTALL", "/opt/spn" } },
   },
   {
     .name = "windows",

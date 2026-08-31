@@ -11,17 +11,24 @@ typedef struct {
 typedef struct {
   const c8* name;
   install_world_t world;
-  u32 stuck [2];
+  u32 stuck [4];
   u32 num_stuck;
   msg_spec_t expect [SPN_INSTALL_MAX_MSGS];
 } test_t;
+
+enum {
+  UNIX_EXE,
+  UNIX_ENV,
+  UNIX_FISH,
+  UNIX_PROFILE,
+  UNIX_ZSHRC,
+};
 
 static const test_t tests [] = {
   {
     .name = "updated",
     .world = { INSTALL_WORLD_UNIX },
     .expect = {
-      { SPN_INSTALL_MSG_INSTALLED, "/h/.spn/bin/spn" },
       { SPN_INSTALL_MSG_RESTART_SHELL, RC_LINE },
     },
   },
@@ -31,18 +38,12 @@ static const test_t tests [] = {
       .vars = { { "HOME", "/h" }, { "PATH", "/p:/h/.spn/bin" } },
       .exe = "/s/spn",
     },
-    .expect = {
-      { SPN_INSTALL_MSG_INSTALLED, "/h/.spn/bin/spn" },
-    },
   },
   {
     .name = "ci",
     .world = {
       .vars = { { "HOME", "/h" }, { "PATH", "/p" }, { "GITHUB_PATH", "/gh" } },
       .exe = "/s/spn",
-    },
-    .expect = {
-      { SPN_INSTALL_MSG_INSTALLED, "/h/.spn/bin/spn" },
     },
   },
   {
@@ -52,67 +53,78 @@ static const test_t tests [] = {
       .exe = "/s/spn",
     },
     .expect = {
-      { SPN_INSTALL_MSG_INSTALLED, "/h/.spn/bin/spn" },
       { SPN_INSTALL_MSG_MANUAL, "/h/.spn/bin" },
     },
   },
   {
-    .name = "stuck_rc",
+    .name = "one_rc_stuck",
     .world = { INSTALL_WORLD_UNIX },
+    .stuck = { UNIX_PROFILE },
+    .num_stuck = 1,
+    .expect = {
+      { SPN_INSTALL_MSG_STUCK_APPEND, "/h/.profile", RC_LINE },
+      { SPN_INSTALL_MSG_RESTART_SHELL, RC_LINE },
+    },
+  },
+  {
+    .name = "every_hook_stuck",
+    .world = { INSTALL_WORLD_UNIX },
+    .stuck = { UNIX_FISH, UNIX_PROFILE, UNIX_ZSHRC },
+    .num_stuck = 3,
+    .expect = {
+      { SPN_INSTALL_MSG_STUCK_WRITE, "/h/.config/fish/conf.d/spn.fish" },
+      { SPN_INSTALL_MSG_STUCK_APPEND, "/h/.profile", RC_LINE },
+      { SPN_INSTALL_MSG_STUCK_APPEND, "/h/.zshrc", RC_LINE },
+      { SPN_INSTALL_MSG_MANUAL, "/h/.spn/bin" },
+    },
+  },
+  {
+    .name = "env_stuck",
+    .world = { INSTALL_WORLD_UNIX },
+    .stuck = { UNIX_ENV },
+    .num_stuck = 1,
+    .expect = {
+      { SPN_INSTALL_MSG_STUCK_WRITE, "/h/.spn/env" },
+      { SPN_INSTALL_MSG_MANUAL, "/h/.spn/bin" },
+    },
+  },
+  {
+    .name = "fish_stuck",
+    .world = { INSTALL_WORLD_UNIX },
+    .stuck = { UNIX_FISH },
+    .num_stuck = 1,
+    .expect = {
+      { SPN_INSTALL_MSG_STUCK_WRITE, "/h/.config/fish/conf.d/spn.fish" },
+      { SPN_INSTALL_MSG_RESTART_SHELL, RC_LINE },
+    },
+  },
+  {
+    .name = "fish_stuck_rc_configured",
+    .world = {
+      INSTALL_WORLD_UNIX,
+      .rc = {
+        [INSTALL_RC_PROFILE] = { .exists = true, .has_line = true },
+        [INSTALL_RC_ZSHRC] = { .exists = true, .has_line = true },
+      },
+    },
     .stuck = { 2 },
     .num_stuck = 1,
     .expect = {
-      { SPN_INSTALL_MSG_INSTALLED, "/h/.spn/bin/spn" },
-      { SPN_INSTALL_MSG_STUCK_FILE, "/h/.profile" },
-      { SPN_INSTALL_MSG_ADD_LINE, RC_LINE },
-    },
-  },
-  {
-    .name = "stuck_two_rc",
-    .world = { INSTALL_WORLD_UNIX },
-    .stuck = { 2, 3 },
-    .num_stuck = 2,
-    .expect = {
-      { SPN_INSTALL_MSG_INSTALLED, "/h/.spn/bin/spn" },
-      { SPN_INSTALL_MSG_STUCK_FILE, "/h/.profile" },
-      { SPN_INSTALL_MSG_STUCK_FILE, "/h/.zshrc" },
-      { SPN_INSTALL_MSG_ADD_LINE, RC_LINE },
-    },
-  },
-  {
-    .name = "stuck_env",
-    .world = { INSTALL_WORLD_UNIX },
-    .stuck = { 0 },
-    .num_stuck = 1,
-    .expect = {
-      { SPN_INSTALL_MSG_INSTALLED, "/h/.spn/bin/spn" },
-      { SPN_INSTALL_MSG_MANUAL, "/h/.spn/bin" },
-      { SPN_INSTALL_MSG_STUCK_FILE, "/h/.spn/env" },
-    },
-  },
-  {
-    .name = "stuck_fish",
-    .world = { INSTALL_WORLD_UNIX },
-    .stuck = { 1 },
-    .num_stuck = 1,
-    .expect = {
-      { SPN_INSTALL_MSG_INSTALLED, "/h/.spn/bin/spn" },
+      { SPN_INSTALL_MSG_STUCK_WRITE, "/h/.config/fish/conf.d/spn.fish" },
       { SPN_INSTALL_MSG_RESTART_SHELL, RC_LINE },
-      { SPN_INSTALL_MSG_STUCK_FILE, "/h/.config/fish/conf.d/spn.fish" },
     },
   },
   {
-    .name = "stuck_github",
+    .name = "github_stuck",
     .world = {
       .vars = { { "HOME", "/h" }, { "PATH", "/p" }, { "GITHUB_PATH", "/gh" } },
       .exe = "/s/spn",
     },
-    .stuck = { 1 },
+    .stuck = { 2 },
     .num_stuck = 1,
     .expect = {
-      { SPN_INSTALL_MSG_INSTALLED, "/h/.spn/bin/spn" },
+      { SPN_INSTALL_MSG_STUCK_APPEND, "/gh", "/h/.spn/bin" },
       { SPN_INSTALL_MSG_MANUAL, "/h/.spn/bin" },
-      { SPN_INSTALL_MSG_STUCK_FILE, "/gh" },
     },
   },
   {
@@ -122,7 +134,6 @@ static const test_t tests [] = {
       .shadow = "/p/spn",
     },
     .expect = {
-      { SPN_INSTALL_MSG_INSTALLED, "/h/.spn/bin/spn" },
       { SPN_INSTALL_MSG_RESTART_SHELL, RC_LINE },
       { SPN_INSTALL_MSG_SHADOW, "/p/spn", "/h/.spn/bin/spn" },
     },
@@ -134,7 +145,6 @@ static const test_t tests [] = {
       .shadow = "/h/.spn/bin/spn",
     },
     .expect = {
-      { SPN_INSTALL_MSG_INSTALLED, "/h/.spn/bin/spn" },
       { SPN_INSTALL_MSG_RESTART_SHELL, RC_LINE },
     },
   },
@@ -142,19 +152,17 @@ static const test_t tests [] = {
     .name = "windows",
     .world = { INSTALL_WORLD_WINDOWS },
     .expect = {
-      { SPN_INSTALL_MSG_INSTALLED, "C:/u/.spn/bin/spn.exe" },
       { SPN_INSTALL_MSG_RESTART_TERMINAL },
     },
   },
   {
-    .name = "windows_stuck_registry",
+    .name = "windows_registry_stuck",
     .world = { INSTALL_WORLD_WINDOWS },
-    .stuck = { 0 },
+    .stuck = { 1 },
     .num_stuck = 1,
     .expect = {
-      { SPN_INSTALL_MSG_INSTALLED, "C:/u/.spn/bin/spn.exe" },
-      { SPN_INSTALL_MSG_MANUAL, "C:\\u\\.spn\\bin" },
       { SPN_INSTALL_MSG_STUCK_REGISTRY },
+      { SPN_INSTALL_MSG_MANUAL, "C:\\u\\.spn\\bin" },
     },
   },
 };
@@ -165,11 +173,12 @@ sp_test_each(install_report, messages, test_t, tests) {
   install_world_t world = it->world;
   sp_try(install_build(t, &world, &layout, &facts));
 
-  spn_install_plan_t plan = spn_install_plan(sp_test_arena(t), &layout, &facts);
+  spn_install_choices_t choices = spn_install_choices(&layout);
+  spn_install_plan_t plan = spn_install_plan(sp_test_arena(t), &layout, &facts, &choices);
 
   spn_install_result_t result = sp_zero;
   sp_for(at, it->num_stuck) {
-    sp_must_lt(t, it->stuck[at], plan.num_path);
+    sp_must_lt(t, it->stuck[at], plan.count);
     result.stuck[result.num_stuck++] = it->stuck[at];
   }
 

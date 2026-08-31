@@ -85,7 +85,7 @@ static sp_err_t set_user_path(spn_install_action_t* action) {
 }
 #endif
 
-static spn_install_facts_t probe(sp_mem_t mem, spn_install_layout_t* layout) {
+static spn_install_facts_t probe_facts(sp_mem_t mem, spn_install_layout_t* layout) {
   spn_install_facts_t facts = sp_zero;
   facts.exe = sp_fs_get_exe_path(mem);
 
@@ -95,7 +95,7 @@ static spn_install_facts_t probe(sp_mem_t mem, spn_install_layout_t* layout) {
     if (facts.rc[it].exists) {
       sp_str_t content = sp_zero;
       if (!sp_io_read_file(scratch.mem, layout->rc[it].path, &content)) {
-        facts.rc[it].has_line = sp_str_contains(content, layout->rc_line);
+        facts.rc[it].has_line = sp_str_contains(content, sp_str_lit(SPN_INSTALL_RC_LINE));
       }
     }
   }
@@ -117,7 +117,6 @@ static spn_install_facts_t probe(sp_mem_t mem, spn_install_layout_t* layout) {
 static sp_err_t apply(spn_install_action_t* action) {
   switch (action->kind) {
     case SPN_INSTALL_ACTION_NONE: return SP_ERR;
-    case SPN_INSTALL_ACTION_CREATE_DIR: return sp_fs_create_dir(action->path);
     case SPN_INSTALL_ACTION_INSTALL_EXE: return sp_fs_copy_atomic(action->path, action->src);
     case SPN_INSTALL_ACTION_WRITE_FILE: return sp_fs_write_atomic(action->path, action->text);
     case SPN_INSTALL_ACTION_APPEND_LINE: return sp_fs_append(action->path, action->text);
@@ -129,34 +128,53 @@ static sp_err_t apply(spn_install_action_t* action) {
 static spn_install_result_t execute(spn_install_plan_t* plan) {
   spn_install_result_t result = sp_zero;
 
-  sp_for(it, plan->num_install) {
-    result.err = apply(&plan->install[it]);
-    if (result.err) {
-      result.failed = plan->install[it];
+  sp_for(it, plan->count) {
+    sp_err_t err = apply(&plan->actions[it]);
+    if (!err) {
+      continue;
+    }
+    if (plan->actions[it].role == SPN_INSTALL_ROLE_EXE) {
+      result.err = err;
+      result.failed = plan->actions[it];
       return result;
     }
-  }
-  sp_for(it, plan->num_path) {
-    if (apply(&plan->path[it])) {
-      result.stuck[result.num_stuck++] = (u32)it;
-    }
+    result.stuck[result.num_stuck++] = (u32)it;
   }
   return result;
 }
 
-spn_install_t spn_install(sp_mem_t mem) {
+spn_install_probe_t spn_install_probe(sp_mem_t mem) {
+  spn_install_probe_t probe = sp_zero;
   sp_env_t env = sp_env_capture(mem);
-  spn_install_layout_t layout = spn_install_resolve(mem, os_host(), &env);
-  if (layout.err) {
-    return (spn_install_t) { .err = layout.err };
+  probe.layout = spn_install_resolve(mem, os_host(), &env);
+  if (probe.layout.err) {
+    return probe;
   }
+  probe.facts = probe_facts(mem, &probe.layout);
+  return probe;
+}
 
-  spn_install_facts_t facts = probe(mem, &layout);
-  spn_install_plan_t plan = spn_install_plan(mem, &layout, &facts);
-  spn_install_result_t result = execute(&plan);
+spn_install_t spn_install_execute(spn_install_probe_t* probe, spn_install_plan_t* plan) {
+  spn_install_result_t result = execute(plan);
   if (result.err) {
-    return (spn_install_t) { .err = SPN_INSTALL_ERR_ACTION, .failed = result.failed };
+    return (spn_install_t) { .err = SPN_INSTALL_ERR_EXE, .failed = result.failed };
+  }
+  return (spn_install_t) {
+    .err = result.num_stuck ? SPN_INSTALL_ERR_STUCK : SPN_INSTALL_OK,
+    .exe = probe->layout.exe,
+    .changes = plan->count,
+    .stuck = result.num_stuck,
+    .msgs = spn_install_report(&probe->layout, &probe->facts, plan, &result),
+  };
+}
+
+spn_install_t spn_install(sp_mem_t mem) {
+  spn_install_probe_t probe = spn_install_probe(mem);
+  if (probe.layout.err) {
+    return (spn_install_t) { .err = probe.layout.err };
   }
 
-  return (spn_install_t) { .msgs = spn_install_report(&layout, &facts, &plan, &result) };
+  spn_install_choices_t choices = spn_install_choices(&probe.layout);
+  spn_install_plan_t plan = spn_install_plan(mem, &probe.layout, &probe.facts, &choices);
+  return spn_install_execute(&probe, &plan);
 }

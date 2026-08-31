@@ -274,7 +274,7 @@ static sp_str_t expect_err(const test_t* it, fixture_t* fx) {
       return sp_str_lit("");
     }
     case SHIM_ERR_ARGS: {
-      return sp_str_lit("install: the spn installer takes no arguments; configure it with SPN_INSTALL, SPN_INSTALL_DOWNLOAD_URL, and SPN_INSTALL_NO_MODIFY_PATH\n");
+      return sp_str_lit("install: the spn installer takes no arguments; configure it with SPN_INSTALL_DOWNLOAD_URL and SPN_INSTALL_NO_MODIFY_PATH\n");
     }
     case SHIM_ERR_UNSUPPORTED_OS: {
       return sp_fmt(fx->mem, "install: unsupported operating system {}\n", sp_fmt_cstr(it->uname_s)).value;
@@ -375,7 +375,7 @@ sp_test_each(install_shim, cases, test_t, tests) {
   if (it->expect.invoked) {
     sp_str_t content = sp_zero;
     sp_must_eq(t, (u32)SP_OK, (u32)sp_io_read_file(fx.mem, args, &content));
-    sp_expect_str_eq_c(t, content, "self\ninstall\n");
+    sp_expect_str_eq_c(t, content, "self\ninstall\n--auto\n");
   }
   else {
     sp_expect(t, !sp_fs_exists(args));

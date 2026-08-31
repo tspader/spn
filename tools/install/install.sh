@@ -22,7 +22,7 @@ checksum_sha256sum() { sha256sum "$1" | cut -d' ' -f1; }
 checksum_shasum() { shasum -a 256 "$1" | cut -d' ' -f1; }
 
 if [ $# -gt 0 ]; then
-  fail "the spn installer takes no arguments; configure it with SPN_INSTALL, SPN_INSTALL_DOWNLOAD_URL, and SPN_INSTALL_NO_MODIFY_PATH"
+  fail "the spn installer takes no arguments; configure it with SPN_INSTALL_DOWNLOAD_URL and SPN_INSTALL_NO_MODIFY_PATH"
 fi
 
 if [ "${OS:-}" = "Windows_NT" ]; then
@@ -99,4 +99,4 @@ if [ "$GOT" != "$SHA" ]; then
 fi
 
 tar -xzf "${TMP}/${ASSET}" -C "$TMP" || fail "failed to extract ${ASSET}"
-"${TMP}/${EXE}" self install
+"${TMP}/${EXE}" self install --auto
