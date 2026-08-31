@@ -1,6 +1,9 @@
 <p align="center">
   <a href="https://spn.spader.zone">
-    <img src="assets/logo/logo.svg" alt="spn" width="180">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="assets/logo/logo-dark.svg">
+      <img src="assets/logo/logo-light.svg" alt="spn" width="180">
+    </picture>
   </a>
 </p>
 
