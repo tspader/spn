@@ -154,6 +154,23 @@ static const test_t tests [] = {
     },
   },
   {
+    // everything already carries us and nothing is planned, but PATH is
+    // still waiting on a restart
+    .name = "pending",
+    .world = {
+      .vars = { { "HOME", "/h" }, { "PATH", "/p" } },
+      .exe = "/h/.spn/bin/spn",
+      .env_current = true,
+      .rc = {
+        [INSTALL_RC_PROFILE] = { .exists = true, .has_line = true },
+        [INSTALL_RC_ZSHENV] = { .exists = true, .has_line = true },
+      },
+    },
+    .expect = {
+      { SPN_INSTALL_MSG_RESTART_SHELL, RC_LINE },
+    },
+  },
+  {
     .name = "github_stuck",
     .world = {
       .vars = { { "HOME", "/h" }, { "PATH", "/p" }, { "GITHUB_PATH", "/gh" } },

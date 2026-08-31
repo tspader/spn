@@ -462,7 +462,12 @@ static bool use_prompt() {
 static sp_cli_result_t run_unattended(sp_cli_t* cli) {
   spn_install_t result = spn_install(host.mem);
   if (result.err != SPN_INSTALL_ERR_EXE && !sp_str_empty(result.exe)) {
-    spn_print(&tui, "install: spn {} installed to {}", sp_fmt_cstr(SPN_VERSION), sp_fmt_str(result.exe));
+    if (result.changes) {
+      spn_print(&tui, "install: spn {} installed to {}", sp_fmt_cstr(SPN_VERSION), sp_fmt_str(result.exe));
+    }
+    else {
+      spn_print(&tui, "install: spn {} already installed at {}", sp_fmt_cstr(SPN_VERSION), sp_fmt_str(result.exe));
+    }
   }
   sp_for(it, result.msgs.count) {
     print_msg(&result.msgs.items[it]);

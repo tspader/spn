@@ -196,6 +196,39 @@ static const test_t tests [] = {
     },
   },
   {
+    // everything already carries us; nothing to write, but PATH is still
+    // waiting on a restart
+    .name = "pending",
+    .world = {
+      .vars = { { "HOME", "/h" }, { "PATH", "/p" } },
+      .exe = "/h/.spn/bin/spn",
+      .env_current = true,
+      .rc = {
+        [INSTALL_RC_PROFILE] = { .exists = true, .has_line = true },
+        [INSTALL_RC_ZSHENV] = { .exists = true, .has_line = true },
+      },
+    },
+    .expect = {
+      .state = SPN_INSTALL_PATH_UPDATED,
+      .live = 2,
+      .posix = true,
+    },
+  },
+  {
+    .name = "fish_current",
+    .world = {
+      INSTALL_WORLD_UNIX,
+      .fish = true,
+      .fish_current = true,
+      .env_current = true,
+    },
+    .expect = {
+      .state = SPN_INSTALL_PATH_UPDATED,
+      .live = 1,
+      .actions = { EXE_UNIX },
+    },
+  },
+  {
     .name = "on_path",
     .world = {
       .vars = { { "HOME", "/h" }, { "PATH", "/p:/h/.spn/bin" } },

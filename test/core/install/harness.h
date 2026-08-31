@@ -45,6 +45,8 @@ typedef struct {
   const c8* exe;
   const c8* shadow;
   bool fish;
+  bool env_current;
+  bool fish_current;
   spn_install_rc_state_t rc [SPN_INSTALL_MAX_RC];
   struct {
     const c8* path;

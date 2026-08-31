@@ -85,6 +85,14 @@ static sp_err_t set_user_path(spn_install_action_t* action) {
 }
 #endif
 
+static bool file_matches(sp_mem_t mem, sp_str_t path, sp_str_t text) {
+  sp_str_t content = sp_zero;
+  if (sp_io_read_file(mem, path, &content)) {
+    return false;
+  }
+  return sp_str_equal(content, text);
+}
+
 static spn_install_facts_t probe_facts(sp_mem_t mem, spn_install_layout_t* layout) {
   spn_install_facts_t facts = sp_zero;
   facts.exe = sp_fs_get_exe_path(mem);
@@ -99,6 +107,8 @@ static spn_install_facts_t probe_facts(sp_mem_t mem, spn_install_layout_t* layou
       }
     }
   }
+  facts.env_current = file_matches(scratch.mem, layout->env_file, sp_str_lit(SPN_INSTALL_ENV_SH));
+  facts.fish_current = file_matches(scratch.mem, layout->fish_conf, sp_str_lit(SPN_INSTALL_FISH_SH));
   sp_mem_end_scratch(scratch);
 
   facts.fish = sp_fs_is_dir(layout->fish_dir);

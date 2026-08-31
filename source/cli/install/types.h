@@ -11,6 +11,17 @@
 #define SPN_INSTALL_ROOT_EXPR "$HOME/.spn"
 #define SPN_INSTALL_RC_LINE ". \"" SPN_INSTALL_ROOT_EXPR "/env\""
 
+#define SPN_INSTALL_ENV_SH \
+  "case \":${PATH}:\" in\n" \
+  "  *:\"" SPN_INSTALL_ROOT_EXPR "/bin\":*) ;;\n" \
+  "  *) export PATH=\"" SPN_INSTALL_ROOT_EXPR "/bin:${PATH}\" ;;\n" \
+  "esac\n"
+
+#define SPN_INSTALL_FISH_SH \
+  "if not contains \"" SPN_INSTALL_ROOT_EXPR "/bin\" $PATH\n" \
+  "  set --export PATH \"" SPN_INSTALL_ROOT_EXPR "/bin\" $PATH\n" \
+  "end\n"
+
 typedef enum {
   SPN_INSTALL_OS_UNIX,
   SPN_INSTALL_OS_WINDOWS,
@@ -94,7 +105,12 @@ typedef struct {
 typedef struct {
   sp_str_t exe;
   sp_str_t shadow;
+  // the fish config dir exists; evidence fish is in use
   bool fish;
+  // the env file already holds exactly what we would write
+  bool env_current;
+  // the fish conf already holds exactly what we would write
+  bool fish_current;
   spn_install_rc_state_t rc [SPN_INSTALL_MAX_RC];
   struct {
     sp_str_t path;

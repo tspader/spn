@@ -137,17 +137,6 @@ spn_install_layout_t spn_install_resolve(sp_mem_t mem, spn_install_os_t os, sp_e
   return layout;
 }
 
-#define ENV_SH \
-  "case \":${PATH}:\" in\n" \
-  "  *:\"" SPN_INSTALL_ROOT_EXPR "/bin\":*) ;;\n" \
-  "  *) export PATH=\"" SPN_INSTALL_ROOT_EXPR "/bin:${PATH}\" ;;\n" \
-  "esac\n"
-
-#define FISH_SH \
-  "if not contains \"" SPN_INSTALL_ROOT_EXPR "/bin\" $PATH\n" \
-  "  set --export PATH \"" SPN_INSTALL_ROOT_EXPR "/bin\" $PATH\n" \
-  "end\n"
-
 #define RC_APPEND "\n" SPN_INSTALL_RC_LINE "\n"
 
 static bool registry_contains(sp_str_t value, sp_str_t bin_native) {
@@ -269,7 +258,7 @@ static spn_install_action_t env_action(spn_install_layout_t* layout) {
     .kind = SPN_INSTALL_ACTION_WRITE_FILE,
     .role = SPN_INSTALL_ROLE_ENV,
     .path = layout->env_file,
-    .text = sp_str_lit(ENV_SH),
+    .text = sp_str_lit(SPN_INSTALL_ENV_SH),
   };
 }
 
@@ -278,7 +267,7 @@ static spn_install_action_t fish_action(spn_install_layout_t* layout) {
     .kind = SPN_INSTALL_ACTION_WRITE_FILE,
     .role = SPN_INSTALL_ROLE_HOOK,
     .path = layout->fish_conf,
-    .text = sp_str_lit(FISH_SH),
+    .text = sp_str_lit(SPN_INSTALL_FISH_SH),
   };
 }
 
@@ -332,8 +321,13 @@ static void plan_posix_hook(spn_install_plan_t* plan, sp_str_t path) {
 }
 
 static void plan_unix_hooks(spn_install_layout_t* layout, spn_install_facts_t* facts, spn_install_choices_t* choices, spn_install_plan_t* plan) {
-  if (has_shell(choices, SPN_INSTALL_SHELL_FISH) && !sp_str_empty(layout->fish_conf)) {
-    push_action(plan, fish_action(layout));
+  if (has_shell(choices, SPN_INSTALL_SHELL_FISH)) {
+    if (facts->fish_current) {
+      plan->live++;
+    }
+    else {
+      push_action(plan, fish_action(layout));
+    }
   }
 
   sp_for(it, layout->num_rc) {
@@ -381,7 +375,9 @@ spn_install_plan_t spn_install_plan(sp_mem_t mem, spn_install_layout_t* layout, 
     case SPN_INSTALL_PATH_CI: {
       switch (layout->os) {
         case SPN_INSTALL_OS_UNIX: {
-          push_action(&plan, env_action(layout));
+          if (!facts->env_current) {
+            push_action(&plan, env_action(layout));
+          }
           push_action(&plan, github_action(mem, layout));
           break;
         }
@@ -395,7 +391,9 @@ spn_install_plan_t spn_install_plan(sp_mem_t mem, spn_install_layout_t* layout, 
     case SPN_INSTALL_PATH_UPDATED: {
       switch (layout->os) {
         case SPN_INSTALL_OS_UNIX: {
-          push_action(&plan, env_action(layout));
+          if (!facts->env_current) {
+            push_action(&plan, env_action(layout));
+          }
           plan_unix_hooks(layout, facts, choices, &plan);
           break;
         }
