@@ -31,12 +31,16 @@ static sp_cli_cmd_t root = {
       .ptr = &host.args.project_file,
     },
     {
-      .brief = 'o',
-      .name = "output",
-      .kind = SP_CLI_OPT_STR,
-      .summary = "Output mode: interactive, noninteractive, quiet, none, json",
-      .placeholder = "MODE",
-      .ptr = &host.args.output,
+      .name = "json",
+      .kind = SP_CLI_OPT_BOOLEAN,
+      .summary = "Write events to stdout as JSONL",
+      .ptr = &host.args.json,
+    },
+    {
+      .name = "no-color",
+      .kind = SP_CLI_OPT_BOOLEAN,
+      .summary = "Disable colored output",
+      .ptr = &host.args.no_color,
     },
     {
       .brief = 'v',

@@ -10,12 +10,12 @@ static sp_cli_result_t add(sp_cli_t* cli) {
   try(spn_cli_open(false));
 
   if (args.test && args.build) {
-    return spn_cli_error(cli, "pass at most one of {.cyan} and {.cyan}", sp_fmt_cstr("--test"), sp_fmt_cstr("--build"));
+    return spn_cli_usage("pass at most one of {.cyan} and {.cyan}", sp_fmt_cstr("--test"), sp_fmt_cstr("--build"));
   }
 
   sp_str_pair_t spec = sp_str_cleave_c8(args.package, '@');
   if (sp_str_empty(spec.first)) {
-    return spn_cli_error(cli, "expected a package name");
+    return spn_cli_usage("expected a package name");
   }
 
   try(spn_cli_refresh_indexes());

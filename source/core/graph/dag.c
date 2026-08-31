@@ -1168,8 +1168,6 @@ static void dag_emit_reports(spn_dag_build_t* b, u64 elapsed) {
         .build_failed = {
           .profile = profile->name,
           .time = elapsed,
-          .num_errors = 1,
-          .first_error = spn_err_to_str(b->result),
         },
       });
     }

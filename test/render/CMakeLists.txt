@@ -1,4 +1,4 @@
-add_executable(integration
+add_executable(render
   ${SRC}/compiler/driver.c
   ${SRC}/compiler/gnu.c
   ${SRC}/compiler/msvc.c
@@ -23,44 +23,21 @@ add_executable(integration
   ${SRC}/sp/str.c
   ${SRC}/triple/triple.c
   main.c
-  cli.c
-  compile_commands.c
-  consume.c
-  corrupt.c
-  cxx.c
-  defines.c
-  deps.c
-  exports.c
-  freshness.c
-  harness_test.c
-  layout.c
-  log.c
-  offline.c
-  options.c
-  patch.c
-  platform.c
-  profile.c
-  reexport.c
-  script.c
-  target.c
-  units.c
-  upstream.c
-  worlds.c
+  cases.c
   ${TEST_TOOLS}/caps.c
   ${TEST_TOOLS}/env.c
-  tools/harness.c
   ${TEST_TOOLS}/fixture.c
   ${TEST_TOOLS}/toml.c
 )
-spn_test_binary(integration)
-target_include_directories(integration PRIVATE
+spn_test_binary(render)
+target_include_directories(render PRIVATE
   ${SRC}/codegen/gen
   ${SRC}/external
-  ${CMAKE_CURRENT_SOURCE_DIR}/tools
+  ${CMAKE_CURRENT_SOURCE_DIR}
 )
-target_compile_definitions(integration PRIVATE
+target_compile_definitions(render PRIVATE
   SPN_TEST_BIN=".build/store/${TRIPLE}${SPN_FLAVOR}/bin/spn${CMAKE_EXECUTABLE_SUFFIX}"
 )
-target_link_libraries(integration PRIVATE yyjson)
-add_dependencies(integration spn spn_codegen_gen)
-add_test(NAME integration COMMAND "$<TARGET_FILE:integration>" WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+target_link_libraries(render PRIVATE yyjson)
+add_dependencies(render spn spn_codegen_gen)
+add_test(NAME render COMMAND "$<TARGET_FILE:render>" WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")

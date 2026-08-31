@@ -7,7 +7,7 @@ static sp_cli_result_t clean(sp_cli_t* cli) {
     return spn_cli_op(spn_clean(host.ctx));
   }
 
-  try(spn_cli_session(cli, sp_zero_s(spn_session_config_t)));
+  try(spn_cli_session(sp_zero_s(spn_session_config_t)));
   return spn_cli_op(spn_clean_profile(host.session));
 }
 

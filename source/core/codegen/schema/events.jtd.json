@@ -77,7 +77,7 @@
       }
     },
     "target_build_passed": { "metadata": { "verb": "Compiled", "verbosity": "debug" }, "ref": "target_passed" },
-    "target_build_failed": { "metadata": { "severity": "error" }, "ref": "target_failed" },
+    "target_build_failed": { "metadata": { "verb": "Failed", "severity": "error" }, "ref": "target_failed" },
     "target_run": {
       "metadata": { "verb": "Running" },
       "properties": {
@@ -93,7 +93,7 @@
       }
     },
     "test_failed": {
-      "metadata": { "severity": "error" },
+      "metadata": { "verb": "Failed", "severity": "error" },
       "properties": {
         "name": { "type": "string" },
         "exit_code": { "type": "int32", "metadata": { "field": "code" } },
@@ -129,7 +129,7 @@
       }
     },
     "link_failed": {
-      "metadata": { "severity": "error" },
+      "metadata": { "verb": "Failed", "severity": "error" },
       "properties": {
         "target": { "type": "string" },
         "exit_code": { "type": "int32" },
@@ -155,7 +155,7 @@
       }
     },
     "embed_failed": {
-      "metadata": { "severity": "error" },
+      "metadata": { "verb": "Failed", "severity": "error" },
       "properties": {
         "target": { "type": "string" },
         "path": { "type": "string" },
@@ -163,7 +163,7 @@
       }
     },
     "node_failed": {
-      "metadata": { "severity": "error" },
+      "metadata": { "verb": "Failed", "severity": "error" },
       "properties": {
         "path": { "type": "string" },
         "message": { "type": "string" }
@@ -180,12 +180,10 @@
       }
     },
     "build_failed": {
-      "metadata": { "severity": "fatal" },
+      "metadata": { "verb": "Failed", "severity": "error" },
       "properties": {
         "profile": { "type": "string" },
-        "time_ns": { "type": "uint64", "metadata": { "field": "time" } },
-        "num_errors": { "type": "uint32" },
-        "first_error": { "type": "string" }
+        "time_ns": { "type": "uint64", "metadata": { "field": "time" } }
       }
     },
     "build_summary": {

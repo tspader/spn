@@ -9,23 +9,6 @@
 
 #include "spn/host.h"
 
-#define SPN_OUTPUT_MODE(X) \
-  X(SPN_OUTPUT_MODE_INTERACTIVE) \
-  X(SPN_OUTPUT_MODE_NONINTERACTIVE) \
-  X(SPN_OUTPUT_MODE_QUIET) \
-  X(SPN_OUTPUT_MODE_NONE) \
-  X(SPN_OUTPUT_MODE_JSON)
-
-typedef enum {
-  SPN_OUTPUT_MODE(SP_X_ENUM_DEFINE)
-} spn_tui_mode_t;
-
-typedef struct {
-  sp_io_stream_writer_t out;
-  sp_io_stream_writer_t err;
-  spn_verbosity_t verbosity;
-} spn_logger_t;
-
 typedef struct {
   sp_io_writer_t base;
   sp_prompt_ctx_t* prompt;
@@ -41,16 +24,21 @@ typedef struct {
 
 typedef struct {
   spn_ctx_t* ctx;
-  spn_tui_mode_t mode;
+  bool json;
+  bool no_color;
   spn_verbosity_t verbosity;
   sp_sys_event_t wake;
 } spn_tui_desc_t;
 
 typedef struct {
   spn_ctx_t* ctx;
-  spn_tui_mode_t mode;
+  bool json;
+  bool interactive;
+  spn_verbosity_t verbosity;
   sp_mem_t mem;
-  spn_logger_t logger;
+  sp_tty_t* out;
+  sp_tty_t* err;
+  sp_tty_t journal;
   spn_tui_line_writer_t writer;
   sp_sys_event_t wake;
   sp_str_ht(bool) seen_url;

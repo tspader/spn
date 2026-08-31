@@ -25,20 +25,11 @@ static void on_signal(sp_os_signal_t signal, void* userdata) {
   }
 }
 
-static s32 err(sp_io_writer_t* io, sp_cli_t* cli) {
-  sp_cli_err_t err = cli->err;
-  sp_fmt_io(io, "{.red}: ", sp_fmt_cstr("error"));
-  sp_cli_err_print(io, err);
-  sp_fmt_io(io, "\n");
-  return 1;
+static void help(sp_tty_t* tty, sp_cli_t* cli) {
+  sp_cli_write_help(tty, cli);
 }
 
-static s32 help(sp_io_writer_t* io, sp_cli_t* cli) {
-  sp_cli_write_help(io, cli);
-  return 0;
-}
-
-static s32 version(sp_io_writer_t* io) {
+static void version(sp_tty_t* tty) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   sp_da(sp_str_t) parts = sp_da_new(scratch.mem, sp_str_t);
 
@@ -53,13 +44,12 @@ static s32 version(sp_io_writer_t* io) {
   }
 
   if (sp_da_size(parts)) {
-    sp_fmt_io(io, "spn {} ({})\n", sp_fmt_cstr(SPN_VERSION), sp_fmt_str(sp_str_join_n(scratch.mem, parts, sp_da_size(parts), sp_str_lit(" "))));
+    sp_tty_fmt(tty, "spn {} ({})\n", sp_fmt_cstr(SPN_VERSION), sp_fmt_str(sp_str_join_n(scratch.mem, parts, sp_da_size(parts), sp_str_lit(" "))));
   } else {
-    sp_fmt_io(io, "spn {}\n", sp_fmt_cstr(SPN_VERSION));
+    sp_tty_fmt(tty, "spn {}\n", sp_fmt_cstr(SPN_VERSION));
   }
 
   sp_mem_end_scratch(scratch);
-  return 0;
 }
 
 s32 spn_main(s32 num_args, const c8** args) {
@@ -83,37 +73,32 @@ s32 spn_main(s32 num_args, const c8** args) {
     verbosity = SPN_VERBOSITY_VERBOSE;
   }
 
-  spn_tui_mode_t mode = SPN_OUTPUT_MODE_INTERACTIVE;
-  if (!sp_str_empty(host.args.output)) {
-    mode = spn_output_mode_from_str(host.args.output);
-  }
-
   spn_tui_init(&tui, (spn_tui_desc_t) {
     .ctx = host.ctx,
-    .mode = mode,
+    .json = host.args.json,
+    .no_color = host.args.no_color,
     .verbosity = verbosity,
     .wake = host.doorbell,
   });
 
-  sp_io_writer_t* io = &tui.logger.out.base;
+  sp_tty_t* out = tui.out;
 
   if (cli.status == SP_CLI_ERR) {
-    return err(io, &cli);
+    spn_tui_usage(&tui, cli.err);
+    return spn_cli_shutdown(false);
   }
   if (host.args.version) {
-    return version(io);
+    version(out);
+    return spn_cli_shutdown(true);
   }
   if (cli.status == SP_CLI_HELP) {
-    return help(io, &cli);
+    help(out, &cli);
+    return spn_cli_shutdown(true);
   }
 
   sp_cli_result_t status = sp_cli_dispatch(&cli);
-
-  switch (status) {
-    case SP_CLI_HELP: help(io, &cli);
-    case SP_CLI_ERR: err(io, &cli);
-    case SP_CLI_OK:
-    case SP_CLI_CONTINUE: break;
+  if (status == SP_CLI_HELP) {
+    help(out, &cli);
   }
 
   return spn_cli_shutdown(status != SP_CLI_ERR);

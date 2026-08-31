@@ -79,6 +79,7 @@ sp_cli_cmd_t spn_cmd_publish = {
     {
       .name = "allow-dirty",
       .summary = "Publish even if the working tree has uncommitted changes",
+      .kind = SP_CLI_OPT_BOOLEAN,
       .ptr = &args.allow_dirty,
     },
   },

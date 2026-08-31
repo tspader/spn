@@ -19,20 +19,21 @@
 typedef struct {
   sp_str_t name;
   sp_str_t toolchain;
-  sp_str_t mode;
-  sp_str_t opt;
+  sp_cli_choice_t mode;
+  sp_cli_choice_t opt;
   sp_str_t sanitize;
   sp_str_t target;
-  sp_str_t os;
-  sp_str_t arch;
-  sp_str_t abi;
+  sp_cli_choice_t os;
+  sp_cli_choice_t arch;
+  sp_cli_choice_t abi;
 } spn_cli_profile_t;
 
 typedef struct {
   struct {
     sp_str_t project_dir;
     sp_str_t project_file;
-    sp_str_t output;
+    bool json;
+    bool no_color;
     bool verbose;
     bool quiet;
     bool version;
@@ -53,11 +54,11 @@ extern spn_tui_t tui;
 void spn_cli_boot();
 s32 spn_cli_shutdown(bool ok);
 
-sp_cli_result_t spn_cli_error(sp_cli_t* cli, const c8* fmt, ...);
-sp_cli_result_t spn_cli_parse_profile(sp_cli_t* cli, spn_profile_override_t* profile);
+sp_cli_result_t spn_cli_usage(const c8* fmt, ...);
+sp_cli_result_t spn_cli_parse_profile(spn_profile_override_t* profile);
 spn_str_arr_t spn_cli_rest_names(sp_cli_t* cli);
 sp_cli_result_t spn_cli_open(bool project_optional);
-sp_cli_result_t spn_cli_session(sp_cli_t* cli, spn_session_config_t config);
+sp_cli_result_t spn_cli_session(spn_session_config_t config);
 sp_cli_result_t spn_cli_refresh_indexes();
 sp_cli_result_t spn_cli_op(spn_op_t* op);
 spn_err_t spn_cli_wait(spn_op_t* op);

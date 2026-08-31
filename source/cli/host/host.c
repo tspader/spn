@@ -8,7 +8,8 @@ s32 spn_cli_shutdown(bool ok) {
   spn_prompt_stop(&tui, ok ? SP_PROMPT_STATE_SUBMIT : SP_PROMPT_STATE_ERROR);
   spn_ctx_close(host.ctx, ok);
   spn_tui_flush(&tui);
-  sp_io_flush(&tui.logger.err.base);
+  sp_io_flush(tui.err->io);
+  sp_io_flush(tui.out->io);
   return ok ? 0 : 1;
 }
 
@@ -34,8 +35,8 @@ sp_cli_result_t spn_cli_open(bool project_optional) {
   return err ? SP_CLI_ERR : SP_CLI_OK;
 }
 
-sp_cli_result_t spn_cli_session(sp_cli_t* cli, spn_session_config_t config) {
-  try(spn_cli_parse_profile(cli, &config.profile));
+sp_cli_result_t spn_cli_session(spn_session_config_t config) {
+  try(spn_cli_parse_profile(&config.profile));
   return spn_ctx_open_session(host.ctx, &config, &host.session) ? SP_CLI_ERR : SP_CLI_OK;
 }
 
@@ -73,10 +74,10 @@ sp_cli_result_t spn_cli_op(spn_op_t* op) {
   return err ? SP_CLI_ERR : SP_CLI_OK;
 }
 
-sp_cli_result_t spn_cli_error(sp_cli_t* cli, const c8* fmt, ...) {
+sp_cli_result_t spn_cli_usage(const c8* fmt, ...) {
   va_list args;
   va_start(args, fmt);
-  sp_str_t message = sp_fmt_mem_v(host.mem, sp_cstr_as_str(fmt), args).value;
+  spn_tui_error_v(&tui, fmt, args);
   va_end(args);
-  return sp_cli_set_error(cli, message);
+  return SP_CLI_ERR;
 }
