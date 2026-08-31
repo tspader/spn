@@ -99,4 +99,13 @@ if [ "$GOT" != "$SHA" ]; then
 fi
 
 tar -xzf "${TMP}/${ASSET}" -C "$TMP" || fail "failed to extract ${ASSET}"
-"${TMP}/${EXE}" self install --auto
+
+# piped into sh, stdin is this script; hand the installer the terminal so it
+# can prompt, exactly the way rustup does
+if [ -t 0 ]; then
+  "${TMP}/${EXE}" self install
+elif [ -t 1 ] && (exec < /dev/tty) 2>/dev/null; then
+  "${TMP}/${EXE}" self install < /dev/tty
+else
+  "${TMP}/${EXE}" self install --auto
+fi

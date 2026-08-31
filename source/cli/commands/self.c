@@ -405,6 +405,7 @@ static sp_cli_result_t run_prompt(sp_cli_t* cli, sp_prompt_ctx_t* prompt, spn_in
       prompt_choices(prompt, s.mem, probe, &choices);
       if (sp_prompt_cancelled(prompt)) {
         sp_prompt_cancel(prompt, "cancelled");
+        status = SP_CLI_ERR;
         goto cleanup;
       }
     }
@@ -420,6 +421,7 @@ static sp_cli_result_t run_prompt(sp_cli_t* cli, sp_prompt_ctx_t* prompt, spn_in
     }
     if (!can_path || sp_prompt_cancelled(prompt)) {
       sp_prompt_cancel(prompt, "cancelled");
+      status = SP_CLI_ERR;
       goto cleanup;
     }
   }
