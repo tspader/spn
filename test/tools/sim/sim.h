@@ -26,6 +26,7 @@ typedef struct {
   sp_da(sp_sim_event_t) events;
   sp_sys_timespec_t clock;
   u64 granularity;
+  u64 autotick;
   u64 ids;
   u64 syscalls;
   sp_sim_fault_kind_t fault_kind;
@@ -44,6 +45,7 @@ void sp_sim_init(sp_sim_t* sim, sp_mem_t mem);
 void sp_sim_install(sp_sim_t* sim);
 void sp_sim_remove(sp_sim_t* sim);
 
+void sp_sim_advance(sp_sim_t* sim, u64 ns);
 bool sp_sim_touch(sp_sim_t* sim, sp_str_t path);
 bool sp_sim_stealth_write(sp_sim_t* sim, sp_str_t path, sp_str_t bytes);
 

@@ -108,11 +108,7 @@ static sp_sim_t* sp_sim_syscall_at(sp_sys_fd_t fd) {
 
 static void sp_sim_stamp(sp_sim_inode_t* node) {
   sp_sim_t* sim = sp_sim_active;
-  sim->clock.tv_nsec += 1000000;
-  if (sim->clock.tv_nsec >= 1000000000) {
-    sim->clock.tv_sec += 1;
-    sim->clock.tv_nsec -= 1000000000;
-  }
+  sp_sim_advance(sim, sim->autotick);
   u64 total = (u64)sim->clock.tv_sec * 1000000000ull + (u64)sim->clock.tv_nsec;
   total -= total % sim->granularity;
   node->mtime.tv_sec = (s64)(total / 1000000000ull);
@@ -981,6 +977,7 @@ void sp_sim_init(sp_sim_t* sim, sp_mem_t mem) {
     .fault_log = sp_da_new(mem, u64),
     .clock = { .tv_sec = 1 },
     .granularity = 1,
+    .autotick = 1000000,
     .ids = 1,
   };
   sp_str_ht_init(mem, sim->nodes);
@@ -995,6 +992,16 @@ void sp_sim_init(sp_sim_t* sim, sp_mem_t mem) {
     .bytes = sp_da_new(mem, u8),
   };
   sp_ht_insert(sim->nodes, sp_str_lit("/"), root);
+}
+
+void sp_sim_advance(sp_sim_t* sim, u64 ns) {
+  SP_ASSERT(sp_sim_active == sim);
+  sim->clock.tv_sec += (s64)(ns / 1000000000ull);
+  sim->clock.tv_nsec += (s64)(ns % 1000000000ull);
+  if (sim->clock.tv_nsec >= 1000000000) {
+    sim->clock.tv_sec += 1;
+    sim->clock.tv_nsec -= 1000000000;
+  }
 }
 
 bool sp_sim_touch(sp_sim_t* sim, sp_str_t path) {

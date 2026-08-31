@@ -81,6 +81,7 @@ typedef struct {
   u64 content;
   u64 entropy;
   u64 rate;
+  u64 tick;
 } fz_step_t;
 
 typedef struct {

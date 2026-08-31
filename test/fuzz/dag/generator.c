@@ -248,6 +248,13 @@ fz_universe_t fz_gen_universe(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_profile_t p
   return u;
 }
 
+static u64 pick_tick(sp_fuzz_prng_t* prng, fz_profile_t* profile) {
+  if (sp_fuzz_chance(prng, 1, 2)) {
+    return 0;
+  }
+  return sp_fuzz_range(prng, 1, 2 * profile->granularity);
+}
+
 fz_trace_t fz_gen_trace(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u) {
   fz_profile_t* profile = &u->profile;
   fz_trace_t trace = sp_zero;
@@ -262,6 +269,7 @@ fz_trace_t fz_gen_trace(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u) {
   sp_for(it, profile->steps) {
     fz_step_t step = sp_zero;
     step.kind = (fz_step_kind_t)sp_fuzz_weighted(prng, profile->step_weights, FZ_STEP_COUNT);
+    step.tick = pick_tick(prng, profile);
     switch (step.kind) {
       case FZ_STEP_MUTATE: {
         u64 source = sp_fuzz_below(prng, profile->source_count);
@@ -323,7 +331,7 @@ fz_trace_t fz_gen_trace(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u) {
     sp_da_push(trace.steps, step);
   }
 
-  sp_da_push(trace.steps, ((fz_step_t) { .kind = FZ_STEP_RUN }));
+  sp_da_push(trace.steps, ((fz_step_t) { .kind = FZ_STEP_RUN, .tick = pick_tick(prng, profile) }));
   return trace;
 }
 

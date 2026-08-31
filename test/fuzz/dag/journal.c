@@ -115,16 +115,16 @@ void fz_journal_universe(fz_journal_t* j, fz_universe_t* u, fz_trace_t* trace, u
 
   sp_da_for(trace->steps, st) {
     fz_step_t* step = &trace->steps[st];
-    emit(j, sp_fmt(mem, "\"ev\":\"plan\",\"i\":{},\"kind\":\"{}\",\"artifact\":{},\"content\":{},\"rate\":{}",
-      sp_fmt_uint(st), sp_fmt_str(step_kind_str(step->kind)), sp_fmt_uint(step->artifact), sp_fmt_uint(step->content), sp_fmt_uint(step->rate)).value);
+    emit(j, sp_fmt(mem, "\"ev\":\"plan\",\"i\":{},\"kind\":\"{}\",\"artifact\":{},\"content\":{},\"rate\":{},\"tick\":{}",
+      sp_fmt_uint(st), sp_fmt_str(step_kind_str(step->kind)), sp_fmt_uint(step->artifact), sp_fmt_uint(step->content), sp_fmt_uint(step->rate), sp_fmt_uint(step->tick)).value);
   }
 }
 
 void fz_journal_step(fz_journal_t* j, fz_step_t* step, u64 index) {
   if (!j) return;
-  emit(j, sp_fmt(j->mem, "\"ev\":\"step\",\"i\":{},\"kind\":\"{}\",\"artifact\":{},\"content\":{},\"rate\":{},\"sys\":{}",
+  emit(j, sp_fmt(j->mem, "\"ev\":\"step\",\"i\":{},\"kind\":\"{}\",\"artifact\":{},\"content\":{},\"rate\":{},\"tick\":{},\"sys\":{}",
     sp_fmt_uint(index), sp_fmt_str(step_kind_str(step->kind)), sp_fmt_uint(step->artifact),
-    sp_fmt_uint(step->content), sp_fmt_uint(step->rate), sp_fmt_uint(sys_now(j))).value);
+    sp_fmt_uint(step->content), sp_fmt_uint(step->rate), sp_fmt_uint(step->tick), sp_fmt_uint(sys_now(j))).value);
 }
 
 static sp_str_t run_err_str(u64 err) {
