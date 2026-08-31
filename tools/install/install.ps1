@@ -61,6 +61,10 @@ if (-not $Targets.ContainsKey($TargetName)) {
 }
 $Target = $Targets[$TargetName]
 
+# irm | iex runs in the caller's session, so the switch must not outlive us
+$SavedNoModifyPath = $env:SPN_INSTALL_NO_MODIFY_PATH
+$SkipPath = $NoModifyPath -or $SavedNoModifyPath
+
 $Stage = New-Item -ItemType Directory -Path (Join-Path ([IO.Path]::GetTempPath()) "spn-install-$([Guid]::NewGuid())")
 try {
   $Archive = Join-Path $Stage $Target.Asset
@@ -74,7 +78,7 @@ try {
   }
 
   Expand-Archive -Path $Archive -DestinationPath $Stage -Force
-  if ($NoModifyPath) {
+  if ($SkipPath) {
     $env:SPN_INSTALL_NO_MODIFY_PATH = "1"
   }
   & (Join-Path $Stage $Target.Exe) self install --auto
@@ -82,10 +86,11 @@ try {
     throw "install: spn self install failed"
   }
 } finally {
+  $env:SPN_INSTALL_NO_MODIFY_PATH = $SavedNoModifyPath
   Remove-Item -Recurse -Force $Stage -ErrorAction SilentlyContinue
 }
 
 $Bin = Join-Path $Home ".spn\bin"
-if (-not $env:SPN_INSTALL_NO_MODIFY_PATH -and (($env:Path -split ';') -notcontains $Bin)) {
+if (-not $SkipPath -and (($env:Path -split ';') -notcontains $Bin)) {
   $env:Path = "$Bin;$env:Path"
 }
