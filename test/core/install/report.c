@@ -11,7 +11,6 @@ typedef struct {
 typedef struct {
   const c8* name;
   install_world_t world;
-  bool fatal;
   u32 stuck [2];
   u32 num_stuck;
   msg_spec_t expect [SPN_INSTALL_MAX_MSGS];
@@ -158,11 +157,6 @@ static const test_t tests [] = {
       { SPN_INSTALL_MSG_STUCK_REGISTRY },
     },
   },
-  {
-    .name = "fatal",
-    .world = { INSTALL_WORLD_UNIX },
-    .fatal = true,
-  },
 };
 
 sp_test_each(install_report, messages, test_t, tests) {
@@ -174,10 +168,6 @@ sp_test_each(install_report, messages, test_t, tests) {
   spn_install_plan_t plan = spn_install_plan(sp_test_arena(t), &layout, &facts);
 
   spn_install_result_t result = sp_zero;
-  if (it->fatal) {
-    result.err = SP_ERR;
-    result.failed = plan.install[0];
-  }
   sp_for(at, it->num_stuck) {
     sp_must_lt(t, it->stuck[at], plan.num_path);
     result.stuck[result.num_stuck++] = it->stuck[at];

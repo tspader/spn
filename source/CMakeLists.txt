@@ -64,9 +64,8 @@ set(SPN_SOURCES
   core/index/jsonl.c
   core/index/json.c
   core/index/publish.c
-  cli/install/exec.c
+  cli/install/install.c
   cli/install/plan.c
-  cli/install/probe.c
   cli/install/report.c
   cli/install/resolve.c
   core/intern/context.c

@@ -49,30 +49,29 @@ static void print_msg(spn_install_msg_t* msg) {
 static sp_cli_result_t install(sp_cli_t* cli) {
   spn_tui_handoff(&tui);
 
-  sp_mem_t mem = host.mem;
-  sp_env_t env = sp_env_capture(mem);
-  spn_install_layout_t layout = spn_install_resolve(mem, spn_install_os_host(), &env);
-  switch (layout.err) {
-    case SPN_INSTALL_OK: break;
-    case SPN_INSTALL_ERR_NO_HOME: return spn_cli_error(cli, "HOME is not set; set SPN_INSTALL to choose an install directory");
-    case SPN_INSTALL_ERR_ROOT_CHARS: return spn_cli_error(cli, "SPN_INSTALL may not contain a quote, dollar sign, backtick, or backslash");
+  spn_install_t result = spn_install(host.mem);
+  sp_for(it, result.msgs.count) {
+    print_msg(&result.msgs.items[it]);
   }
 
-  spn_install_facts_t facts = spn_install_probe(mem, &layout);
-  spn_install_plan_t plan = spn_install_plan(mem, &layout, &facts);
-  spn_install_result_t result = spn_install_execute(&plan);
-  spn_install_msgs_t msgs = spn_install_report(&layout, &facts, &plan, &result);
-  sp_for(it, msgs.count) {
-    print_msg(&msgs.items[it]);
-  }
-
-  if (result.err) {
-    switch (result.failed.kind) {
-      case SPN_INSTALL_ACTION_INSTALL_EXE: {
-        return spn_cli_error(cli, "failed to replace {}; close any running spn and retry", sp_fmt_str(result.failed.path));
-      }
-      default: {
-        return spn_cli_error(cli, "failed to create {}", sp_fmt_str(result.failed.path));
+  switch (result.err) {
+    case SPN_INSTALL_OK: {
+      return SP_CLI_OK;
+    }
+    case SPN_INSTALL_ERR_NO_HOME: {
+      return spn_cli_error(cli, "HOME is not set; set SPN_INSTALL to choose an install directory");
+    }
+    case SPN_INSTALL_ERR_ROOT_CHARS: {
+      return spn_cli_error(cli, "SPN_INSTALL may not contain a quote, dollar sign, backtick, or backslash");
+    }
+    case SPN_INSTALL_ERR_ACTION: {
+      switch (result.failed.kind) {
+        case SPN_INSTALL_ACTION_INSTALL_EXE: {
+          return spn_cli_error(cli, "failed to replace {}; close any running spn and retry", sp_fmt_str(result.failed.path));
+        }
+        default: {
+          return spn_cli_error(cli, "failed to create {}", sp_fmt_str(result.failed.path));
+        }
       }
     }
   }

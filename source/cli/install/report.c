@@ -25,10 +25,6 @@ static void push(spn_install_msgs_t* msgs, spn_install_msg_t msg) {
 
 spn_install_msgs_t spn_install_report(spn_install_layout_t* layout, spn_install_facts_t* facts, spn_install_plan_t* plan, spn_install_result_t* result) {
   spn_install_msgs_t msgs = sp_zero;
-  if (result->err) {
-    return msgs;
-  }
-
   push(&msgs, (spn_install_msg_t) { .kind = SPN_INSTALL_MSG_INSTALLED, .subject = layout->exe });
 
   stuck_t stuck = classify_stuck(plan, result);

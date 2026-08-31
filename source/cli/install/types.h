@@ -17,6 +17,7 @@ typedef enum {
   SPN_INSTALL_OK = 0,
   SPN_INSTALL_ERR_NO_HOME,
   SPN_INSTALL_ERR_ROOT_CHARS,
+  SPN_INSTALL_ERR_ACTION,
 } spn_install_err_t;
 
 typedef enum {
@@ -134,5 +135,11 @@ typedef struct {
   spn_install_msg_t items [SPN_INSTALL_MAX_MSGS];
   u32 count;
 } spn_install_msgs_t;
+
+typedef struct {
+  spn_install_err_t err;
+  spn_install_action_t failed;
+  spn_install_msgs_t msgs;
+} spn_install_t;
 
 #endif

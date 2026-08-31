@@ -67,10 +67,8 @@ add_executable(core
   index/release.c
   index/sync.c
   index/transaction.c
-  install/exec.c
   install/harness.c
   install/plan.c
-  install/probe.c
   install/render.c
   install/report.c
   install/resolve.c
@@ -180,9 +178,7 @@ add_executable(core
   ${SRC}/index/jsonl.c
   ${SRC}/index/json.c
   ${SRC}/index/publish.c
-  ${CLI}/install/exec.c
   ${CLI}/install/plan.c
-  ${CLI}/install/probe.c
   ${CLI}/install/report.c
   ${CLI}/install/resolve.c
   ${SRC}/intern/context.c

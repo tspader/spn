@@ -4,14 +4,6 @@
 #include "os/os.h"
 #include "str/str.h"
 
-spn_install_os_t spn_install_os_host() {
-#if defined(SP_WIN32)
-  return SPN_INSTALL_OS_WINDOWS;
-#else
-  return SPN_INSTALL_OS_UNIX;
-#endif
-}
-
 static bool root_chars_valid(sp_str_t root) {
   sp_str_for(root, it) {
     c8 c = root.data[it];
