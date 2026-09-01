@@ -7,20 +7,21 @@
 #include "pkg/patch.h"
 #include "profile/types.h"
 #include "target/mutate.h"
+#include "when/when.h"
 
 sp_test_suite(pkg, .serial = true);
 
 static spn_pkg_info_t make_pkg(sp_mem_t mem) {
   spn_pkg_info_t pkg = spn_pkg_new(mem, sp_str_lit("A"));
   pkg.macos.min_os = (spn_os_version_t) { .major = 12 };
-  sp_da_push(pkg.macos.frameworks, sp_str_lit("A"));
+  sp_da_push(pkg.gated.frameworks, ((spn_gated_str_t) { .value = sp_str_lit("A") }));
 
   spn_target_info_t bin = {
     .name = sp_str_lit("A"),
     .kind = SPN_TARGET_KIND_EXE,
   };
   spn_target_info_init(mem, &bin);
-  sp_da_push(bin.macos.frameworks, sp_str_lit("B"));
+  sp_da_push(bin.gated.frameworks, ((spn_gated_str_t) { .value = sp_str_lit("B") }));
   bin.windows.subsystem = SPN_WIN_SUBSYSTEM_WINDOWS;
   sp_str_om_insert(pkg.exes, bin.name, bin);
 
@@ -30,6 +31,9 @@ static spn_pkg_info_t make_pkg(sp_mem_t mem) {
 typedef enum {
   PKG_EDIT_NONE,
   PKG_EDIT_MACOS_MIN_OS,
+  PKG_EDIT_MACOS_FRAMEWORK,
+  PKG_EDIT_MACOS_FRAMEWORK_WHEN,
+  PKG_EDIT_TARGET_FRAMEWORK,
   PKG_EDIT_TARGET_SUBSYSTEM,
   PKG_EDIT_PROFILE_SYSROOT,
 } pkg_edit_t;
@@ -52,6 +56,10 @@ static const hash_platform_test_t hash_platform_tests [] = {
   { .name = "hash_windows",                   .profile = { .os = SPN_OS_WINDOWS }, .expect = { .hashed = true } },
   { .name = "track_macos_min_os",             .profile = { .os = SPN_OS_MACOS },   .edit = PKG_EDIT_MACOS_MIN_OS,     .expect = { .hashed = true, .changed = true } },
   { .name = "ignore_macos_edit_on_windows",   .profile = { .os = SPN_OS_WINDOWS }, .edit = PKG_EDIT_MACOS_MIN_OS,     .expect = { .hashed = true } },
+  { .name = "track_macos_framework",          .profile = { .os = SPN_OS_MACOS },   .edit = PKG_EDIT_MACOS_FRAMEWORK,  .expect = { .hashed = true, .changed = true } },
+  { .name = "track_macos_framework_when",     .profile = { .os = SPN_OS_MACOS },   .edit = PKG_EDIT_MACOS_FRAMEWORK_WHEN, .expect = { .hashed = true, .changed = true } },
+  { .name = "track_target_framework",         .profile = { .os = SPN_OS_MACOS },   .edit = PKG_EDIT_TARGET_FRAMEWORK, .expect = { .hashed = true, .changed = true } },
+  { .name = "ignore_framework_edit_on_windows", .profile = { .os = SPN_OS_WINDOWS }, .edit = PKG_EDIT_MACOS_FRAMEWORK, .expect = { .hashed = true } },
   { .name = "track_windows_subsystem",        .profile = { .os = SPN_OS_WINDOWS }, .edit = PKG_EDIT_TARGET_SUBSYSTEM, .expect = { .hashed = true, .changed = true } },
   { .name = "ignore_subsystem_edit_on_macos", .profile = { .os = SPN_OS_MACOS },   .edit = PKG_EDIT_TARGET_SUBSYSTEM, .expect = { .hashed = true } },
   { .name = "track_profile_sysroot",          .profile = { .os = SPN_OS_MACOS },   .edit = PKG_EDIT_PROFILE_SYSROOT,  .expect = { .hashed = true, .changed = true } },
@@ -70,6 +78,20 @@ sp_test_each(pkg, hash_platform, hash_platform_test_t, hash_platform_tests, .set
     }
     case PKG_EDIT_MACOS_MIN_OS: {
       pkg.macos.min_os = (spn_os_version_t) { .major = 13 };
+      break;
+    }
+    case PKG_EDIT_MACOS_FRAMEWORK: {
+      sp_da_push(pkg.gated.frameworks, ((spn_gated_str_t) { .value = sp_str_lit("C") }));
+      break;
+    }
+    case PKG_EDIT_MACOS_FRAMEWORK_WHEN: {
+      spn_when_t when = { .clauses = sp_da_new(mem, spn_when_clause_t) };
+      sp_da_push(when.clauses, ((spn_when_clause_t) { .key = sp_str_lit("os"), .value = spn_option_value_str(sp_str_lit("macos")) }));
+      pkg.gated.frameworks[0].when = when;
+      break;
+    }
+    case PKG_EDIT_TARGET_FRAMEWORK: {
+      sp_da_push(spn_pkg_get_target(&pkg, "A")->gated.frameworks, ((spn_gated_str_t) { .value = sp_str_lit("C") }));
       break;
     }
     case PKG_EDIT_TARGET_SUBSYSTEM: {

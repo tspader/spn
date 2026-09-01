@@ -37,6 +37,7 @@ void spn_pkg_init(sp_mem_t mem, spn_pkg_info_t* pkg, sp_str_t name) {
   sp_da_init(a, pkg->gated.system_deps);
   sp_da_init(a, pkg->gated.include);
   sp_da_init(a, pkg->gated.define);
+  sp_da_init(a, pkg->gated.frameworks);
   sp_str_om_init(pkg->options);
 }
 

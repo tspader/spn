@@ -61,6 +61,7 @@ static const test_t tests [] = {
   { "when_not" },
   { "when_source" },
   { "when_values" },
+  { "when_frameworks" },
 };
 
 static spn_toml_loader_t loader_new(sp_mem_t mem) {

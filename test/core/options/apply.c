@@ -28,6 +28,8 @@ typedef struct {
   const c8* deps [4];
   const c8* sys [4];
   const c8* pkg_define [4];
+  const c8* frameworks [4];
+  const c8* pkg_frameworks [4];
 } apply_expect_t;
 
 typedef struct {
@@ -46,6 +48,8 @@ typedef struct {
   apply_list_t deps;
   apply_list_t sys;
   apply_list_t pkg_define;
+  apply_list_t frameworks;
+  apply_list_t pkg_frameworks;
   apply_expect_t expect;
 } apply_test_t;
 
@@ -317,6 +321,32 @@ static const apply_test_t list_tests [] = {
     },
   },
   {
+    .name = "target_frameworks",
+    .facts = { .os = SPN_OS_MACOS },
+    .frameworks = {
+      .values = {
+        { .value = "A", .when = { { "os", "macos" } } },
+        { .value = "B", .when = { { "os", "linux" } } },
+      },
+    },
+    .expect = {
+      .frameworks = { "A" },
+    },
+  },
+  {
+    .name = "package_frameworks",
+    .facts = { .os = SPN_OS_MACOS },
+    .pkg_frameworks = {
+      .values = {
+        { .value = "A", .when = { { "os", "macos" } } },
+        { .value = "B", .when = { { "os", "linux" } } },
+      },
+    },
+    .expect = {
+      .pkg_frameworks = { "A" },
+    },
+  },
+  {
     .name = "applies_once",
     .facts = { .os = SPN_OS_LINUX, .mode = SPN_MODE_DEBUG },
     .reapply = true,
@@ -370,6 +400,8 @@ sp_test_each(options_apply, lists, apply_test_t, list_tests) {
     { it->deps, &exe->deps, &exe->gated.deps, it->expect.deps },
     { it->sys, &info.system_deps, &info.gated.system_deps, it->expect.sys, },
     { it->pkg_define, &info.define, &info.gated.define, it->expect.pkg_define },
+    { it->frameworks, &exe->macos.frameworks, &exe->gated.frameworks, it->expect.frameworks },
+    { it->pkg_frameworks, &info.macos.frameworks, &info.gated.frameworks, it->expect.pkg_frameworks },
   };
   sp_carr_for(path_lists, lt) {
     make_path_list(mem, path_lists[lt].test, path_lists[lt].plain, path_lists[lt].gated);

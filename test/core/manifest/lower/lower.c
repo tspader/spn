@@ -33,6 +33,7 @@ typedef struct {
   gated_t flags [4];
   gated_t system_deps [4];
   gated_t deps [4];
+  gated_t frameworks [4];
   spn_cxx_options_t cxx;
 } target_t;
 
@@ -137,6 +138,7 @@ typedef struct {
   gated_t build_include [4];
   gated_t define [8];
   gated_t system_deps [8];
+  gated_t frameworks [4];
   issue_t issues [7];
   target_t libs [8];
   target_t exes [8];
@@ -800,6 +802,34 @@ static const test_t tests [] = {
     .define = { { "A" }, { "B", "os = \"windows\"" } },
   },
   {
+    .name = "frameworks_gated",
+    .manifest = "frameworks_gated",
+    .frameworks = { { "Cocoa" }, { "GSS", "negotiate = true" } },
+    .libs = {
+      {
+        .name = "t",
+        .linkages = { .static_lib = true },
+        .frameworks = { { "Metal" }, { "IOKit", "os = \"macos\"" } },
+      },
+    },
+  },
+  {
+    .name = "validate_frameworks_when_unknown_key",
+    .manifest = "validate_frameworks_when_unknown_key",
+    .frameworks = { { "GSS", "simd = \"avx2\"" } },
+    .libs = {
+      {
+        .name = "t",
+        .linkages = { .static_lib = true },
+        .frameworks = { { "Metal", "simd = \"avx2\"" } },
+      },
+    },
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "lib[0].macos.frameworks[0].when.simd" },
+      { SPN_ERR_CODEGEN_INVALID, "package.macos.frameworks[0].when.simd" },
+    },
+  },
+  {
     .name = "validate_package_define_when_unknown_key",
     .manifest = "validate_package_define_when_unknown_key",
     .define = { { "A" }, { "B", "simd = \"avx2\"" } },
@@ -1055,6 +1085,8 @@ static sp_err_t check_targets(sp_test_t* t, spn_target_map_t om, const target_t*
     check_gated(t, info->gated.flags, arr[i].flags);
     check_gated(t, info->gated.system_deps, arr[i].system_deps);
     check_gated(t, info->gated.deps, arr[i].deps);
+    sp_expect_eq(t, (u32)0, (u32)sp_da_size(info->macos.frameworks));
+    check_gated(t, info->gated.frameworks, arr[i].frameworks);
     sp_expect_eq(t, (u32)arr[i].cxx.standard, (u32)info->cxx.standard);
     sp_expect_eq(t, arr[i].cxx.no_exceptions, info->cxx.no_exceptions);
     sp_expect_eq(t, arr[i].cxx.no_rtti, info->cxx.no_rtti);
@@ -1119,6 +1151,8 @@ sp_test_each(lower, cases, test_t, tests) {
   sp_expect_eq(t, (u32)0, (u32)sp_da_size(pkg.define));
   check_gated(t, pkg.gated.define, it->define);
   check_gated(t, pkg.gated.system_deps, it->system_deps);
+  sp_expect_eq(t, (u32)0, (u32)sp_da_size(pkg.macos.frameworks));
+  check_gated(t, pkg.gated.frameworks, it->frameworks);
   sp_expect_eq(t, (u32)0, (u32)sp_da_size(pkg.include));
   check_gated_paths(t, pkg.gated.include, it->include);
   check_gated_paths(t, pkg.build.gated.source, it->build_source);

@@ -1,0 +1,12 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[package.macos]
+frameworks = ["Cocoa", { value = "GSS", when = { negotiate = true } }]
+
+[[lib]]
+name = "t"
+
+[lib.macos]
+frameworks = [{ value = "Metal", when = { os = "macos" } }]

@@ -29,7 +29,7 @@
 
     "platform_macos": {
       "optionalProperties": {
-        "frameworks": { "elements": { "type": "string" } },
+        "frameworks": { "elements": { "ref": "value_entry" }, "metadata": { "shorthand": "value" } },
         "min_os": { "metadata": { "extern": "os_version" } }
       }
     },

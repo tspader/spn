@@ -1,0 +1,32 @@
+{
+  "package": {
+    "name": "p",
+    "version": "1.0.0",
+    "macos": {
+      "frameworks": [
+        "Cocoa",
+        {
+          "value": "GSS",
+          "when": {
+            "negotiate": true
+          }
+        }
+      ]
+    }
+  },
+  "lib": {
+    "t": {
+      "name": "t",
+      "macos": {
+        "frameworks": [
+          {
+            "value": "Metal",
+            "when": {
+              "os": "macos"
+            }
+          }
+        ]
+      }
+    }
+  }
+}

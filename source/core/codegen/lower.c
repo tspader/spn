@@ -128,7 +128,6 @@ static spn_target_info_t lower_target(spn_toml_loader_t* ctx, const spn_cg_targe
     .no_link = sp_opt_is_null(cg->link) ? false : !sp_opt_get(cg->link),
     .cxx = lower_cxx_options(&cg->cxx),
     .macos = {
-      .frameworks = cg->macos.frameworks,
       .min_os = cg->macos.min_os,
     },
     .windows = {
@@ -142,6 +141,7 @@ static spn_target_info_t lower_target(spn_toml_loader_t* ctx, const spn_cg_targe
       .flags = lower_gated_values(ctx, cg->flags),
       .system_deps = lower_gated_values(ctx, cg->system_deps),
       .deps = sp_da_new(ctx->mem, spn_gated_str_t),
+      .frameworks = lower_gated_values(ctx, cg->macos.frameworks),
     },
   };
   sp_da_for(cg->deps, it) {
@@ -238,7 +238,8 @@ static void lower_package(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, s
   sp_da_for(p->system_deps, it) {
     sp_da_push(info->gated.system_deps, ((spn_gated_str_t) { .value = p->system_deps[it].lib, .when = p->system_deps[it].when }));
   }
-  info->macos.frameworks = p->macos.frameworks ? p->macos.frameworks : sp_da_new(ctx->mem, sp_str_t);
+  info->macos.frameworks = sp_da_new(ctx->mem, sp_str_t);
+  info->gated.frameworks = lower_gated_values(ctx, p->macos.frameworks);
   info->macos.min_os = p->macos.min_os;
   info->build = lower_metaprogram(ctx, &p->build, sp_str_lit("build"), SPN_TARGET_KIND_BUILD_METAPROGRAM);
   info->configure = lower_metaprogram(ctx, &p->configure, sp_str_lit("configure"), SPN_TARGET_KIND_CONFIGURE_METAPROGRAM);
@@ -678,6 +679,9 @@ static void validate_target_whens(spn_toml_loader_t* ctx, spn_cg_target_om_t tar
     validate_value_whens(ctx, target->define, "define", out);
     validate_value_whens(ctx, target->flags, "flags", out);
     validate_value_whens(ctx, target->system_deps, "system_deps", out);
+    spn_toml_loader_push_key(ctx, "macos");
+    validate_value_whens(ctx, target->macos.frameworks, "frameworks", out);
+    spn_toml_loader_pop(ctx);
     spn_toml_loader_push_key(ctx, "deps");
     sp_da_for(target->deps, jt) {
       spn_toml_loader_push_index(ctx, jt);
@@ -701,6 +705,9 @@ static void validate_pkg_whens(spn_toml_loader_t* ctx, const spn_cg_manifest_t* 
   spn_toml_loader_pop(ctx);
   validate_source_whens(ctx, cg->package.include, "include", out);
   validate_value_whens(ctx, cg->package.define, "define", out);
+  spn_toml_loader_push_key(ctx, "macos");
+  validate_value_whens(ctx, cg->package.macos.frameworks, "frameworks", out);
+  spn_toml_loader_pop(ctx);
   spn_toml_loader_pop(ctx);
 }
 

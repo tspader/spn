@@ -183,6 +183,7 @@ struct spn_pkg_info {
     spn_gated_list_t system_deps;
     spn_gated_path_list_t include;
     spn_gated_list_t define;
+    spn_gated_list_t frameworks;
   } gated;
   spn_toolchain_map_t toolchains;
   spn_target_info_t build;
