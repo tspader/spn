@@ -15,6 +15,7 @@
 #define TARGET_ARM_LINUX_GNU  { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_GNU }
 #define TARGET_ARM_LINUX_MUSL { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_MUSL }
 #define TARGET_ARM_MACOS      { SPN_ARCH_ARM64, SPN_OS_MACOS, SPN_ABI_APPLE }
+#define TARGET_ARM_BARE       { SPN_ARCH_ARM64, SPN_OS_FREESTANDING, SPN_ABI_BARE }
 
 typedef struct {
   spn_err_t err;
@@ -192,10 +193,11 @@ static const complete_test_t complete_tests [] = {
   },
   {
     .name = "cross_single_abi_os_completes",
-    .targets = { TARGET_ARM_MACOS, TARGET_WASM },
+    .targets = { TARGET_ARM_MACOS, TARGET_WASM, TARGET_ARM_BARE },
     .checks = {
       { .target = { .arch = SPN_ARCH_ARM64, .os = SPN_OS_MACOS }, .triple = TARGET_ARM_MACOS },
       { .target = { .arch = SPN_ARCH_WASM32, .os = SPN_OS_WASI }, .triple = TARGET_WASM },
+      { .target = { .arch = SPN_ARCH_ARM64, .os = SPN_OS_FREESTANDING }, .triple = TARGET_ARM_BARE },
       { .target = { .arch = SPN_ARCH_ARM64, .os = SPN_OS_MACOS, .abi = SPN_ABI_GNU }, .err = SPN_ERR_TOOLCHAIN_TARGET },
     },
   },
