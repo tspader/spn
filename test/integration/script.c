@@ -423,6 +423,26 @@ sp_test(script, embed) {
   });
 }
 
+sp_test(script, embed_cross_linux_aarch64) {
+  return run_command_test(t, (command_test_t) {
+    .project = "test/integration/fixtures/script/embed",
+    .copy = { "hello.txt" },
+    .when.target = "aarch64-linux-musl",
+    .args = { "build", "--target", "aarch64-linux-musl" },
+    .expect = { .exists = { target_exe("main", "aarch64-linux-musl") } },
+  });
+}
+
+sp_test(script, embed_cross_windows_aarch64) {
+  return run_command_test(t, (command_test_t) {
+    .project = "test/integration/fixtures/script/embed",
+    .copy = { "hello.txt" },
+    .when.target = "aarch64-windows-gnu",
+    .args = { "build", "--target", "aarch64-windows-gnu" },
+    .expect = { .exists = { target_exe("main", "aarch64-windows-gnu") } },
+  });
+}
+
 sp_test(script, input_order) {
   return sp_test_skip(t, "pending: canonicalize declared node input/output order in DAG construction");
 

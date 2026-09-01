@@ -11,10 +11,16 @@ typedef enum {
   EMBED_FORMAT_MACHO,
 } embed_format_t;
 
+typedef enum {
+  EMBED_ARCH_X86_64,
+  EMBED_ARCH_AARCH64,
+} embed_arch_t;
+
 typedef struct {
   const c8* output;
   const c8* header;
   const c8* format;
+  const c8* arch;
 } embed_t;
 
 typedef struct {
@@ -33,11 +39,11 @@ typedef struct {
   } macho;
 } embed_obj_t;
 
-static embed_obj_t embed_obj_new(sp_mem_t mem, embed_format_t format) {
+static embed_obj_t embed_obj_new(sp_mem_t mem, embed_format_t format, embed_arch_t arch) {
   embed_obj_t obj = { .format = format };
   switch (format) {
     case EMBED_FORMAT_ELF: {
-      obj.elf.elf = sp_elf_new(mem);
+      obj.elf.elf = sp_elf_new(mem, arch == EMBED_ARCH_X86_64 ? EM_X86_64 : EM_AARCH64);
       obj.elf.rodata = sp_elf_add_section(obj.elf.elf, (sp_elf_section_t){
         .name = sp_str_lit(".rodata"),
         .type = SHT_PROGBITS,
@@ -47,7 +53,7 @@ static embed_obj_t embed_obj_new(sp_mem_t mem, embed_format_t format) {
       break;
     }
     case EMBED_FORMAT_COFF: {
-      obj.coff.coff = sp_coff_new(mem);
+      obj.coff.coff = sp_coff_new(mem, arch == EMBED_ARCH_X86_64 ? SP_COFF_MACHINE_AMD64 : SP_COFF_MACHINE_ARM64);
       obj.coff.rdata = sp_coff_add_section(
         obj.coff.coff,
         sp_str_lit(".rdata"),
@@ -55,12 +61,12 @@ static embed_obj_t embed_obj_new(sp_mem_t mem, embed_format_t format) {
       break;
     }
     case EMBED_FORMAT_MACHO: {
-      // Only produced for the host; cross targets are elf/coff
-#if defined(__x86_64__)
-      obj.macho.macho = sp_macho_new(mem, SP_MACHO_CPU_X86_64, SP_MACHO_SUBTYPE_X86_64);
-#else
-      obj.macho.macho = sp_macho_new(mem, SP_MACHO_CPU_ARM64, SP_MACHO_SUBTYPE_ARM64);
-#endif
+      if (arch == EMBED_ARCH_X86_64) {
+        obj.macho.macho = sp_macho_new(mem, SP_MACHO_CPU_X86_64, SP_MACHO_SUBTYPE_X86_64);
+      }
+      else {
+        obj.macho.macho = sp_macho_new(mem, SP_MACHO_CPU_ARM64, SP_MACHO_SUBTYPE_ARM64);
+      }
       obj.macho.konst = sp_macho_add_section(obj.macho.macho, sp_str_lit("__TEXT"), sp_str_lit("__const"), 3);
       break;
     }
@@ -202,7 +208,25 @@ sp_cli_result_t embed_run(sp_cli_t* cli) {
     }
   }
 
-  embed_obj_t obj = embed_obj_new(mem, format);
+#if defined(__x86_64__) || defined(_M_X64)
+  embed_arch_t arch = EMBED_ARCH_X86_64;
+#else
+  embed_arch_t arch = EMBED_ARCH_AARCH64;
+#endif
+  if (embed->arch) {
+    sp_str_t name = sp_str_view(embed->arch);
+    if (sp_str_equal(name, sp_str_lit("x86_64"))) {
+      arch = EMBED_ARCH_X86_64;
+    }
+    else if (sp_str_equal(name, sp_str_lit("aarch64"))) {
+      arch = EMBED_ARCH_AARCH64;
+    }
+    else {
+      return sp_cli_set_error(cli, sp_fmt(mem, "unknown arch {.red}", sp_fmt_str(name)).value);
+    }
+  }
+
+  embed_obj_t obj = embed_obj_new(mem, format, arch);
 
   sp_da(embed_entry_t) entries = SP_NULLPTR;
   sp_da_init(mem, entries);
@@ -306,6 +330,13 @@ s32 embed_main(s32 num_args, const c8** args) {
         .summary = "Object format to write: elf, coff, or macho (defaults to elf)",
         .placeholder = "format",
         .ptr = &embed.format,
+      },
+      {
+        .name = "arch",
+        .kind = SP_CLI_OPT_CSTR,
+        .summary = "Architecture to write: x86_64 or aarch64 (defaults to the host)",
+        .placeholder = "arch",
+        .ptr = &embed.arch,
       },
     },
     .args = {

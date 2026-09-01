@@ -39,6 +39,7 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 else()
   set(EMBED_FORMAT elf)
 endif()
+string(REGEX MATCH "^[^-]+" EMBED_ARCH ${TRIPLE})
 
 file(GLOB SPN_INIT_TEMPLATES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/assets/init/*)
 add_custom_command(
@@ -46,6 +47,7 @@ add_custom_command(
   COMMAND $<TARGET_FILE:embed>
     --header ${EMBED_HDR}
     --format ${EMBED_FORMAT}
+    --arch ${EMBED_ARCH}
     ${EMBED_OBJ}
     ${CMAKE_SOURCE_DIR}/include/spn.h=include/spn.h
     ${CMAKE_SOURCE_DIR}/include/spn/core.h=include/spn/core.h

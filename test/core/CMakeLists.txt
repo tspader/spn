@@ -53,6 +53,7 @@ add_executable(core
   dag/tree.c
   dag/track.c
   dag/wasm.c
+  external/obj.c
   gen/lower.c
   gen/reader.c
   git/fixture.c
@@ -165,6 +166,7 @@ add_executable(core
   ${SRC}/error/json.c
   ${SRC}/event/event.c
   ${SRC}/external/git.c
+  ${SRC}/external/obj.c
   ${SRC}/external/tom.c
   ${SRC}/external/wasm/script.c
   ${SRC}/filter/filter.c
@@ -203,6 +205,9 @@ add_executable(core
   ${SRC}/hash/digest/digest.c
   ${SRC}/hash/sha256/sha256.c
   ${UTIL}/atomic_file/atomic_file.c
+  ${UTIL}/coff/coff.c
+  ${UTIL}/macho/macho.c
+  ${UTIL}/sp_elf/sp_elf.c
   ${UTIL}/fs/fs.c
   ${UTIL}/io/io.c
   ${UTIL}/os/os.c
