@@ -27,6 +27,7 @@ typedef struct {
   const c8* sys_target [4];
   const c8* deps [4];
   const c8* sys [4];
+  const c8* pkg_define [4];
 } apply_expect_t;
 
 typedef struct {
@@ -44,6 +45,7 @@ typedef struct {
   apply_list_t sys_target;
   apply_list_t deps;
   apply_list_t sys;
+  apply_list_t pkg_define;
   apply_expect_t expect;
 } apply_test_t;
 
@@ -302,6 +304,19 @@ static const apply_test_t list_tests [] = {
     },
   },
   {
+    .name = "package_define",
+    .facts = { .os = SPN_OS_LINUX },
+    .pkg_define = {
+      .values = {
+        { .value = "A", .when = { { "os", "linux" } } },
+        { .value = "B", .when = { { "os", "windows" } } },
+      },
+    },
+    .expect = {
+      .pkg_define = { "A" },
+    },
+  },
+  {
     .name = "applies_once",
     .facts = { .os = SPN_OS_LINUX, .mode = SPN_MODE_DEBUG },
     .reapply = true,
@@ -354,6 +369,7 @@ sp_test_each(options_apply, lists, apply_test_t, list_tests) {
     { it->sys_target, &exe->system_deps, &exe->gated.system_deps, it->expect.sys_target, },
     { it->deps, &exe->deps, &exe->gated.deps, it->expect.deps },
     { it->sys, &info.system_deps, &info.gated.system_deps, it->expect.sys, },
+    { it->pkg_define, &info.define, &info.gated.define, it->expect.pkg_define },
   };
   sp_carr_for(path_lists, lt) {
     make_path_list(mem, path_lists[lt].test, path_lists[lt].plain, path_lists[lt].gated);

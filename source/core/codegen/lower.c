@@ -230,7 +230,8 @@ static void lower_package(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, s
   }
   info->include = sp_da_new(ctx->mem, spn_path_t);
   info->gated.include = lower_gated_sources(ctx, p->include, true);
-  info->define = p->define ? p->define : sp_da_new(ctx->mem, sp_str_t);
+  info->define = sp_da_new(ctx->mem, sp_str_t);
+  info->gated.define = lower_gated_values(ctx, p->define);
   info->public_define = sp_da_new(ctx->mem, sp_str_t);
   info->system_deps = sp_da_new(ctx->mem, sp_str_t);
   info->gated.system_deps = sp_da_new(ctx->mem, spn_gated_str_t);
@@ -689,7 +690,7 @@ static void validate_target_whens(spn_toml_loader_t* ctx, spn_cg_target_om_t tar
   spn_toml_loader_pop(ctx);
 }
 
-static void validate_pkg_system_dep_whens(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
+static void validate_pkg_whens(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
   spn_toml_loader_push_key(ctx, "package");
   spn_toml_loader_push_key(ctx, "system_deps");
   sp_da_for(cg->package.system_deps, it) {
@@ -698,12 +699,8 @@ static void validate_pkg_system_dep_whens(spn_toml_loader_t* ctx, const spn_cg_m
     spn_toml_loader_pop(ctx);
   }
   spn_toml_loader_pop(ctx);
-  spn_toml_loader_pop(ctx);
-}
-
-static void validate_pkg_include_whens(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
-  spn_toml_loader_push_key(ctx, "package");
   validate_source_whens(ctx, cg->package.include, "include", out);
+  validate_value_whens(ctx, cg->package.define, "define", out);
   spn_toml_loader_pop(ctx);
 }
 
@@ -836,8 +833,7 @@ static void validate_whens(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, 
   validate_target_whens(ctx, cg->script, "script", out);
   validate_target_whens(ctx, cg->test, "test", out);
   validate_target_whens(ctx, cg->example, "example", out);
-  validate_pkg_system_dep_whens(ctx, cg, out);
-  validate_pkg_include_whens(ctx, cg, out);
+  validate_pkg_whens(ctx, cg, out);
   validate_metaprogram_whens(ctx, cg);
   validate_option_sets(ctx, cg, out);
 }

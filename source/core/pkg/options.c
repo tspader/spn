@@ -278,6 +278,7 @@ void spn_pkg_apply_options(
 
   apply_gated(&ctx, &info->system_deps, info->gated.system_deps);
   apply_gated_paths(&ctx, &info->include, info->gated.include);
+  apply_gated(&ctx, &info->define, info->gated.define);
 
   sp_str_om_for(info->options, it) {
     spn_option_info_t* option = sp_str_om_at(info->options, it);

@@ -135,7 +135,7 @@ typedef struct {
   gated_t include [4];
   gated_t build_source [4];
   gated_t build_include [4];
-  const c8* define [8];
+  gated_t define [8];
   gated_t system_deps [8];
   issue_t issues [7];
   target_t libs [8];
@@ -564,7 +564,7 @@ static const test_t tests [] = {
     .version = { 1, 2, 3 },
     .commit = "abc",
     .include = { { "inc" } },
-    .define = { "SPUM" },
+    .define = { { "SPUM" } },
     .system_deps = { { "z" } },
   },
   {
@@ -793,6 +793,19 @@ static const test_t tests [] = {
     .name = "package_system_deps_gated",
     .manifest = "package_system_deps_gated",
     .system_deps = { { "m" }, { "ws2_32", "os = \"windows\"" } },
+  },
+  {
+    .name = "package_define_gated",
+    .manifest = "package_define_gated",
+    .define = { { "A" }, { "B", "os = \"windows\"" } },
+  },
+  {
+    .name = "validate_package_define_when_unknown_key",
+    .manifest = "validate_package_define_when_unknown_key",
+    .define = { { "A" }, { "B", "simd = \"avx2\"" } },
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "package.define[1].when.simd" }
+    },
   },
   {
     .name = "validate_option_define_on_enum",
@@ -1103,7 +1116,8 @@ sp_test_each(lower, cases, test_t, tests) {
   }
 
   // Package arrays
-  sp_must_strs_eq(t, pkg.define, sp_da_size(pkg.define), it->define);
+  sp_expect_eq(t, (u32)0, (u32)sp_da_size(pkg.define));
+  check_gated(t, pkg.gated.define, it->define);
   check_gated(t, pkg.gated.system_deps, it->system_deps);
   sp_expect_eq(t, (u32)0, (u32)sp_da_size(pkg.include));
   check_gated_paths(t, pkg.gated.include, it->include);
