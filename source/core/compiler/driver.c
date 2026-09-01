@@ -58,9 +58,9 @@ void spn_cc_push_args(sp_mem_t mem, spn_invocation_t* invocation, sp_da(spn_arg_
 
 spn_cc_cap_set_t spn_cc_driver_caps(spn_cc_driver_t driver) {
   switch (driver) {
-    case SPN_CC_DRIVER_GCC: return SPN_CC_CAP_EXCLUDE_LIBS | SPN_CC_CAP_NOLIBC;
-    case SPN_CC_DRIVER_CLANG: return SPN_CC_CAP_TARGET_TRIPLE | SPN_CC_CAP_CLANG_FRONTEND | SPN_CC_CAP_EXCLUDE_LIBS | SPN_CC_CAP_NOLIBC;
-    case SPN_CC_DRIVER_ZIG: return SPN_CC_CAP_TARGET_TRIPLE | SPN_CC_CAP_CLANG_FRONTEND;
+    case SPN_CC_DRIVER_GCC: return SPN_CC_CAP_EXCLUDE_LIBS | SPN_CC_CAP_NOLIBC | SPN_CC_CAP_FREESTANDING;
+    case SPN_CC_DRIVER_CLANG: return SPN_CC_CAP_TARGET_TRIPLE | SPN_CC_CAP_LLVM_TRIPLE | SPN_CC_CAP_CLANG_FRONTEND | SPN_CC_CAP_EXCLUDE_LIBS | SPN_CC_CAP_NOLIBC | SPN_CC_CAP_FREESTANDING;
+    case SPN_CC_DRIVER_ZIG: return SPN_CC_CAP_TARGET_TRIPLE | SPN_CC_CAP_CLANG_FRONTEND | SPN_CC_CAP_FREESTANDING;
     case SPN_CC_DRIVER_MSVC: return 0;
     case SPN_CC_DRIVER_NONE: sp_unreachable_case();
   }
@@ -142,7 +142,7 @@ static spn_err_t feature_unsupported(const spn_cc_toolchain_t* toolchain, const 
 }
 
 spn_err_t spn_cc_validate_profile(const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile) {
-  if (toolchain->driver == SPN_CC_DRIVER_MSVC && profile->os == SPN_OS_FREESTANDING) {
+  if (profile->os == SPN_OS_FREESTANDING && !spn_cc_has(toolchain, SPN_CC_CAP_FREESTANDING)) {
     return feature_unsupported(toolchain, profile, SPN_CC_FEATURE_COMPILE);
   }
   spn_triple_t target = { profile->arch, profile->os, profile->abi };
