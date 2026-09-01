@@ -1,6 +1,6 @@
-int a(void);
+int a();
 
-void _start(void) {
+void _start() {
   a();
   for (;;) {
   }

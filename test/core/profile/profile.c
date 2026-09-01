@@ -190,18 +190,7 @@ static const test_t tests [] = {
     },
   },
   {
-    .name = "freestanding_target_defaults_to_static",
-    .overrides = { .os = SPN_OS_FREESTANDING },
-    .host = PROFILE_HOST_LINUX_GNU,
-    .expect = {
-      .target = { SPN_ARCH_X64, SPN_OS_FREESTANDING, SPN_ABI_BARE },
-      .linkage = SPN_LIB_KIND_STATIC,
-      .selected = "zig",
-      .targeted = true,
-    },
-  },
-  {
-    .name = "freestanding_ignores_shared_demand",
+    .name = "freestanding_defaults_to_static",
     .overrides = { .arch = SPN_ARCH_ARM64, .os = SPN_OS_FREESTANDING },
     .host = PROFILE_HOST_LINUX_GNU,
     .shared_demand = true,

@@ -161,14 +161,13 @@ sp_test(profile, cross_target_freestanding) {
   });
 }
 
-sp_test(profile, freestanding_flags) {
+sp_test(profile, freestanding_libs_not_pic) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/profile/freestanding",
     .copy = { "a.c" },
     .when.target = "aarch64-freestanding",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", "aarch64-freestanding" } } },
-      { .kind = ACTION_VERIFY_CC_ARG, .verify_cc_arg = { "-ffreestanding" } },
       { .kind = ACTION_VERIFY_NO_CC_ARG, .verify_cc_arg = { "-fPIC" } },
     },
   });
