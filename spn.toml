@@ -116,6 +116,11 @@ name = "installer"
 source = ["tools/install/main.c", "tools/install/render.c"]
 include = ["tools/install"]
 
+[[script]]
+name = "docs"
+source = ["tools/gen/docs.c", "tools/jtd.c"]
+include = ["tools"]
+
 [[test]]
 name = "core"
 source = [
