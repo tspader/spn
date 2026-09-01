@@ -433,6 +433,18 @@ static const defines_t defines_tests [] = {
     } },
   },
   {
+    .name = "freestanding_release",
+    .facts = { .os = SPN_OS_FREESTANDING, .arch = SPN_ARCH_ARM64, .abi = SPN_ABI_BARE, .mode = SPN_MODE_RELEASE, .opt = SPN_OPT_LEVEL_2 },
+    .expect = { .defines = {
+      "SPN_BUILD",
+      "SPN_BUILD_OS_FREESTANDING",
+      "SPN_BUILD_ARCH_AARCH64",
+      "SPN_BUILD_ABI_NONE",
+      "SPN_BUILD_MODE_RELEASE",
+      "SPN_BUILD_OPT_2",
+    } },
+  },
+  {
     .name = "sanitize_pair",
     .facts = {
       .os = SPN_OS_LINUX, .arch = SPN_ARCH_X64, .abi = SPN_ABI_GNU, .mode = SPN_MODE_DEBUG, .opt = SPN_OPT_LEVEL_0,

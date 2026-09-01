@@ -53,6 +53,7 @@ sp_hash_t spn_pkg_hash_platform(spn_pkg_info_t* pkg, const spn_profile_info_t* p
     }
     case SPN_OS_LINUX:
     case SPN_OS_WASI:
+    case SPN_OS_FREESTANDING:
     case SPN_OS_NONE: {
       break;
     }

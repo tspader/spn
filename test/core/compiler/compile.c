@@ -33,6 +33,20 @@ static const compile_test_t tests [] = {
     },
   },
   {
+    .name = "gcc_gnu_dialect",
+    .driver = SPN_CC_DRIVER_GCC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_GNU,
+      .standard = SPN_GNU11,
+    },
+    .expect = {
+      .command = "cc",
+      .args = { "-std=gnu11", "-c", "-Werror=return-type", "main.c", "-o", "main.o" },
+    },
+  },
+  {
     .name = "gcc_depfile",
     .driver = SPN_CC_DRIVER_GCC,
     .profile = {
@@ -59,6 +73,75 @@ static const compile_test_t tests [] = {
     .expect = {
       .command = "cc",
       .args = { "--target=wasm32-wasi", "-std=c99", "-O2", "-c", "-Werror=return-type", "main.c", "-o", "main.o" },
+    },
+  },
+  {
+    .name = "zig_linux_target",
+    .driver = SPN_CC_DRIVER_ZIG,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_MUSL,
+      .standard = SPN_C99,
+    },
+    .expect = {
+      .command = "cc",
+      .args = { "--target=x86_64-linux-musl", "-std=c99", "-c", "-Werror=return-type", "main.c", "-o", "main.o" },
+    },
+  },
+  {
+    .name = "clang_windows_msvc_target",
+    .driver = SPN_CC_DRIVER_CLANG,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_MSVC,
+      .standard = SPN_C99,
+    },
+    .expect = {
+      .command = "cc",
+      .args = { "--target=x86_64-windows-msvc", "-std=c99", "-c", "-gno-codeview-command-line", "-Werror=return-type", "main.c", "-Xclang", "-object-file-name=main.o", "-o", "main.o" },
+    },
+  },
+  {
+    .name = "zig_freestanding_target",
+    .driver = SPN_CC_DRIVER_ZIG,
+    .profile = {
+      .arch = SPN_ARCH_ARM64,
+      .os = SPN_OS_FREESTANDING,
+      .abi = SPN_ABI_BARE,
+      .standard = SPN_C99,
+    },
+    .expect = {
+      .command = "cc",
+      .args = { "--target=aarch64-freestanding-none", "-std=c99", "-ffreestanding", "-c", "-Werror=return-type", "main.c", "-o", "main.o" },
+    },
+  },
+  {
+    .name = "clang_freestanding_target",
+    .driver = SPN_CC_DRIVER_CLANG,
+    .profile = {
+      .arch = SPN_ARCH_ARM64,
+      .os = SPN_OS_FREESTANDING,
+      .abi = SPN_ABI_BARE,
+      .standard = SPN_C99,
+    },
+    .expect = {
+      .command = "cc",
+      .args = { "--target=aarch64-none-elf", "-std=c99", "-ffreestanding", "-c", "-Werror=return-type", "main.c", "-o", "main.o" },
+    },
+  },
+  {
+    .name = "msvc_freestanding_unsupported",
+    .driver = SPN_CC_DRIVER_MSVC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_FREESTANDING,
+      .abi = SPN_ABI_BARE,
+    },
+    .expect = {
+      .err = SPN_ERR_COMPILER_FEATURE_UNSUPPORTED,
+      .feature = SPN_CC_FEATURE_COMPILE,
     },
   },
   {
@@ -107,6 +190,20 @@ static const compile_test_t tests [] = {
     .expect = {
       .command = "ml64",
       .args = { "/nologo", "/c", "/Fomain.o", "main.c" },
+    },
+  },
+  {
+    .name = "msvc_gnu11_takes_c11_switch",
+    .driver = SPN_CC_DRIVER_MSVC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_MSVC,
+      .standard = SPN_GNU11,
+    },
+    .expect = {
+      .command = "cc",
+      .args = { "/nologo", "/utf-8", "/Brepro", "/std:c11", "/c", "/we4715", "/Fomain.o", "main.c" },
     },
   },
   {

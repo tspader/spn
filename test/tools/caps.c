@@ -23,6 +23,8 @@ static const test_toolchain_t toolchains [] = {
       "aarch64-macos",
       "x86_64-windows-gnu",
       "aarch64-windows-gnu",
+      "x86_64-freestanding",
+      "aarch64-freestanding",
     },
   },
   {

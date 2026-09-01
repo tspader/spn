@@ -26,6 +26,8 @@ static const from_str_t from_str_tests [] = {
   { "x64_macos",          "x86_64-macos",          { SPN_ARCH_X64,   SPN_OS_MACOS } },
   { "arm64_macos",        "aarch64-macos",         { SPN_ARCH_ARM64, SPN_OS_MACOS } },
   { "arm64_macos_apple",  "aarch64-macos-apple",   { SPN_ARCH_ARM64, SPN_OS_MACOS,   SPN_ABI_APPLE } },
+  { "arm64_freestanding_none", "aarch64-freestanding-none", { SPN_ARCH_ARM64, SPN_OS_FREESTANDING, SPN_ABI_BARE } },
+  { "x64_freestanding",   "x86_64-freestanding",   { SPN_ARCH_X64,   SPN_OS_FREESTANDING } },
   { "x64_linux_no_abi",   "x86_64-linux",          { SPN_ARCH_X64,   SPN_OS_LINUX } },
   { "arm64_linux_no_abi", "aarch64-linux",         { SPN_ARCH_ARM64, SPN_OS_LINUX } },
   { "x64_bare",           "x86_64",                { SPN_ARCH_X64 } },
@@ -59,6 +61,7 @@ static const to_str_t to_str_tests [] = {
   { "x64_windows_gnu",   { SPN_ARCH_X64,   SPN_OS_WINDOWS, SPN_ABI_GNU },   { "x86_64-windows-gnu" } },
   { "arm64_macos",       { SPN_ARCH_ARM64, SPN_OS_MACOS },                  { "aarch64-macos" } },
   { "arm64_macos_apple", { SPN_ARCH_ARM64, SPN_OS_MACOS,   SPN_ABI_APPLE }, { "aarch64-macos-apple" } },
+  { "arm64_freestanding_none", { SPN_ARCH_ARM64, SPN_OS_FREESTANDING, SPN_ABI_BARE }, { "aarch64-freestanding-none" } },
   { "x64_linux_no_abi",  { SPN_ARCH_X64,   SPN_OS_LINUX },                  { "x86_64-linux" } },
   { "arm64_bare",        { SPN_ARCH_ARM64 },                                { "aarch64" } },
   { "empty",             { SPN_ARCH_NONE },                                 { "" } },
@@ -66,21 +69,6 @@ static const to_str_t to_str_tests [] = {
 
 sp_test_each(triple, to_str, to_str_t, to_str_tests) {
   sp_str_t result = spn_triple_to_str(sp_test_arena(t), it->triple);
-  sp_expect_str_eq_c(t, result, it->expect.value);
-  return SP_OK;
-}
-
-
-static const to_str_t to_cc_target_tests [] = {
-  { "linux_gnu",             { SPN_ARCH_X64,    SPN_OS_LINUX,   SPN_ABI_GNU },   { "x86_64-linux-gnu" } },
-  { "windows_gnu",           { SPN_ARCH_X64,    SPN_OS_WINDOWS, SPN_ABI_GNU },   { "x86_64-windows-gnu" } },
-  { "windows_msvc",          { SPN_ARCH_X64,    SPN_OS_WINDOWS, SPN_ABI_MSVC },  { "x86_64-windows-msvc" } },
-  { "macos_apple_drops_abi", { SPN_ARCH_ARM64,  SPN_OS_MACOS,   SPN_ABI_APPLE }, { "aarch64-macos" } },
-  { "wasi_musl_drops_abi",   { SPN_ARCH_WASM32, SPN_OS_WASI,    SPN_ABI_MUSL },  { "wasm32-wasi" } },
-};
-
-sp_test_each(triple, to_cc_target, to_str_t, to_cc_target_tests) {
-  sp_str_t result = spn_triple_to_cc_target(sp_test_arena(t), it->triple);
   sp_expect_str_eq_c(t, result, it->expect.value);
   return SP_OK;
 }
@@ -125,6 +113,7 @@ static const lib_file_name_t lib_file_name_tests [] = {
   { "msvc_shared",        { SPN_ARCH_X64,   SPN_OS_WINDOWS, SPN_ABI_MSVC },  SP_OS_LIB_SHARED, { "foo.dll" } },
   { "windows_gnu_static", { SPN_ARCH_X64,   SPN_OS_WINDOWS, SPN_ABI_GNU },   SP_OS_LIB_STATIC, { "libfoo.a" } },
   { "windows_gnu_shared", { SPN_ARCH_X64,   SPN_OS_WINDOWS, SPN_ABI_GNU },   SP_OS_LIB_SHARED, { "foo.dll" } },
+  { "freestanding_static", { SPN_ARCH_ARM64, SPN_OS_FREESTANDING, SPN_ABI_BARE }, SP_OS_LIB_STATIC, { "libfoo.a" } },
 };
 
 sp_test_each(triple, lib_file_name, lib_file_name_t, lib_file_name_tests) {
@@ -146,6 +135,7 @@ static const exe_file_name_t exe_file_name_tests [] = {
   { "msvc",  { SPN_ARCH_X64,    SPN_OS_WINDOWS, SPN_ABI_MSVC },  { "foo.exe" } },
   { "windows_gnu", { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU }, { "foo.exe" } },
   { "wasi",  { SPN_ARCH_WASM32, SPN_OS_WASI },                   { "foo.wasm" } },
+  { "freestanding", { SPN_ARCH_ARM64, SPN_OS_FREESTANDING, SPN_ABI_BARE }, { "foo.elf" } },
 };
 
 sp_test_each(triple, exe_file_name, exe_file_name_t, exe_file_name_tests) {
@@ -335,6 +325,7 @@ static const entry_t entry_tests [] = {
   { "full",                 { SPN_ARCH_X64,    SPN_OS_LINUX,   SPN_ABI_GNU },  { .full = { SPN_ARCH_X64,    SPN_OS_LINUX,   SPN_ABI_GNU } } },
   { "single_abi_filled",    { SPN_ARCH_ARM64,  SPN_OS_MACOS },                 { .full = { SPN_ARCH_ARM64,  SPN_OS_MACOS,   SPN_ABI_APPLE } } },
   { "wasi_abi_filled",      { SPN_ARCH_WASM32, SPN_OS_WASI },                  { .full = { SPN_ARCH_WASM32, SPN_OS_WASI,    SPN_ABI_MUSL } } },
+  { "freestanding_abi_filled", { SPN_ARCH_ARM64, SPN_OS_FREESTANDING },          { .full = { SPN_ARCH_ARM64,  SPN_OS_FREESTANDING, SPN_ABI_BARE } } },
   { "ambiguous_abi",        { SPN_ARCH_X64,    SPN_OS_LINUX },                 { .rejected = true } },
   { "missing_os",           { SPN_ARCH_X64 },                                  { .rejected = true } },
   { "missing_arch",         { SPN_ARCH_NONE,   SPN_OS_LINUX,   SPN_ABI_GNU },  { .rejected = true } },
@@ -367,6 +358,7 @@ static const os_abis_t os_abis_tests [] = {
   { "windows", SPN_OS_WINDOWS, { SPN_ABI_GNU, SPN_ABI_MSVC } },
   { "macos",   SPN_OS_MACOS,   { SPN_ABI_APPLE } },
   { "wasi",    SPN_OS_WASI,    { SPN_ABI_MUSL } },
+  { "freestanding", SPN_OS_FREESTANDING, { SPN_ABI_BARE } },
   { "none",    SPN_OS_NONE },
 };
 

@@ -1,0 +1,13 @@
+[package]
+name = "profile_freestanding"
+version = "0.1.0"
+
+[[lib]]
+name = "A"
+kinds = ["static"]
+source = ["a.c"]
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+deps = ["A"]

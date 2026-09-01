@@ -21,7 +21,8 @@ void spn_cc_embed_ctx_init(spn_cc_embed_ctx_t* c, sp_mem_t mem, spn_os_t os, spn
   switch (os) {
     case SPN_OS_WINDOWS: format = SPN_OBJ_COFF; break;
     case SPN_OS_MACOS: format = SPN_OBJ_MACHO; break;
-    case SPN_OS_LINUX: format = SPN_OBJ_ELF; break;
+    case SPN_OS_LINUX:
+    case SPN_OS_FREESTANDING: format = SPN_OBJ_ELF; break;
     case SPN_OS_WASI:
     case SPN_OS_NONE: sp_unreachable_case();
   }

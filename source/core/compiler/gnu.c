@@ -39,6 +39,9 @@ static sp_str_t c_standard_to_flag(spn_c_standard_t standard) {
     case SPN_C89: return sp_str_lit("-std=c89");
     case SPN_C99: return sp_str_lit("-std=c99");
     case SPN_C11: return sp_str_lit("-std=c11");
+    case SPN_GNU89: return sp_str_lit("-std=gnu89");
+    case SPN_GNU99: return sp_str_lit("-std=gnu99");
+    case SPN_GNU11: return sp_str_lit("-std=gnu11");
     case SPN_C_STANDARD_NONE: return sp_str_lit("-std=c99");
   }
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
@@ -60,9 +63,30 @@ static bool is_os_version_present(spn_os_version_t version) {
   return version.major || version.minor;
 }
 
+static sp_str_t render_target(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, spn_triple_t triple) {
+  switch (triple.os) {
+    case SPN_OS_MACOS:
+    case SPN_OS_WASI: {
+      triple.abi = SPN_ABI_NONE;
+      return spn_triple_to_str(mem, triple);
+    }
+    case SPN_OS_FREESTANDING: {
+      if (spn_cc_has(toolchain, SPN_CC_CAP_LLVM_TRIPLE)) {
+        return sp_fmt(mem, "{}-none-elf", sp_fmt_str(spn_arch_to_str(triple.arch))).value;
+      }
+      return spn_triple_to_str(mem, triple);
+    }
+    case SPN_OS_LINUX:
+    case SPN_OS_WINDOWS:
+    case SPN_OS_NONE: return spn_triple_to_str(mem, triple);
+  }
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
 spn_sanitizer_set_t spn_gcc_supported_sanitizers(spn_triple_t target) {
   switch (target.os) {
     case SPN_OS_WASI:
+    case SPN_OS_FREESTANDING:
     case SPN_OS_WINDOWS: return 0;
     case SPN_OS_MACOS: return SPN_SANITIZER_ADDRESS | SPN_SANITIZER_THREAD | SPN_SANITIZER_UNDEFINED;
     case SPN_OS_LINUX:
@@ -73,7 +97,8 @@ spn_sanitizer_set_t spn_gcc_supported_sanitizers(spn_triple_t target) {
 
 spn_sanitizer_set_t spn_clang_supported_sanitizers(spn_triple_t target) {
   switch (target.os) {
-    case SPN_OS_WASI: return 0;
+    case SPN_OS_WASI:
+    case SPN_OS_FREESTANDING: return 0;
     case SPN_OS_WINDOWS: return target.abi == SPN_ABI_MSVC && target.arch == SPN_ARCH_X64 ? SPN_SANITIZER_ADDRESS : 0;
     case SPN_OS_MACOS: return SPN_SANITIZER_ADDRESS | SPN_SANITIZER_THREAD | SPN_SANITIZER_UNDEFINED | SPN_SANITIZER_LEAK;
     case SPN_OS_LINUX:
@@ -84,7 +109,8 @@ spn_sanitizer_set_t spn_clang_supported_sanitizers(spn_triple_t target) {
 
 spn_sanitizer_set_t spn_zig_supported_sanitizers(spn_triple_t target) {
   switch (target.os) {
-    case SPN_OS_WASI: return 0;
+    case SPN_OS_WASI:
+    case SPN_OS_FREESTANDING: return 0;
     case SPN_OS_WINDOWS: return SPN_SANITIZER_UNDEFINED;
     case SPN_OS_MACOS:
     case SPN_OS_LINUX:
@@ -93,7 +119,7 @@ spn_sanitizer_set_t spn_zig_supported_sanitizers(spn_triple_t target) {
   SP_UNREACHABLE_RETURN(0);
 }
 
-void spn_gnu_render_flags(sp_mem_t mem, const spn_profile_info_t* profile, spn_cc_flags_t* flags) {
+void spn_gnu_render_flags(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, spn_cc_flags_t* flags) {
   if (profile->mode == SPN_MODE_DEBUG) {
     sp_da_push(flags->compile, sp_str_lit("-g"));
   }
@@ -108,6 +134,13 @@ void spn_gnu_render_flags(sp_mem_t mem, const spn_profile_info_t* profile, spn_c
     sp_da_push(flags->compile, sp_str_lit("-fno-sanitize-recover=all"));
     sp_da_push(flags->compile, sp_str_lit("-fno-omit-frame-pointer"));
   }
+  if (profile->os == SPN_OS_FREESTANDING) {
+    sp_da_push(flags->compile, sp_str_lit("-ffreestanding"));
+    if (spn_cc_has(toolchain, SPN_CC_CAP_NOLIBC)) {
+      sp_da_push(flags->link, sp_str_lit("-nostartfiles"));
+      sp_da_push(flags->link, sp_str_lit("-nolibc"));
+    }
+  }
 }
 
 static void add_launcher(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, spn_lang_t lang, spn_invocation_t* invocation) {
@@ -117,7 +150,7 @@ static void add_launcher(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
   spn_cc_push_strs(mem, invocation, launcher.args);
   if (spn_cc_has(toolchain, SPN_CC_CAP_TARGET_TRIPLE)) {
     spn_triple_t triple = { profile->arch, profile->os, profile->abi };
-    sp_str_t target = spn_triple_to_cc_target(mem, triple);
+    sp_str_t target = render_target(mem, toolchain, triple);
     if (!sp_str_empty(target)) {
       spn_cc_push_fmt(mem, invocation, "--target={}", sp_fmt_str(target));
     }
@@ -129,7 +162,7 @@ void spn_gnu_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, c
   spn_cc_flags_t flags = sp_zero;
   sp_da_init(mem, flags.compile);
   sp_da_init(mem, flags.link);
-  spn_gnu_render_flags(mem, profile, &flags);
+  spn_gnu_render_flags(mem, toolchain, profile, &flags);
   if (compile->lang == SPN_LANG_C) {
     spn_cc_push_str(mem, invocation, c_standard_to_flag(profile->standard));
   } else if (compile->lang == SPN_LANG_CXX) {
@@ -204,7 +237,7 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
   spn_cc_flags_t flags = sp_zero;
   sp_da_init(mem, flags.compile);
   sp_da_init(mem, flags.link);
-  spn_gnu_render_flags(mem, profile, &flags);
+  spn_gnu_render_flags(mem, toolchain, profile, &flags);
   spn_cc_push_strs(mem, invocation, flags.link);
   switch (link->kind) {
     case SPN_CC_OUTPUT_REACTOR: {
@@ -312,6 +345,7 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
       }
       case SPN_OS_WINDOWS:
       case SPN_OS_WASI:
+      case SPN_OS_FREESTANDING:
       case SPN_OS_NONE: {
         break;
       }

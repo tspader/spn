@@ -91,11 +91,12 @@ spn build
 ./build/debug/demo
 ```
 
-Cross compiling works out of the box. The following commands produce `build/x86_64-windows-gnu/debug/main.exe` and `build/aarch64-macos/debug/main`:
+Cross compiling works out of the box. The following commands produce `build/x86_64-windows-gnu/debug/main.exe`, `build/aarch64-macos/debug/main`, and a bare metal `build/aarch64-freestanding-none/debug/main.elf` with no libc or startup files:
 
 ```sh
 spn build --target x86_64-windows-gnu
 spn build --target aarch64-macos
+spn build --target aarch64-freestanding
 ```
 
 Congratulations! You now have a C program which:

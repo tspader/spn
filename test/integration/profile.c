@@ -145,6 +145,46 @@ sp_test(profile, cross_target_macos) {
   });
 }
 
+sp_test(profile, cross_target_freestanding) {
+  return run_command_test(t, (command_test_t) {
+    .project = "test/integration/fixtures/profile/freestanding",
+    .copy = { "a.c" },
+    .when.target = "aarch64-freestanding",
+    .args = { "build", "--target", "aarch64-freestanding" },
+    .expect = {
+      .exists = { target_exe("main", "aarch64-freestanding-none") },
+      .events = {
+        { .event = SPN_EVENT_INIT_BUILD_GRAPH, .key = "target", .value = "aarch64-freestanding-none" },
+        { .event = SPN_EVENT_INIT_BUILD_GRAPH, .key = "toolchain", .value = "zig" },
+      },
+    },
+  });
+}
+
+sp_test(profile, freestanding_libs_not_pic) {
+  return run_test(t, (test_t) {
+    .project = "test/integration/fixtures/profile/freestanding",
+    .copy = { "a.c" },
+    .when.target = "aarch64-freestanding",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", "aarch64-freestanding" } } },
+      { .kind = ACTION_VERIFY_NO_CC_ARG, .verify_cc_arg = { "-fPIC" } },
+    },
+  });
+}
+
+sp_test(profile, freestanding_rejects_shared_lib) {
+  return run_test(t, (test_t) {
+    .project = "test/integration/fixtures/profile/freestanding_shared",
+    .copy = { "a.c" },
+    .when.target = "aarch64-freestanding",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", "aarch64-freestanding" }, .rc = 1 } },
+      { .kind = ACTION_VERIFY_RESULT, .verify_result = { .err = SPN_ERR_COMPILER_FEATURE_UNSUPPORTED } },
+    },
+  });
+}
+
 sp_test(profile, flags) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/profile/sanitize",

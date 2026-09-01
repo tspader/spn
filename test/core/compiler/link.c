@@ -313,6 +313,49 @@ static const link_test_t tests [] = {
     },
   },
   {
+    .name = "freestanding_rpath_never_renders",
+    .driver = SPN_CC_DRIVER_ZIG,
+    .profile = {
+      .arch = SPN_ARCH_ARM64,
+      .os = SPN_OS_FREESTANDING,
+      .abi = SPN_ABI_BARE,
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .rpath = true,
+    .expect = {
+      .command = "cc",
+      .args = { "--target=aarch64-freestanding-none", "main.o", "-o", "main" },
+    },
+  },
+  {
+    .name = "gcc_freestanding_exe",
+    .driver = SPN_CC_DRIVER_GCC,
+    .profile = {
+      .arch = SPN_ARCH_ARM64,
+      .os = SPN_OS_FREESTANDING,
+      .abi = SPN_ABI_BARE,
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .expect = {
+      .command = "cc",
+      .args = { "-nostartfiles", "-nolibc", "main.o", "-o", "main" },
+    },
+  },
+  {
+    .name = "freestanding_shared_lib_unsupported",
+    .driver = SPN_CC_DRIVER_ZIG,
+    .profile = {
+      .arch = SPN_ARCH_ARM64,
+      .os = SPN_OS_FREESTANDING,
+      .abi = SPN_ABI_BARE,
+    },
+    .kind = SPN_CC_OUTPUT_SHARED_LIB,
+    .expect = {
+      .err = SPN_ERR_COMPILER_FEATURE_UNSUPPORTED,
+      .feature = SPN_CC_FEATURE_LINK_SHARED,
+    },
+  },
+  {
     .name = "libs_precede_system_libs",
     .driver = SPN_CC_DRIVER_GCC,
     .profile = {

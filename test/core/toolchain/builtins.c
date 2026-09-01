@@ -2,7 +2,7 @@
 #include "triple/triple.h"
 
 #define BUILTINS_MAX_HOSTS 6
-#define BUILTINS_MAX_TARGETS 4
+#define BUILTINS_MAX_TARGETS 6
 
 typedef struct {
   bool absent;
@@ -38,6 +38,8 @@ static const builtins_test_t tests [] = {
         { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU },
         { SPN_ARCH_ARM64, SPN_OS_MACOS, SPN_ABI_APPLE },
         { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU },
+        { SPN_ARCH_X64, SPN_OS_FREESTANDING, SPN_ABI_BARE },
+        { SPN_ARCH_ARM64, SPN_OS_FREESTANDING, SPN_ABI_BARE },
       },
     },
   },
