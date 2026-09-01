@@ -29,6 +29,7 @@ set(SPN_SOURCES
   core/compiler/gnu.c
   core/compiler/msvc.c
   core/compiler/occ.c
+  core/compiler/rsp.c
   core/compiler/toc.c
   core/ctx/ctx.c
   core/ctx/init.c

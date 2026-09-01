@@ -111,7 +111,18 @@ typedef enum {
 typedef struct {
   spn_arg_t program;
   sp_da(spn_arg_t) args;
+  u32 launcher;
   spn_path_t cwd;
 } spn_invocation_t;
+
+typedef enum {
+  SPN_RSP_STYLE_WINDOWS,
+  SPN_RSP_STYLE_GNU,
+} spn_rsp_style_t;
+
+typedef struct {
+  sp_str_t content;
+  spn_invocation_t invocation;
+} spn_rsp_t;
 
 #endif

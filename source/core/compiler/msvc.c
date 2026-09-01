@@ -76,6 +76,7 @@ static void add_launcher(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, spn_
   sp_assert(!spn_arg_empty(launcher.program));
   invocation->program = launcher.program;
   spn_cc_push_strs(mem, invocation, launcher.args);
+  invocation->launcher = sp_da_size(invocation->args);
   spn_cc_push_c(mem, invocation, "/nologo");
 }
 
@@ -211,6 +212,7 @@ void spn_msvc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, con
 void spn_msvc_render_archive(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_cc_archive_files_t* files, spn_invocation_t* invocation) {
   invocation->program = toolchain->archiver.program;
   spn_cc_push_strs(mem, invocation, toolchain->archiver.args);
+  invocation->launcher = sp_da_size(invocation->args);
   spn_cc_push_c(mem, invocation, "/nologo");
   spn_cc_push_glued(mem, invocation, "/OUT:", files->output);
   spn_cc_push_paths(mem, invocation, files->objects);

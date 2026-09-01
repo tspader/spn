@@ -227,6 +227,7 @@ spn_invocation_t spn_cc_render_compile_command(sp_mem_t mem, const spn_cc_toolch
 
   spn_invocation_t invocation = {
     .program = base->program,
+    .launcher = base->launcher,
     .cwd = base->cwd,
   };
   sp_da_init(mem, invocation.args);
