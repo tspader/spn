@@ -178,7 +178,7 @@ typedef struct {
   sp_da(sp_elf_symbol_t) symbols;
 } sp_elf_t;
 
-SP_API sp_elf_t*          sp_elf_new(sp_mem_t mem);
+SP_API sp_elf_t*          sp_elf_new(sp_mem_t mem, u16 machine);
 SP_API void               sp_elf_free(sp_elf_t* elf);
 SP_API u32                sp_elf_add_section(sp_elf_t* elf, sp_elf_section_t desc);
 SP_API sp_elf_section_t*  sp_elf_section(sp_elf_t* elf, u32 section);
@@ -206,13 +206,13 @@ SP_API sp_err_t           sp_elf_read_from_file(sp_mem_t mem, sp_str_t path, sp_
 #if defined(SP_ELF_IMPLEMENTATION) && !defined(SP_ELF_IMPLEMENTATION_GUARD)
 #define SP_ELF_IMPLEMENTATION_GUARD
 
-sp_elf_t* sp_elf_new(sp_mem_t mem) {
+sp_elf_t* sp_elf_new(sp_mem_t mem, u16 machine) {
   sp_mem_arena_t* arena = sp_mem_arena_new(mem);
   sp_mem_t am = sp_mem_arena_as_allocator(arena);
   sp_elf_t* elf = sp_mem_allocator_alloc_type(am, sp_elf_t);
   elf->arena = arena;
   elf->mem = am;
-  elf->machine = EM_X86_64;
+  elf->machine = machine;
   elf->filetype = ET_REL;
   sp_da_init(am, elf->sections);
   sp_da_init(am, elf->symbols);
@@ -731,7 +731,7 @@ sp_err_t sp_elf_read(sp_mem_t mem, const u8* data, u64 size, sp_elf_t** out) {
   *out = SP_NULLPTR;
 
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch_for(mem);
-  sp_elf_t* elf = sp_elf_new(mem);
+  sp_elf_t* elf = sp_elf_new(mem, 0);
   sp_err_t err = sp_elf_read_ex(elf, data, size, scratch.mem);
   sp_mem_end_scratch(scratch);
 

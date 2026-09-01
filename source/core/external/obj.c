@@ -9,18 +9,42 @@ spn_obj_kind_t spn_obj_get_native_format() {
   return SPN_OBJ_ELF;
 }
 
+static u16 elf_machine(spn_arch_t arch) {
+  switch (arch) {
+    case SPN_ARCH_X64:   return EM_X86_64;
+    case SPN_ARCH_ARM64: return EM_AARCH64;
+    case SPN_ARCH_WASM32:
+    case SPN_ARCH_NONE: {
+      sp_unreachable_case();
+    }
+  }
+  SP_UNREACHABLE_RETURN(EM_X86_64);
+}
+
+static u16 coff_machine(spn_arch_t arch) {
+  switch (arch) {
+    case SPN_ARCH_X64:   return SP_COFF_MACHINE_AMD64;
+    case SPN_ARCH_ARM64: return SP_COFF_MACHINE_ARM64;
+    case SPN_ARCH_WASM32:
+    case SPN_ARCH_NONE: {
+      sp_unreachable_case();
+    }
+  }
+  SP_UNREACHABLE_RETURN(SP_COFF_MACHINE_AMD64);
+}
+
 void spn_obj_init(spn_obj_builder_t* obj, sp_mem_t mem, spn_obj_kind_t kind, spn_arch_t arch) {
   obj->kind = kind;
   switch (kind) {
     case SPN_OBJ_COFF: {
-      obj->coff.coff = sp_coff_new(mem);
+      obj->coff.coff = sp_coff_new(mem, coff_machine(arch));
       obj->coff.section = sp_coff_add_section(obj->coff.coff, sp_str_lit(".rdata"),
         SP_COFF_SCN_CNT_INITIALIZED_DATA |
         SP_COFF_SCN_ALIGN_8BYTES |
         SP_COFF_SCN_MEM_READ);
     } break;
     case SPN_OBJ_ELF: {
-      obj->elf.elf = sp_elf_new(mem);
+      obj->elf.elf = sp_elf_new(mem, elf_machine(arch));
       obj->elf.rodata = sp_elf_add_section(obj->elf.elf, (sp_elf_section_t){
         .name = sp_str_lit(".rodata"),
         .type = SHT_PROGBITS,

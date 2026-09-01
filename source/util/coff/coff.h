@@ -5,6 +5,7 @@
 
 #define SP_COFF_MACHINE_AMD64      0x8664
 #define SP_COFF_MACHINE_I386       0x014C
+#define SP_COFF_MACHINE_ARM64      0xAA64
 
 #define SP_COFF_SCN_CNT_CODE              0x00000020
 #define SP_COFF_SCN_CNT_INITIALIZED_DATA  0x00000040
@@ -51,9 +52,10 @@ typedef struct {
   sp_da(sp_coff_sym_entry_t) symbols;
   sp_io_dyn_mem_writer_t strtab;
   sp_mem_arena_t* arena;
+  u16 machine;
 } sp_coff_t;
 
-sp_coff_t*          sp_coff_new(sp_mem_t mem);
+sp_coff_t*          sp_coff_new(sp_mem_t mem, u16 machine);
 void                sp_coff_free(sp_coff_t* coff);
 sp_coff_section_t*  sp_coff_add_section(sp_coff_t* coff, sp_str_t name, u32 flags);
 sp_coff_section_t*  sp_coff_find_section(sp_coff_t* coff, sp_str_t name);
@@ -76,12 +78,13 @@ static void sp_coff_write_u16(sp_io_writer_t* w, u16 v)  { sp_io_write(w, &v, 2,
 static void sp_coff_write_u32(sp_io_writer_t* w, u32 v)  { sp_io_write(w, &v, 4, SP_NULLPTR); }
 static void sp_coff_write_s16(sp_io_writer_t* w, s16 v)  { sp_io_write(w, &v, 2, SP_NULLPTR); }
 
-sp_coff_t* sp_coff_new(sp_mem_t mem) {
+sp_coff_t* sp_coff_new(sp_mem_t mem, u16 machine) {
   sp_mem_arena_t* arena = sp_mem_arena_new(mem);
   sp_mem_t alloc = sp_mem_arena_as_allocator(arena);
 
   sp_coff_t* coff = sp_alloc_type(alloc, sp_coff_t);
   coff->arena = arena;
+  coff->machine = machine;
   sp_da_init(alloc, coff->sections);
   sp_da_init(alloc, coff->symbols);
 
@@ -182,7 +185,7 @@ sp_err_t sp_coff_write(sp_coff_t* coff, sp_io_writer_t* out) {
   u32 symtab_offset = pos;
 
   // File header (20 bytes)
-  sp_coff_write_u16(out, SP_COFF_MACHINE_AMD64);   // machine
+  sp_coff_write_u16(out, coff->machine);            // machine
   sp_coff_write_u16(out, num_sections);             // number_of_sections
   sp_coff_write_u32(out, 0);                        // time_date_stamp
   sp_coff_write_u32(out, symtab_offset);            // pointer_to_symbol_table
