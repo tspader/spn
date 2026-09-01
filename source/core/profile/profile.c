@@ -142,7 +142,7 @@ void spn_profile_finalize(spn_profile_info_t* profile, spn_triple_t triple, bool
   profile->os = triple.os;
   profile->abi = triple.abi;
   if (!profile->linkage) {
-    profile->linkage = !shared && triple.abi == SPN_ABI_MUSL ? SPN_LIB_KIND_STATIC : SPN_LIB_KIND_SHARED;
+    profile->linkage = triple.os == SPN_OS_FREESTANDING || (!shared && triple.abi == SPN_ABI_MUSL) ? SPN_LIB_KIND_STATIC : SPN_LIB_KIND_SHARED;
   }
 }
 
