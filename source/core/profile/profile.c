@@ -137,12 +137,22 @@ bool spn_profile_shared(const spn_profile_info_t* profile, bool shared_demand) {
   return profile->linkage == SPN_LIB_KIND_SHARED || (!profile->linkage && shared_demand);
 }
 
+static spn_linkage_t default_linkage(spn_triple_t triple, bool shared) {
+  if (triple.os == SPN_OS_FREESTANDING) {
+    return SPN_LIB_KIND_STATIC;
+  }
+  if (!shared && triple.abi == SPN_ABI_MUSL) {
+    return SPN_LIB_KIND_STATIC;
+  }
+  return SPN_LIB_KIND_SHARED;
+}
+
 void spn_profile_finalize(spn_profile_info_t* profile, spn_triple_t triple, bool shared) {
   profile->arch = triple.arch;
   profile->os = triple.os;
   profile->abi = triple.abi;
   if (!profile->linkage) {
-    profile->linkage = triple.os == SPN_OS_FREESTANDING || (!shared && triple.abi == SPN_ABI_MUSL) ? SPN_LIB_KIND_STATIC : SPN_LIB_KIND_SHARED;
+    profile->linkage = default_linkage(triple, shared);
   }
 }
 
