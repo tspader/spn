@@ -122,7 +122,7 @@ spn_sanitizer_set_t spn_zig_supported_sanitizers(spn_triple_t target) {
   SP_UNREACHABLE_RETURN(0);
 }
 
-void spn_gnu_render_flags(sp_mem_t mem, const spn_profile_info_t* profile, spn_cc_flags_t* flags) {
+void spn_gnu_render_flags(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, spn_cc_flags_t* flags) {
   if (profile->mode == SPN_MODE_DEBUG) {
     sp_da_push(flags->compile, sp_str_lit("-g"));
   }
@@ -136,6 +136,13 @@ void spn_gnu_render_flags(sp_mem_t mem, const spn_profile_info_t* profile, spn_c
     sp_da_push(flags->link, sanitizer);
     sp_da_push(flags->compile, sp_str_lit("-fno-sanitize-recover=all"));
     sp_da_push(flags->compile, sp_str_lit("-fno-omit-frame-pointer"));
+  }
+  if (profile->os == SPN_OS_FREESTANDING) {
+    sp_da_push(flags->compile, sp_str_lit("-ffreestanding"));
+    if (spn_cc_has(toolchain, SPN_CC_CAP_NOLIBC)) {
+      sp_da_push(flags->link, sp_str_lit("-nostartfiles"));
+      sp_da_push(flags->link, sp_str_lit("-nolibc"));
+    }
   }
 }
 
@@ -158,7 +165,7 @@ void spn_gnu_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, c
   spn_cc_flags_t flags = sp_zero;
   sp_da_init(mem, flags.compile);
   sp_da_init(mem, flags.link);
-  spn_gnu_render_flags(mem, profile, &flags);
+  spn_gnu_render_flags(mem, toolchain, profile, &flags);
   if (compile->lang == SPN_LANG_C) {
     spn_cc_push_str(mem, invocation, c_standard_to_flag(profile->standard));
   } else if (compile->lang == SPN_LANG_CXX) {
@@ -233,7 +240,7 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
   spn_cc_flags_t flags = sp_zero;
   sp_da_init(mem, flags.compile);
   sp_da_init(mem, flags.link);
-  spn_gnu_render_flags(mem, profile, &flags);
+  spn_gnu_render_flags(mem, toolchain, profile, &flags);
   spn_cc_push_strs(mem, invocation, flags.link);
   switch (link->kind) {
     case SPN_CC_OUTPUT_REACTOR: {

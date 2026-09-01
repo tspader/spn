@@ -203,6 +203,36 @@ static const flags_test_t tests [] = {
     },
   },
   {
+    .name = "freestanding_zig_strips_nothing",
+    .profile = {
+      .arch = SPN_ARCH_ARM64,
+      .os = SPN_OS_FREESTANDING,
+      .abi = SPN_ABI_BARE,
+    },
+    .driver = SPN_CC_DRIVER_ZIG,
+    .expect = { .compile = { "-ffreestanding" } },
+  },
+  {
+    .name = "freestanding_gcc_strips_runtime",
+    .profile = {
+      .arch = SPN_ARCH_ARM64,
+      .os = SPN_OS_FREESTANDING,
+      .abi = SPN_ABI_BARE,
+    },
+    .driver = SPN_CC_DRIVER_GCC,
+    .expect = { .compile = { "-ffreestanding" }, .link = { "-nostartfiles", "-nolibc" } },
+  },
+  {
+    .name = "freestanding_clang_strips_runtime",
+    .profile = {
+      .arch = SPN_ARCH_ARM64,
+      .os = SPN_OS_FREESTANDING,
+      .abi = SPN_ABI_BARE,
+    },
+    .driver = SPN_CC_DRIVER_CLANG,
+    .expect = { .compile = { "-ffreestanding" }, .link = { "-nostartfiles", "-nolibc" } },
+  },
+  {
     .name = "reject_sanitizers_with_static_linkage",
     .profile = {
       .arch = SPN_ARCH_X64,

@@ -100,7 +100,7 @@ static const compile_test_t tests [] = {
     },
     .expect = {
       .command = "cc",
-      .args = { "--target=aarch64-freestanding-none", "-std=c99", "-c", "-Werror=return-type", "main.c", "-o", "main.o" },
+      .args = { "--target=aarch64-freestanding-none", "-std=c99", "-ffreestanding", "-c", "-Werror=return-type", "main.c", "-o", "main.o" },
     },
   },
   {
@@ -114,7 +114,20 @@ static const compile_test_t tests [] = {
     },
     .expect = {
       .command = "cc",
-      .args = { "--target=aarch64-none-elf", "-std=c99", "-c", "-Werror=return-type", "main.c", "-o", "main.o" },
+      .args = { "--target=aarch64-none-elf", "-std=c99", "-ffreestanding", "-c", "-Werror=return-type", "main.c", "-o", "main.o" },
+    },
+  },
+  {
+    .name = "msvc_freestanding_unsupported",
+    .driver = SPN_CC_DRIVER_MSVC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_FREESTANDING,
+      .abi = SPN_ABI_BARE,
+    },
+    .expect = {
+      .err = SPN_ERR_COMPILER_FEATURE_UNSUPPORTED,
+      .feature = SPN_CC_FEATURE_COMPILE,
     },
   },
   {
