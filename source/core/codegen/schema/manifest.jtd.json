@@ -107,6 +107,9 @@
       "properties": {
         "from": { "type": "string" },
         "to": { "type": "string" }
+      },
+      "optionalProperties": {
+        "when": { "metadata": { "extern": "when", "include": "when/types.h" } }
       }
     },
 

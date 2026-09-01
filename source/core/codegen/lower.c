@@ -257,10 +257,12 @@ static bool publish_mount_ok(sp_str_t path) {
 static void lower_publish(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
   spn_toml_loader_push_key(ctx, "publish");
   out->publish.copy = sp_da_new(ctx->mem, spn_publish_copy_t);
+  out->gated.publish.copy = sp_da_new(ctx->mem, spn_publish_copy_t);
   sp_da_for(cg->publish.copy, it) {
     spn_publish_copy_t copy = {
       .from = cg->publish.copy[it].from,
       .to = cg->publish.copy[it].to,
+      .when = cg->publish.copy[it].when,
     };
     if (!lower_path_ok(ctx, copy.from) || !lower_path_ok(ctx, copy.to)) {
       continue;
@@ -271,7 +273,7 @@ static void lower_publish(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, s
       spn_toml_loader_pop(ctx);
       continue;
     }
-    sp_da_push(out->publish.copy, copy);
+    sp_da_push(out->gated.publish.copy, copy);
   }
   spn_toml_loader_pop(ctx);
 }
@@ -711,6 +713,18 @@ static void validate_pkg_whens(spn_toml_loader_t* ctx, const spn_cg_manifest_t* 
   spn_toml_loader_pop(ctx);
 }
 
+static void validate_publish_whens(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
+  spn_toml_loader_push_key(ctx, "publish");
+  spn_toml_loader_push_key(ctx, "copy");
+  sp_da_for(cg->publish.copy, it) {
+    spn_toml_loader_push_index(ctx, it);
+    validate_when(ctx, &cg->publish.copy[it].when, out);
+    spn_toml_loader_pop(ctx);
+  }
+  spn_toml_loader_pop(ctx);
+  spn_toml_loader_pop(ctx);
+}
+
 static void validate_facts_only_whens(spn_toml_loader_t* ctx, sp_da(spn_cg_source_entry_t) entries, const c8* key) {
   spn_toml_loader_push_key(ctx, key);
   sp_da_for(entries, it) {
@@ -841,6 +855,7 @@ static void validate_whens(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, 
   validate_target_whens(ctx, cg->test, "test", out);
   validate_target_whens(ctx, cg->example, "example", out);
   validate_pkg_whens(ctx, cg, out);
+  validate_publish_whens(ctx, cg, out);
   validate_metaprogram_whens(ctx, cg);
   validate_option_sets(ctx, cg, out);
 }

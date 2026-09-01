@@ -23,6 +23,12 @@ typedef struct {
 } gated_t;
 
 typedef struct {
+  const c8* from;
+  const c8* to;
+  const c8* when;
+} copy_t;
+
+typedef struct {
   const c8* name;
   spn_linkage_set_t linkages;
   bool no_link;
@@ -139,6 +145,7 @@ typedef struct {
   gated_t define [8];
   gated_t system_deps [8];
   gated_t frameworks [4];
+  copy_t publish [4];
   issue_t issues [7];
   target_t libs [8];
   target_t exes [8];
@@ -830,6 +837,22 @@ static const test_t tests [] = {
     },
   },
   {
+    .name = "publish_gated",
+    .manifest = "publish_gated",
+    .publish = {
+      { "source/a.h", "include" },
+      { "source/b.h", "include/b", "os = \"windows\"" },
+    },
+  },
+  {
+    .name = "validate_publish_when_unknown_key",
+    .manifest = "validate_publish_when_unknown_key",
+    .publish = { { "source/a.h", "include", "simd = \"avx2\"" } },
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "publish.copy[0].when.simd" },
+    },
+  },
+  {
     .name = "validate_package_define_when_unknown_key",
     .manifest = "validate_package_define_when_unknown_key",
     .define = { { "A" }, { "B", "simd = \"avx2\"" } },
@@ -1037,6 +1060,16 @@ static sp_err_t check_gated_list(sp_test_t* t, spn_gated_list_t actual, const ga
   return SP_OK;
 }
 
+static sp_err_t check_copy_list(sp_test_t* t, sp_da(spn_publish_copy_t) actual, const copy_t* expected, u32 n) {
+  sp_must_eq(t, n, (u32)sp_da_size(actual));
+  sp_for(it, n) {
+    sp_expect_str_eq_c(t, actual[it].from, expected[it].from);
+    sp_expect_str_eq_c(t, actual[it].to, expected[it].to);
+    sp_expect_str_eq_c(t, spn_when_to_str(sp_test_arena(t), &actual[it].when), expected[it].when ? expected[it].when : "always");
+  }
+  return SP_OK;
+}
+
 static sp_err_t check_gated_path_list(sp_test_t* t, spn_gated_path_list_t actual, const gated_t* expected, u32 n) {
   sp_must_eq(t, n, (u32)sp_da_size(actual));
   sp_for(it, n) {
@@ -1153,6 +1186,10 @@ sp_test_each(lower, cases, test_t, tests) {
   check_gated(t, pkg.gated.system_deps, it->system_deps);
   sp_expect_eq(t, (u32)0, (u32)sp_da_size(pkg.macos.frameworks));
   check_gated(t, pkg.gated.frameworks, it->frameworks);
+  sp_expect_eq(t, (u32)0, (u32)sp_da_size(pkg.publish.copy));
+  u32 num_copies = 0;
+  sp_carr_detect_len(it->publish, num_copies, it->publish[num_copies].from);
+  sp_try(check_copy_list(t, pkg.gated.publish.copy, it->publish, num_copies));
   sp_expect_eq(t, (u32)0, (u32)sp_da_size(pkg.include));
   check_gated_paths(t, pkg.gated.include, it->include);
   check_gated_paths(t, pkg.build.gated.source, it->build_source);

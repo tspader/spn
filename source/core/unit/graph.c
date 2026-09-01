@@ -23,6 +23,14 @@ static sp_da(spn_embed_t) clone_embed_list(sp_mem_t mem, sp_da(spn_embed_t) sour
   return result;
 }
 
+static sp_da(spn_publish_copy_t) clone_copy_list(sp_mem_t mem, sp_da(spn_publish_copy_t) source) {
+  sp_da(spn_publish_copy_t) result = sp_da_new(mem, spn_publish_copy_t);
+  sp_da_for(source, it) {
+    sp_da_push(result, source[it]);
+  }
+  return result;
+}
+
 static sp_da(spn_path_t) clone_path_list(sp_mem_t mem, sp_da(spn_path_t) source) {
   sp_da(spn_path_t) result = sp_da_new(mem, spn_path_t);
   sp_da_for(source, it) {
@@ -73,6 +81,7 @@ static spn_pkg_info_t* clone_pkg_info(spn_session_t* s, spn_pkg_id_t id, spn_bui
   info->public_define = clone_str_list(mem, source->public_define);
   info->system_deps = clone_str_list(mem, source->system_deps);
   info->macos.frameworks = clone_str_list(mem, source->macos.frameworks);
+  info->publish.copy = clone_copy_list(mem, source->publish.copy);
 
   spn_when_env_t env;
   spn_when_env_from_profile(mem, &build->profile, &env);

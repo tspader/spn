@@ -62,6 +62,7 @@ static const test_t tests [] = {
   { "when_source" },
   { "when_values" },
   { "when_frameworks" },
+  { "when_publish" },
 };
 
 static spn_toml_loader_t loader_new(sp_mem_t mem) {

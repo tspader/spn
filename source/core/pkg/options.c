@@ -247,6 +247,15 @@ static void apply_gated_paths(apply_ctx_t* ctx, sp_da(spn_path_t)* plain, spn_ga
   }
 }
 
+static void apply_copies(apply_ctx_t* ctx, sp_da(spn_publish_copy_t)* plain, sp_da(spn_publish_copy_t) gated) {
+  sp_da_for(gated, it) {
+    if (!spn_when_eval(&gated[it].when, ctx->env)) {
+      continue;
+    }
+    sp_da_push(*plain, gated[it]);
+  }
+}
+
 static void apply_target(apply_ctx_t* ctx, spn_target_info_t* target) {
   apply_gated_paths(ctx, &target->source, target->gated.source);
   apply_gated_paths(ctx, &target->headers, target->gated.headers);
@@ -281,6 +290,7 @@ void spn_pkg_apply_options(
   apply_gated_paths(&ctx, &info->include, info->gated.include);
   apply_gated(&ctx, &info->define, info->gated.define);
   apply_gated(&ctx, &info->macos.frameworks, info->gated.frameworks);
+  apply_copies(&ctx, &info->publish.copy, info->gated.publish.copy);
 
   sp_str_om_for(info->options, it) {
     spn_option_info_t* option = sp_str_om_at(info->options, it);

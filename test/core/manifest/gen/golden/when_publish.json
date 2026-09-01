@@ -1,0 +1,21 @@
+{
+  "package": {
+    "name": "p",
+    "version": "1.0.0"
+  },
+  "publish": {
+    "copy": [
+      {
+        "from": "source/a.h",
+        "to": "include"
+      },
+      {
+        "from": "source/b.h",
+        "to": "include",
+        "when": {
+          "os": "windows"
+        }
+      }
+    ]
+  }
+}
