@@ -217,7 +217,7 @@ sp_str_t         fz_output_content(sp_mem_t mem, u64 identity, const sp_str_t* i
 u64              fz_action_inputs(sp_mem_t mem, fz_universe_t* u, const fz_state_t* state, u64 action, const sp_str_t* bytes, sp_str_t** inputs);
 fz_shape_t       fz_shape_now(sp_mem_t mem, fz_universe_t* u, const fz_state_t* state, u64 action);
 spn_dag_digest_t fz_model_weak(sp_mem_t mem, fz_universe_t* u, const sp_str_t* bytes, u64 action);
-u32              fz_model_obs(sp_mem_t mem, fz_universe_t* u, const fz_state_t* state, const sp_str_t* bytes, u64 action, const fz_shape_t* shape, spn_dag_obs_t** obs);
+u32              fz_model_obs(sp_mem_t mem, fz_universe_t* u, const fz_state_t* state, const sp_str_t* bytes, u64 action, const fz_shape_t* shape, spn_dag_obs_t** obs, spn_dag_digest_t** digests);
 void             fz_executor_init(fz_executor_t* ex, sp_mem_t mem, sp_sim_t* sim, sp_fuzz_prng_t prng);
 fz_err_t         fz_run_trace(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u, fz_trace_t* trace, fz_journal_t* j);
 fz_err_t         fz_run_sweep(sp_mem_t mem, sp_fuzz_prng_t* prng, fz_universe_t* u, fz_trace_t* trace, fz_journal_t* j);

@@ -25,6 +25,8 @@ spn_path_rel_t  spn_path_within(spn_path_t base, spn_path_t path);
 sp_hash_t       spn_path_hash(spn_path_t path);
 sp_hash_t       spn_path_on_hash(void* key, u64 size);
 bool            spn_path_on_compare(void* a, void* b, u64 size);
+spn_path_root_set_t spn_path_root_mask(spn_path_root_t root);
+spn_path_root_set_t spn_path_pinned_roots();
 
 spn_arg_t       spn_arg_lit(sp_str_t value);
 spn_arg_t       spn_arg_path(spn_path_t path);

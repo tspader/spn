@@ -7,27 +7,20 @@
 #include "atomic_file/atomic_file.h"
 
 
-static sp_str_t format_obs_kind(spn_dag_obs_kind_t kind) {
+static c8 format_obs_kind(spn_dag_obs_kind_t kind) {
   switch (kind) {
-    case SPN_DAG_OBS_FILE:        return sp_str_lit("file");
-    case SPN_DAG_OBS_ABSENT:      return sp_str_lit("absent");
-    case SPN_DAG_OBS_ENUMERATION: return sp_str_lit("enumeration");
+    case SPN_DAG_OBS_FILE:        return 'f';
+    case SPN_DAG_OBS_ABSENT:      return 'a';
+    case SPN_DAG_OBS_ENUMERATION: return 'e';
   }
-  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+  SP_UNREACHABLE_RETURN('f');
 }
 
-static bool parse_obs_kind(sp_str_t str, spn_dag_obs_kind_t* out) {
-  if (sp_str_equal(str, sp_str_lit("file"))) {
-    *out = SPN_DAG_OBS_FILE;
-    return true;
-  }
-  if (sp_str_equal(str, sp_str_lit("absent"))) {
-    *out = SPN_DAG_OBS_ABSENT;
-    return true;
-  }
-  if (sp_str_equal(str, sp_str_lit("enumeration"))) {
-    *out = SPN_DAG_OBS_ENUMERATION;
-    return true;
+static bool parse_obs_kind(c8 c, spn_dag_obs_kind_t* out) {
+  switch (c) {
+    case 'f': *out = SPN_DAG_OBS_FILE; return true;
+    case 'a': *out = SPN_DAG_OBS_ABSENT; return true;
+    case 'e': *out = SPN_DAG_OBS_ENUMERATION; return true;
   }
   return false;
 }
@@ -98,17 +91,6 @@ static bool row_digest(sp_str_t* cursor, spn_dag_digest_t* out) {
     return false;
   }
   return spn_dag_digest_parse(hex, out);
-}
-
-static bool row_word(sp_str_t* cursor, sp_str_t* out) {
-  u32 len = 0;
-  while (len < cursor->len && cursor->data[len] != ' ' && cursor->data[len] != '\n') {
-    len++;
-  }
-  if (!len) {
-    return false;
-  }
-  return row_bytes(cursor, len, out);
 }
 
 static bool row_line(sp_str_t* cursor, sp_str_t* out) {
@@ -183,10 +165,9 @@ static spn_err_t write_obs_row(sp_io_writer_t* io, const spn_dag_obs_t* obs) {
   if (sp_str_contains(obs->path.sub, sp_str_lit("\n"))) {
     return SPN_ERR_DAG_STORE_WRITE;
   }
-  if (sp_fmt_io(io, "{} {} ",
-    sp_fmt_str(format_obs_kind(obs->kind)),
-    sp_fmt_uint(obs->path.root)
-  )) {
+  c8 kind [2] = { format_obs_kind(obs->kind), ' ' };
+  spn_try(write_bytes(io, kind, sizeof(kind)));
+  if (sp_fmt_io(io, "{} ", sp_fmt_uint(obs->path.root))) {
     return SPN_ERR_DAG_STORE_WRITE;
   }
   if (obs->kind == SPN_DAG_OBS_ENUMERATION) {
@@ -201,7 +182,7 @@ static bool parse_obs_row(sp_str_t* cursor, spn_dag_obs_t* out) {
   sp_str_t kind = sp_zero;
   u64 root = 0;
   sp_str_t sub = sp_zero;
-  if (!row_word(cursor, &kind) || !parse_obs_kind(kind, &out->kind)) return false;
+  if (!row_bytes(cursor, 1, &kind) || !parse_obs_kind(kind.data[0], &out->kind)) return false;
   if (!row_lit(cursor, ' ')) return false;
   if (!row_u64(cursor, &root) || root >= SPN_PATH_ROOT_COUNT) return false;
   if (!row_lit(cursor, ' ')) return false;
@@ -216,19 +197,28 @@ static bool parse_obs_row(sp_str_t* cursor, spn_dag_obs_t* out) {
   return true;
 }
 
-#define obs_version '6'
+#define obs_version '7'
 
-static spn_err_t write_obs(sp_io_writer_t* io, const spn_dag_obs_t* obs, u64 count) {
+static spn_err_t write_obs(sp_io_writer_t* io, sp_mem_t mem, const spn_dag_pathset_t* set) {
   spn_try(write_header(io, obs_version));
-  sp_for(it, count) {
-    spn_try(write_obs_row(io, obs + it));
+  if (sp_fmt_io(io, "{}\n", sp_fmt_str(spn_dag_digest_hex(mem, set->pinned)))) {
+    return SPN_ERR_DAG_STORE_WRITE;
+  }
+  sp_da_for(set->obs, it) {
+    spn_try(write_obs_row(io, set->obs + it));
   }
   return SPN_OK;
 }
 
-static bool parse_obs(sp_str_t content, sp_da(spn_dag_obs_t)* set) {
+static bool parse_obs(sp_str_t content, spn_dag_pathset_t* set) {
   sp_str_t cursor = content;
   if (!row_header(&cursor, obs_version)) {
+    return false;
+  }
+  if (!row_digest(&cursor, &set->pinned)) {
+    return false;
+  }
+  if (!row_lit(&cursor, '\n')) {
     return false;
   }
   while (cursor.len) {
@@ -236,7 +226,7 @@ static bool parse_obs(sp_str_t content, sp_da(spn_dag_obs_t)* set) {
     if (!parse_obs_row(&cursor, &obs)) {
       return false;
     }
-    sp_da_push(*set, obs);
+    sp_da_push(set->obs, obs);
   }
   return true;
 }
@@ -270,7 +260,7 @@ static void save_outputs(sp_str_t dir, spn_dag_digest_t key, const spn_dag_actio
   sp_mem_end_scratch(s);
 }
 
-static bool load_obs(spn_dag_obs_table_t* d, spn_dag_digest_t key, sp_da(spn_dag_obs_t)* set) {
+static bool load_obs(spn_dag_obs_table_t* d, spn_dag_digest_t key, spn_dag_pathset_t* set) {
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
 
   sp_str_t path = entry_path(d->dir, s.mem, key);
@@ -287,12 +277,12 @@ static bool load_obs(spn_dag_obs_table_t* d, spn_dag_digest_t key, sp_da(spn_dag
   return ok;
 }
 
-static void save_obs(spn_dag_obs_table_t* d, spn_dag_digest_t key, const spn_dag_obs_t* obs, u64 count) {
+static void save_obs(spn_dag_obs_table_t* d, spn_dag_digest_t key, const spn_dag_pathset_t* set) {
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
 
   sp_io_dyn_mem_writer_t sink = sp_zero;
   sp_io_dyn_mem_writer_init(s.mem, &sink);
-  if (!write_obs(&sink.base, obs, count)) {
+  if (!write_obs(&sink.base, s.mem, set)) {
     sp_fs_write_atomic(entry_path(d->dir, s.mem, key), sp_io_dyn_mem_writer_as_str(&sink));
     if (d->stats) {
       sp_atomic_u32_add(&d->stats->cache_writes, 1, SP_ATOMIC_RELAXED);
@@ -387,9 +377,10 @@ bool spn_dag_action_cache_remove(spn_dag_action_cache_t* c, spn_dag_digest_t key
   return removed;
 }
 
-void spn_dag_obs_table_init(spn_dag_obs_table_t* d, sp_mem_t mem, sp_str_t dir) {
+void spn_dag_obs_table_init(spn_dag_obs_table_t* d, sp_mem_t mem, const spn_path_roots_t* roots, sp_str_t dir) {
   d->arena = sp_mem_arena_new(mem);
   d->mem = sp_mem_arena_as_allocator(d->arena);
+  d->roots = roots;
   d->dir = sp_str_copy(d->mem, dir);
   sp_ht_init(d->mem, d->entries);
 
@@ -398,23 +389,11 @@ void spn_dag_obs_table_init(spn_dag_obs_table_t* d, sp_mem_t mem, sp_str_t dir) 
   }
 }
 
-static spn_dag_pathset_t copy_pathset(sp_mem_t mem, spn_dag_pathset_t set) {
-  spn_dag_pathset_t copy = sp_zero;
-  sp_da_init(mem, copy.obs);
-  sp_da_for(set.obs, it) {
-    spn_dag_obs_t obs = set.obs[it];
-    obs.path.sub = sp_str_copy(mem, set.obs[it].path.sub);
-    obs.filter = sp_str_copy(mem, set.obs[it].filter);
-    sp_da_push(copy.obs, obs);
-  }
-  return copy;
-}
-
-bool spn_dag_obs_table_get(spn_dag_obs_table_t* d, spn_dag_digest_t weak, sp_mem_t mem, spn_dag_pathset_t* set) {
+bool spn_dag_obs_table_get(spn_dag_obs_table_t* d, spn_dag_digest_t weak, spn_dag_pathset_t* set) {
   sp_mutex_lock(&d->mutex);
   spn_dag_pathset_t* cached = sp_ht_getp(d->entries, weak);
   if (cached) {
-    *set = copy_pathset(mem, *cached);
+    *set = *cached;
     sp_mutex_unlock(&d->mutex);
     return true;
   }
@@ -426,7 +405,7 @@ bool spn_dag_obs_table_get(spn_dag_obs_table_t* d, spn_dag_digest_t weak, sp_mem
 
   spn_dag_pathset_t loaded = sp_zero;
   sp_da_init(d->mem, loaded.obs);
-  if (!load_obs(d, weak, &loaded.obs)) {
+  if (!load_obs(d, weak, &loaded)) {
     sp_mutex_unlock(&d->mutex);
     return false;
   }
@@ -436,16 +415,20 @@ bool spn_dag_obs_table_get(spn_dag_obs_table_t* d, spn_dag_digest_t weak, sp_mem
   }
 
   sp_ht_insert(d->entries, weak, loaded);
-  *set = copy_pathset(mem, loaded);
+  *set = loaded;
   sp_mutex_unlock(&d->mutex);
   return true;
 }
 
-void spn_dag_obs_table_put(spn_dag_obs_table_t* d, spn_dag_digest_t weak, const spn_dag_obs_t* obs, u32 count) {
+spn_dag_pathset_t spn_dag_obs_table_put(spn_dag_obs_table_t* d, spn_dag_digest_t weak, const spn_dag_obs_t* obs, u32 count) {
   sp_mutex_lock(&d->mutex);
   spn_dag_pathset_t set = sp_zero;
+  set.pinned = spn_dag_pinned_digest(d->roots->pinned, obs, count);
   sp_da_init(d->mem, set.obs);
   sp_for(it, count) {
+    if (d->roots->pinned & spn_path_root_mask(obs[it].path.root)) {
+      continue;
+    }
     spn_dag_obs_t copy = obs[it];
     copy.path.sub = sp_str_copy(d->mem, obs[it].path.sub);
     copy.filter = sp_str_copy(d->mem, obs[it].filter);
@@ -454,9 +437,10 @@ void spn_dag_obs_table_put(spn_dag_obs_table_t* d, spn_dag_digest_t weak, const 
   sp_ht_insert(d->entries, weak, set);
 
   if (!sp_str_empty(d->dir)) {
-    save_obs(d, weak, set.obs, sp_da_size(set.obs));
+    save_obs(d, weak, &set);
   }
   sp_mutex_unlock(&d->mutex);
+  return set;
 }
 
 static spn_err_t write_hint_row(sp_io_writer_t* io, sp_mem_t mem, spn_path_t path, const spn_dag_file_meta_t* meta) {

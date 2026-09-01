@@ -45,6 +45,7 @@ add_executable(core
   dag/hints.c
   dag/key.c
   dag/parallel.c
+  dag/pinned.c
   dag/run.c
   dag/stamp.c
   dag/store.c

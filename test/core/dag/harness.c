@@ -22,7 +22,11 @@ void dag_test_env_init(dag_test_env_t* env, sp_test_t* t, dag_test_env_config_t 
   if (!sp_fs_exists(env->root)) {
     sp_fs_create_dir(env->root);
   }
+  env->roots.pinned = config.pinned;
   env->roots.dirs[SPN_PATH_ROOT_PROJECT] = env->root;
+  if (config.checkout) {
+    env->roots.dirs[SPN_PATH_ROOT_CHECKOUT] = dag_test_env_path(env, sp_str_view(config.checkout));
+  }
   spn_dag_store_init(&env->store, (spn_dag_store_config_t) {
     .kind = config.store,
     .mem = env->mem,
@@ -33,7 +37,7 @@ void dag_test_env_init(dag_test_env_t* env, sp_test_t* t, dag_test_env_config_t 
   spn_dag_file_cache_fence(&env->files, SPN_DAG_STAMP_TRUST_ALL);
   spn_dag_file_cache_load(&env->files, dag_test_env_path(env, sp_str_lit("files")));
   spn_dag_action_cache_init(&env->cache, env->mem, sp_str_lit(""));
-  spn_dag_obs_table_init(&env->discovery, env->mem, dag_test_env_path(env, sp_str_lit("manifests")));
+  spn_dag_obs_table_init(&env->discovery, env->mem, &env->roots, dag_test_env_path(env, sp_str_lit("manifests")));
   env->env = (spn_dag_env_t) {
     .files = &env->files,
     .cache = &env->cache,
@@ -48,7 +52,7 @@ void dag_test_env_cold(dag_test_env_t* env) {
   spn_dag_file_cache_init(&env->files, env->mem, &env->roots);
   spn_dag_file_cache_fence(&env->files, SPN_DAG_STAMP_TRUST_ALL);
   spn_dag_file_cache_load(&env->files, dag_test_env_path(env, sp_str_lit("files")));
-  spn_dag_obs_table_init(&env->discovery, env->mem, dag_test_env_path(env, sp_str_lit("manifests")));
+  spn_dag_obs_table_init(&env->discovery, env->mem, &env->roots, dag_test_env_path(env, sp_str_lit("manifests")));
 }
 
 spn_dag_t* dag_test_env_graph(dag_test_env_t* env) {
@@ -92,7 +96,7 @@ spn_dag_digest_t dag_test_digest(const c8* data) {
   return spn_dag_digest(str.data, str.len);
 }
 
-u32 dag_test_obs_build(const dag_test_obs_t* specs, u32 cap, spn_dag_obs_t* out) {
+u32 dag_test_obs_build(const dag_test_obs_t* specs, u32 cap, spn_dag_obs_t* out, spn_dag_digest_t* digests) {
   u32 count = 0;
   sp_for(it, cap) {
     if (!specs[it].path) {
@@ -103,8 +107,8 @@ u32 dag_test_obs_build(const dag_test_obs_t* specs, u32 cap, spn_dag_obs_t* out)
       .path = { .root = specs[it].root, .sub = sp_str_view(specs[it].path) },
       .filter = specs[it].filter ? sp_str_view(specs[it].filter) : sp_str_lit("")
     };
-    if (specs[it].content) {
-      out[count].meta.digest = dag_test_digest(specs[it].content);
+    if (digests) {
+      digests[count] = dag_test_digest(specs[it].content);
     }
     count++;
   }

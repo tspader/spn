@@ -128,6 +128,9 @@ spn_err_t spn_dag_action_add_output(spn_dag_t* g, spn_dag_id_t action_id, spn_da
   }
   if (!spn_path_empty(artifact->path)) {
     sp_assert(artifact->path.root != SPN_PATH_ROOT_NONE);
+    if (g->roots->pinned & spn_path_root_mask(artifact->path.root)) {
+      return SPN_ERR_DAG_PINNED_OUTPUT;
+    }
   }
   if (sp_str_empty(artifact->name)) {
     artifact->name = sp_fs_get_name(artifact->path.sub);
@@ -204,7 +207,8 @@ spn_dag_digest_t spn_dag_weak_key(spn_dag_t* g, spn_dag_id_t action_id) {
 
   spn_digest_ctx_t ctx = sp_zero;
   spn_digest_init_blake3(&ctx);
-  spn_dag_hash_str(&ctx, sp_str_lit("spn.dag.action.v3"));
+  spn_dag_hash_str(&ctx, sp_str_lit("spn.dag.action.v4"));
+  spn_dag_hash_u64(&ctx, g->roots->pinned);
   spn_dag_hash_digest(&ctx, action->identity);
 
   spn_dag_hash_u64(&ctx, sp_da_size(action->consumes));
@@ -225,20 +229,45 @@ spn_dag_digest_t spn_dag_weak_key(spn_dag_t* g, spn_dag_id_t action_id) {
   return spn_dag_hash_final(&ctx);
 }
 
-spn_dag_digest_t spn_dag_strong_key(spn_dag_digest_t weak, const spn_dag_obs_t* obs, u32 count) {
+static void hash_obs_row(spn_digest_ctx_t* ctx, const spn_dag_obs_t* obs) {
+  spn_dag_hash_u8(ctx, (u8)obs->kind);
+  spn_dag_hash_u8(ctx, (u8)obs->path.root);
+  spn_dag_hash_str(ctx, obs->path.sub);
+  spn_dag_hash_str(ctx, obs->filter);
+}
+
+spn_dag_digest_t spn_dag_strong_key(spn_dag_digest_t weak, spn_dag_digest_t pinned, const spn_dag_obs_t* obs, const spn_dag_digest_t* digests, u32 count) {
   spn_digest_ctx_t ctx = sp_zero;
   spn_digest_init_blake3(&ctx);
-  spn_dag_hash_str(&ctx, sp_str_lit("spn.dag.strong.v7"));
+  spn_dag_hash_str(&ctx, sp_str_lit("spn.dag.strong.v8"));
   spn_dag_hash_digest(&ctx, weak);
+  spn_dag_hash_digest(&ctx, pinned);
   spn_dag_hash_u64(&ctx, count);
   sp_for(it, count) {
-    spn_dag_hash_u8(&ctx, (u8)obs[it].kind);
-    spn_dag_hash_u8(&ctx, (u8)obs[it].path.root);
-    spn_dag_hash_str(&ctx, obs[it].path.sub);
-    spn_dag_hash_str(&ctx, obs[it].filter);
-    spn_dag_hash_digest(&ctx, obs[it].meta.digest);
+    hash_obs_row(&ctx, &obs[it]);
+    spn_dag_hash_digest(&ctx, digests[it]);
   }
 
+  return spn_dag_hash_final(&ctx);
+}
+
+spn_dag_digest_t spn_dag_pinned_digest(spn_path_root_set_t pinned, const spn_dag_obs_t* obs, u32 count) {
+  u64 rows = 0;
+  sp_for(it, count) {
+    if (pinned & spn_path_root_mask(obs[it].path.root)) {
+      rows++;
+    }
+  }
+
+  spn_digest_ctx_t ctx = sp_zero;
+  spn_digest_init_blake3(&ctx);
+  spn_dag_hash_str(&ctx, sp_str_lit("spn.dag.pinned.v1"));
+  spn_dag_hash_u64(&ctx, rows);
+  sp_for(it, count) {
+    if (pinned & spn_path_root_mask(obs[it].path.root)) {
+      hash_obs_row(&ctx, &obs[it]);
+    }
+  }
   return spn_dag_hash_final(&ctx);
 }
 
@@ -246,6 +275,14 @@ spn_dag_digest_t spn_dag_digest(const void* data, u64 len) {
   spn_dag_digest_t digest = sp_zero;
   spn_digest(SPN_DIGEST_BLAKE3, data, len, digest.bytes);
   return digest;
+}
+
+spn_dag_digest_t spn_dag_path_digest(spn_path_t path) {
+  spn_digest_ctx_t ctx = sp_zero;
+  spn_digest_init_blake3(&ctx);
+  spn_dag_hash_str(&ctx, sp_str_lit("spn.dag.path.v1"));
+  spn_dag_hash_path(&ctx, path);
+  return spn_dag_hash_final(&ctx);
 }
 
 bool spn_dag_digest_equal(spn_dag_digest_t a, spn_dag_digest_t b) {
