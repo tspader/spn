@@ -128,6 +128,7 @@ source = [
   "test/core/closure/*.c",
   "test/core/compiler/*.c",
   "test/core/compiler/exports/*.c",
+  "test/core/compiler/rsp/*.c",
   "test/core/dag/*.c",
   "test/core/external/*.c",
   "test/core/gen/*.c",

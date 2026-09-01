@@ -1,6 +1,4 @@
-#include "compiler.h"
-
-#include "compiler/rsp.h"
+#include "../compiler.h"
 
 #define cmdline_args_max 4
 
@@ -46,7 +44,7 @@ static const test_t tests [] = {
   },
 };
 
-sp_test_each(rsp, cmdline_len, test_t, tests, .setup = spn_test_ctx_setup) {
+sp_test_each(rsp_cmdline, len, test_t, tests, .setup = spn_test_ctx_setup) {
   sp_mem_t mem = sp_test_arena(t);
 
   spn_invocation_t invocation = {

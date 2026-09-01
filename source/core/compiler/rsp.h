@@ -6,7 +6,8 @@
 
 #define spn_rsp_cmdline_max 32766
 
-u32       spn_rsp_cmdline_len(const spn_path_roots_t* roots, const spn_invocation_t* invocation);
-spn_rsp_t spn_rsp_render(sp_mem_t mem, const spn_path_roots_t* roots, const spn_invocation_t* invocation, spn_path_t file);
+u32             spn_rsp_cmdline_len(const spn_path_roots_t* roots, const spn_invocation_t* invocation);
+spn_rsp_style_t spn_rsp_style(spn_cc_driver_t driver);
+spn_rsp_t       spn_rsp_render(sp_mem_t mem, const spn_path_roots_t* roots, const spn_invocation_t* invocation, spn_rsp_style_t style, spn_path_t file);
 
 #endif

@@ -61,10 +61,20 @@ static spn_err_t write_rsp(sp_str_t path, sp_str_t content) {
   return SPN_OK;
 }
 
-static spn_err_t run_link(spn_invocation_t* invocation, spn_path_t output, spn_invocation_result_t* run) {
+static spn_path_t rsp_path(spn_target_unit_t* target, const c8* name) {
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+  spn_path_t dir = spn_target_unit_object_dir(spn.mem, target);
+  sp_fs_create_dir(spn_path_str(&spn.roots, s.mem, dir));
+  spn_path_t path = spn_path_join(spn.mem, dir, sp_cstr_as_str(name));
+  sp_mem_end_scratch(s);
+  return path;
+}
+
+static spn_err_t run_link(spn_target_unit_t* target, spn_invocation_t* invocation, const c8* name, spn_invocation_result_t* run) {
   if (spn.host.os == SPN_OS_WINDOWS && spn_rsp_cmdline_len(&spn.roots, invocation) > spn_rsp_cmdline_max) {
-    spn_path_t file = spn_path_suffix(spn.mem, output, sp_str_lit(".rsp"));
-    spn_rsp_t rsp = spn_rsp_render(spn.mem, &spn.roots, invocation, file);
+    spn_path_t file = rsp_path(target, name);
+    spn_rsp_style_t style = spn_rsp_style(target->pkg->build->toolchain->cc.driver);
+    spn_rsp_t rsp = spn_rsp_render(spn.mem, &spn.roots, invocation, style, file);
     spn_try(write_rsp(spn_path_str(&spn.roots, spn.mem, file), rsp.content));
     *invocation = rsp.invocation;
   }
@@ -117,7 +127,7 @@ static spn_err_t link_exports_exec(sp_mem_t scratch, spn_target_unit_t* target, 
   invocation->cwd = pkg->paths.work;
 
   spn_invocation_result_t run = sp_zero;
-  spn_try(run_link(invocation, files.output, &run));
+  spn_try(run_link(target, invocation, "exports.rsp", &run));
   if (run.result.status.exit_code) {
     return emit_link_failed(target, invocation, run.result.status.exit_code, run.result.out, run.result.err);
   }
@@ -209,7 +219,7 @@ static spn_err_t link_target_exec(sp_mem_t scratch, spn_target_unit_t* target, s
   spn_try(spn_target_link_invocation(spn.mem, target, &files, invocation));
 
   spn_invocation_result_t run = sp_zero;
-  spn_try(run_link(invocation, files.output, &run));
+  spn_try(run_link(target, invocation, "link.rsp", &run));
 
   if (run.result.status.exit_code) {
     return emit_link_failed(target, invocation, run.result.status.exit_code, run.result.out, run.result.err);

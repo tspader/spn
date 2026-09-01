@@ -29,8 +29,10 @@ add_executable(core
   compiler/exports/render.c
   compiler/flags.c
   compiler/link.c
-  compiler/rsp.c
-  compiler/cmdline.c
+  compiler/rsp/cmdline.c
+  compiler/rsp/gnu.c
+  compiler/rsp/style.c
+  compiler/rsp/windows.c
   compiler/toc.c
   dag/harness.c
   dag/action_cache.c
