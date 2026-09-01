@@ -298,14 +298,6 @@ bool spn_triple_match(spn_triple_t entry, spn_triple_t target) {
   return true;
 }
 
-sp_str_t spn_triple_to_cc_target(sp_mem_t mem, spn_triple_t triple) {
-  spn_triple_t cc = triple;
-  if (cc.abi == SPN_ABI_APPLE || cc.os == SPN_OS_WASI) {
-    cc.abi = SPN_ABI_NONE;
-  }
-  return spn_triple_to_str(mem, cc);
-}
-
 sp_str_t spn_triple_to_autoconf(sp_mem_t mem, spn_triple_t triple) {
   sp_str_t arch = spn_arch_to_str(triple.arch);
 

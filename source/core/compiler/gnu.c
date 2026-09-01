@@ -60,6 +60,32 @@ static bool is_os_version_present(spn_os_version_t version) {
   return version.major || version.minor;
 }
 
+static sp_str_t render_freestanding_target(sp_mem_t mem, spn_triple_t triple, spn_cc_driver_t driver) {
+  switch (driver) {
+    case SPN_CC_DRIVER_ZIG: return spn_triple_to_str(mem, triple);
+    case SPN_CC_DRIVER_CLANG: return sp_fmt(mem, "{}-none-elf", sp_fmt_str(spn_arch_to_str(triple.arch))).value;
+    case SPN_CC_DRIVER_GCC:
+    case SPN_CC_DRIVER_MSVC:
+    case SPN_CC_DRIVER_NONE: sp_unreachable_case();
+  }
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
+static sp_str_t render_target(sp_mem_t mem, spn_triple_t triple, spn_cc_driver_t driver) {
+  switch (triple.os) {
+    case SPN_OS_MACOS:
+    case SPN_OS_WASI: {
+      triple.abi = SPN_ABI_NONE;
+      return spn_triple_to_str(mem, triple);
+    }
+    case SPN_OS_FREESTANDING: return render_freestanding_target(mem, triple, driver);
+    case SPN_OS_LINUX:
+    case SPN_OS_WINDOWS:
+    case SPN_OS_NONE: return spn_triple_to_str(mem, triple);
+  }
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
 spn_sanitizer_set_t spn_gcc_supported_sanitizers(spn_triple_t target) {
   switch (target.os) {
     case SPN_OS_WASI:
@@ -120,7 +146,7 @@ static void add_launcher(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
   spn_cc_push_strs(mem, invocation, launcher.args);
   if (spn_cc_has(toolchain, SPN_CC_CAP_TARGET_TRIPLE)) {
     spn_triple_t triple = { profile->arch, profile->os, profile->abi };
-    sp_str_t target = spn_triple_to_cc_target(mem, triple);
+    sp_str_t target = render_target(mem, triple, toolchain->driver);
     if (!sp_str_empty(target)) {
       spn_cc_push_fmt(mem, invocation, "--target={}", sp_fmt_str(target));
     }

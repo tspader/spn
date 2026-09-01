@@ -62,6 +62,62 @@ static const compile_test_t tests [] = {
     },
   },
   {
+    .name = "zig_linux_target",
+    .driver = SPN_CC_DRIVER_ZIG,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_MUSL,
+      .standard = SPN_C99,
+    },
+    .expect = {
+      .command = "cc",
+      .args = { "--target=x86_64-linux-musl", "-std=c99", "-c", "-Werror=return-type", "main.c", "-o", "main.o" },
+    },
+  },
+  {
+    .name = "clang_windows_msvc_target",
+    .driver = SPN_CC_DRIVER_CLANG,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_MSVC,
+      .standard = SPN_C99,
+    },
+    .expect = {
+      .command = "cc",
+      .args = { "--target=x86_64-windows-msvc", "-std=c99", "-c", "-gno-codeview-command-line", "-Werror=return-type", "main.c", "-Xclang", "-object-file-name=main.o", "-o", "main.o" },
+    },
+  },
+  {
+    .name = "zig_freestanding_target",
+    .driver = SPN_CC_DRIVER_ZIG,
+    .profile = {
+      .arch = SPN_ARCH_ARM64,
+      .os = SPN_OS_FREESTANDING,
+      .abi = SPN_ABI_BARE,
+      .standard = SPN_C99,
+    },
+    .expect = {
+      .command = "cc",
+      .args = { "--target=aarch64-freestanding-none", "-std=c99", "-c", "-Werror=return-type", "main.c", "-o", "main.o" },
+    },
+  },
+  {
+    .name = "clang_freestanding_target",
+    .driver = SPN_CC_DRIVER_CLANG,
+    .profile = {
+      .arch = SPN_ARCH_ARM64,
+      .os = SPN_OS_FREESTANDING,
+      .abi = SPN_ABI_BARE,
+      .standard = SPN_C99,
+    },
+    .expect = {
+      .command = "cc",
+      .args = { "--target=aarch64-none-elf", "-std=c99", "-c", "-Werror=return-type", "main.c", "-o", "main.o" },
+    },
+  },
+  {
     .name = "clang_windows_deterministic_codeview",
     .driver = SPN_CC_DRIVER_CLANG,
     .profile = {

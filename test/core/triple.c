@@ -74,21 +74,6 @@ sp_test_each(triple, to_str, to_str_t, to_str_tests) {
 }
 
 
-static const to_str_t to_cc_target_tests [] = {
-  { "linux_gnu",             { SPN_ARCH_X64,    SPN_OS_LINUX,   SPN_ABI_GNU },   { "x86_64-linux-gnu" } },
-  { "windows_gnu",           { SPN_ARCH_X64,    SPN_OS_WINDOWS, SPN_ABI_GNU },   { "x86_64-windows-gnu" } },
-  { "windows_msvc",          { SPN_ARCH_X64,    SPN_OS_WINDOWS, SPN_ABI_MSVC },  { "x86_64-windows-msvc" } },
-  { "macos_apple_drops_abi", { SPN_ARCH_ARM64,  SPN_OS_MACOS,   SPN_ABI_APPLE }, { "aarch64-macos" } },
-  { "wasi_musl_drops_abi",   { SPN_ARCH_WASM32, SPN_OS_WASI,    SPN_ABI_MUSL },  { "wasm32-wasi" } },
-};
-
-sp_test_each(triple, to_cc_target, to_str_t, to_cc_target_tests) {
-  sp_str_t result = spn_triple_to_cc_target(sp_test_arena(t), it->triple);
-  sp_expect_str_eq_c(t, result, it->expect.value);
-  return SP_OK;
-}
-
-
 typedef struct {
   const c8* name;
   spn_triple_t partial;
