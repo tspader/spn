@@ -147,13 +147,13 @@ static const discovery_test_t discovery_tests [] = {
 
 static void discovery_put(spn_dag_obs_table_t* discovery, const discovery_entry_t* entry) {
   spn_dag_obs_t obs [DAG_TEST_MAX_INPUTS] = sp_zero;
-  u32 count = dag_test_obs_build(entry->obs, DAG_TEST_MAX_INPUTS, obs);
+  u32 count = dag_test_obs_build(entry->obs, DAG_TEST_MAX_INPUTS, obs, SP_NULLPTR);
   spn_dag_obs_table_put(discovery, dag_test_digest(entry->key), obs, count);
 }
 
 static sp_err_t discovery_expect_obs(sp_test_t* t, const spn_dag_pathset_t* set, const dag_test_obs_t* expect) {
   spn_dag_obs_t obs [DAG_TEST_MAX_INPUTS] = sp_zero;
-  u32 count = dag_test_obs_build(expect, DAG_TEST_MAX_INPUTS, obs);
+  u32 count = dag_test_obs_build(expect, DAG_TEST_MAX_INPUTS, obs, SP_NULLPTR);
   sp_must_eq(t, count, (u32)sp_da_size(set->obs));
   sp_for(it, count) {
     sp_expect_eq(t, obs[it].kind, set->obs[it].kind);

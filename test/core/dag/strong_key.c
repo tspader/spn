@@ -82,8 +82,9 @@ static const strong_key_test_t strong_key_tests [] = {
 
 static spn_dag_digest_t build_strong_key(const strong_key_action_t* spec) {
   spn_dag_obs_t obs [DAG_TEST_MAX_INPUTS] = sp_zero;
-  u32 count = dag_test_obs_build(spec->obs, DAG_TEST_MAX_INPUTS, obs);
-  return spn_dag_strong_key(dag_test_digest(spec->prelim), obs, count);
+  spn_dag_digest_t digests [DAG_TEST_MAX_INPUTS] = sp_zero;
+  u32 count = dag_test_obs_build(spec->obs, DAG_TEST_MAX_INPUTS, obs, digests);
+  return spn_dag_strong_key(dag_test_digest(spec->prelim), obs, digests, count);
 }
 
 sp_test_each(dag_strong_key, fold, strong_key_test_t, strong_key_tests) {

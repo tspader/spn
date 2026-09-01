@@ -96,11 +96,12 @@ spn_dag_digest_t fz_model_weak(sp_mem_t mem, fz_universe_t* u, const sp_str_t* b
   return spn_dag_hash_final(&ctx);
 }
 
-u32 fz_model_obs(sp_mem_t mem, fz_universe_t* u, const fz_state_t* state, const sp_str_t* bytes, u64 at, const fz_shape_t* shape, spn_dag_obs_t** obs) {
+u32 fz_model_obs(sp_mem_t mem, fz_universe_t* u, const fz_state_t* state, const sp_str_t* bytes, u64 at, const fz_shape_t* shape, spn_dag_obs_t** obs, spn_dag_digest_t** digests) {
   spn_path_roots_t roots = sp_zero;
   fz_roots_init(&roots);
 
-  sp_da(spn_dag_obs_t) rows = sp_da_new(mem, spn_dag_obs_t);
+  sp_da(spn_dag_obs_t) built = sp_da_new(mem, spn_dag_obs_t);
+  sp_da(spn_dag_digest_t) built_digests = sp_da_new(mem, spn_dag_digest_t);
   sp_da_for(u->actions[at].obs, ot) {
     fz_obs_t fo = u->actions[at].obs[ot];
     sp_str_t path = fo.probe
@@ -118,14 +119,30 @@ u32 fz_model_obs(sp_mem_t mem, fz_universe_t* u, const fz_state_t* state, const 
       digest = spn_dag_digest(bytes[fo.artifact].data, bytes[fo.artifact].len);
     }
 
-    sp_da_push(rows, ((spn_dag_obs_t) {
+    sp_da_push(built, ((spn_dag_obs_t) {
       .kind = shape->file[ot] ? SPN_DAG_OBS_FILE : SPN_DAG_OBS_ABSENT,
       .path = spn_path_make(&roots, path),
-      .meta = { .digest = digest },
     }));
+    sp_da_push(built_digests, digest);
   }
 
+  sp_da(spn_dag_obs_t) rows = sp_da_new(mem, spn_dag_obs_t);
+  sp_da_for(built, it) {
+    sp_da_push(rows, built[it]);
+  }
   spn_dag_obs_canonicalize(rows);
+
+  spn_dag_digest_t* out = sp_alloc_n(mem, spn_dag_digest_t, sp_da_size(rows) ? sp_da_size(rows) : 1);
+  sp_da_for(rows, rt) {
+    sp_da_for(built, bt) {
+      if (rows[rt].kind == built[bt].kind && spn_path_equal(rows[rt].path, built[bt].path) && sp_str_equal(rows[rt].filter, built[bt].filter)) {
+        out[rt] = built_digests[bt];
+        break;
+      }
+    }
+  }
+
   *obs = rows;
+  *digests = out;
   return (u32)sp_da_size(rows);
 }

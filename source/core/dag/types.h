@@ -35,7 +35,6 @@ typedef struct {
   spn_dag_obs_kind_t kind;
   spn_path_t path;
   sp_str_t filter;
-  spn_dag_file_meta_t meta;
 } spn_dag_obs_t;
 
 typedef struct spn_dag_env_t spn_dag_env_t;

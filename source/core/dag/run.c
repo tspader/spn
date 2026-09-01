@@ -519,17 +519,16 @@ done:
   return err;
 }
 
-static spn_err_t resolve_one(spn_dag_file_cache_t* files, spn_dag_obs_t* o, sp_mem_t mem) {
+static spn_err_t resolve_one(spn_dag_file_cache_t* files, const spn_dag_obs_t* o, spn_dag_digest_t* digest, sp_mem_t mem) {
+  *digest = (spn_dag_digest_t) sp_zero;
   switch (o->kind) {
     case SPN_DAG_OBS_ENUMERATION: {
-      o->meta = (spn_dag_file_meta_t) sp_zero;
-      return membership_digest(spn_path_str(files->roots, mem, o->path), o->filter, &o->meta.digest);
+      return membership_digest(spn_path_str(files->roots, mem, o->path), o->filter, digest);
     }
     case SPN_DAG_OBS_ABSENT: {
       sp_sys_file_meta_t sys = sp_zero;
       sp_err_t rc = sp_sys_get_path_metadata_s(sp_sys_get_root(0), spn_path_str(files->roots, mem, o->path), &sys);
       if (rc == SP_ERR_SYS_NOT_FOUND) {
-        o->meta = (spn_dag_file_meta_t) sp_zero;
         return SPN_OK;
       }
       if (rc) {
@@ -546,25 +545,21 @@ static spn_err_t resolve_one(spn_dag_file_cache_t* files, spn_dag_obs_t* o, sp_m
   spn_try(spn_dag_file_cache_stat(files, o->path, &sys));
 
   if (sys.kind == SP_FS_KIND_DIR) {
-    o->meta = (spn_dag_file_meta_t) sp_zero;
-    return membership_digest(spn_path_str(files->roots, mem, o->path), sp_str_lit(""), &o->meta.digest);
+    return membership_digest(spn_path_str(files->roots, mem, o->path), sp_str_lit(""), digest);
   }
 
-  spn_dag_file_meta_t fresh = file_meta_from_sys(sys);
-  spn_try(spn_dag_file_cache_digest(files, o->path, &fresh.digest));
-  o->meta = fresh;
-  return SPN_OK;
+  return spn_dag_file_cache_digest(files, o->path, digest);
 }
 
-static spn_err_t resolve_observations(spn_dag_file_cache_t* files, spn_dag_obs_t* obs, u32 count) {
+static spn_err_t resolve_observations(spn_dag_file_cache_t* files, const spn_dag_obs_t* obs, u32 count, spn_dag_digest_t* digests) {
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
   spn_err_t err = SPN_OK;
   sp_for(it, count) {
     if (files->roots->pinned & spn_path_root_mask(obs[it].path.root)) {
-      obs[it].meta = (spn_dag_file_meta_t) sp_zero;
+      digests[it] = (spn_dag_digest_t) sp_zero;
       continue;
     }
-    err = resolve_one(files, &obs[it], s.mem);
+    err = resolve_one(files, &obs[it], &digests[it], s.mem);
     if (err) {
       break;
     }
@@ -662,12 +657,13 @@ static bool restore_strong(spn_dag_t* g, spn_dag_action_t* action, spn_dag_diges
     return false;
   }
   u32 count = (u32)sp_da_size(set.obs);
-  bool resolved = !resolve_observations(env->files, set.obs, count);
+  spn_dag_digest_t* digests = sp_alloc_n(mem, spn_dag_digest_t, count ? count : 1);
+  bool resolved = !resolve_observations(env->files, set.obs, count, digests);
   trace_resolve(env, action->id, resolved);
   if (!resolved) {
     return false;
   }
-  spn_dag_digest_t strong = spn_dag_strong_key(weak, set.obs, count);
+  spn_dag_digest_t strong = spn_dag_strong_key(weak, set.obs, digests, count);
   trace_emit(env, (spn_dag_trace_event_t) { .kind = SPN_DAG_TRACE_STRONG, .action = action->id, .key = strong });
   return try_restore(g, action, strong, env);
 }
@@ -770,12 +766,13 @@ static spn_err_t commit(spn_dag_t* g, spn_dag_attempt_t* attempt, spn_dag_env_t*
     }
     case SPN_DAG_ACTION_DISCOVERED: {
       u32 count = (u32)sp_da_size(attempt->obs);
-      bool resolved = !resolve_observations(env->files, attempt->obs, count);
+      spn_dag_digest_t* digests = sp_alloc_n(attempt->mem, spn_dag_digest_t, count ? count : 1);
+      bool resolved = !resolve_observations(env->files, attempt->obs, count, digests);
       trace_resolve(env, action->id, resolved);
       spn_dag_obs_table_put(env->discovery, attempt->key, attempt->obs, count);
       spn_dag_digest_t key = attempt->key;
       if (resolved) {
-        key = spn_dag_strong_key(attempt->key, attempt->obs, count);
+        key = spn_dag_strong_key(attempt->key, attempt->obs, digests, count);
         trace_emit(env, (spn_dag_trace_event_t) { .kind = SPN_DAG_TRACE_STRONG, .action = action->id, .key = key });
       }
       spn_try(settle(g, action, env, &attempt->diag));

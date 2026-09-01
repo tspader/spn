@@ -96,7 +96,7 @@ spn_dag_digest_t dag_test_digest(const c8* data) {
   return spn_dag_digest(str.data, str.len);
 }
 
-u32 dag_test_obs_build(const dag_test_obs_t* specs, u32 cap, spn_dag_obs_t* out) {
+u32 dag_test_obs_build(const dag_test_obs_t* specs, u32 cap, spn_dag_obs_t* out, spn_dag_digest_t* digests) {
   u32 count = 0;
   sp_for(it, cap) {
     if (!specs[it].path) {
@@ -107,8 +107,8 @@ u32 dag_test_obs_build(const dag_test_obs_t* specs, u32 cap, spn_dag_obs_t* out)
       .path = { .root = specs[it].root, .sub = sp_str_view(specs[it].path) },
       .filter = specs[it].filter ? sp_str_view(specs[it].filter) : sp_str_lit("")
     };
-    if (specs[it].content) {
-      out[count].meta.digest = dag_test_digest(specs[it].content);
+    if (digests) {
+      digests[count] = dag_test_digest(specs[it].content);
     }
     count++;
   }

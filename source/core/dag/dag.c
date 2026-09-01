@@ -229,7 +229,7 @@ spn_dag_digest_t spn_dag_weak_key(spn_dag_t* g, spn_dag_id_t action_id) {
   return spn_dag_hash_final(&ctx);
 }
 
-spn_dag_digest_t spn_dag_strong_key(spn_dag_digest_t weak, const spn_dag_obs_t* obs, u32 count) {
+spn_dag_digest_t spn_dag_strong_key(spn_dag_digest_t weak, const spn_dag_obs_t* obs, const spn_dag_digest_t* digests, u32 count) {
   spn_digest_ctx_t ctx = sp_zero;
   spn_digest_init_blake3(&ctx);
   spn_dag_hash_str(&ctx, sp_str_lit("spn.dag.strong.v7"));
@@ -240,7 +240,7 @@ spn_dag_digest_t spn_dag_strong_key(spn_dag_digest_t weak, const spn_dag_obs_t* 
     spn_dag_hash_u8(&ctx, (u8)obs[it].path.root);
     spn_dag_hash_str(&ctx, obs[it].path.sub);
     spn_dag_hash_str(&ctx, obs[it].filter);
-    spn_dag_hash_digest(&ctx, obs[it].meta.digest);
+    spn_dag_hash_digest(&ctx, digests[it]);
   }
 
   return spn_dag_hash_final(&ctx);
