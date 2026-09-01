@@ -651,7 +651,7 @@ static spn_dag_digest_t weak_key_traced(spn_dag_t* g, spn_dag_action_t* action, 
 
 static bool restore_strong(spn_dag_t* g, spn_dag_action_t* action, spn_dag_digest_t weak, spn_dag_env_t* env, sp_mem_t mem) {
   spn_dag_pathset_t set = sp_zero;
-  bool present = spn_dag_obs_table_get(env->discovery, weak, mem, &set);
+  bool present = spn_dag_obs_table_get(env->discovery, weak, &set);
   trace_emit(env, (spn_dag_trace_event_t) { .kind = SPN_DAG_TRACE_DISCOVERY, .action = action->id, .key = weak, .hit = present });
   if (!present) {
     return false;
@@ -765,14 +765,14 @@ static spn_err_t commit(spn_dag_t* g, spn_dag_attempt_t* attempt, spn_dag_env_t*
       return SPN_OK;
     }
     case SPN_DAG_ACTION_DISCOVERED: {
-      u32 count = (u32)sp_da_size(attempt->obs);
+      spn_dag_pathset_t set = spn_dag_obs_table_put(env->discovery, attempt->key, attempt->obs, (u32)sp_da_size(attempt->obs));
+      u32 count = (u32)sp_da_size(set.obs);
       spn_dag_digest_t* digests = sp_alloc_n(attempt->mem, spn_dag_digest_t, count ? count : 1);
-      bool resolved = !resolve_observations(env->files, attempt->obs, count, digests);
+      bool resolved = !resolve_observations(env->files, set.obs, count, digests);
       trace_resolve(env, action->id, resolved);
-      spn_dag_obs_table_put(env->discovery, attempt->key, attempt->obs, count);
       spn_dag_digest_t key = attempt->key;
       if (resolved) {
-        key = spn_dag_strong_key(attempt->key, attempt->obs, digests, count);
+        key = spn_dag_strong_key(attempt->key, set.obs, digests, count);
         trace_emit(env, (spn_dag_trace_event_t) { .kind = SPN_DAG_TRACE_STRONG, .action = action->id, .key = key });
       }
       spn_try(settle(g, action, env, &attempt->diag));
@@ -948,14 +948,11 @@ static bool defer_observations(spn_dag_run_t* run, spn_dag_action_t* action, sp_
 }
 
 static bool defer_pathset(spn_dag_run_t* run, spn_dag_action_t* action, spn_dag_digest_t weak, u64 epoch, bool* requeue) {
-  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
   spn_dag_pathset_t set = sp_zero;
-  bool deferred = false;
-  if (spn_dag_obs_table_get(run->env->discovery, weak, s.mem, &set)) {
-    deferred = defer_observations(run, action, set.obs, epoch, requeue);
+  if (!spn_dag_obs_table_get(run->env->discovery, weak, &set)) {
+    return false;
   }
-  sp_mem_end_scratch(s);
-  return deferred;
+  return defer_observations(run, action, set.obs, epoch, requeue);
 }
 
 static spn_err_t seed_source(spn_dag_env_t* env, spn_dag_artifact_t* artifact) {

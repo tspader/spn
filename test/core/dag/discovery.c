@@ -165,7 +165,7 @@ static sp_err_t discovery_expect_obs(sp_test_t* t, const spn_dag_pathset_t* set,
 
 static sp_err_t discovery_expect(sp_test_t* t, spn_dag_obs_table_t* discovery, const c8* key, const discovery_expect_t* expect) {
   spn_dag_pathset_t set = sp_zero;
-  bool present = spn_dag_obs_table_get(discovery, dag_test_digest(key), sp_test_arena(t), &set);
+  bool present = spn_dag_obs_table_get(discovery, dag_test_digest(key), &set);
   sp_must_eq(t, expect->hit, present);
   if (!expect->hit) {
     return SP_OK;

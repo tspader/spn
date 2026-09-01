@@ -398,23 +398,11 @@ void spn_dag_obs_table_init(spn_dag_obs_table_t* d, sp_mem_t mem, sp_str_t dir) 
   }
 }
 
-static spn_dag_pathset_t copy_pathset(sp_mem_t mem, spn_dag_pathset_t set) {
-  spn_dag_pathset_t copy = sp_zero;
-  sp_da_init(mem, copy.obs);
-  sp_da_for(set.obs, it) {
-    spn_dag_obs_t obs = set.obs[it];
-    obs.path.sub = sp_str_copy(mem, set.obs[it].path.sub);
-    obs.filter = sp_str_copy(mem, set.obs[it].filter);
-    sp_da_push(copy.obs, obs);
-  }
-  return copy;
-}
-
-bool spn_dag_obs_table_get(spn_dag_obs_table_t* d, spn_dag_digest_t weak, sp_mem_t mem, spn_dag_pathset_t* set) {
+bool spn_dag_obs_table_get(spn_dag_obs_table_t* d, spn_dag_digest_t weak, spn_dag_pathset_t* set) {
   sp_mutex_lock(&d->mutex);
   spn_dag_pathset_t* cached = sp_ht_getp(d->entries, weak);
   if (cached) {
-    *set = copy_pathset(mem, *cached);
+    *set = *cached;
     sp_mutex_unlock(&d->mutex);
     return true;
   }
@@ -436,12 +424,12 @@ bool spn_dag_obs_table_get(spn_dag_obs_table_t* d, spn_dag_digest_t weak, sp_mem
   }
 
   sp_ht_insert(d->entries, weak, loaded);
-  *set = copy_pathset(mem, loaded);
+  *set = loaded;
   sp_mutex_unlock(&d->mutex);
   return true;
 }
 
-void spn_dag_obs_table_put(spn_dag_obs_table_t* d, spn_dag_digest_t weak, const spn_dag_obs_t* obs, u32 count) {
+spn_dag_pathset_t spn_dag_obs_table_put(spn_dag_obs_table_t* d, spn_dag_digest_t weak, const spn_dag_obs_t* obs, u32 count) {
   sp_mutex_lock(&d->mutex);
   spn_dag_pathset_t set = sp_zero;
   sp_da_init(d->mem, set.obs);
@@ -457,6 +445,7 @@ void spn_dag_obs_table_put(spn_dag_obs_table_t* d, spn_dag_digest_t weak, const 
     save_obs(d, weak, set.obs, sp_da_size(set.obs));
   }
   sp_mutex_unlock(&d->mutex);
+  return set;
 }
 
 static spn_err_t write_hint_row(sp_io_writer_t* io, sp_mem_t mem, spn_path_t path, const spn_dag_file_meta_t* meta) {
