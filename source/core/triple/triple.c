@@ -298,37 +298,6 @@ bool spn_triple_match(spn_triple_t entry, spn_triple_t target) {
   return true;
 }
 
-sp_str_t spn_triple_to_autoconf(sp_mem_t mem, spn_triple_t triple) {
-  sp_str_t arch = spn_arch_to_str(triple.arch);
-
-  // Autoconf uses GNU 4-part triples: arch-vendor-os-abi
-  // For mingw: x86_64-w64-mingw32
-  // For linux: x86_64-unknown-linux-gnu
-  // For macos: x86_64-apple-darwin
-  switch (triple.os) {
-    case SPN_OS_LINUX: {
-      sp_str_t abi = spn_abi_to_str(triple.abi);
-      return sp_fmt(mem, "{}-unknown-linux-{}", sp_fmt_str(arch), sp_fmt_str(abi)).value;
-    }
-    case SPN_OS_WINDOWS: {
-      return sp_fmt(mem, "{}-w64-mingw32", sp_fmt_str(arch)).value;
-    }
-    case SPN_OS_MACOS: {
-      return sp_fmt(mem, "{}-apple-darwin", sp_fmt_str(arch)).value;
-    }
-    case SPN_OS_WASI: {
-      return sp_fmt(mem, "{}-wasi", sp_fmt_str(arch)).value;
-    }
-    case SPN_OS_FREESTANDING: {
-      return sp_fmt(mem, "{}-none-elf", sp_fmt_str(arch)).value;
-    }
-    case SPN_OS_NONE: {
-      return arch;
-    }
-  }
-  return arch;
-}
-
 sp_str_t spn_triple_lib_file_name(sp_mem_t mem, spn_triple_t triple, sp_str_t name, sp_os_lib_kind_t kind) {
   switch (kind) {
     case SP_OS_LIB_STATIC: {
@@ -362,16 +331,4 @@ sp_str_t spn_triple_exe_file_name(sp_mem_t mem, spn_triple_t triple, sp_str_t na
     case SPN_OS_NONE:    return sp_str_copy(mem, name);
   }
   SP_UNREACHABLE_RETURN(name);
-}
-
-sp_str_t spn_os_to_cmake_system_name(spn_os_t os) {
-  switch (os) {
-    case SPN_OS_LINUX:   return sp_str_lit("Linux");
-    case SPN_OS_WINDOWS: return sp_str_lit("Windows");
-    case SPN_OS_MACOS:   return sp_str_lit("Darwin");
-    case SPN_OS_WASI:   return sp_str_lit("WASI"); // @spader ? p much dead code
-    case SPN_OS_FREESTANDING: return sp_str_lit("Generic");
-    case SPN_OS_NONE:    return sp_str_lit("");
-  }
-  SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
