@@ -63,6 +63,7 @@ static bool is_os_version_present(spn_os_version_t version) {
 spn_sanitizer_set_t spn_gcc_supported_sanitizers(spn_triple_t target) {
   switch (target.os) {
     case SPN_OS_WASI:
+    case SPN_OS_FREESTANDING:
     case SPN_OS_WINDOWS: return 0;
     case SPN_OS_MACOS: return SPN_SANITIZER_ADDRESS | SPN_SANITIZER_THREAD | SPN_SANITIZER_UNDEFINED;
     case SPN_OS_LINUX:
@@ -73,7 +74,8 @@ spn_sanitizer_set_t spn_gcc_supported_sanitizers(spn_triple_t target) {
 
 spn_sanitizer_set_t spn_clang_supported_sanitizers(spn_triple_t target) {
   switch (target.os) {
-    case SPN_OS_WASI: return 0;
+    case SPN_OS_WASI:
+    case SPN_OS_FREESTANDING: return 0;
     case SPN_OS_WINDOWS: return target.abi == SPN_ABI_MSVC && target.arch == SPN_ARCH_X64 ? SPN_SANITIZER_ADDRESS : 0;
     case SPN_OS_MACOS: return SPN_SANITIZER_ADDRESS | SPN_SANITIZER_THREAD | SPN_SANITIZER_UNDEFINED | SPN_SANITIZER_LEAK;
     case SPN_OS_LINUX:
@@ -84,7 +86,8 @@ spn_sanitizer_set_t spn_clang_supported_sanitizers(spn_triple_t target) {
 
 spn_sanitizer_set_t spn_zig_supported_sanitizers(spn_triple_t target) {
   switch (target.os) {
-    case SPN_OS_WASI: return 0;
+    case SPN_OS_WASI:
+    case SPN_OS_FREESTANDING: return 0;
     case SPN_OS_WINDOWS: return SPN_SANITIZER_UNDEFINED;
     case SPN_OS_MACOS:
     case SPN_OS_LINUX:
@@ -312,6 +315,7 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
       }
       case SPN_OS_WINDOWS:
       case SPN_OS_WASI:
+      case SPN_OS_FREESTANDING:
       case SPN_OS_NONE: {
         break;
       }

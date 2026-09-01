@@ -25,6 +25,7 @@ typedef enum {
   SPN_ABI_MUSL,
   SPN_ABI_MSVC,
   SPN_ABI_APPLE,
+  SPN_ABI_BARE,
 } spn_abi_t;
 
 typedef enum {
@@ -33,6 +34,7 @@ typedef enum {
   SPN_OS_LINUX,
   SPN_OS_MACOS,
   SPN_OS_WASI,
+  SPN_OS_FREESTANDING,
 } spn_os_t;
 
 typedef enum {
@@ -140,6 +142,7 @@ typedef enum {
   SPN_LIBC_MUSL = 1,
   SPN_LIBC_COSMOPOLITAN = 2,
   SPN_LIBC_CUSTOM = 3,
+  SPN_LIBC_NONE = 4,
 } spn_libc_kind_t;
 
 typedef enum {

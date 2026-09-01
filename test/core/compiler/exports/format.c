@@ -26,6 +26,12 @@ static const format_test_t tests [] = {
     .expect = { .format = SPN_CC_EXPORTS_VERSION_SCRIPT, .extension = "map" },
   },
   {
+    .name = "freestanding_shared",
+    .kind = SPN_CC_OUTPUT_SHARED_LIB,
+    .os = SPN_OS_FREESTANDING,
+    .expect = { .format = SPN_CC_EXPORTS_VERSION_SCRIPT, .extension = "map" },
+  },
+  {
     .name = "unknown_os_shared",
     .kind = SPN_CC_OUTPUT_SHARED_LIB,
     .os = SPN_OS_NONE,

@@ -187,6 +187,7 @@ u32 spn_os_abis(spn_os_t os, const spn_abi_t** abis) {
   static const spn_abi_t windows_abis [] = { SPN_ABI_GNU, SPN_ABI_MSVC };
   static const spn_abi_t macos_abis [] = { SPN_ABI_APPLE };
   static const spn_abi_t wasi_abis [] = { SPN_ABI_MUSL };
+  static const spn_abi_t freestanding_abis [] = { SPN_ABI_BARE };
 
   switch (os) {
     case SPN_OS_LINUX: {
@@ -204,6 +205,10 @@ u32 spn_os_abis(spn_os_t os, const spn_abi_t** abis) {
     case SPN_OS_WASI: {
       *abis = wasi_abis;
       return sp_carr_len(wasi_abis);
+    }
+    case SPN_OS_FREESTANDING: {
+      *abis = freestanding_abis;
+      return sp_carr_len(freestanding_abis);
     }
     case SPN_OS_NONE: {
       *abis = SP_NULLPTR;
@@ -322,6 +327,9 @@ sp_str_t spn_triple_to_autoconf(sp_mem_t mem, spn_triple_t triple) {
     case SPN_OS_WASI: {
       return sp_fmt(mem, "{}-wasi", sp_fmt_str(arch)).value;
     }
+    case SPN_OS_FREESTANDING: {
+      return sp_fmt(mem, "{}-none-elf", sp_fmt_str(arch)).value;
+    }
     case SPN_OS_NONE: {
       return arch;
     }
@@ -343,6 +351,7 @@ sp_str_t spn_triple_lib_file_name(sp_mem_t mem, spn_triple_t triple, sp_str_t na
         case SPN_OS_MACOS:   return sp_fmt(mem, "lib{}.dylib", sp_fmt_str(name)).value;
         case SPN_OS_LINUX:
         case SPN_OS_WASI:
+        case SPN_OS_FREESTANDING:
         case SPN_OS_NONE:    return sp_fmt(mem, "lib{}.so", sp_fmt_str(name)).value;
       }
       break;
@@ -355,6 +364,7 @@ sp_str_t spn_triple_exe_file_name(sp_mem_t mem, spn_triple_t triple, sp_str_t na
   switch (triple.os) {
     case SPN_OS_WINDOWS: return sp_fmt(mem, "{}.exe", sp_fmt_str(name)).value;
     case SPN_OS_WASI:    return sp_fmt(mem, "{}.wasm", sp_fmt_str(name)).value;
+    case SPN_OS_FREESTANDING: return sp_fmt(mem, "{}.elf", sp_fmt_str(name)).value;
     case SPN_OS_LINUX:
     case SPN_OS_MACOS:
     case SPN_OS_NONE:    return sp_str_copy(mem, name);
@@ -368,6 +378,7 @@ sp_str_t spn_os_to_cmake_system_name(spn_os_t os) {
     case SPN_OS_WINDOWS: return sp_str_lit("Windows");
     case SPN_OS_MACOS:   return sp_str_lit("Darwin");
     case SPN_OS_WASI:   return sp_str_lit("WASI"); // @spader ? p much dead code
+    case SPN_OS_FREESTANDING: return sp_str_lit("Generic");
     case SPN_OS_NONE:    return sp_str_lit("");
   }
   SP_UNREACHABLE_RETURN(sp_str_lit(""));

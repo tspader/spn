@@ -51,6 +51,9 @@ spn_os_t spn_os_from_str(sp_str_t str) {
   else if (sp_str_equal_cstr(str, "wasi")) {
     return SPN_OS_WASI;
   }
+  else if (sp_str_equal_cstr(str, "freestanding")) {
+    return SPN_OS_FREESTANDING;
+  }
   return SPN_OS_NONE;
 }
 
@@ -60,6 +63,7 @@ sp_str_t spn_os_to_str(spn_os_t os) {
     case SPN_OS_WINDOWS: return sp_str_lit("windows");
     case SPN_OS_MACOS:   return sp_str_lit("macos");
     case SPN_OS_WASI:   return sp_str_lit("wasi");
+    case SPN_OS_FREESTANDING: return sp_str_lit("freestanding");
     case SPN_OS_NONE:    return sp_str_lit("");
   }
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
@@ -117,6 +121,9 @@ spn_abi_t spn_abi_from_str(sp_str_t str) {
   if (sp_str_equal_cstr(str, "apple")) {
     return SPN_ABI_APPLE;
   }
+  if (sp_str_equal_cstr(str, "none")) {
+    return SPN_ABI_BARE;
+  }
 
   return SPN_ABI_NONE;
 }
@@ -134,6 +141,9 @@ sp_str_t spn_abi_to_str(spn_abi_t abi) {
     }
     case SPN_ABI_APPLE: {
       return sp_str_lit("apple");
+    }
+    case SPN_ABI_BARE: {
+      return sp_str_lit("none");
     }
     case SPN_ABI_NONE: {
       return sp_str_lit("");
@@ -156,6 +166,9 @@ spn_libc_kind_t spn_libc_kind_from_str(sp_str_t str) {
   if (sp_str_equal_cstr(str, "custom")) {
     return SPN_LIBC_CUSTOM;
   }
+  if (sp_str_equal_cstr(str, "none")) {
+    return SPN_LIBC_NONE;
+  }
 
   SP_UNREACHABLE_RETURN(SPN_LIBC_GNU);
 }
@@ -173,6 +186,9 @@ sp_str_t spn_libc_kind_to_str(spn_libc_kind_t libc) {
     }
     case SPN_LIBC_CUSTOM: {
       return SP_LIT("custom");
+    }
+    case SPN_LIBC_NONE: {
+      return SP_LIT("none");
     }
   }
 

@@ -150,6 +150,7 @@ sp_cli_cmd_t spn_cmd_build = {
         { .name = "macos", .value = SPN_OS_MACOS },
         { .name = "windows", .value = SPN_OS_WINDOWS },
         { .name = "wasi", .value = SPN_OS_WASI },
+        { .name = "freestanding", .value = SPN_OS_FREESTANDING },
       },
     },
     {
@@ -175,6 +176,7 @@ sp_cli_cmd_t spn_cmd_build = {
         { .name = "musl", .value = SPN_ABI_MUSL },
         { .name = "msvc", .value = SPN_ABI_MSVC },
         { .name = "apple", .value = SPN_ABI_APPLE },
+        { .name = "none", .value = SPN_ABI_BARE },
       },
     },
   },

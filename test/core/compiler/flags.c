@@ -106,6 +106,17 @@ static const flags_test_t tests [] = {
     .expect = { .unsupported = SPN_SANITIZER_ADDRESS },
   },
   {
+    .name = "reject_ubsan_on_freestanding",
+    .profile = {
+      .arch = SPN_ARCH_ARM64,
+      .os = SPN_OS_FREESTANDING,
+      .abi = SPN_ABI_BARE,
+      .sanitizers = SPN_SANITIZER_UNDEFINED,
+    },
+    .driver = SPN_CC_DRIVER_ZIG,
+    .expect = { .unsupported = SPN_SANITIZER_UNDEFINED },
+  },
+  {
     .name = "zig_driver_rejects_asan",
     .profile = {
       .arch = SPN_ARCH_X64,

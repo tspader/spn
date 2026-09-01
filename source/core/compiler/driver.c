@@ -327,6 +327,7 @@ spn_cc_exports_format_t spn_cc_exports_format(spn_cc_output_kind_t kind, spn_os_
         case SPN_OS_WINDOWS: return SPN_CC_EXPORTS_DEF;
         case SPN_OS_LINUX:
         case SPN_OS_WASI:
+        case SPN_OS_FREESTANDING:
         case SPN_OS_NONE: return SPN_CC_EXPORTS_VERSION_SCRIPT;
       }
       SP_UNREACHABLE_RETURN(SPN_CC_EXPORTS_VERSION_SCRIPT);
