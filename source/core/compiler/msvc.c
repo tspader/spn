@@ -29,8 +29,11 @@ static sp_str_t c_standard_switch(spn_c_standard_t standard) {
     // cl has no c89/c99 modes; its default is the closest it gets
     case SPN_C89:
     case SPN_C99:
+    case SPN_GNU89:
+    case SPN_GNU99:
     case SPN_C_STANDARD_NONE: return sp_str_lit("");
-    case SPN_C11: return sp_str_lit("/std:c11");
+    case SPN_C11:
+    case SPN_GNU11: return sp_str_lit("/std:c11");
   }
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }

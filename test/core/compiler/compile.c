@@ -33,6 +33,20 @@ static const compile_test_t tests [] = {
     },
   },
   {
+    .name = "gcc_gnu_dialect",
+    .driver = SPN_CC_DRIVER_GCC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_GNU,
+      .standard = SPN_GNU11,
+    },
+    .expect = {
+      .command = "cc",
+      .args = { "-std=gnu11", "-c", "-Werror=return-type", "main.c", "-o", "main.o" },
+    },
+  },
+  {
     .name = "gcc_depfile",
     .driver = SPN_CC_DRIVER_GCC,
     .profile = {
@@ -176,6 +190,20 @@ static const compile_test_t tests [] = {
     .expect = {
       .command = "ml64",
       .args = { "/nologo", "/c", "/Fomain.o", "main.c" },
+    },
+  },
+  {
+    .name = "msvc_gnu11_takes_c11_switch",
+    .driver = SPN_CC_DRIVER_MSVC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_MSVC,
+      .standard = SPN_GNU11,
+    },
+    .expect = {
+      .command = "cc",
+      .args = { "/nologo", "/utf-8", "/Brepro", "/std:c11", "/c", "/we4715", "/Fomain.o", "main.c" },
     },
   },
   {

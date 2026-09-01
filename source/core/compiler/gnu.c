@@ -39,6 +39,9 @@ static sp_str_t c_standard_to_flag(spn_c_standard_t standard) {
     case SPN_C89: return sp_str_lit("-std=c89");
     case SPN_C99: return sp_str_lit("-std=c99");
     case SPN_C11: return sp_str_lit("-std=c11");
+    case SPN_GNU89: return sp_str_lit("-std=gnu89");
+    case SPN_GNU99: return sp_str_lit("-std=gnu99");
+    case SPN_GNU11: return sp_str_lit("-std=gnu11");
     case SPN_C_STANDARD_NONE: return sp_str_lit("-std=c99");
   }
   SP_UNREACHABLE_RETURN(sp_str_lit(""));

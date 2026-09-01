@@ -571,6 +571,15 @@ sp_str_t spn_c_standard_to_str(spn_c_standard_t standard) {
     case SPN_C89: {
       return sp_str_lit("c89");
     }
+    case SPN_GNU11: {
+      return sp_str_lit("gnu11");
+    }
+    case SPN_GNU99: {
+      return sp_str_lit("gnu99");
+    }
+    case SPN_GNU89: {
+      return sp_str_lit("gnu89");
+    }
     case SPN_C_STANDARD_NONE: {
       return sp_str_lit("");
     }
@@ -650,6 +659,15 @@ spn_c_standard_t spn_c_standard_from_str(sp_str_t str) {
   }
   if (sp_str_equal_cstr(str, "c11")) {
     return SPN_C11;
+  }
+  if (sp_str_equal_cstr(str, "gnu89")) {
+    return SPN_GNU89;
+  }
+  if (sp_str_equal_cstr(str, "gnu99")) {
+    return SPN_GNU99;
+  }
+  if (sp_str_equal_cstr(str, "gnu11")) {
+    return SPN_GNU11;
   }
   if (sp_str_empty(str)) {
     return SPN_C_STANDARD_NONE;

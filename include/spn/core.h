@@ -163,6 +163,9 @@ typedef enum {
   SPN_C11,
   SPN_C99,
   SPN_C89,
+  SPN_GNU11,
+  SPN_GNU99,
+  SPN_GNU89,
 } spn_c_standard_t;
 
 typedef enum {
