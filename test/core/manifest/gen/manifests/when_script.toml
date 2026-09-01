@@ -1,0 +1,8 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[package.build]
+source = ["b.c"]
+define = ["A", { value = "B", when = { os = "windows" } }]
+flags = [{ value = "-g", when = { mode = "debug" } }]

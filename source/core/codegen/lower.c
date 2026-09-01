@@ -163,11 +163,11 @@ static spn_target_info_t lower_metaprogram(spn_toml_loader_t* ctx, const spn_cg_
   spn_target_info_t program = {
     .name = name,
     .kind = kind,
-    .define = cg->define,
-    .flags = cg->flags,
     .gated = {
       .source = lower_gated_sources(ctx, cg->source, false),
       .include = lower_gated_sources(ctx, cg->include, true),
+      .define = lower_gated_values(ctx, cg->define),
+      .flags = lower_gated_values(ctx, cg->flags),
     },
   };
   spn_target_info_init(ctx->mem, &program);
@@ -725,19 +725,31 @@ static void validate_publish_whens(spn_toml_loader_t* ctx, const spn_cg_manifest
   spn_toml_loader_pop(ctx);
 }
 
+static void validate_facts_only_when(spn_toml_loader_t* ctx, const spn_when_t* when, u32 index) {
+  spn_toml_loader_push_index(ctx, index);
+  spn_toml_loader_push_key(ctx, "when");
+  sp_da_for(when->clauses, it) {
+    const spn_when_clause_t* clause = &when->clauses[it];
+    if (!when_key_is_fact(clause->key) || !when_fact_value_valid(clause->key, clause->value)) {
+      spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, clause->key.data);
+    }
+  }
+  spn_toml_loader_pop(ctx);
+  spn_toml_loader_pop(ctx);
+}
+
 static void validate_facts_only_whens(spn_toml_loader_t* ctx, sp_da(spn_cg_source_entry_t) entries, const c8* key) {
   spn_toml_loader_push_key(ctx, key);
   sp_da_for(entries, it) {
-    spn_toml_loader_push_index(ctx, it);
-    spn_toml_loader_push_key(ctx, "when");
-    sp_da_for(entries[it].when.clauses, jt) {
-      const spn_when_clause_t* clause = &entries[it].when.clauses[jt];
-      if (!when_key_is_fact(clause->key) || !when_fact_value_valid(clause->key, clause->value)) {
-        spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, clause->key.data);
-      }
-    }
-    spn_toml_loader_pop(ctx);
-    spn_toml_loader_pop(ctx);
+    validate_facts_only_when(ctx, &entries[it].when, it);
+  }
+  spn_toml_loader_pop(ctx);
+}
+
+static void validate_facts_only_value_whens(spn_toml_loader_t* ctx, sp_da(spn_cg_value_entry_t) entries, const c8* key) {
+  spn_toml_loader_push_key(ctx, key);
+  sp_da_for(entries, it) {
+    validate_facts_only_when(ctx, &entries[it].when, it);
   }
   spn_toml_loader_pop(ctx);
 }
@@ -756,6 +768,8 @@ static void validate_metaprogram_whens(spn_toml_loader_t* ctx, const spn_cg_mani
     spn_toml_loader_push_key(ctx, scripts[it].key);
     validate_facts_only_whens(ctx, scripts[it].script->source, "source");
     validate_facts_only_whens(ctx, scripts[it].script->include, "include");
+    validate_facts_only_value_whens(ctx, scripts[it].script->define, "define");
+    validate_facts_only_value_whens(ctx, scripts[it].script->flags, "flags");
     spn_toml_loader_pop(ctx);
   }
   spn_toml_loader_pop(ctx);

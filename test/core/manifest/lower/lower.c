@@ -142,6 +142,8 @@ typedef struct {
   gated_t include [4];
   gated_t build_source [4];
   gated_t build_include [4];
+  gated_t build_define [4];
+  gated_t build_flags [4];
   gated_t define [8];
   gated_t system_deps [8];
   gated_t frameworks [4];
@@ -558,6 +560,24 @@ static const test_t tests [] = {
     },
     .issues = {
       { SPN_ERR_CODEGEN_INVALID, "package.build.source[0].when.tls" },
+    }
+  },
+  {
+    .name = "metaprogram_values_gated",
+    .manifest = "metaprogram_values_gated",
+    .build_source = { { "b.c" } },
+    .build_define = { { "A" }, { "B", "os = \"windows\"" } },
+    .build_flags = { { "-g", "mode = \"debug\"" } },
+  },
+  {
+    .name = "validate_metaprogram_value_when_option",
+    .manifest = "validate_metaprogram_value_when_option",
+    .build_source = { { "b.c" } },
+    .build_define = { { "A", "tls = true" } },
+    .build_flags = { { "-g", "tls = true" } },
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "package.build.define[0].when.tls" },
+      { SPN_ERR_CODEGEN_INVALID, "package.build.flags[0].when.tls" },
     }
   },
   {
@@ -1194,6 +1214,10 @@ sp_test_each(lower, cases, test_t, tests) {
   check_gated_paths(t, pkg.gated.include, it->include);
   check_gated_paths(t, pkg.build.gated.source, it->build_source);
   check_gated_paths(t, pkg.build.gated.include, it->build_include);
+  sp_expect_eq(t, (u32)0, (u32)sp_da_size(pkg.build.define));
+  sp_expect_eq(t, (u32)0, (u32)sp_da_size(pkg.build.flags));
+  check_gated(t, pkg.build.gated.define, it->build_define);
+  check_gated(t, pkg.build.gated.flags, it->build_flags);
 
   // Targets
   sp_try(check_targets(t, pkg.libs,     it->libs,     SP_CARR_LEN(it->libs),     SPN_TARGET_KIND_LIB));

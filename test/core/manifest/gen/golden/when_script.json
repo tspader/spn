@@ -1,0 +1,28 @@
+{
+  "package": {
+    "name": "p",
+    "version": "1.0.0",
+    "build": {
+      "source": [
+        "b.c"
+      ],
+      "define": [
+        "A",
+        {
+          "value": "B",
+          "when": {
+            "os": "windows"
+          }
+        }
+      ],
+      "flags": [
+        {
+          "value": "-g",
+          "when": {
+            "mode": "debug"
+          }
+        }
+      ]
+    }
+  }
+}

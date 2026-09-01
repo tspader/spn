@@ -137,8 +137,8 @@
       "optionalProperties": {
         "source": { "elements": { "ref": "source_entry" }, "metadata": { "shorthand": "path" } },
         "include": { "elements": { "ref": "source_entry" }, "metadata": { "shorthand": "path" } },
-        "define": { "elements": { "type": "string" } },
-        "flags": { "elements": { "type": "string" } }
+        "define": { "elements": { "ref": "value_entry" }, "metadata": { "shorthand": "value" } },
+        "flags": { "elements": { "ref": "value_entry" }, "metadata": { "shorthand": "value" } }
       }
     },
 
