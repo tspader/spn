@@ -33,6 +33,7 @@ typedef enum {
   PKG_EDIT_MACOS_MIN_OS,
   PKG_EDIT_MACOS_FRAMEWORK,
   PKG_EDIT_MACOS_FRAMEWORK_WHEN,
+  PKG_EDIT_PLAIN_FRAMEWORK,
   PKG_EDIT_TARGET_FRAMEWORK,
   PKG_EDIT_TARGET_SUBSYSTEM,
   PKG_EDIT_PROFILE_SYSROOT,
@@ -58,6 +59,7 @@ static const hash_platform_test_t hash_platform_tests [] = {
   { .name = "ignore_macos_edit_on_windows",   .profile = { .os = SPN_OS_WINDOWS }, .edit = PKG_EDIT_MACOS_MIN_OS,     .expect = { .hashed = true } },
   { .name = "track_macos_framework",          .profile = { .os = SPN_OS_MACOS },   .edit = PKG_EDIT_MACOS_FRAMEWORK,  .expect = { .hashed = true, .changed = true } },
   { .name = "track_macos_framework_when",     .profile = { .os = SPN_OS_MACOS },   .edit = PKG_EDIT_MACOS_FRAMEWORK_WHEN, .expect = { .hashed = true, .changed = true } },
+  { .name = "ignore_plain_framework",        .profile = { .os = SPN_OS_MACOS },   .edit = PKG_EDIT_PLAIN_FRAMEWORK,  .expect = { .hashed = true } },
   { .name = "track_target_framework",         .profile = { .os = SPN_OS_MACOS },   .edit = PKG_EDIT_TARGET_FRAMEWORK, .expect = { .hashed = true, .changed = true } },
   { .name = "ignore_framework_edit_on_windows", .profile = { .os = SPN_OS_WINDOWS }, .edit = PKG_EDIT_MACOS_FRAMEWORK, .expect = { .hashed = true } },
   { .name = "track_windows_subsystem",        .profile = { .os = SPN_OS_WINDOWS }, .edit = PKG_EDIT_TARGET_SUBSYSTEM, .expect = { .hashed = true, .changed = true } },
@@ -88,6 +90,10 @@ sp_test_each(pkg, hash_platform, hash_platform_test_t, hash_platform_tests, .set
       spn_when_t when = { .clauses = sp_da_new(mem, spn_when_clause_t) };
       sp_da_push(when.clauses, ((spn_when_clause_t) { .key = sp_str_lit("os"), .value = spn_option_value_str(sp_str_lit("macos")) }));
       pkg.gated.frameworks[0].when = when;
+      break;
+    }
+    case PKG_EDIT_PLAIN_FRAMEWORK: {
+      sp_da_push(pkg.macos.frameworks, sp_str_lit("C"));
       break;
     }
     case PKG_EDIT_TARGET_FRAMEWORK: {

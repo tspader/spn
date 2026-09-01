@@ -1,6 +1,10 @@
 [package]
 name = "defines_simple"
 version = "0.1.0"
+define = [
+  { value = "GATE_DEBUG=1", when = { mode = "debug" } },
+  { value = "GATE_RELEASE=1", when = { mode = "release" } },
+]
 
 [[bin]]
 name = "main"

@@ -28,5 +28,10 @@
         ]
       }
     }
+  },
+  "options": {
+    "negotiate": {
+      "type": "bool"
+    }
   }
 }

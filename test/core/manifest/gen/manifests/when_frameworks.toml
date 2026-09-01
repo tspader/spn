@@ -5,6 +5,9 @@ version = "1.0.0"
 [package.macos]
 frameworks = ["Cocoa", { value = "GSS", when = { negotiate = true } }]
 
+[options.negotiate]
+type = "bool"
+
 [[lib]]
 name = "t"
 

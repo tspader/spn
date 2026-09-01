@@ -134,6 +134,7 @@ add_executable(core
   unit/link_plan.c
   unit/objects.c
   unit/paths.c
+  unit/clone.c
   ${CMAKE_SOURCE_DIR}/tools/jtd.c
   ${CMAKE_SOURCE_DIR}/tools/gen/lower.c
   ${CMAKE_SOURCE_DIR}/tools/install/render.c
