@@ -148,6 +148,7 @@ static void add_launcher(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
   sp_assert(!spn_arg_empty(launcher.program));
   invocation->program = launcher.program;
   spn_cc_push_strs(mem, invocation, launcher.args);
+  invocation->launcher = sp_da_size(invocation->args);
   if (spn_cc_has(toolchain, SPN_CC_CAP_TARGET_TRIPLE)) {
     spn_triple_t triple = { profile->arch, profile->os, profile->abi };
     sp_str_t target = render_target(mem, toolchain, triple);
@@ -358,6 +359,7 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
 void spn_gnu_render_archive(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_cc_archive_files_t* files, spn_invocation_t* invocation) {
   invocation->program = toolchain->archiver.program;
   spn_cc_push_strs(mem, invocation, toolchain->archiver.args);
+  invocation->launcher = sp_da_size(invocation->args);
   spn_cc_push_c(mem, invocation, "rcs");
   spn_cc_push_path(mem, invocation, files->output);
   spn_cc_push_paths(mem, invocation, files->objects);

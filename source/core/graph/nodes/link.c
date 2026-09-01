@@ -7,6 +7,7 @@
 #include "external/cc.h"
 #include "compiler/driver.h"
 #include "compiler/exports.h"
+#include "compiler/rsp.h"
 #include "compiler/toc.h"
 #include "error/error.h"
 #include "event/event.h"
@@ -50,6 +51,26 @@ static spn_err_t emit_link_failed(spn_target_unit_t* unit, spn_invocation_t* inv
   return SPN_ERROR;
 }
 
+static spn_err_t write_rsp(sp_str_t path, sp_str_t content) {
+  sp_io_file_writer_t writer = sp_zero;
+  if (sp_io_file_writer_from_path(&writer, path) != SP_OK) {
+    return spn_err_emit(&spn, (spn_err_union_t) { .kind = SPN_ERR_FS_WRITE, .fs.path = path });
+  }
+  sp_io_write_str(&writer.base, content, SP_NULLPTR);
+  sp_io_file_writer_close(&writer);
+  return SPN_OK;
+}
+
+static spn_err_t run_link(spn_invocation_t* invocation, spn_path_t output, spn_invocation_result_t* run) {
+  if (spn.host.os == SPN_OS_WINDOWS && spn_rsp_cmdline_len(&spn.roots, invocation) > spn_rsp_cmdline_max) {
+    spn_path_t file = spn_path_suffix(spn.mem, output, sp_str_lit(".rsp"));
+    spn_rsp_t rsp = spn_rsp_render(spn.mem, &spn.roots, invocation, file);
+    spn_try(write_rsp(spn_path_str(&spn.roots, spn.mem, file), rsp.content));
+    *invocation = rsp.invocation;
+  }
+  *run = spn_invocation_run(invocation);
+  return SPN_OK;
+}
 
 typedef sp_str_ht(u8) spn_symbol_set_t;
 
@@ -95,7 +116,8 @@ static spn_err_t link_exports_exec(sp_mem_t scratch, spn_target_unit_t* target, 
   spn_try(spn_cc_render_archive(spn.mem, toolchain, profile, &files, invocation));
   invocation->cwd = pkg->paths.work;
 
-  spn_invocation_result_t run = spn_invocation_run(invocation);
+  spn_invocation_result_t run = sp_zero;
+  spn_try(run_link(invocation, files.output, &run));
   if (run.result.status.exit_code) {
     return emit_link_failed(target, invocation, run.result.status.exit_code, run.result.out, run.result.err);
   }
@@ -186,7 +208,8 @@ static spn_err_t link_target_exec(sp_mem_t scratch, spn_target_unit_t* target, s
   spn_invocation_t* invocation = sp_alloc_type(spn.mem, spn_invocation_t);
   spn_try(spn_target_link_invocation(spn.mem, target, &files, invocation));
 
-  spn_invocation_result_t run = spn_invocation_run(invocation);
+  spn_invocation_result_t run = sp_zero;
+  spn_try(run_link(invocation, files.output, &run));
 
   if (run.result.status.exit_code) {
     return emit_link_failed(target, invocation, run.result.status.exit_code, run.result.out, run.result.err);

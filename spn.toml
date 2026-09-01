@@ -167,6 +167,7 @@ source = [
   "source/core/compiler/gnu.c",
   "source/core/compiler/msvc.c",
   "source/core/compiler/occ.c",
+  "source/core/compiler/rsp.c",
   "source/core/compiler/toc.c",
   "source/core/core/core.c",
   "source/core/ctx/ctx.c",

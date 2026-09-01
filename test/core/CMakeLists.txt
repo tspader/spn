@@ -29,6 +29,8 @@ add_executable(core
   compiler/exports/render.c
   compiler/flags.c
   compiler/link.c
+  compiler/rsp.c
+  compiler/cmdline.c
   compiler/toc.c
   dag/harness.c
   dag/action_cache.c
@@ -151,6 +153,7 @@ add_executable(core
   ${SRC}/compiler/gnu.c
   ${SRC}/compiler/msvc.c
   ${SRC}/compiler/occ.c
+  ${SRC}/compiler/rsp.c
   ${SRC}/compiler/toc.c
   ${SRC}/core/core.c
   ${SRC}/ctx/ctx.c
