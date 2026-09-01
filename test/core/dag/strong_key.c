@@ -2,6 +2,7 @@
 
 typedef struct {
   const c8* prelim;
+  const c8* pinned;
   dag_test_obs_t obs [DAG_TEST_MAX_INPUTS];
 } strong_key_action_t;
 
@@ -78,13 +79,24 @@ static const strong_key_test_t strong_key_tests [] = {
     .a = { .prelim = "publish", .obs = { { "inc", "M1", SPN_DAG_OBS_ENUMERATION, "*.h" } } },
     .b = { .prelim = "publish", .obs = { { "inc", "M2", SPN_DAG_OBS_ENUMERATION, "*.h" } } },
   },
+  {
+    .name = "pinned_digest_changes_key",
+    .a = { .prelim = "cc main.c", .pinned = "P1", .obs = { { "sp.h", "SP" } } },
+    .b = { .prelim = "cc main.c", .pinned = "P2", .obs = { { "sp.h", "SP" } } },
+  },
+  {
+    .name = "pinned_digest_matches",
+    .a = { .prelim = "cc main.c", .pinned = "P1", .obs = { { "sp.h", "SP" } } },
+    .b = { .prelim = "cc main.c", .pinned = "P1", .obs = { { "sp.h", "SP" } } },
+    .expect = { .equal = true }
+  },
 };
 
 static spn_dag_digest_t build_strong_key(const strong_key_action_t* spec) {
   spn_dag_obs_t obs [DAG_TEST_MAX_INPUTS] = sp_zero;
   spn_dag_digest_t digests [DAG_TEST_MAX_INPUTS] = sp_zero;
   u32 count = dag_test_obs_build(spec->obs, DAG_TEST_MAX_INPUTS, obs, digests);
-  return spn_dag_strong_key(dag_test_digest(spec->prelim), obs, digests, count);
+  return spn_dag_strong_key(dag_test_digest(spec->prelim), dag_test_digest(spec->pinned), obs, digests, count);
 }
 
 sp_test_each(dag_strong_key, fold, strong_key_test_t, strong_key_tests) {

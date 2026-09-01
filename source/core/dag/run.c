@@ -555,10 +555,6 @@ static spn_err_t resolve_observations(spn_dag_file_cache_t* files, const spn_dag
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
   spn_err_t err = SPN_OK;
   sp_for(it, count) {
-    if (files->roots->pinned & spn_path_root_mask(obs[it].path.root)) {
-      digests[it] = (spn_dag_digest_t) sp_zero;
-      continue;
-    }
     err = resolve_one(files, &obs[it], &digests[it], s.mem);
     if (err) {
       break;
@@ -663,7 +659,7 @@ static bool restore_strong(spn_dag_t* g, spn_dag_action_t* action, spn_dag_diges
   if (!resolved) {
     return false;
   }
-  spn_dag_digest_t strong = spn_dag_strong_key(weak, set.obs, digests, count);
+  spn_dag_digest_t strong = spn_dag_strong_key(weak, set.pinned, set.obs, digests, count);
   trace_emit(env, (spn_dag_trace_event_t) { .kind = SPN_DAG_TRACE_STRONG, .action = action->id, .key = strong });
   return try_restore(g, action, strong, env);
 }
@@ -772,7 +768,7 @@ static spn_err_t commit(spn_dag_t* g, spn_dag_attempt_t* attempt, spn_dag_env_t*
       trace_resolve(env, action->id, resolved);
       spn_dag_digest_t key = attempt->key;
       if (resolved) {
-        key = spn_dag_strong_key(attempt->key, set.obs, digests, count);
+        key = spn_dag_strong_key(attempt->key, set.pinned, set.obs, digests, count);
         trace_emit(env, (spn_dag_trace_event_t) { .kind = SPN_DAG_TRACE_STRONG, .action = action->id, .key = key });
       }
       spn_try(settle(g, action, env, &attempt->diag));

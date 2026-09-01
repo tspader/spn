@@ -1237,7 +1237,7 @@ spn_dag_build_t* spn_dag_build_new(spn_op_t* op) {
   });
   spn_dag_file_cache_init(&b->files, spn.mem, &spn.roots);
   spn_dag_action_cache_init(&b->actions, spn.mem, sp_fs_join_path(session->mem, dir, sp_str_lit("strong")));
-  spn_dag_obs_table_init(&b->discovery, spn.mem, sp_fs_join_path(session->mem, dir, sp_str_lit("weak")));
+  spn_dag_obs_table_init(&b->discovery, spn.mem, &spn.roots, sp_fs_join_path(session->mem, dir, sp_str_lit("weak")));
   b->files.stats = &b->stats;
   b->actions.stats = &b->stats;
   b->discovery.stats = &b->stats;

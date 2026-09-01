@@ -146,6 +146,7 @@ typedef struct {
 } spn_dag_action_cache_t;
 
 typedef struct {
+  spn_dag_digest_t pinned;
   sp_da(spn_dag_obs_t) obs;
 } spn_dag_pathset_t;
 
@@ -153,6 +154,7 @@ typedef struct {
   sp_mem_arena_t* arena;
   sp_mem_t mem;
   sp_mutex_t mutex;
+  const spn_path_roots_t* roots;
   sp_str_t dir;
   sp_ht(spn_dag_digest_t, spn_dag_pathset_t) entries;
   spn_dag_stats_t* stats;

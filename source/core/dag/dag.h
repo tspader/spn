@@ -31,7 +31,8 @@ spn_dag_digest_t    spn_dag_hash_final(spn_digest_ctx_t* ctx);
 
 
 spn_dag_digest_t    spn_dag_weak_key(spn_dag_t* g, spn_dag_id_t action);
-spn_dag_digest_t    spn_dag_strong_key(spn_dag_digest_t weak, const spn_dag_obs_t* obs, const spn_dag_digest_t* digests, u32 count);
+spn_dag_digest_t    spn_dag_strong_key(spn_dag_digest_t weak, spn_dag_digest_t pinned, const spn_dag_obs_t* obs, const spn_dag_digest_t* digests, u32 count);
+spn_dag_digest_t    spn_dag_pinned_digest(spn_path_root_set_t pinned, const spn_dag_obs_t* obs, u32 count);
 void                spn_dag_obs_canonicalize(sp_da(spn_dag_obs_t) obs);
 spn_dag_digest_t    spn_dag_digest(const void* data, u64 len);
 spn_dag_digest_t    spn_dag_path_digest(spn_path_t path);
@@ -59,7 +60,7 @@ bool                spn_dag_action_cache_get(spn_dag_action_cache_t* c, spn_dag_
 void                spn_dag_action_cache_put(spn_dag_action_cache_t* c, spn_dag_digest_t key, const spn_dag_action_output_t* outputs, u32 count);
 bool                spn_dag_action_cache_remove(spn_dag_action_cache_t* c, spn_dag_digest_t key);
 
-void                spn_dag_obs_table_init(spn_dag_obs_table_t* t, sp_mem_t mem, sp_str_t dir);
+void                spn_dag_obs_table_init(spn_dag_obs_table_t* t, sp_mem_t mem, const spn_path_roots_t* roots, sp_str_t dir);
 bool                spn_dag_obs_table_get(spn_dag_obs_table_t* t, spn_dag_digest_t key, spn_dag_pathset_t* set);
 spn_dag_pathset_t   spn_dag_obs_table_put(spn_dag_obs_table_t* t, spn_dag_digest_t key, const spn_dag_obs_t* obs, u32 count);
 
