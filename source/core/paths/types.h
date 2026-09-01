@@ -5,9 +5,12 @@
 #include "spn/core.h"
 #include "spn/types.h"
 
+typedef u32 spn_path_root_set_t;
+
 typedef struct {
   sp_str_t dirs [SPN_PATH_ROOT_COUNT];
   sp_str_t storage;
+  spn_path_root_set_t pinned;
 } spn_path_roots_t;
 
 typedef struct {

@@ -203,6 +203,17 @@ sp_hash_t spn_path_hash(spn_path_t path) {
   return sp_hash_bytes(path.sub.data, path.sub.len, (u64)path.root);
 }
 
+sp_static_assert(SPN_PATH_ROOT_COUNT <= 32, spn_path_root_set_must_fit_u32);
+
+spn_path_root_set_t spn_path_root_mask(spn_path_root_t root) {
+  return 1u << root;
+}
+
+spn_path_root_set_t spn_path_pinned_roots() {
+  return spn_path_root_mask(SPN_PATH_ROOT_CHECKOUT)
+    | spn_path_root_mask(SPN_PATH_ROOT_TOOLCHAIN);
+}
+
 sp_hash_t spn_path_on_hash(void* key, u64 size) {
   return spn_path_hash(*(spn_path_t*)key);
 }
