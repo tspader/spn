@@ -22,7 +22,11 @@ void dag_test_env_init(dag_test_env_t* env, sp_test_t* t, dag_test_env_config_t 
   if (!sp_fs_exists(env->root)) {
     sp_fs_create_dir(env->root);
   }
+  env->roots.pinned = config.pinned;
   env->roots.dirs[SPN_PATH_ROOT_PROJECT] = env->root;
+  if (config.checkout) {
+    env->roots.dirs[SPN_PATH_ROOT_CHECKOUT] = dag_test_env_path(env, sp_str_view(config.checkout));
+  }
   spn_dag_store_init(&env->store, (spn_dag_store_config_t) {
     .kind = config.store,
     .mem = env->mem,

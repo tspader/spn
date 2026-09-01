@@ -1241,6 +1241,10 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
           sp_io_write_str(w.io, sp_str_lit("a build action output has no file name"), SP_NULLPTR);
           break;
         }
+        case SPN_ERR_DAG_PINNED_OUTPUT: {
+          sp_tty_fmt(&w, "{.cyan} is declared as a build action output, but it is inside an immutable cache directory", sp_fmt_str(get_contextual_path(ctx, mem, event->err.dag.path)));
+          break;
+        }
         case SPN_ERR_DAG_MISSING_INPUT: {
           sp_tty_fmt(&w, "{.cyan} doesn't exist, but is listed as an input", sp_fmt_str(get_contextual_path(ctx, mem, event->err.dag.path)));
           break;

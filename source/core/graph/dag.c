@@ -488,7 +488,14 @@ static spn_err_t dag_add_user_nodes(spn_dag_build_t* b, spn_pkg_unit_t* unit, sp
 
     sp_da_for(node->outputs, ot) {
       spn_dag_id_t file = spn_dag_add_file(g, node->outputs[ot]);
-      spn_try(spn_dag_action_add_output(g, action, file));
+      spn_err_t err = spn_dag_action_add_output(g, action, file);
+      if (err) {
+        b->env.diag = (spn_dag_diag_t) {
+          .err = err,
+          .path = spn_path_str(g->roots, b->mem, node->outputs[ot])
+        };
+        return err;
+      }
       sp_da_push(pkg->user_outputs, file);
     }
 
@@ -1273,7 +1280,11 @@ spn_err_t spn_dag_build_session(spn_op_t* op) {
   spn_dag_build_t* b = spn_dag_build_new(op);
   session->dag.build = b;
 
-  spn_try(prepare_graph(b));
+  spn_err_t prepared = prepare_graph(b);
+  if (prepared) {
+    b->result = prepared;
+    return dag_result(b);
+  }
 
   spn_triple_t target = { session->profile.arch, session->profile.os, session->profile.abi };
   spn_event_buffer_push(spn.events, (spn_event_t) {

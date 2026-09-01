@@ -560,6 +560,10 @@ static spn_err_t resolve_observations(spn_dag_file_cache_t* files, spn_dag_obs_t
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
   spn_err_t err = SPN_OK;
   sp_for(it, count) {
+    if (files->roots->pinned & spn_path_root_mask(obs[it].path.root)) {
+      obs[it].meta = (spn_dag_file_meta_t) sp_zero;
+      continue;
+    }
     err = resolve_one(files, &obs[it], s.mem);
     if (err) {
       break;
@@ -844,6 +848,7 @@ static void targets_init(spn_dag_targets_t* targets, spn_dag_t* g, sp_mem_t mem)
       continue;
     }
 
+    sp_assert(!(g->roots->pinned & spn_path_root_mask(artifact->path.root)));
     sp_assert(!sp_ht_getp(targets->by_path, artifact->path));
     sp_ht_insert(targets->by_path, artifact->path, ((spn_dag_target_t) {
       .producer = artifact->producer.index,
@@ -916,6 +921,9 @@ static void defer_producer(spn_dag_run_t* run, spn_dag_action_t* action, u32 pro
 static bool defer_observations(spn_dag_run_t* run, spn_dag_action_t* action, sp_da(spn_dag_obs_t) obs, u64 epoch, bool* requeue) {
   sp_da_for(obs, it) {
     const spn_dag_obs_t* o = &obs[it];
+    if (run->g->roots->pinned & spn_path_root_mask(o->path.root)) {
+      continue;
+    }
 
     spn_dag_target_t* exact = sp_ht_getp(run->targets.by_path, o->path);
     if (exact) {
@@ -973,7 +981,11 @@ static spn_err_t seed_sources(spn_dag_t* g, spn_dag_env_t* env) {
       }
       case SPN_DAG_ARTIFACT_KIND_FILE: {
         if (!artifact->producer.occupied) {
-          if (seed_source(env, artifact)) {
+          if (g->roots->pinned & spn_path_root_mask(artifact->path.root)) {
+            artifact->materialized = artifact->path;
+            artifact->digest = spn_dag_path_digest(artifact->path);
+          }
+          else if (seed_source(env, artifact)) {
             diag_set(&env->diag, SPN_ERR_DAG_MISSING_INPUT, (spn_dag_id_t) sp_zero, artifact_render(g, artifact->path));
             return SPN_ERR_DAG_MISSING_INPUT;
           }

@@ -73,7 +73,8 @@ spn_dag_digest_t fz_model_weak(sp_mem_t mem, fz_universe_t* u, const sp_str_t* b
   sp_str_t identity = sp_fmt(mem, "id{}", sp_fmt_uint(action->identity)).value;
   spn_digest_ctx_t ctx = sp_zero;
   spn_digest_init_blake3(&ctx);
-  spn_dag_hash_str(&ctx, sp_str_lit("spn.dag.action.v3"));
+  spn_dag_hash_str(&ctx, sp_str_lit("spn.dag.action.v4"));
+  spn_dag_hash_u64(&ctx, 0);
   spn_dag_hash_digest(&ctx, spn_dag_digest(identity.data, identity.len));
 
   spn_dag_hash_u64(&ctx, sp_da_size(action->consumes));

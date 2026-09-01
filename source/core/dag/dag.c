@@ -128,6 +128,9 @@ spn_err_t spn_dag_action_add_output(spn_dag_t* g, spn_dag_id_t action_id, spn_da
   }
   if (!spn_path_empty(artifact->path)) {
     sp_assert(artifact->path.root != SPN_PATH_ROOT_NONE);
+    if (g->roots->pinned & spn_path_root_mask(artifact->path.root)) {
+      return SPN_ERR_DAG_PINNED_OUTPUT;
+    }
   }
   if (sp_str_empty(artifact->name)) {
     artifact->name = sp_fs_get_name(artifact->path.sub);
@@ -204,7 +207,8 @@ spn_dag_digest_t spn_dag_weak_key(spn_dag_t* g, spn_dag_id_t action_id) {
 
   spn_digest_ctx_t ctx = sp_zero;
   spn_digest_init_blake3(&ctx);
-  spn_dag_hash_str(&ctx, sp_str_lit("spn.dag.action.v3"));
+  spn_dag_hash_str(&ctx, sp_str_lit("spn.dag.action.v4"));
+  spn_dag_hash_u64(&ctx, g->roots->pinned);
   spn_dag_hash_digest(&ctx, action->identity);
 
   spn_dag_hash_u64(&ctx, sp_da_size(action->consumes));
@@ -246,6 +250,14 @@ spn_dag_digest_t spn_dag_digest(const void* data, u64 len) {
   spn_dag_digest_t digest = sp_zero;
   spn_digest(SPN_DIGEST_BLAKE3, data, len, digest.bytes);
   return digest;
+}
+
+spn_dag_digest_t spn_dag_path_digest(spn_path_t path) {
+  spn_digest_ctx_t ctx = sp_zero;
+  spn_digest_init_blake3(&ctx);
+  spn_dag_hash_str(&ctx, sp_str_lit("spn.dag.path.v1"));
+  spn_dag_hash_path(&ctx, path);
+  return spn_dag_hash_final(&ctx);
 }
 
 bool spn_dag_digest_equal(spn_dag_digest_t a, spn_dag_digest_t b) {

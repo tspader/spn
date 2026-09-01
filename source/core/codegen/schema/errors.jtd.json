@@ -75,6 +75,7 @@
     "dag_glob": { "properties": {} },
     "dag_output_name": { "properties": {} },
     "dag_duplicate_output": { "properties": {} },
+    "dag_pinned_output": { "ref": "dag" },
     "dag_stat": { "properties": {} },
     "dag_missing_input": { "ref": "dag" },
     "dag_missing_output": { "ref": "dag" },

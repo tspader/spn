@@ -34,6 +34,7 @@ spn_dag_digest_t    spn_dag_weak_key(spn_dag_t* g, spn_dag_id_t action);
 spn_dag_digest_t    spn_dag_strong_key(spn_dag_digest_t weak, const spn_dag_obs_t* obs, u32 count);
 void                spn_dag_obs_canonicalize(sp_da(spn_dag_obs_t) obs);
 spn_dag_digest_t    spn_dag_digest(const void* data, u64 len);
+spn_dag_digest_t    spn_dag_path_digest(spn_path_t path);
 bool                spn_dag_digest_equal(spn_dag_digest_t a, spn_dag_digest_t b);
 bool                spn_dag_digest_valid(spn_dag_digest_t digest);
 sp_str_t            spn_dag_digest_hex(sp_mem_t mem, spn_dag_digest_t digest);

@@ -21,8 +21,10 @@ typedef struct {
 
 typedef struct {
   const c8* sub;
+  const c8* checkout;
   spn_dag_store_kind_t store;
   bool discovery;
+  spn_path_root_set_t pinned;
 } dag_test_env_config_t;
 
 typedef struct {
