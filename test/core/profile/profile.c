@@ -395,6 +395,24 @@ static const query_test_t query_tests [] = {
 };
 
 typedef struct {
+  spn_linkage_t linkage;
+} linkage_expect_t;
+
+typedef struct {
+  const c8* name;
+  spn_abi_t abi;
+  linkage_expect_t expect;
+} linkage_test_t;
+
+static const linkage_test_t linkage_tests [] = {
+  { .name = "gnu_is_shared",   .abi = SPN_ABI_GNU,   .expect = { .linkage = SPN_LIB_KIND_SHARED } },
+  { .name = "musl_is_static",  .abi = SPN_ABI_MUSL,  .expect = { .linkage = SPN_LIB_KIND_STATIC } },
+  { .name = "msvc_is_shared",  .abi = SPN_ABI_MSVC,  .expect = { .linkage = SPN_LIB_KIND_SHARED } },
+  { .name = "apple_is_shared", .abi = SPN_ABI_APPLE, .expect = { .linkage = SPN_LIB_KIND_SHARED } },
+  { .name = "bare_is_static",  .abi = SPN_ABI_BARE,  .expect = { .linkage = SPN_LIB_KIND_STATIC } },
+};
+
+typedef struct {
   spn_toolchain_query_kind_t kind;
 } kind_expect_t;
 
@@ -505,5 +523,12 @@ sp_test_each(profile, kind, kind_test_t, kind_tests) {
   spn_toolchain_query_t query = spn_profile_query(&profile, (spn_triple_t) PROFILE_HOST_LINUX_GNU);
   sp_expect_eq(t, (u32)it->expect.kind, (u32)query.kind);
   sp_expect_str_eq_c(t, query.name, it->toolchain);
+  return SP_OK;
+}
+
+sp_test_each(profile, linkage, linkage_test_t, linkage_tests) {
+  spn_profile_info_t profile = sp_zero;
+  spn_profile_finalize(&profile, it->abi);
+  sp_expect_eq(t, (u32)it->expect.linkage, (u32)profile.linkage);
   return SP_OK;
 }

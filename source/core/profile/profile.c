@@ -174,10 +174,29 @@ spn_toolchain_query_t spn_profile_query(const spn_profile_info_t* profile, spn_t
   };
 }
 
+static spn_linkage_t abi_linkage(spn_abi_t abi) {
+  switch (abi) {
+    case SPN_ABI_GNU:
+    case SPN_ABI_MSVC:
+    case SPN_ABI_APPLE: {
+      return SPN_LIB_KIND_SHARED;
+    }
+    case SPN_ABI_MUSL:
+    case SPN_ABI_BARE: {
+      return SPN_LIB_KIND_STATIC;
+    }
+    case SPN_ABI_NONE: {
+      sp_unreachable_case();
+    }
+  }
+
+  sp_unreachable_return(SPN_LIB_KIND_NONE);
+}
+
 void spn_profile_finalize(spn_profile_info_t* profile, spn_abi_t abi) {
   profile->abi = abi;
   if (!profile->linkage) {
-    profile->linkage = abi == SPN_ABI_MUSL ? SPN_LIB_KIND_STATIC : SPN_LIB_KIND_SHARED;
+    profile->linkage = abi_linkage(abi);
   }
 }
 
