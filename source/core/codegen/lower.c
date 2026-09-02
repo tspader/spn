@@ -1082,7 +1082,7 @@ static void validate_inline_toolchains(spn_toml_loader_t* ctx, const spn_cg_mani
     }
     sp_da_for(t->host, h) {
       spn_triple_t host_triple = sp_zero;
-      if (spn_triple_parse(t->host[h].key, &host_triple) || !host_triple.arch || !host_triple.os) {
+      if (spn_triple_parse(t->host[h].key, &host_triple) || !host_triple.os) {
         spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "host");
       }
       bool url = !sp_str_empty(t->host[h].value.url);
