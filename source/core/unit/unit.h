@@ -9,7 +9,7 @@
 
 spn_profile_info_t spn_build_metaprogram_profile();
 spn_build_id_t     spn_build_id(const spn_profile_info_t* profile);
-spn_err_t          spn_build_add(spn_session_t* session, spn_profile_info_t profile, spn_path_t root, spn_toolchain_info_t* toolchain, spn_build_unit_t** build);
+spn_build_unit_t*  spn_build_add(spn_session_t* session, spn_profile_info_t profile, spn_path_t root, spn_toolchain_info_t* toolchain);
 
 spn_err_t spn_units_add_packages(spn_session_t* session);
 

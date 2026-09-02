@@ -57,13 +57,9 @@ static spn_toolchain_unit_t* bind_toolchain(spn_session_t* s, spn_toolchain_info
   return unit;
 }
 
-spn_err_t spn_build_add(spn_session_t* s, spn_profile_info_t profile, spn_path_t root, spn_toolchain_info_t* toolchain, spn_build_unit_t** out) {
+spn_build_unit_t* spn_build_add(spn_session_t* s, spn_profile_info_t profile, spn_path_t root, spn_toolchain_info_t* toolchain) {
   spn_build_id_t id = spn_build_id(&profile);
-  if (sp_om_has(s->units.builds, id)) {
-    *out = sp_om_get(s->units.builds, id);
-    sp_assert((*out)->toolchain->info == toolchain);
-    return SPN_OK;
-  }
+  sp_assert(!sp_om_has(s->units.builds, id));
 
   sp_om_insert(s->units.builds, id, sp_zero_struct(spn_build_unit_t));
   spn_build_unit_t* build = sp_om_back(s->units.builds);
@@ -74,7 +70,5 @@ spn_err_t spn_build_add(spn_session_t* s, spn_profile_info_t profile, spn_path_t
   sp_da_init(s->mem, build->include);
   build->define = spn_when_facts_to_defines(s->mem, spn_profile_facts(&build->profile));
   sp_da_init(s->mem, build->packages);
-
-  *out = build;
-  return SPN_OK;
+  return build;
 }
