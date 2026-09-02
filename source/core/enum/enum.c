@@ -148,6 +148,9 @@ sp_str_t spn_abi_to_str(spn_abi_t abi) {
     case SPN_ABI_NONE: {
       return sp_str_lit("");
     }
+    case SPN_ABI_COUNT: {
+      sp_unreachable_case();
+    }
   }
 
   SP_UNREACHABLE_RETURN(sp_str_lit(""));

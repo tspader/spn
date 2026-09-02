@@ -75,7 +75,7 @@ struct spn_toolchain_catalog_t {
 };
 
 typedef struct {
-  spn_abi_t items [SPN_ABI_BARE + 1];
+  spn_abi_t items [SPN_ABI_COUNT];
   u32 count;
 } spn_abi_list_t;
 
