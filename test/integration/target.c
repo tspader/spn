@@ -198,6 +198,8 @@ sp_test(target, publish) {
       { .kind = ACTION_VERIFY_INCLUDE, .verify_include.file = sp_str_lit("kit.h") },
       { .kind = ACTION_VERIFY_INCLUDE, .verify_include.file = sp_str_lit("kit/a.h") },
       { .kind = ACTION_VERIFY_INCLUDE, .verify_include.file = sp_str_lit("kit/b.h") },
+      { .kind = ACTION_VERIFY_INCLUDE, .verify_include.file = sp_str_lit("kit/on.h") },
+      { .kind = ACTION_VERIFY_NOT_EXISTS, .exists = store_file("include/kit/off.h") },
       { .kind = ACTION_VERIFY_EXISTS, .exists = exe("publish") },
     },
   });

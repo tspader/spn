@@ -1,0 +1,11 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[package.build]
+source = ["b.c"]
+define = [{ value = "A", when = { tls = true } }]
+flags = [{ value = "-g", when = { tls = true } }]
+
+[options.tls]
+type = "bool"

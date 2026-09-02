@@ -183,6 +183,17 @@ static sp_da(spn_path_t) resolve_paths(const spn_path_roots_t* roots, spn_gated_
   return resolved;
 }
 
+static sp_da(sp_str_t) resolve_values(spn_gated_list_t entries, spn_when_env_t* env) {
+  sp_da(sp_str_t) resolved = sp_da_new(spn.mem, sp_str_t);
+  sp_da_for(entries, it) {
+    if (!spn_when_eval(&entries[it].when, env)) {
+      continue;
+    }
+    sp_da_push(resolved, entries[it].value);
+  }
+  return resolved;
+}
+
 static spn_err_t resolve_configure_source(spn_ctx_t* ctx, sp_str_t name, spn_gated_path_list_t declared, spn_loaded_pkg_t* loaded, spn_when_env_t* env, sp_da(spn_path_t)* source) {
   sp_da(spn_path_t) resolved = sp_da_new(spn.mem, spn_path_t);
   sp_da_for(declared, it) {
@@ -341,9 +352,13 @@ static spn_err_t load_package(spn_session_t* session, spn_resolved_pkg_t* pkg, s
   loaded->build = loaded->info->build;
   loaded->build.source = resolve_paths(roots, loaded->info->build.gated.source, loaded, &facts);
   loaded->build.include = resolve_paths(roots, loaded->info->build.gated.include, loaded, &facts);
+  loaded->build.define = resolve_values(loaded->info->build.gated.define, &facts);
+  loaded->build.flags = resolve_values(loaded->info->build.gated.flags, &facts);
 
   loaded->configure = loaded->info->configure;
   loaded->configure.include = resolve_paths(roots, loaded->info->configure.gated.include, loaded, &facts);
+  loaded->configure.define = resolve_values(loaded->info->configure.gated.define, &facts);
+  loaded->configure.flags = resolve_values(loaded->info->configure.gated.flags, &facts);
 
   // @spader This is a weird case. Normally, a manifest is validated when we
   // actually load the TOML, mechanically. No real context needed. But lists

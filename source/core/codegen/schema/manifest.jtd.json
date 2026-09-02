@@ -29,7 +29,7 @@
 
     "platform_macos": {
       "optionalProperties": {
-        "frameworks": { "elements": { "type": "string" } },
+        "frameworks": { "elements": { "ref": "value_entry" }, "metadata": { "shorthand": "value" } },
         "min_os": { "metadata": { "extern": "os_version" } }
       }
     },
@@ -107,6 +107,9 @@
       "properties": {
         "from": { "type": "string" },
         "to": { "type": "string" }
+      },
+      "optionalProperties": {
+        "when": { "metadata": { "extern": "when", "include": "when/types.h" } }
       }
     },
 
@@ -122,7 +125,7 @@
         "maintainer": { "type": "string" },
         "upstream": { "ref": "upstream" },
         "include": { "elements": { "ref": "source_entry" }, "metadata": { "shorthand": "path" } },
-        "define": { "elements": { "type": "string" } },
+        "define": { "elements": { "ref": "value_entry" }, "metadata": { "shorthand": "value" } },
         "system_deps": { "elements": { "ref": "system_dep_entry" }, "metadata": { "shorthand": "lib" } },
         "macos": { "ref": "platform_macos" },
         "build": { "ref": "build_script" },
@@ -134,8 +137,8 @@
       "optionalProperties": {
         "source": { "elements": { "ref": "source_entry" }, "metadata": { "shorthand": "path" } },
         "include": { "elements": { "ref": "source_entry" }, "metadata": { "shorthand": "path" } },
-        "define": { "elements": { "type": "string" } },
-        "flags": { "elements": { "type": "string" } }
+        "define": { "elements": { "ref": "value_entry" }, "metadata": { "shorthand": "value" } },
+        "flags": { "elements": { "ref": "value_entry" }, "metadata": { "shorthand": "value" } }
       }
     },
 

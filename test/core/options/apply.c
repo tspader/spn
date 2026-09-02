@@ -27,6 +27,9 @@ typedef struct {
   const c8* sys_target [4];
   const c8* deps [4];
   const c8* sys [4];
+  const c8* pkg_define [4];
+  const c8* frameworks [4];
+  const c8* pkg_frameworks [4];
 } apply_expect_t;
 
 typedef struct {
@@ -44,6 +47,9 @@ typedef struct {
   apply_list_t sys_target;
   apply_list_t deps;
   apply_list_t sys;
+  apply_list_t pkg_define;
+  apply_list_t frameworks;
+  apply_list_t pkg_frameworks;
   apply_expect_t expect;
 } apply_test_t;
 
@@ -302,6 +308,45 @@ static const apply_test_t list_tests [] = {
     },
   },
   {
+    .name = "package_define",
+    .facts = { .os = SPN_OS_LINUX },
+    .pkg_define = {
+      .values = {
+        { .value = "A", .when = { { "os", "linux" } } },
+        { .value = "B", .when = { { "os", "windows" } } },
+      },
+    },
+    .expect = {
+      .pkg_define = { "A" },
+    },
+  },
+  {
+    .name = "target_frameworks",
+    .facts = { .os = SPN_OS_MACOS },
+    .frameworks = {
+      .values = {
+        { .value = "A", .when = { { "os", "macos" } } },
+        { .value = "B", .when = { { "os", "linux" } } },
+      },
+    },
+    .expect = {
+      .frameworks = { "A" },
+    },
+  },
+  {
+    .name = "package_frameworks",
+    .facts = { .os = SPN_OS_MACOS },
+    .pkg_frameworks = {
+      .values = {
+        { .value = "A", .when = { { "os", "macos" } } },
+        { .value = "B", .when = { { "os", "linux" } } },
+      },
+    },
+    .expect = {
+      .pkg_frameworks = { "A" },
+    },
+  },
+  {
     .name = "applies_once",
     .facts = { .os = SPN_OS_LINUX, .mode = SPN_MODE_DEBUG },
     .reapply = true,
@@ -354,6 +399,9 @@ sp_test_each(options_apply, lists, apply_test_t, list_tests) {
     { it->sys_target, &exe->system_deps, &exe->gated.system_deps, it->expect.sys_target, },
     { it->deps, &exe->deps, &exe->gated.deps, it->expect.deps },
     { it->sys, &info.system_deps, &info.gated.system_deps, it->expect.sys, },
+    { it->pkg_define, &info.define, &info.gated.define, it->expect.pkg_define },
+    { it->frameworks, &exe->macos.frameworks, &exe->gated.frameworks, it->expect.frameworks },
+    { it->pkg_frameworks, &info.macos.frameworks, &info.gated.frameworks, it->expect.pkg_frameworks },
   };
   sp_carr_for(path_lists, lt) {
     make_path_list(mem, path_lists[lt].test, path_lists[lt].plain, path_lists[lt].gated);
@@ -515,4 +563,63 @@ sp_test_each(options_apply, option_defines, apply_option_test_t, option_tests) {
   sp_err_t err = expect_list(t, info.define, it->expect.define);
   if (err) return err;
   return expect_list(t, info.public_define, it->expect.public_define);
+}
+
+typedef struct {
+  const c8* from;
+  const c8* to;
+  apply_clause_t when [2];
+} apply_copy_t;
+
+typedef struct {
+  const c8* name;
+  spn_when_facts_t facts;
+  apply_copy_t copies [4];
+  const c8* expect [4];
+} apply_copy_test_t;
+
+static const apply_copy_test_t copy_tests [] = {
+  {
+    .name = "publish_copies",
+    .facts = { .os = SPN_OS_LINUX },
+    .copies = {
+      { .from = "source/a.h", .to = "include", .when = { { "os", "linux" } } },
+      { .from = "source/b.h", .to = "include", .when = { { "os", "windows" } } },
+      { .from = "source/c.h", .to = "include" },
+    },
+    .expect = { "source/a.h", "source/c.h" },
+  },
+};
+
+sp_test_each(options_apply, publish_copies, apply_copy_test_t, copy_tests) {
+  sp_mem_t mem = sp_test_arena(t);
+  spn_pkg_info_t info = sp_zero;
+  sp_da_init(mem, info.publish.copy);
+  sp_da_init(mem, info.gated.publish.copy);
+  sp_carr_for(it->copies, ct) {
+    if (!it->copies[ct].from) {
+      break;
+    }
+    sp_da_push(info.gated.publish.copy, ((spn_publish_copy_t) {
+      .from = sp_cstr_as_str(it->copies[ct].from),
+      .to = sp_cstr_as_str(it->copies[ct].to),
+      .when = make_apply_when(mem, it->copies[ct].when, sp_carr_len(it->copies[ct].when)),
+    }));
+  }
+
+  spn_when_env_t env = sp_zero;
+  spn_when_env_init(mem, &env);
+  spn_when_env_set_facts(&env, it->facts);
+  spn_path_roots_t roots = sp_zero;
+  spn_tree_roots_t trees = sp_zero;
+  spn_pkg_apply_options(mem, &info, &roots, trees, &env);
+
+  sp_expect(t, info.applied);
+  u32 expected = 0;
+  sp_carr_detect_len(it->expect, expected, it->expect[expected]);
+  sp_must_eq(t, expected, (u32)sp_da_size(info.publish.copy));
+  sp_for(ct, expected) {
+    sp_expect_str_eq_c(t, info.publish.copy[ct].from, it->expect[ct]);
+  }
+  return SP_OK;
 }

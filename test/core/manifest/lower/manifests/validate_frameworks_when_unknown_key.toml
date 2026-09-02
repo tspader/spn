@@ -1,0 +1,13 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[package.macos]
+frameworks = [{ value = "GSS", when = { simd = "avx2" } }]
+
+[[lib]]
+name = "t"
+kinds = ["static"]
+
+[lib.macos]
+frameworks = [{ value = "Metal", when = { simd = "avx2" } }]

@@ -6,6 +6,8 @@ sp_test(defines, build_facts) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
       { .kind = ACTION_VERIFY_CC_ARG, .verify_cc_arg = { "-DSPN_BUILD", "/DSPN_BUILD" } },
+      { .kind = ACTION_VERIFY_CC_ARG, .verify_cc_arg = { "-DGATE_DEBUG=1", "/DGATE_DEBUG=1" } },
+      { .kind = ACTION_VERIFY_NO_CC_ARG, .verify_cc_arg = { "-DGATE_RELEASE=1", "/DGATE_RELEASE=1" } },
     },
   });
 }

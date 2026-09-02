@@ -9,10 +9,21 @@
 #include "pkg/mutate.h"
 #include "profile/types.h"
 #include "target/mutate.h"
+#include "when/when.h"
 
 static sp_hash_t hash_push(sp_hash_t hash, sp_hash_t value) {
   sp_hash_t parts [] = { hash, value };
   return spn_digest_hash_combine(parts, sp_carr_len(parts));
+}
+
+static sp_hash_t hash_gated(sp_hash_t hash, spn_gated_list_t list) {
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_da_for(list, it) {
+    hash = hash_push(hash, spn_digest_hash_str(list[it].value));
+    hash = hash_push(hash, spn_digest_hash_str(spn_when_to_str(scratch.mem, &list[it].when)));
+  }
+  sp_mem_end_scratch(scratch);
+  return hash;
 }
 
 sp_hash_t spn_pkg_hash_platform(spn_pkg_info_t* pkg, const spn_profile_info_t* profile) {
@@ -25,17 +36,13 @@ sp_hash_t spn_pkg_hash_platform(spn_pkg_info_t* pkg, const spn_profile_info_t* p
       hash = hash_push(hash, (sp_hash_t)profile->sysroot.root);
       hash = hash_push(hash, spn_digest_hash_str(profile->sysroot.sub));
       hash = hash_push(hash, spn_digest_hash(&pkg->macos.min_os, sizeof(pkg->macos.min_os)));
-      sp_da_for(pkg->macos.frameworks, it) {
-        hash = hash_push(hash, spn_digest_hash_str(pkg->macos.frameworks[it]));
-      }
+      hash = hash_gated(hash, pkg->gated.frameworks);
       sp_carr_for(maps, mt) {
         sp_om_for(maps[mt], it) {
           spn_target_info_t* target = sp_str_om_at(maps[mt], it);
           hash = hash_push(hash, spn_digest_hash_str(target->name));
           hash = hash_push(hash, spn_digest_hash(&target->macos.min_os, sizeof(target->macos.min_os)));
-          sp_da_for(target->macos.frameworks, ft) {
-            hash = hash_push(hash, spn_digest_hash_str(target->macos.frameworks[ft]));
-          }
+          hash = hash_gated(hash, target->gated.frameworks);
         }
       }
       break;

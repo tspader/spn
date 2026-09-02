@@ -6,6 +6,8 @@ version = "1.0.0"
 copy = [
   { from = "source/kit.h", to = "include/kit.h" },
   { from = "source/sub/*", to = "include/kit" },
+  { from = "source/on.h", to = "include/kit/on.h", when = { mode = "debug" } },
+  { from = "source/off.h", to = "include/kit/off.h", when = { mode = "release" } },
 ]
 
 [[lib]]

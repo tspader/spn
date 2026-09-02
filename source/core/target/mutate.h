@@ -21,6 +21,7 @@ static inline void spn_target_info_init(sp_mem_t mem, spn_target_info_t* target)
   if (!target->gated.flags)       sp_da_init(mem, target->gated.flags);
   if (!target->gated.system_deps) sp_da_init(mem, target->gated.system_deps);
   if (!target->gated.deps)        sp_da_init(mem, target->gated.deps);
+  if (!target->gated.frameworks)  sp_da_init(mem, target->gated.frameworks);
 }
 void spn_target_add_define_ex(spn_target_info_t* target, sp_str_t define);
 void spn_target_add_flag_ex(spn_target_info_t* target, sp_str_t flag);

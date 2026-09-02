@@ -23,6 +23,12 @@ typedef struct {
 } gated_t;
 
 typedef struct {
+  const c8* from;
+  const c8* to;
+  const c8* when;
+} copy_t;
+
+typedef struct {
   const c8* name;
   spn_linkage_set_t linkages;
   bool no_link;
@@ -33,6 +39,7 @@ typedef struct {
   gated_t flags [4];
   gated_t system_deps [4];
   gated_t deps [4];
+  gated_t frameworks [4];
   spn_cxx_options_t cxx;
 } target_t;
 
@@ -135,8 +142,12 @@ typedef struct {
   gated_t include [4];
   gated_t build_source [4];
   gated_t build_include [4];
-  const c8* define [8];
+  gated_t build_define [4];
+  gated_t build_flags [4];
+  gated_t define [8];
   gated_t system_deps [8];
+  gated_t frameworks [4];
+  copy_t publish [4];
   issue_t issues [7];
   target_t libs [8];
   target_t exes [8];
@@ -552,6 +563,24 @@ static const test_t tests [] = {
     }
   },
   {
+    .name = "metaprogram_values_gated",
+    .manifest = "metaprogram_values_gated",
+    .build_source = { { "b.c" } },
+    .build_define = { { "A" }, { "B", "os = \"windows\"" } },
+    .build_flags = { { "-g", "mode = \"debug\"" } },
+  },
+  {
+    .name = "validate_metaprogram_value_when_option",
+    .manifest = "validate_metaprogram_value_when_option",
+    .build_source = { { "b.c" } },
+    .build_define = { { "A", "tls = true" } },
+    .build_flags = { { "-g", "tls = true" } },
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "package.build.define[0].when.tls" },
+      { SPN_ERR_CODEGEN_INVALID, "package.build.flags[0].when.tls" },
+    }
+  },
+  {
     .name = "package",
     .manifest = "package",
     .pkg_name = "p",
@@ -564,7 +593,7 @@ static const test_t tests [] = {
     .version = { 1, 2, 3 },
     .commit = "abc",
     .include = { { "inc" } },
-    .define = { "SPUM" },
+    .define = { { "SPUM" } },
     .system_deps = { { "z" } },
   },
   {
@@ -795,6 +824,63 @@ static const test_t tests [] = {
     .system_deps = { { "m" }, { "ws2_32", "os = \"windows\"" } },
   },
   {
+    .name = "package_define_gated",
+    .manifest = "package_define_gated",
+    .define = { { "A" }, { "B", "os = \"windows\"" } },
+  },
+  {
+    .name = "frameworks_gated",
+    .manifest = "frameworks_gated",
+    .frameworks = { { "Cocoa" }, { "GSS", "negotiate = true" } },
+    .libs = {
+      {
+        .name = "t",
+        .linkages = { .static_lib = true },
+        .frameworks = { { "Metal" }, { "IOKit", "os = \"macos\"" } },
+      },
+    },
+  },
+  {
+    .name = "validate_frameworks_when_unknown_key",
+    .manifest = "validate_frameworks_when_unknown_key",
+    .frameworks = { { "GSS", "simd = \"avx2\"" } },
+    .libs = {
+      {
+        .name = "t",
+        .linkages = { .static_lib = true },
+        .frameworks = { { "Metal", "simd = \"avx2\"" } },
+      },
+    },
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "lib[0].macos.frameworks[0].when.simd" },
+      { SPN_ERR_CODEGEN_INVALID, "package.macos.frameworks[0].when.simd" },
+    },
+  },
+  {
+    .name = "publish_gated",
+    .manifest = "publish_gated",
+    .publish = {
+      { "source/a.h", "include" },
+      { "source/b.h", "include/b", "os = \"windows\"" },
+    },
+  },
+  {
+    .name = "validate_publish_when_unknown_key",
+    .manifest = "validate_publish_when_unknown_key",
+    .publish = { { "source/a.h", "include", "simd = \"avx2\"" } },
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "publish.copy[0].when.simd" },
+    },
+  },
+  {
+    .name = "validate_package_define_when_unknown_key",
+    .manifest = "validate_package_define_when_unknown_key",
+    .define = { { "A" }, { "B", "simd = \"avx2\"" } },
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "package.define[1].when.simd" }
+    },
+  },
+  {
     .name = "validate_option_define_on_enum",
     .manifest = "validate_option_define_on_enum",
     .issues = {
@@ -994,6 +1080,16 @@ static sp_err_t check_gated_list(sp_test_t* t, spn_gated_list_t actual, const ga
   return SP_OK;
 }
 
+static sp_err_t check_copy_list(sp_test_t* t, sp_da(spn_publish_copy_t) actual, const copy_t* expected, u32 n) {
+  sp_must_eq(t, n, (u32)sp_da_size(actual));
+  sp_for(it, n) {
+    sp_expect_str_eq_c(t, actual[it].from, expected[it].from);
+    sp_expect_str_eq_c(t, actual[it].to, expected[it].to);
+    sp_expect_str_eq_c(t, spn_when_to_str(sp_test_arena(t), &actual[it].when), expected[it].when ? expected[it].when : "always");
+  }
+  return SP_OK;
+}
+
 static sp_err_t check_gated_path_list(sp_test_t* t, spn_gated_path_list_t actual, const gated_t* expected, u32 n) {
   sp_must_eq(t, n, (u32)sp_da_size(actual));
   sp_for(it, n) {
@@ -1042,6 +1138,8 @@ static sp_err_t check_targets(sp_test_t* t, spn_target_map_t om, const target_t*
     check_gated(t, info->gated.flags, arr[i].flags);
     check_gated(t, info->gated.system_deps, arr[i].system_deps);
     check_gated(t, info->gated.deps, arr[i].deps);
+    sp_expect_eq(t, (u32)0, (u32)sp_da_size(info->macos.frameworks));
+    check_gated(t, info->gated.frameworks, arr[i].frameworks);
     sp_expect_eq(t, (u32)arr[i].cxx.standard, (u32)info->cxx.standard);
     sp_expect_eq(t, arr[i].cxx.no_exceptions, info->cxx.no_exceptions);
     sp_expect_eq(t, arr[i].cxx.no_rtti, info->cxx.no_rtti);
@@ -1103,12 +1201,23 @@ sp_test_each(lower, cases, test_t, tests) {
   }
 
   // Package arrays
-  sp_must_strs_eq(t, pkg.define, sp_da_size(pkg.define), it->define);
+  sp_expect_eq(t, (u32)0, (u32)sp_da_size(pkg.define));
+  check_gated(t, pkg.gated.define, it->define);
   check_gated(t, pkg.gated.system_deps, it->system_deps);
+  sp_expect_eq(t, (u32)0, (u32)sp_da_size(pkg.macos.frameworks));
+  check_gated(t, pkg.gated.frameworks, it->frameworks);
+  sp_expect_eq(t, (u32)0, (u32)sp_da_size(pkg.publish.copy));
+  u32 num_copies = 0;
+  sp_carr_detect_len(it->publish, num_copies, it->publish[num_copies].from);
+  sp_try(check_copy_list(t, pkg.gated.publish.copy, it->publish, num_copies));
   sp_expect_eq(t, (u32)0, (u32)sp_da_size(pkg.include));
   check_gated_paths(t, pkg.gated.include, it->include);
   check_gated_paths(t, pkg.build.gated.source, it->build_source);
   check_gated_paths(t, pkg.build.gated.include, it->build_include);
+  sp_expect_eq(t, (u32)0, (u32)sp_da_size(pkg.build.define));
+  sp_expect_eq(t, (u32)0, (u32)sp_da_size(pkg.build.flags));
+  check_gated(t, pkg.build.gated.define, it->build_define);
+  check_gated(t, pkg.build.gated.flags, it->build_flags);
 
   // Targets
   sp_try(check_targets(t, pkg.libs,     it->libs,     SP_CARR_LEN(it->libs),     SPN_TARGET_KIND_LIB));

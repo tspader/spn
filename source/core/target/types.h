@@ -87,6 +87,7 @@ struct spn_target_info {
     spn_gated_list_t flags;
     spn_gated_list_t system_deps;
     spn_gated_list_t deps;
+    spn_gated_list_t frameworks;
   } gated;
 };
 
