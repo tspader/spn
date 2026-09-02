@@ -15,17 +15,6 @@ typedef struct {
 
 static const launcher_test_t tests [] = {
   {
-    .name = "empty_root_is_identity",
-    .launcher = { .program = "A" },
-    .expect = { .program = "A" },
-  },
-  {
-    .name = "empty_program_stays_empty",
-    .launcher = { .program = "" },
-    .root = "/R",
-    .expect = { .program = "" },
-  },
-  {
     .name = "root_prefixes_program",
     .launcher = { .program = "B/A", .args = { "C" } },
     .root = "/R",
@@ -63,7 +52,7 @@ sp_test_each(launcher, resolve, launcher_test_t, tests) {
       program = it->expect.program_win;
     }
 #endif
-    spn_path_t root = { .sub = sp_str_view(it->root ? it->root : "") };
+    spn_path_t root = { .sub = sp_cstr_as_str(it->root) };
     spn_toolchain_launcher_t rooted = spn_toolchain_launcher_with_root(mem, launcher, root);
     sp_expect_str_eq_c(t, spn_arg_str(&roots, mem, rooted.program), program);
   }

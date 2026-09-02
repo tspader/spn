@@ -970,15 +970,6 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
           );
           break;
         }
-        case SPN_ERR_TOOLCHAIN_NO_SHA: {
-          sp_tty_fmt(
-            &w,
-            "toolchain {} has no sha256 for {.gray}",
-            sp_fmt_str(colored_name(w.color, mem, event->err.artifact.name)),
-            sp_fmt_str(event->err.artifact.url)
-          );
-          break;
-        }
         case SPN_ERR_TOOLCHAIN_SHA: {
           sp_tty_fmt(
             &w,

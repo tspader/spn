@@ -4,8 +4,6 @@
 #include "toolchain/toolchain.h"
 
 spn_toolchain_launcher_t spn_toolchain_launcher_with_root(sp_mem_t mem, spn_toolchain_launcher_t launcher, spn_path_t root) {
-  if (spn_path_empty(root) || spn_arg_empty(launcher.program)) return launcher;
-
   sp_str_t name = launcher.program.prefix;
 #if defined(SP_WIN32)
   name = sp_fmt(mem, "{}.exe", sp_fmt_str(name)).value;

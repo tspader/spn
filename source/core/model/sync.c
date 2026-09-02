@@ -48,85 +48,91 @@ typedef struct {
   spn_err_t err;
 } toolchain_job_t;
 
-static spn_err_t setup_toolchain_unit(spn_toolchain_store_t* store, spn_toolchain_unit_t* unit) {
-  spn_toolchain_info_t* toolchain = unit->info;
-  sp_str_t name = toolchain->name;
+static spn_cc_toolchain_t cc_toolchain(spn_toolchain_info_t* toolchain) {
+  return (spn_cc_toolchain_t) {
+    .name = toolchain->name,
+    .driver = toolchain->driver,
+    .compiler = toolchain->compiler,
+    .cxx = toolchain->cxx,
+    .linker = toolchain->linker,
+    .archiver = toolchain->archiver,
+    .archiver_driver = toolchain->driver == SPN_CC_DRIVER_MSVC ? SPN_AR_DRIVER_MSVC : SPN_AR_DRIVER_GNU,
+  };
+}
 
+static spn_err_t setup_local(spn_toolchain_store_t* store, spn_toolchain_unit_t* unit) {
+  spn_toolchain_info_t* toolchain = unit->info;
   sp_tm_timer_t timer = sp_tm_start_timer();
 
-  bool cached = true;
-  sp_str_t url = sp_zero;
-  switch (toolchain->support.kind) {
-    case SPN_TOOLCHAIN_SUPPORT_LOCAL: {
-      break;
-    }
-    case SPN_TOOLCHAIN_SUPPORT_ARTIFACT: {
-      spn_artifact_t artifact = toolchain->support.artifact;
-      url = spn_artifact_resolve_url(spn.mem, artifact, store->mirror);
-      cached = sp_fs_is_dir(spn_toolchain_store_path(store, artifact));
-      break;
-    }
-    case SPN_TOOLCHAIN_SUPPORT_NONE: {
-      sp_unreachable_case();
-    }
-  }
+  unit->cc = cc_toolchain(toolchain);
+  spn_try(spn_toolchain_probe(&unit->cc, spn_probe_split_path(spn.mem, sp_env_get_path(spn.env)), &store->probes, spn.mem, &unit->identity));
+  spn_probe_cache_flush(&store->probes);
 
+  spn_event_buffer_push(spn.events, (spn_event_t) {
+    .kind = SPN_EVENT_SYNC_PACKAGE,
+    .sync_pkg = {
+      .name = toolchain->name,
+      .time = sp_tm_read_timer(&timer),
+    }
+  });
+  return SPN_OK;
+}
+
+static spn_err_t setup_artifact(spn_toolchain_store_t* store, spn_toolchain_unit_t* unit) {
+  spn_toolchain_info_t* toolchain = unit->info;
+  spn_artifact_t artifact = toolchain->support.artifact;
+  sp_tm_timer_t timer = sp_tm_start_timer();
+
+  sp_str_t url = spn_artifact_resolve_url(spn.mem, artifact, store->mirror);
+  sp_str_t dest = spn_toolchain_store_path(store, artifact);
+  bool cached = sp_fs_is_dir(dest);
   if (!cached) {
     spn_event_buffer_push(spn.events, (spn_event_t) {
       .kind = SPN_EVENT_SYNC,
       .sync = {
-        .name = name,
+        .name = toolchain->name,
         .url = url,
       }});
+    spn_try(spn_toolchain_provision(store, toolchain->name, artifact));
   }
 
-  spn_try(spn_toolchain_provision(store, toolchain, &unit->root));
+  spn_path_t root = spn_path_make(&spn.roots, dest);
+  unit->version = toolchain->version;
+  unit->cc = cc_toolchain(toolchain);
+  unit->cc.compiler = spn_toolchain_launcher_with_root(spn.mem, toolchain->compiler, root);
+  unit->cc.linker = spn_toolchain_launcher_with_root(spn.mem, toolchain->linker, root);
+  unit->cc.archiver = spn_toolchain_launcher_with_root(spn.mem, toolchain->archiver, root);
+  if (spn_toolchain_has_cxx(toolchain)) {
+    unit->cc.cxx = spn_toolchain_launcher_with_root(spn.mem, toolchain->cxx, root);
+  }
 
-  spn_event_buffer_push(spn.events, (spn_event_t){
+  spn_event_buffer_push(spn.events, (spn_event_t) {
     .kind = SPN_EVENT_SYNC_PACKAGE,
     .sync_pkg = {
-      .name = name,
+      .name = toolchain->name,
       .url = url,
-      .source_path = unit->root,
+      .source_path = dest,
       .time = sp_tm_read_timer(&timer),
       .fetched = !cached,
     }
   });
+  return SPN_OK;
+}
 
-  unit->cc = (spn_cc_toolchain_t) {
-    .name = toolchain->name,
-    .driver = toolchain->driver,
-    .archiver_driver = toolchain->driver == SPN_CC_DRIVER_MSVC ? SPN_AR_DRIVER_MSVC : SPN_AR_DRIVER_GNU,
-  };
-  if (sp_str_empty(unit->root)) {
-    unit->cc.compiler = toolchain->compiler;
-    unit->cc.cxx = toolchain->cxx;
-    unit->cc.linker = toolchain->linker;
-    unit->cc.archiver = toolchain->archiver;
-  } else {
-    spn_path_t root = spn_path_make(&spn.roots, unit->root);
-    unit->cc.compiler = spn_toolchain_launcher_with_root(spn.mem, toolchain->compiler, root);
-    unit->cc.cxx = spn_toolchain_launcher_with_root(spn.mem, toolchain->cxx, root);
-    unit->cc.linker = spn_toolchain_launcher_with_root(spn.mem, toolchain->linker, root);
-    unit->cc.archiver = spn_toolchain_launcher_with_root(spn.mem, toolchain->archiver, root);
-  }
-
-  switch (toolchain->support.kind) {
+static spn_err_t setup_toolchain_unit(spn_toolchain_store_t* store, spn_toolchain_unit_t* unit) {
+  switch (unit->info->support.kind) {
     case SPN_TOOLCHAIN_SUPPORT_LOCAL: {
-      spn_try(spn_toolchain_probe(&unit->cc, spn_probe_split_path(spn.mem, sp_env_get_path(spn.env)), &store->probes, spn.mem, &unit->identity));
-      spn_probe_cache_flush(&store->probes);
-      break;
+      return setup_local(store, unit);
     }
     case SPN_TOOLCHAIN_SUPPORT_ARTIFACT: {
-      unit->version = toolchain->version;
-      break;
+      return setup_artifact(store, unit);
     }
     case SPN_TOOLCHAIN_SUPPORT_NONE: {
       sp_unreachable_case();
     }
   }
 
-  return SPN_OK;
+  sp_unreachable_return(SPN_ERROR);
 }
 
 static spn_err_t materialize_tree(spn_session_t* session, sp_str_t name, spn_pkg_root_t tree, spn_path_t* root, bool* fetched) {
