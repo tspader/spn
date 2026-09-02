@@ -165,7 +165,9 @@ static spn_abi_list_t abi_order(const spn_profile_info_t* profile, spn_triple_t 
 }
 
 spn_toolchain_query_t spn_profile_query(const spn_profile_info_t* profile, spn_triple_t host) {
+  bool automatic = sp_str_equal_cstr(profile->toolchain, "auto");
   return (spn_toolchain_query_t) {
+    .kind = automatic ? SPN_TOOLCHAIN_QUERY_AUTO : SPN_TOOLCHAIN_QUERY_NAMED,
     .name = profile->toolchain,
     .target = { profile->arch, profile->os, profile->abi },
     .abis = abi_order(profile, host),

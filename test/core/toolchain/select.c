@@ -105,7 +105,6 @@ static const resolve_test_t resolve_tests [] = {
   {
     .name = "auto_picks_first_in_declared_order",
     .file = "auto.json",
-    .toolchain = "auto",
     .target = X64_WINDOWS,
     .abis = { SPN_ABI_GNU },
     .expect = { .name = "A", .triple = TARGET_WIN_GNU },
@@ -113,7 +112,6 @@ static const resolve_test_t resolve_tests [] = {
   {
     .name = "auto_takes_first_supported_abi",
     .file = "auto.json",
-    .toolchain = "auto",
     .target = X64_LINUX,
     .abis = { SPN_ABI_MUSL, SPN_ABI_GNU },
     .expect = { .name = "B", .triple = TARGET_LINUX_MUSL },
@@ -121,7 +119,6 @@ static const resolve_test_t resolve_tests [] = {
   {
     .name = "auto_scans_entries_before_abis",
     .file = "order.json",
-    .toolchain = "auto",
     .target = X64_LINUX,
     .abis = { SPN_ABI_MUSL, SPN_ABI_GNU },
     .expect = { .name = "A", .triple = HOST_X64_LINUX },
@@ -129,7 +126,6 @@ static const resolve_test_t resolve_tests [] = {
   {
     .name = "auto_skips_unsupported_host",
     .file = "auto.json",
-    .toolchain = "auto",
     .target = ARM_LINUX,
     .abis = { SPN_ABI_MUSL, SPN_ABI_GNU },
     .host = HOST_ARM_LINUX,
@@ -138,7 +134,6 @@ static const resolve_test_t resolve_tests [] = {
   {
     .name = "auto_with_empty_catalog",
     .file = "empty.json",
-    .toolchain = "auto",
     .target = X64_LINUX,
     .abis = { SPN_ABI_GNU },
     .expect = { .err = SPN_ERR_TOOLCHAIN_NONE },
@@ -146,7 +141,6 @@ static const resolve_test_t resolve_tests [] = {
   {
     .name = "auto_with_no_capable_toolchain",
     .file = "auto.json",
-    .toolchain = "auto",
     .target = WASM,
     .abis = { SPN_ABI_MUSL },
     .expect = { .err = SPN_ERR_TOOLCHAIN_NONE },
@@ -154,14 +148,12 @@ static const resolve_test_t resolve_tests [] = {
   {
     .name = "auto_without_abis_needs_one",
     .file = "auto.json",
-    .toolchain = "auto",
     .target = X64_WINDOWS,
     .expect = { .err = SPN_ERR_TARGET_ABI, .abis = { SPN_ABI_GNU, SPN_ABI_MSVC } },
   },
   {
     .name = "auto_without_abis_rejects_unreachable_target",
     .file = "auto.json",
-    .toolchain = "auto",
     .target = { SPN_ARCH_WASM32, SPN_OS_LINUX },
     .expect = { .err = SPN_ERR_TOOLCHAIN_NONE },
   },
@@ -271,6 +263,7 @@ sp_test_each(select, complete, complete_test_t, complete_tests, .setup = spn_tes
   sp_for(at, checks) {
     const check_t* check = &it->checks[at];
     spn_toolchain_query_t query = {
+      .kind = SPN_TOOLCHAIN_QUERY_NAMED,
       .name = sp_str_lit("A"),
       .target = check->target,
       .abis = abi_list(check->abis),
@@ -303,10 +296,13 @@ sp_test_each(select, resolve, resolve_test_t, resolve_tests, .setup = spn_test_c
   }
 
   spn_toolchain_query_t query = {
-    .name = sp_cstr_as_str(it->toolchain),
     .target = it->target,
     .abis = abi_list(it->abis),
   };
+  if (it->toolchain) {
+    query.kind = SPN_TOOLCHAIN_QUERY_NAMED;
+    query.name = sp_cstr_as_str(it->toolchain);
+  }
   spn_toolchain_selection_t selection = sp_zero;
   spn_err_t err = spn_toolchain_select(&catalog, query, &selection);
   sp_must_eq(t, (u32)it->expect.err, (u32)err);

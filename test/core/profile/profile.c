@@ -394,6 +394,28 @@ static const query_test_t query_tests [] = {
   },
 };
 
+typedef struct {
+  spn_toolchain_query_kind_t kind;
+} kind_expect_t;
+
+typedef struct {
+  const c8* name;
+  const c8* toolchain;
+  kind_expect_t expect;
+} kind_test_t;
+
+static const kind_test_t kind_tests [] = {
+  {
+    .name = "auto_is_automatic",
+    .toolchain = "auto",
+  },
+  {
+    .name = "anything_else_is_named",
+    .toolchain = "T",
+    .expect = { .kind = SPN_TOOLCHAIN_QUERY_NAMED },
+  },
+};
+
 static spn_profile_info_t desc_to_info(const profile_desc_t* d) {
   return (spn_profile_info_t) {
     .name = d->name ? sp_cstr_as_str(d->name) : (sp_str_t) sp_zero,
@@ -475,5 +497,13 @@ sp_test_each(profile, query, query_test_t, query_tests) {
   sp_for(at, abis) {
     sp_expect_eq(t, (u32)it->expect.abis[at], (u32)query.abis.items[at]);
   }
+  return SP_OK;
+}
+
+sp_test_each(profile, kind, kind_test_t, kind_tests) {
+  spn_profile_info_t profile = { .toolchain = sp_cstr_as_str(it->toolchain) };
+  spn_toolchain_query_t query = spn_profile_query(&profile, (spn_triple_t) PROFILE_HOST_LINUX_GNU);
+  sp_expect_eq(t, (u32)it->expect.kind, (u32)query.kind);
+  sp_expect_str_eq_c(t, query.name, it->toolchain);
   return SP_OK;
 }
