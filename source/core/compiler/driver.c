@@ -5,6 +5,7 @@
 
 #include "error/error.h"
 #include "paths/paths.h"
+#include "toolchain/driver.h"
 
 void spn_cc_push(sp_mem_t mem, spn_invocation_t* invocation, spn_arg_t arg) {
   if (!invocation->args) sp_da_init(mem, invocation->args);
@@ -56,19 +57,8 @@ void spn_cc_push_args(sp_mem_t mem, spn_invocation_t* invocation, sp_da(spn_arg_
   }
 }
 
-spn_cc_cap_set_t spn_cc_driver_caps(spn_cc_driver_t driver) {
-  switch (driver) {
-    case SPN_CC_DRIVER_GCC: return SPN_CC_CAP_EXCLUDE_LIBS | SPN_CC_CAP_NOLIBC | SPN_CC_CAP_FREESTANDING;
-    case SPN_CC_DRIVER_CLANG: return SPN_CC_CAP_TARGET_TRIPLE | SPN_CC_CAP_LLVM_TRIPLE | SPN_CC_CAP_CLANG_FRONTEND | SPN_CC_CAP_EXCLUDE_LIBS | SPN_CC_CAP_NOLIBC | SPN_CC_CAP_FREESTANDING;
-    case SPN_CC_DRIVER_ZIG: return SPN_CC_CAP_TARGET_TRIPLE | SPN_CC_CAP_CLANG_FRONTEND | SPN_CC_CAP_FREESTANDING;
-    case SPN_CC_DRIVER_MSVC: return 0;
-    case SPN_CC_DRIVER_NONE: sp_unreachable_case();
-  }
-  SP_UNREACHABLE_RETURN(0);
-}
-
 bool spn_cc_has(const spn_cc_toolchain_t* toolchain, spn_cc_cap_t cap) {
-  return (spn_cc_driver_caps(toolchain->driver) & cap) == (spn_cc_cap_set_t)cap;
+  return (spn_toolchain_driver_caps(toolchain->driver) & cap) == (spn_cc_cap_set_t)cap;
 }
 
 spn_cc_depfile_t spn_cc_depfile(const spn_cc_toolchain_t* toolchain, spn_lang_t lang) {
@@ -142,8 +132,13 @@ static spn_err_t feature_unsupported(const spn_cc_toolchain_t* toolchain, const 
 }
 
 spn_err_t spn_cc_validate_profile(const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile) {
-  if (profile->os == SPN_OS_FREESTANDING && !spn_cc_has(toolchain, SPN_CC_CAP_FREESTANDING)) {
-    return feature_unsupported(toolchain, profile, SPN_CC_FEATURE_COMPILE);
+  if (profile->os == SPN_OS_FREESTANDING) {
+    if (!spn_cc_has(toolchain, SPN_CC_CAP_FREESTANDING)) {
+      return feature_unsupported(toolchain, profile, SPN_CC_FEATURE_COMPILE);
+    }
+    if (profile->linkage == SPN_LIB_KIND_SHARED) {
+      return feature_unsupported(toolchain, profile, SPN_CC_FEATURE_LINK_SHARED);
+    }
   }
   spn_triple_t target = { profile->arch, profile->os, profile->abi };
   spn_sanitizer_set_t supported = get_supported_sanitizers(toolchain, target);

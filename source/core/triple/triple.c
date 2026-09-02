@@ -114,23 +114,23 @@ typedef struct {
 #define SPN_ELF_PT_INTERP 3
 #define SPN_ELF_CLASS_64 2
 
-sp_str_t spn_elf_interp(sp_mem_t mem, sp_io_seeking_reader_t* elf) {
-  sp_str_t none = sp_str_lit("");
+spn_err_t spn_elf_interp(sp_mem_t mem, sp_io_seeking_reader_t* elf, sp_str_t* interp) {
+  *interp = sp_str_lit("");
   s64 position = 0;
   u64 bytes = 0;
 
   elf_ehdr_t ehdr = sp_zero;
   if (sp_io_seeking_reader_seek(elf, 0, SP_IO_SEEK_SET, &position)) {
-    return none;
+    return SPN_ERROR;
   }
   if (sp_io_read_all(elf->reader, &ehdr, sizeof(ehdr), &bytes) || bytes != sizeof(ehdr)) {
-    return none;
+    return SPN_ERROR;
   }
   if (ehdr.e_ident[0] != 0x7f || ehdr.e_ident[1] != 'E' || ehdr.e_ident[2] != 'L' || ehdr.e_ident[3] != 'F') {
-    return none;
+    return SPN_ERROR;
   }
   if (ehdr.e_ident[4] != SPN_ELF_CLASS_64) {
-    return none;
+    return SPN_ERROR;
   }
 
   u64 interp_offset = 0;
@@ -138,10 +138,10 @@ sp_str_t spn_elf_interp(sp_mem_t mem, sp_io_seeking_reader_t* elf) {
   sp_for(it, ehdr.e_phnum) {
     elf_phdr_t phdr = sp_zero;
     if (sp_io_seeking_reader_seek(elf, (s64)(ehdr.e_phoff + it * ehdr.e_phentsize), SP_IO_SEEK_SET, &position)) {
-      return none;
+      return SPN_ERROR;
     }
     if (sp_io_read_all(elf->reader, &phdr, sizeof(phdr), &bytes) || bytes != sizeof(phdr)) {
-      return none;
+      return SPN_ERROR;
     }
     if (phdr.p_type == SPN_ELF_PT_INTERP && !interp_size) {
       interp_offset = phdr.p_offset;
@@ -150,22 +150,23 @@ sp_str_t spn_elf_interp(sp_mem_t mem, sp_io_seeking_reader_t* elf) {
   }
 
   if (!interp_size) {
-    return none;
+    return SPN_OK;
   }
 
   c8* data = sp_alloc(mem, interp_size);
   if (sp_io_seeking_reader_seek(elf, (s64)interp_offset, SP_IO_SEEK_SET, &position)) {
-    return none;
+    return SPN_ERROR;
   }
   if (sp_io_read_all(elf->reader, data, interp_size, &bytes) || bytes != interp_size) {
-    return none;
+    return SPN_ERROR;
   }
 
   u32 len = 0;
   while (len < interp_size && data[len]) {
     len++;
   }
-  return sp_str(data, len);
+  *interp = sp_str(data, len);
+  return SPN_OK;
 }
 
 spn_abi_t spn_abi_from_interp(sp_str_t interp) {
@@ -179,7 +180,11 @@ spn_abi_t spn_abi_from_interp(sp_str_t interp) {
 }
 
 spn_abi_t spn_host_libc(sp_mem_t mem, sp_io_seeking_reader_t* elf) {
-  return spn_abi_from_interp(spn_elf_interp(mem, elf));
+  sp_str_t interp = sp_zero;
+  if (spn_elf_interp(mem, elf, &interp)) {
+    return SPN_ABI_NONE;
+  }
+  return spn_abi_from_interp(interp);
 }
 
 u32 spn_os_abis(spn_os_t os, const spn_abi_t** abis) {
@@ -218,30 +223,79 @@ u32 spn_os_abis(spn_os_t os, const spn_abi_t** abis) {
   SP_UNREACHABLE_RETURN(0);
 }
 
-bool spn_triple_entry(spn_triple_t partial, spn_triple_t* full) {
-  *full = sp_zero_s(spn_triple_t);
-  if (!partial.arch || !partial.os) {
-    return false;
-  }
+u32 spn_os_archs(spn_os_t os, const spn_arch_t** archs) {
+  static const spn_arch_t native_archs [] = { SPN_ARCH_X64, SPN_ARCH_ARM64 };
+  static const spn_arch_t wasi_archs [] = { SPN_ARCH_WASM32 };
 
-  const spn_abi_t* abis = SP_NULLPTR;
-  u32 count = spn_os_abis(partial.os, &abis);
-
-  if (!partial.abi) {
-    if (count != 1) {
-      return false;
+  switch (os) {
+    case SPN_OS_LINUX:
+    case SPN_OS_WINDOWS:
+    case SPN_OS_MACOS:
+    case SPN_OS_FREESTANDING: {
+      *archs = native_archs;
+      return sp_carr_len(native_archs);
     }
-    *full = (spn_triple_t) { partial.arch, partial.os, abis[0] };
-    return true;
+    case SPN_OS_WASI: {
+      *archs = wasi_archs;
+      return sp_carr_len(wasi_archs);
+    }
+    case SPN_OS_NONE: {
+      *archs = SP_NULLPTR;
+      return 0;
+    }
   }
+  SP_UNREACHABLE_RETURN(0);
+}
 
+static bool os_has_arch(spn_os_t os, spn_arch_t arch) {
+  const spn_arch_t* archs = SP_NULLPTR;
+  u32 count = spn_os_archs(os, &archs);
   sp_for(it, count) {
-    if (abis[it] == partial.abi) {
-      *full = partial;
+    if (archs[it] == arch) {
       return true;
     }
   }
   return false;
+}
+
+static bool os_has_abi(spn_os_t os, spn_abi_t abi) {
+  const spn_abi_t* abis = SP_NULLPTR;
+  u32 count = spn_os_abis(os, &abis);
+  sp_for(it, count) {
+    if (abis[it] == abi) {
+      return true;
+    }
+  }
+  return false;
+}
+
+spn_triple_entry_t spn_triple_entry(spn_triple_t partial, spn_triple_t* full) {
+  *full = sp_zero_s(spn_triple_t);
+  if (!partial.arch) {
+    return SPN_TRIPLE_ENTRY_MISSING_ARCH;
+  }
+  if (!partial.os) {
+    return SPN_TRIPLE_ENTRY_MISSING_OS;
+  }
+  if (!os_has_arch(partial.os, partial.arch)) {
+    return SPN_TRIPLE_ENTRY_FOREIGN_ARCH;
+  }
+
+  if (partial.abi) {
+    if (!os_has_abi(partial.os, partial.abi)) {
+      return SPN_TRIPLE_ENTRY_FOREIGN_ABI;
+    }
+    *full = partial;
+    return SPN_TRIPLE_ENTRY_OK;
+  }
+
+  const spn_abi_t* abis = SP_NULLPTR;
+  u32 count = spn_os_abis(partial.os, &abis);
+  if (count != 1) {
+    return SPN_TRIPLE_ENTRY_MISSING_ABI;
+  }
+  *full = (spn_triple_t) { partial.arch, partial.os, abis[0] };
+  return SPN_TRIPLE_ENTRY_OK;
 }
 
 spn_triple_t spn_triple_host() {

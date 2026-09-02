@@ -59,6 +59,17 @@ static spn_triple_t lower_triple(const spn_cg_triple_t* triple) {
   };
 }
 
+static void issue_triple_entry(spn_toml_loader_t* ctx, spn_triple_entry_t entry) {
+  switch (entry) {
+    case SPN_TRIPLE_ENTRY_MISSING_ARCH: spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, "arch"); break;
+    case SPN_TRIPLE_ENTRY_MISSING_OS:   spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, "os"); break;
+    case SPN_TRIPLE_ENTRY_MISSING_ABI:  spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, "abi"); break;
+    case SPN_TRIPLE_ENTRY_FOREIGN_ARCH: spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "arch"); break;
+    case SPN_TRIPLE_ENTRY_FOREIGN_ABI:  spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "abi"); break;
+    case SPN_TRIPLE_ENTRY_OK: sp_unreachable_case();
+  }
+}
+
 static spn_linkage_set_t lower_linkages(sp_da(sp_str_t) kinds) {
   spn_linkage_set_t set = sp_zero;
   sp_da_for(kinds, k) {
@@ -322,16 +333,13 @@ static void lower_toolchains(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg
     sp_da_for(t->target, it) {
       spn_triple_t partial = lower_triple(&t->target[it]);
       spn_triple_t full = sp_zero;
-      if (!spn_triple_entry(partial, &full)) {
+      spn_triple_entry_t entry = spn_triple_entry(partial, &full);
+      if (entry != SPN_TRIPLE_ENTRY_OK) {
         spn_toml_loader_push_key(ctx, "toolchain");
         spn_toml_loader_push_index(ctx, n);
         spn_toml_loader_push_key(ctx, "target");
         spn_toml_loader_push_index(ctx, it);
-        if (partial.arch && partial.os && partial.abi) {
-          spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "abi");
-        } else {
-          spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, !partial.arch ? "arch" : !partial.os ? "os" : "abi");
-        }
+        issue_triple_entry(ctx, entry);
         spn_toml_loader_pop(ctx);
         spn_toml_loader_pop(ctx);
         spn_toml_loader_pop(ctx);

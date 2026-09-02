@@ -197,6 +197,7 @@ typedef struct {
 
 typedef struct {
   const c8* value;
+  bool malformed;
 } interp_expect_t;
 
 typedef struct {
@@ -214,9 +215,9 @@ static const interp_t interp_tests [] = {
   { .name = "musl_loader",     .interp = "/lib/ld-musl-x86_64.so.1",    .expect = { "/lib/ld-musl-x86_64.so.1" } },
   { .name = "interp_after_load", .interp = "/lib/ld-musl-x86_64.so.1", .load_first = true, .expect = { "/lib/ld-musl-x86_64.so.1" } },
   { .name = "static_binary" },
-  { .name = "bad_magic",       .interp = "/lib64/ld-linux-x86-64.so.2", .bad_magic = true },
-  { .name = "elf32_rejected",  .interp = "/lib64/ld-linux-x86-64.so.2", .elf32 = true },
-  { .name = "truncated_phdrs", .interp = "/lib64/ld-linux-x86-64.so.2", .truncated = true },
+  { .name = "bad_magic",       .interp = "/lib64/ld-linux-x86-64.so.2", .bad_magic = true, .expect = { .malformed = true } },
+  { .name = "elf32_rejected",  .interp = "/lib64/ld-linux-x86-64.so.2", .elf32 = true, .expect = { .malformed = true } },
+  { .name = "truncated_phdrs", .interp = "/lib64/ld-linux-x86-64.so.2", .truncated = true, .expect = { .malformed = true } },
 };
 
 static sp_str_t interp_build_elf(sp_mem_t mem, const interp_t* spec) {
@@ -263,8 +264,12 @@ sp_test_each(triple, elf_interp, interp_t, interp_tests) {
   sp_str_t elf = interp_build_elf(sp_test_arena(t), it);
   sp_io_reader_t backing = sp_zero;
   sp_io_seeking_reader_t reader = interp_reader(&backing, elf);
-  sp_str_t interp = spn_elf_interp(sp_test_arena(t), &reader);
-  sp_expect_str_eq_c(t, interp, it->expect.value ? it->expect.value : "");
+  sp_str_t interp = sp_zero;
+  spn_err_t err = spn_elf_interp(sp_test_arena(t), &reader, &interp);
+  sp_expect_eq(t, (u32)(it->expect.malformed ? SPN_ERROR : SPN_OK), (u32)err);
+  if (!err) {
+    sp_expect_str_eq_c(t, interp, it->expect.value ? it->expect.value : "");
+  }
   return SP_OK;
 }
 
@@ -316,27 +321,29 @@ typedef struct {
   const c8* name;
   spn_triple_t partial;
   struct {
-    bool rejected;
+    spn_triple_entry_t result;
     spn_triple_t full;
   } expect;
 } entry_t;
 
 static const entry_t entry_tests [] = {
-  { "full",                 { SPN_ARCH_X64,    SPN_OS_LINUX,   SPN_ABI_GNU },  { .full = { SPN_ARCH_X64,    SPN_OS_LINUX,   SPN_ABI_GNU } } },
-  { "single_abi_filled",    { SPN_ARCH_ARM64,  SPN_OS_MACOS },                 { .full = { SPN_ARCH_ARM64,  SPN_OS_MACOS,   SPN_ABI_APPLE } } },
-  { "wasi_abi_filled",      { SPN_ARCH_WASM32, SPN_OS_WASI },                  { .full = { SPN_ARCH_WASM32, SPN_OS_WASI,    SPN_ABI_MUSL } } },
-  { "freestanding_abi_filled", { SPN_ARCH_ARM64, SPN_OS_FREESTANDING },          { .full = { SPN_ARCH_ARM64,  SPN_OS_FREESTANDING, SPN_ABI_BARE } } },
-  { "ambiguous_abi",        { SPN_ARCH_X64,    SPN_OS_LINUX },                 { .rejected = true } },
-  { "missing_os",           { SPN_ARCH_X64 },                                  { .rejected = true } },
-  { "missing_arch",         { SPN_ARCH_NONE,   SPN_OS_LINUX,   SPN_ABI_GNU },  { .rejected = true } },
-  { "foreign_abi",          { SPN_ARCH_X64,    SPN_OS_MACOS,   SPN_ABI_GNU },  { .rejected = true } },
+  { "full",                    { SPN_ARCH_X64,    SPN_OS_LINUX,        SPN_ABI_GNU },   { .full = { SPN_ARCH_X64,    SPN_OS_LINUX,        SPN_ABI_GNU } } },
+  { "single_abi_filled",       { SPN_ARCH_ARM64,  SPN_OS_MACOS },                       { .full = { SPN_ARCH_ARM64,  SPN_OS_MACOS,        SPN_ABI_APPLE } } },
+  { "wasi_abi_filled",         { SPN_ARCH_WASM32, SPN_OS_WASI },                        { .full = { SPN_ARCH_WASM32, SPN_OS_WASI,         SPN_ABI_MUSL } } },
+  { "freestanding_abi_filled", { SPN_ARCH_ARM64,  SPN_OS_FREESTANDING },                { .full = { SPN_ARCH_ARM64,  SPN_OS_FREESTANDING, SPN_ABI_BARE } } },
+  { "ambiguous_abi",           { SPN_ARCH_X64,    SPN_OS_LINUX },                       { .result = SPN_TRIPLE_ENTRY_MISSING_ABI } },
+  { "missing_os",              { SPN_ARCH_X64 },                                        { .result = SPN_TRIPLE_ENTRY_MISSING_OS } },
+  { "missing_arch",            { SPN_ARCH_NONE,   SPN_OS_LINUX,        SPN_ABI_GNU },   { .result = SPN_TRIPLE_ENTRY_MISSING_ARCH } },
+  { "foreign_abi",             { SPN_ARCH_X64,    SPN_OS_MACOS,        SPN_ABI_GNU },   { .result = SPN_TRIPLE_ENTRY_FOREIGN_ABI } },
+  { "foreign_arch",            { SPN_ARCH_X64,    SPN_OS_WASI },                        { .result = SPN_TRIPLE_ENTRY_FOREIGN_ARCH } },
+  { "foreign_arch_before_abi", { SPN_ARCH_WASM32, SPN_OS_LINUX },                       { .result = SPN_TRIPLE_ENTRY_FOREIGN_ARCH } },
 };
 
 sp_test_each(triple, entry, entry_t, entry_tests) {
   spn_triple_t full = sp_zero;
-  bool ok = spn_triple_entry(it->partial, &full);
-  sp_expect_eq(t, !it->expect.rejected, ok);
-  if (ok) {
+  spn_triple_entry_t result = spn_triple_entry(it->partial, &full);
+  sp_expect_eq(t, it->expect.result, result);
+  if (result == SPN_TRIPLE_ENTRY_OK) {
     sp_expect_eq(t, it->expect.full.arch, full.arch);
     sp_expect_eq(t, it->expect.full.os, full.os);
     sp_expect_eq(t, it->expect.full.abi, full.abi);
@@ -361,6 +368,36 @@ static const os_abis_t os_abis_tests [] = {
   { "freestanding", SPN_OS_FREESTANDING, { SPN_ABI_BARE } },
   { "none",    SPN_OS_NONE },
 };
+
+#define TRIPLE_MAX_ARCHS 3
+
+typedef struct {
+  const c8* name;
+  spn_os_t os;
+  spn_arch_t expect [TRIPLE_MAX_ARCHS];
+} os_archs_t;
+
+static const os_archs_t os_archs_tests [] = {
+  { "linux",        SPN_OS_LINUX,        { SPN_ARCH_X64, SPN_ARCH_ARM64 } },
+  { "windows",      SPN_OS_WINDOWS,      { SPN_ARCH_X64, SPN_ARCH_ARM64 } },
+  { "macos",        SPN_OS_MACOS,        { SPN_ARCH_X64, SPN_ARCH_ARM64 } },
+  { "wasi",         SPN_OS_WASI,         { SPN_ARCH_WASM32 } },
+  { "freestanding", SPN_OS_FREESTANDING, { SPN_ARCH_X64, SPN_ARCH_ARM64 } },
+  { "none",         SPN_OS_NONE },
+};
+
+sp_test_each(triple, os_archs, os_archs_t, os_archs_tests) {
+  u32 expected = 0;
+  sp_carr_detect_len(it->expect, expected, it->expect[expected]);
+
+  const spn_arch_t* archs = SP_NULLPTR;
+  u32 count = spn_os_archs(it->os, &archs);
+  sp_must_eq(t, expected, count);
+  sp_for(at, count) {
+    sp_expect_eq(t, it->expect[at], archs[at]);
+  }
+  return SP_OK;
+}
 
 sp_test_each(triple, os_abis, os_abis_t, os_abis_tests) {
   u32 expected = 0;

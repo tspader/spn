@@ -8,7 +8,6 @@
 
 #define HOST_X64_LINUX_MUSL { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL }
 #define HOST_X64_WIN_GNU    { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU }
-#define HOST_X64_WIN_MSVC   { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MSVC }
 #define TARGET_WIN_MSVC     { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MSVC }
 #define TARGET_LINUX_GNU    { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU }
 #define TARGET_LINUX_MUSL   { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL }
@@ -24,6 +23,7 @@ typedef struct {
   bool no_artifact;
   spn_triple_t triple;
   const c8* abis [SELECT_MAX_ABIS];
+  const c8* targets [SELECT_MAX_TARGETS];
 } select_expect_t;
 
 typedef struct {
@@ -48,6 +48,7 @@ typedef struct {
   spn_err_t err;
   spn_triple_t triple;
   const c8* abis [SELECT_MAX_ABIS];
+  const c8* targets [SELECT_MAX_TARGETS];
 } complete_check_t;
 
 typedef struct {
@@ -71,9 +72,22 @@ static const complete_test_t complete_tests [] = {
   {
     .name = "host_only_rejects_foreign_fields",
     .checks = {
-      { .target = { .os = SPN_OS_WINDOWS, .abi = SPN_ABI_GNU }, .err = SPN_ERR_TOOLCHAIN_TARGET },
-      { .target = { .abi = SPN_ABI_MUSL }, .err = SPN_ERR_TOOLCHAIN_TARGET },
-      { .target = { .arch = SPN_ARCH_ARM64, .abi = SPN_ABI_GNU }, .err = SPN_ERR_TOOLCHAIN_TARGET },
+      { .target = { .os = SPN_OS_WINDOWS, .abi = SPN_ABI_GNU }, .err = SPN_ERR_TOOLCHAIN_TARGET, .targets = { "x86_64-linux-gnu", "x86_64-freestanding-none" } },
+      { .target = { .abi = SPN_ABI_MUSL }, .err = SPN_ERR_TOOLCHAIN_TARGET, .targets = { "x86_64-linux-gnu", "x86_64-freestanding-none" } },
+      { .target = { .arch = SPN_ARCH_ARM64, .abi = SPN_ABI_GNU }, .err = SPN_ERR_TOOLCHAIN_TARGET, .targets = { "x86_64-linux-gnu", "x86_64-freestanding-none" } },
+    },
+  },
+  {
+    .name = "host_only_gcc_completes_host_arch_bare_metal",
+    .checks = {
+      { .target = { .os = SPN_OS_FREESTANDING }, .triple = { SPN_ARCH_X64, SPN_OS_FREESTANDING, SPN_ABI_BARE } },
+    },
+  },
+  {
+    .name = "abi_asked_only_when_list_reaches_os",
+    .targets = { TARGET_WASM },
+    .checks = {
+      { .target = { .os = SPN_OS_WINDOWS }, .err = SPN_ERR_TOOLCHAIN_TARGET },
     },
   },
   {
@@ -328,7 +342,7 @@ static const select_test_t select_tests [] = {
         .name = "A",
         .role = SPN_TOOLCHAIN_ROLE_SCRIPT,
         .target = TARGET_WIN_GNU,
-        .expect = { .err = SPN_ERR_TOOLCHAIN_SCRIPT_TARGET },
+        .expect = { .err = SPN_ERR_TOOLCHAIN_SCRIPT_TARGET, .targets = { "x86_64-linux-gnu", "x86_64-freestanding-none" } },
       },
     },
   },
@@ -364,7 +378,7 @@ static const select_test_t select_tests [] = {
       {
         .name = "A",
         .host = HOST_ARM_MACOS,
-        .expect = { .err = SPN_ERR_TOOLCHAIN_HOST },
+        .expect = { .err = SPN_ERR_TOOLCHAIN_HOST, .targets = { "aarch64-macos-apple" } },
       },
     },
   },
@@ -392,7 +406,7 @@ static const select_test_t select_tests [] = {
         .name = "A",
         .target = { SPN_ARCH_ARM64, SPN_OS_MACOS, SPN_ABI_APPLE },
         .host = HOST_ARM_MACOS,
-        .expect = { .err = SPN_ERR_TOOLCHAIN_HOST },
+        .expect = { .err = SPN_ERR_TOOLCHAIN_HOST, .targets = { "aarch64-macos-apple" } },
       },
     },
   },
@@ -448,14 +462,13 @@ static spn_triple_t pinned_target(spn_triple_t target, spn_triple_t host) {
   };
 }
 
-static sp_err_t check_target_error(sp_test_t* t, sp_mem_t mem, spn_event_t* err, spn_toolchain_info_t* toolchain, spn_triple_t target, spn_triple_t host) {
+static sp_err_t check_target_error(sp_test_t* t, sp_mem_t mem, spn_event_t* err, spn_toolchain_info_t* toolchain, spn_triple_t target, spn_triple_t host, const c8* const* expected) {
   sp_expect(t, fixture_triple_equal(err->err.toolchain.target, pinned_target(target, host)));
   sp_expect(t, fixture_triple_equal(err->err.toolchain.host, host));
 
   sp_da(sp_str_t) targets = err->err.toolchain.targets;
   if (sp_da_empty(toolchain->targets)) {
-    sp_must_eq(t, 1, sp_da_size(targets));
-    sp_expect_str_eq(t, targets[0], spn_triple_to_str(mem, host));
+    sp_must_strs_eq(t, targets, sp_da_size(targets), expected);
     return SP_OK;
   }
 
@@ -523,7 +536,7 @@ sp_test_each(select, complete, complete_test_t, complete_tests, .setup = spn_tes
         break;
       }
       default: {
-        if (check_target_error(t, mem, &errs[0], spn_toolchain_catalog_get(&catalog, sp_str_lit("A")), check.target, host)) return SP_ERR;
+        if (check_target_error(t, mem, &errs[0], spn_toolchain_catalog_get(&catalog, sp_str_lit("A")), check.target, host, check.targets)) return SP_ERR;
         break;
       }
     }
@@ -572,7 +585,7 @@ sp_test_each(select, resolve, select_test_t, select_tests, .setup = spn_test_ctx
       }
       spn_toolchain_info_t* named = spn_toolchain_catalog_get(&catalog, sp_str_view(query.name));
       if (named) {
-        if (check_target_error(t, mem, &errs[0], named, query.target, host)) return SP_ERR;
+        if (check_target_error(t, mem, &errs[0], named, query.target, host, query.expect.targets)) return SP_ERR;
       } else {
         sp_expect(t, fixture_triple_equal(toolchain->host, host));
         sp_expect(t, sp_da_empty(toolchain->targets));

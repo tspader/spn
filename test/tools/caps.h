@@ -12,10 +12,13 @@
 
 #if defined(SP_MACOS)
   #define SPN_TEST_TRIPLE SPN_TEST_ARCH "-macos-apple"
+  #define SPN_TEST_HOST_TARGETS SPN_TEST_ARCH "-macos"
 #elif defined(SP_WIN32)
   #define SPN_TEST_TRIPLE SPN_TEST_ARCH "-windows-gnu"
+  #define SPN_TEST_HOST_TARGETS SPN_TEST_ARCH "-windows"
 #else
   #define SPN_TEST_TRIPLE SPN_TEST_ARCH "-linux-gnu"
+  #define SPN_TEST_HOST_TARGETS SPN_TEST_ARCH "-linux", SPN_TEST_ARCH "-freestanding-none"
 #endif
 
 typedef struct {

@@ -454,6 +454,13 @@ static const test_t tests [] = {
     }
   },
   {
+    .name = "validate_toolchain_target_foreign_arch",
+    .manifest = "toolchain_target_arch",
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].target[0].arch" }
+    }
+  },
+  {
     .name = "validate_toolchain_url_without_sha",
     .manifest = "toolchain_no_sha",
     .issues = {

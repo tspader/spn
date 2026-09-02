@@ -29,21 +29,10 @@ typedef enum {
 } spn_ar_driver_t;
 
 typedef enum {
-  SPN_CC_CAP_TARGET_TRIPLE  = 1 << 0,
-  SPN_CC_CAP_CLANG_FRONTEND = 1 << 1,
-  SPN_CC_CAP_EXCLUDE_LIBS   = 1 << 2,
-  SPN_CC_CAP_NOLIBC         = 1 << 3,
-  SPN_CC_CAP_FREESTANDING   = 1 << 4,
-  SPN_CC_CAP_LLVM_TRIPLE    = 1 << 5,
-} spn_cc_cap_t;
-
-typedef enum {
   SPN_CC_DEPFILE_NONE,
   SPN_CC_DEPFILE_OPTIONAL,
   SPN_CC_DEPFILE_REQUIRED,
 } spn_cc_depfile_t;
-
-typedef u32 spn_cc_cap_set_t;
 
 typedef struct {
   sp_str_t name;

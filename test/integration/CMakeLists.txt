@@ -21,6 +21,7 @@ add_executable(integration
   ${SRC}/intern/intern.c
   ${SRC}/paths/paths.c
   ${UTIL}/str/str.c
+  ${SRC}/toolchain/toolchain.c
   ${SRC}/triple/triple.c
   main.c
   cli.c

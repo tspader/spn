@@ -62,7 +62,7 @@ spn_err_t spn_toolchain_catalog_init(spn_toolchain_catalog_t* catalog, sp_str_t 
         .abi = sp_opt_is_null(t->target[it].abi) ? SPN_ABI_NONE : sp_opt_get(t->target[it].abi),
       };
       spn_triple_t full = sp_zero;
-      if (!spn_triple_entry(partial, &full)) {
+      if (spn_triple_entry(partial, &full) != SPN_TRIPLE_ENTRY_OK) {
         return SPN_ERROR;
       }
       sp_da_push(toolchain.targets, full);

@@ -4,6 +4,7 @@
 #include "enum/enum.h"
 #include "error/error.h"
 #include "toolchain/catalog.h"
+#include "toolchain/toolchain.h"
 #include "triple/triple.h"
 
 SP_PRIVATE spn_triple_t pin_target(spn_toolchain_query_t query) {
@@ -28,9 +29,9 @@ SP_PRIVATE bool needs_abi(spn_toolchain_query_t query) {
   return count > 1 && is_cross(pinned, query.host);
 }
 
-SP_PRIVATE bool has_target(spn_toolchain_info_t* toolchain, spn_triple_t target) {
-  sp_da_for(toolchain->targets, it) {
-    spn_triple_t entry = toolchain->targets[it];
+SP_PRIVATE bool has_target(sp_da(spn_triple_t) targets, spn_triple_t target) {
+  sp_da_for(targets, it) {
+    spn_triple_t entry = targets[it];
     if (entry.arch == target.arch && entry.os == target.os && entry.abi == target.abi) {
       return true;
     }
@@ -38,23 +39,21 @@ SP_PRIVATE bool has_target(spn_toolchain_info_t* toolchain, spn_triple_t target)
   return false;
 }
 
-SP_PRIVATE spn_err_t complete(spn_toolchain_info_t* toolchain, spn_toolchain_query_t query, spn_triple_t* completed) {
+SP_PRIVATE bool has_match(sp_da(spn_triple_t) targets, spn_triple_t pattern) {
+  sp_da_for(targets, it) {
+    if (spn_triple_match(pattern, targets[it])) {
+      return true;
+    }
+  }
+  return false;
+}
+
+SP_PRIVATE spn_err_t complete(sp_da(spn_triple_t) targets, spn_toolchain_query_t query, spn_triple_t* completed) {
   *completed = sp_zero_s(spn_triple_t);
   spn_triple_t pinned = pin_target(query);
 
-  if (sp_da_empty(toolchain->targets)) {
-    if (pinned.arch != query.host.arch || pinned.os != query.host.os) {
-      return SPN_ERR_TOOLCHAIN_TARGET;
-    }
-    if (pinned.abi && pinned.abi != query.host.abi) {
-      return SPN_ERR_TOOLCHAIN_TARGET;
-    }
-    *completed = query.host;
-    return SPN_OK;
-  }
-
   if (pinned.abi) {
-    if (!has_target(toolchain, pinned)) {
+    if (!has_target(targets, pinned)) {
       return SPN_ERR_TOOLCHAIN_TARGET;
     }
     *completed = pinned;
@@ -82,7 +81,7 @@ SP_PRIVATE spn_err_t complete(spn_toolchain_info_t* toolchain, spn_toolchain_que
 
   sp_for(it, num) {
     spn_triple_t full = { pinned.arch, pinned.os, ordered[it] };
-    if (has_target(toolchain, full)) {
+    if (has_target(targets, full)) {
       *completed = full;
       return SPN_OK;
     }
@@ -90,16 +89,12 @@ SP_PRIVATE spn_err_t complete(spn_toolchain_info_t* toolchain, spn_toolchain_que
   return SPN_ERR_TOOLCHAIN_TARGET;
 }
 
-SP_PRIVATE sp_da(sp_str_t) render_targets(sp_mem_t mem, spn_toolchain_info_t* toolchain, spn_triple_t host) {
-  sp_da(sp_str_t) targets = sp_da_new(mem, sp_str_t);
-  if (sp_da_empty(toolchain->targets)) {
-    sp_da_push(targets, spn_triple_to_str(mem, host));
-    return targets;
+SP_PRIVATE sp_da(sp_str_t) render_targets(sp_mem_t mem, sp_da(spn_triple_t) targets) {
+  sp_da(sp_str_t) rendered = sp_da_new(mem, sp_str_t);
+  sp_da_for(targets, it) {
+    sp_da_push(rendered, spn_triple_to_str(mem, targets[it]));
   }
-  sp_da_for(toolchain->targets, it) {
-    sp_da_push(targets, spn_triple_to_str(mem, toolchain->targets[it]));
-  }
-  return targets;
+  return rendered;
 }
 
 SP_PRIVATE bool host_supported(spn_toolchain_info_t* toolchain, spn_triple_t host) {
@@ -127,9 +122,9 @@ spn_opt_artifact_t get_artifact(sp_da(spn_toolchain_host_t) hosts, spn_triple_t 
   return result;
 }
 
-SP_PRIVATE spn_err_t try_toolchain(spn_toolchain_info_t* toolchain, spn_toolchain_query_t query, spn_toolchain_resolution_t* resolution) {
+SP_PRIVATE spn_err_t try_toolchain(spn_toolchain_info_t* toolchain, sp_da(spn_triple_t) targets, spn_toolchain_query_t query, spn_toolchain_resolution_t* resolution) {
   spn_triple_t completed = sp_zero;
-  spn_err_t err = complete(toolchain, query, &completed);
+  spn_err_t err = complete(targets, query, &completed);
   if (err) {
     switch (query.role) {
       case SPN_TOOLCHAIN_ROLE_BUILD:  return err;
@@ -160,12 +155,12 @@ SP_PRIVATE spn_err_t try_toolchain(spn_toolchain_info_t* toolchain, spn_toolchai
   return SPN_OK;
 }
 
-SP_PRIVATE spn_err_t make_error(spn_err_t kind, spn_toolchain_catalog_t* catalog, spn_toolchain_info_t* toolchain, spn_toolchain_query_t query, sp_mem_t mem) {
+SP_PRIVATE spn_err_t make_error(spn_err_t kind, spn_toolchain_catalog_t* catalog, sp_da(spn_triple_t) targets, spn_toolchain_query_t query, sp_mem_t mem) {
   sp_da(sp_str_t) candidates = sp_da_new(mem, sp_str_t);
   sp_om_for(catalog->entries, it) {
     spn_toolchain_info_t* entry = sp_om_at(catalog->entries, it);
     spn_toolchain_resolution_t resolution = sp_zero;
-    if (!try_toolchain(entry, query, &resolution)) {
+    if (!try_toolchain(entry, spn_toolchain_targets(mem, entry, query.host), query, &resolution)) {
       sp_da_push(candidates, entry->name);
     }
   }
@@ -177,7 +172,7 @@ SP_PRIVATE spn_err_t make_error(spn_err_t kind, spn_toolchain_catalog_t* catalog
       .target = pin_target(query),
       .host = query.host,
       .candidates = candidates,
-      .targets = toolchain ? render_targets(mem, toolchain, query.host) : sp_da_new(mem, sp_str_t),
+      .targets = render_targets(mem, targets),
     },
   });
 }
@@ -210,7 +205,8 @@ spn_err_t spn_toolchain_select(spn_toolchain_catalog_t* catalog, spn_toolchain_q
       return make_abi_error(query, mem);
     }
     sp_om_for(catalog->entries, it) {
-      if (!try_toolchain(sp_om_at(catalog->entries, it), query, resolution)) {
+      spn_toolchain_info_t* entry = sp_om_at(catalog->entries, it);
+      if (!try_toolchain(entry, spn_toolchain_targets(mem, entry, query.host), query, resolution)) {
         return SPN_OK;
       }
     }
@@ -222,13 +218,14 @@ spn_err_t spn_toolchain_select(spn_toolchain_catalog_t* catalog, spn_toolchain_q
     return make_error(SPN_ERR_TOOLCHAIN_UNKNOWN, catalog, SP_NULLPTR, query, mem);
   }
 
-  if (!sp_da_empty(toolchain->targets) && needs_abi(query)) {
+  sp_da(spn_triple_t) targets = spn_toolchain_targets(mem, toolchain, query.host);
+  if (needs_abi(query) && has_match(targets, pin_target(query))) {
     return make_abi_error(query, mem);
   }
 
-  spn_err_t err = try_toolchain(toolchain, query, resolution);
+  spn_err_t err = try_toolchain(toolchain, targets, query, resolution);
   if (err) {
-    return make_error(err, catalog, toolchain, query, mem);
+    return make_error(err, catalog, targets, query, mem);
   }
   return SPN_OK;
 }
