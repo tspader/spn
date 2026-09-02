@@ -1024,15 +1024,6 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
           );
           break;
         }
-        case SPN_ERR_TOOLCHAIN_SCRIPT_TARGET: {
-          sp_tty_fmt(
-            &w,
-            "build scripts compile to {.yellow}, but toolchain {} can't target it",
-            sp_fmt_str(spn_triple_to_str(mem, event->err.toolchain.target)),
-            sp_fmt_str(colored_name(w.color, mem, event->err.toolchain.name))
-          );
-          break;
-        }
         case SPN_ERR_TOOLCHAIN_NONE: {
           sp_str_t target = spn_triple_to_str(mem, event->err.toolchain.target);
           sp_tty_fmt(
@@ -1435,12 +1426,13 @@ static void render_event_extra(sp_tty_t* w, spn_event_t* event) {
           sp_io_write_str(w->io, event->err.publish.output, SP_NULLPTR);
           break;
         }
-        case SPN_ERR_TOOLCHAIN_TARGET:
-        case SPN_ERR_TOOLCHAIN_SCRIPT_TARGET: {
+        case SPN_ERR_TOOLCHAIN_TARGET: {
+          sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
           sp_da_for(event->err.toolchain.targets, it) {
             sp_io_write_str(w->io, it ? sp_str_lit(", ") : sp_str_lit("it can target: "), SP_NULLPTR);
-            sp_tty_fmt(w, "{.yellow}", sp_fmt_str(event->err.toolchain.targets[it]));
+            sp_tty_fmt(w, "{.yellow}", sp_fmt_str(spn_triple_to_str(scratch.mem, event->err.toolchain.targets[it])));
           }
+          sp_mem_end_scratch(scratch);
           if (!sp_da_empty(event->err.toolchain.targets)) {
             sp_io_write_c8(w->io, '\n');
           }
@@ -1468,7 +1460,7 @@ static void render_event_extra(sp_tty_t* w, spn_event_t* event) {
         case SPN_ERR_TARGET_ABI: {
           sp_da_for(event->err.completion.candidates, it) {
             sp_io_write_str(w->io, it ? sp_str_lit(", ") : sp_str_lit("one of: "), SP_NULLPTR);
-            sp_tty_fmt(w, "{.green}", sp_fmt_str(event->err.completion.candidates[it]));
+            sp_tty_fmt(w, "{.green}", sp_fmt_str(spn_abi_to_str(event->err.completion.candidates[it])));
           }
           if (!sp_da_empty(event->err.completion.candidates)) {
             sp_io_write_c8(w->io, '\n');

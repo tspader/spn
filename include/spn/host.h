@@ -54,6 +54,7 @@ spn_arch_t spn_arch_from_str(sp_str_t str);
 spn_os_t spn_os_from_str(sp_str_t str);
 sp_str_t spn_os_to_str(spn_os_t os);
 spn_abi_t spn_abi_from_str(sp_str_t str);
+sp_str_t spn_abi_to_str(spn_abi_t abi);
 spn_mode_t spn_mode_from_str(sp_str_t str);
 spn_opt_level_t spn_opt_level_from_str(sp_str_t str);
 spn_sanitizer_t spn_sanitizer_from_str(sp_str_t str);

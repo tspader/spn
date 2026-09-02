@@ -13,7 +13,6 @@
     "toolchain_none": { "ref": "toolchain" },
     "toolchain_target": { "ref": "toolchain" },
     "target_abi": { "ref": "completion" },
-    "toolchain_script_target": { "ref": "toolchain" },
     "toolchain_host": { "ref": "toolchain" },
     "toolchain_fetch": { "ref": "artifact" },
     "toolchain_no_sha": { "ref": "artifact" },
@@ -180,14 +179,14 @@
         "target": { "metadata": { "extern": "triple" } },
         "host": { "metadata": { "extern": "triple" } },
         "candidates": { "elements": { "type": "string" } },
-        "targets": { "elements": { "type": "string" } }
+        "targets": { "elements": { "metadata": { "extern": "triple" } } }
       }
     },
     "completion": {
       "properties": {
         "target": { "metadata": { "extern": "triple" } },
         "host": { "metadata": { "extern": "triple" } },
-        "candidates": { "elements": { "type": "string" } }
+        "candidates": { "elements": { "metadata": { "extern": "abi" } } }
       }
     },
     "program": {
