@@ -1074,6 +1074,7 @@ static void validate_inline_toolchains(spn_toml_loader_t* ctx, const spn_cg_mani
 
     spn_toml_loader_push_index(ctx, it);
     if (sp_str_empty(t->name))     { spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, "name"); }
+    if (sp_str_equal_cstr(t->name, "auto")) { spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "name"); }
     if (sp_str_empty(t->compiler)) { spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, "compiler"); }
     if (sp_str_empty(t->linker))   { spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, "linker"); }
     if (sp_str_empty(t->archiver)) { spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, "archiver"); }

@@ -439,6 +439,13 @@ static const test_t tests [] = {
     }
   },
   {
+    .name = "validate_toolchain_name_auto",
+    .manifest = "toolchain_name_auto",
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].name" }
+    }
+  },
+  {
     .name = "validate_toolchain_target_abi",
     .manifest = "toolchain_target_abi",
     .issues = {

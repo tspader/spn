@@ -1,0 +1,10 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[[toolchain]]
+name = "auto"
+compiler = "cc"
+linker = "cc"
+archiver = "ar"
+driver = "gcc"
