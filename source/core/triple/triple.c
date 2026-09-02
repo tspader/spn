@@ -255,7 +255,7 @@ u32 spn_os_archs(spn_os_t os, const spn_arch_t** archs) {
   SP_UNREACHABLE_RETURN(0);
 }
 
-static bool os_has_arch(spn_os_t os, spn_arch_t arch) {
+bool spn_os_has_arch(spn_os_t os, spn_arch_t arch) {
   const spn_arch_t* archs = SP_NULLPTR;
   u32 count = spn_os_archs(os, &archs);
   sp_for(it, count) {
@@ -266,7 +266,7 @@ static bool os_has_arch(spn_os_t os, spn_arch_t arch) {
   return false;
 }
 
-static bool os_has_abi(spn_os_t os, spn_abi_t abi) {
+bool spn_os_has_abi(spn_os_t os, spn_abi_t abi) {
   const spn_abi_t* abis = SP_NULLPTR;
   u32 count = spn_os_abis(os, &abis);
   sp_for(it, count) {
@@ -285,12 +285,12 @@ spn_triple_entry_t spn_triple_entry(spn_triple_t partial, spn_triple_t* full) {
   if (!partial.os) {
     return SPN_TRIPLE_ENTRY_MISSING_OS;
   }
-  if (!os_has_arch(partial.os, partial.arch)) {
+  if (!spn_os_has_arch(partial.os, partial.arch)) {
     return SPN_TRIPLE_ENTRY_FOREIGN_ARCH;
   }
 
   if (partial.abi) {
-    if (!os_has_abi(partial.os, partial.abi)) {
+    if (!spn_os_has_abi(partial.os, partial.abi)) {
       return SPN_TRIPLE_ENTRY_FOREIGN_ABI;
     }
     *full = partial;

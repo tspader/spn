@@ -290,6 +290,24 @@ static const test_t tests [] = {
     .host = PROFILE_HOST_LINUX_GNU,
     .expect = { .err = SPN_ERR_PROFILE_UNDEFINED },
   },
+  {
+    .name = "foreign_arch_is_rejected",
+    .overrides = { .arch = SPN_ARCH_WASM32 },
+    .host = PROFILE_HOST_LINUX_GNU,
+    .expect = { .err = SPN_ERR_PROFILE_ARCH },
+  },
+  {
+    .name = "foreign_abi_is_rejected",
+    .overrides = { .os = SPN_OS_MACOS, .abi = SPN_ABI_GNU },
+    .host = PROFILE_HOST_LINUX_GNU,
+    .expect = { .err = SPN_ERR_PROFILE_ABI },
+  },
+  {
+    .name = "manifest_foreign_abi_is_rejected",
+    .profile = { .name = "default", .arch = SPN_ARCH_WASM32, .os = SPN_OS_WASI, .abi = SPN_ABI_GNU },
+    .host = PROFILE_HOST_LINUX_GNU,
+    .expect = { .err = SPN_ERR_PROFILE_ABI },
+  },
 };
 
 typedef struct {

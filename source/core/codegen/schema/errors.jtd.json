@@ -45,6 +45,8 @@
     "wasm_export_not_found": { "ref": "wasm" },
     "profile_invalid": { "ref": "profile" },
     "profile_undefined": { "ref": "profile" },
+    "profile_arch": { "ref": "profile" },
+    "profile_abi": { "ref": "profile" },
     "sanitizer_unsupported": { "ref": "sanitizer" },
     "sanitizer_static": { "ref": "sanitizer" },
     "compiler_feature_unsupported": { "ref": "compiler" },
@@ -212,7 +214,8 @@
     },
     "profile": {
       "properties": {
-        "name": { "type": "string" }
+        "name": { "type": "string" },
+        "target": { "metadata": { "extern": "triple" } }
       }
     },
     "sanitizer": {

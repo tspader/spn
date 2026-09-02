@@ -119,13 +119,13 @@ sp_test(profile, static_config_is_not_a_shared_demand) {
   });
 }
 
-sp_test(profile, target_without_toolchain) {
+sp_test(profile, target_with_foreign_arch) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/profile/override",
     .when.msvc_todo = true,
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", "x86_64-wasi" }, .rc = 1 } },
-      { .kind = ACTION_VERIFY_RESULT, .verify_result = { .err = SPN_ERR_TOOLCHAIN_NONE } },
+      { .kind = ACTION_VERIFY_RESULT, .verify_result = { .err = SPN_ERR_PROFILE_ARCH } },
     },
   });
 }

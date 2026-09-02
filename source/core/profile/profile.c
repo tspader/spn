@@ -266,14 +266,31 @@ spn_err_t spn_profile_resolve(spn_profile_table_t profiles, const spn_profile_ov
     merged.opt = merged.mode == SPN_MODE_RELEASE ? SPN_OPT_LEVEL_2 : SPN_OPT_LEVEL_0;
   }
 
-  spn_os_t os = target.os ? target.os : host.os;
+  spn_triple_t pinned = {
+    .arch = target.arch ? target.arch : host.arch,
+    .os = target.os ? target.os : host.os,
+    .abi = target.abi,
+  };
+  if (!spn_os_has_arch(pinned.os, pinned.arch)) {
+    return spn_err_emit(&spn, (spn_err_union_t) {
+      .kind = SPN_ERR_PROFILE_ARCH,
+      .profile = { .name = name, .target = pinned },
+    });
+  }
+  if (pinned.abi && !spn_os_has_abi(pinned.os, pinned.abi)) {
+    return spn_err_emit(&spn, (spn_err_union_t) {
+      .kind = SPN_ERR_PROFILE_ABI,
+      .profile = { .name = name, .target = pinned },
+    });
+  }
+
   *result = (spn_profile_info_t) {
     .name       = merged.name,
     .toolchain  = merged.toolchain,
-    .os         = os,
-    .arch       = target.arch ? target.arch : host.arch,
-    .abi        = target.abi,
-    .linkage    = resolve_linkage(merged.linkage, os, pkg),
+    .os         = pinned.os,
+    .arch       = pinned.arch,
+    .abi        = pinned.abi,
+    .linkage    = resolve_linkage(merged.linkage, pinned.os, pkg),
     .standard   = merged.standard,
     .mode       = merged.mode,
     .opt        = merged.opt,

@@ -682,6 +682,26 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
           );
           break;
         }
+        case SPN_ERR_PROFILE_ARCH: {
+          sp_tty_fmt(
+            &w,
+            "target {.yellow} isn't valid; {} doesn't run on {.red}",
+            sp_fmt_str(spn_triple_to_str(mem, event->err.profile.target)),
+            sp_fmt_str(spn_os_to_str(event->err.profile.target.os)),
+            sp_fmt_str(spn_arch_to_str(event->err.profile.target.arch))
+          );
+          break;
+        }
+        case SPN_ERR_PROFILE_ABI: {
+          sp_tty_fmt(
+            &w,
+            "target {.yellow} isn't valid; {} has no {.red} abi",
+            sp_fmt_str(spn_triple_to_str(mem, event->err.profile.target)),
+            sp_fmt_str(spn_os_to_str(event->err.profile.target.os)),
+            sp_fmt_str(spn_abi_to_str(event->err.profile.target.abi))
+          );
+          break;
+        }
         case SPN_ERR_SANITIZER_UNSUPPORTED: {
           if (event->err.sanitizer.supported) {
             sp_tty_fmt(
