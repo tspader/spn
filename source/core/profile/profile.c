@@ -16,7 +16,7 @@ sp_str_t spn_profile_build_dir(sp_mem_t mem, const spn_profile_info_t* profile) 
   return sp_fs_join_path(mem, spn_triple_to_str(mem, target), profile->name);
 }
 
-void overlay_profile(spn_profile_info_t* to, spn_profile_info_t* from) {
+static void overlay_profile(spn_profile_info_t* to, spn_profile_info_t* from) {
   if (!sp_str_empty(from->name)) {
     to->name = from->name;
   }
