@@ -159,6 +159,13 @@ static const resolve_test_t resolve_tests [] = {
     .expect = { .err = SPN_ERR_TARGET_ABI, .abis = { SPN_ABI_GNU, SPN_ABI_MSVC } },
   },
   {
+    .name = "auto_without_abis_rejects_unreachable_target",
+    .file = "auto.json",
+    .toolchain = "auto",
+    .target = { SPN_ARCH_WASM32, SPN_OS_LINUX },
+    .expect = { .err = SPN_ERR_TOOLCHAIN_NONE },
+  },
+  {
     .name = "unknown_name_lists_capable_toolchains",
     .file = "auto.json",
     .toolchain = "Z",

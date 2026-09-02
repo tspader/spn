@@ -89,9 +89,22 @@ static spn_err_t emit_abi(spn_toolchain_catalog_t* catalog, spn_toolchain_query_
   });
 }
 
+static bool reachable(spn_toolchain_catalog_t* catalog, spn_triple_t target) {
+  sp_om_for(catalog->entries, it) {
+    spn_toolchain_info_t* entry = sp_om_at(catalog->entries, it);
+    if (entry->support.kind != SPN_TOOLCHAIN_SUPPORT_NONE && reaches(entry, target)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 static spn_err_t select_auto(spn_toolchain_catalog_t* catalog, spn_toolchain_query_t query, spn_toolchain_selection_t* selection) {
   if (!query.abis.count) {
-    return emit_abi(catalog, query);
+    if (reachable(catalog, query.target)) {
+      return emit_abi(catalog, query);
+    }
+    return emit(SPN_ERR_TOOLCHAIN_NONE, catalog, query, SP_NULLPTR, SP_NULLPTR);
   }
 
   sp_om_for(catalog->entries, it) {
