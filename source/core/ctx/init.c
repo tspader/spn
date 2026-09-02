@@ -245,7 +245,8 @@ spn_ctx_t* spn_ctx_new(spn_wake_fn_t wake, void* wake_data) {
   ctx->host = spn_triple_host();
 
   sp_str_t builtins = sp_str((const c8*)toolchains_json, toolchains_json_size);
-  sp_assert(spn_toolchain_catalog_init(&ctx->catalog, builtins, ctx->heap) == SPN_OK);
+  spn_toolchain_catalog_init(&ctx->catalog, ctx->host, ctx->heap);
+  sp_assert(spn_toolchain_catalog_load(&ctx->catalog, builtins) == SPN_OK);
 
   ctx->paths.cwd = sp_fs_get_cwd(ctx->heap);
   ctx->paths.patches = sp_env_get(ctx->env, sp_str_lit("SPN_PATCH_DIR"));

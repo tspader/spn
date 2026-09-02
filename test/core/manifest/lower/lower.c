@@ -71,7 +71,6 @@ typedef struct {
 
 typedef struct {
   const c8* name;
-  bool remote;
   const c8* url;
   const c8* sha256;
   const c8* mirrors;
@@ -634,7 +633,6 @@ static const test_t tests [] = {
     .toolchains = {
       {
         .name = "zig",
-        .remote = true,
         .url = "https://tc",
         .sha256 = "deadbeef",
         .mirrors = "https://mirrors",
@@ -1287,7 +1285,6 @@ sp_test_each(lower, cases, test_t, tests) {
 
     spn_toolchain_info_t* tc = sp_str_om_get(pkg.toolchains, sp_str_view(expected.name));
     sp_must(t, tc);
-    sp_expect_eq(t, expected.remote, tc->source == SPN_TOOLCHAIN_SOURCE_DISTRIBUTION);
 
     if (expected.url)      sp_expect_str_eq_c(t, tc->hosts[0].artifact.url, expected.url);
     if (expected.sha256)   sp_expect_str_eq_c(t, tc->hosts[0].artifact.sha256, expected.sha256);

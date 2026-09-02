@@ -128,7 +128,6 @@ add_executable(core
   toolchain/provision.c
   toolchain/select.c
   toolchain/sha256.c
-  toolchain/targets.c
   toolchain/toolchain.c
   unit/harness.c
   unit/walk.c
@@ -275,7 +274,6 @@ set_source_files_properties(
   toolchain/provision.c
   toolchain/select.c
   toolchain/sha256.c
-  toolchain/targets.c
   toolchain/toolchain.c
   PROPERTIES COMPILE_DEFINITIONS "TOOLCHAINS_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/toolchain/toolchains\"")
 target_link_libraries(core PRIVATE yyjson vmlib blake3)

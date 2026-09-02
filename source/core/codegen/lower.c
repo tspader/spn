@@ -321,14 +321,6 @@ static void lower_toolchains(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg
         },
       }));
     }
-    toolchain.source = SPN_TOOLCHAIN_SOURCE_LOCAL;
-    sp_da_for(toolchain.hosts, at) {
-      if (!sp_str_empty(toolchain.hosts[at].artifact.url)) {
-        toolchain.source = SPN_TOOLCHAIN_SOURCE_DISTRIBUTION;
-        break;
-      }
-    }
-
     toolchain.targets = sp_da_new(ctx->mem, spn_triple_t);
     sp_da_for(t->target, it) {
       spn_triple_t partial = lower_triple(&t->target[it]);

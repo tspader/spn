@@ -43,17 +43,21 @@ typedef struct {
   sp_str_t mirror_list;
 } spn_artifact_t;
 
-typedef sp_opt(spn_artifact_t) spn_opt_artifact_t;
-
-typedef enum {
-  SPN_TOOLCHAIN_SOURCE_LOCAL,
-  SPN_TOOLCHAIN_SOURCE_DISTRIBUTION,
-} spn_toolchain_source_t;
-
 typedef struct {
   spn_triple_t triple;
   spn_artifact_t artifact;
 } spn_toolchain_host_t;
+
+typedef enum {
+  SPN_TOOLCHAIN_SUPPORT_NONE,
+  SPN_TOOLCHAIN_SUPPORT_LOCAL,
+  SPN_TOOLCHAIN_SUPPORT_ARTIFACT,
+} spn_toolchain_support_kind_t;
+
+typedef struct {
+  spn_toolchain_support_kind_t kind;
+  spn_artifact_t artifact;
+} spn_toolchain_support_t;
 
 typedef struct {
   sp_str_t name;
@@ -63,13 +67,15 @@ typedef struct {
   spn_toolchain_launcher_t cxx;
   spn_toolchain_launcher_t linker;
   spn_toolchain_launcher_t archiver;
-  spn_toolchain_source_t source;
   sp_da(spn_toolchain_host_t) hosts;
   sp_da(spn_triple_t) targets;
+  spn_toolchain_support_t support;
 } spn_toolchain_info_t;
 
 // Entries preserve declaration order; auto-selection takes the first match.
 struct spn_toolchain_catalog_t {
+  sp_mem_t mem;
+  spn_triple_t host;
   sp_str_om(spn_toolchain_info_t) entries;
 };
 

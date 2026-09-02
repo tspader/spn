@@ -285,17 +285,12 @@ sp_test_each(provision, store, provision_test_t, tests, .setup = spn_test_ctx_se
     }
 
     spn_toolchain_info_t toolchain = fixture_local_toolchain(name, name);
-    spn_opt_artifact_t artifact = sp_zero;
-    if (!it->local) {
-      toolchain.source = SPN_TOOLCHAIN_SOURCE_DISTRIBUTION;
-      sp_opt_set(artifact, ((spn_artifact_t) {
-        .url = url,
-        .sha256 = artifact_sha,
-      }));
-    }
+    toolchain.support = it->local
+      ? (spn_toolchain_support_t) { .kind = SPN_TOOLCHAIN_SUPPORT_LOCAL }
+      : (spn_toolchain_support_t) { .kind = SPN_TOOLCHAIN_SUPPORT_ARTIFACT, .artifact = { .url = url, .sha256 = artifact_sha } };
 
     roots[at] = sp_str_lit("sentinel");
-    spn_err_t err = spn_toolchain_provision(&store, &toolchain, artifact, &roots[at]);
+    spn_err_t err = spn_toolchain_provision(&store, &toolchain, &roots[at]);
     sp_must_eq(t, (u32)it->expect.kind, (u32)err);
     if (err) {
       sp_da(spn_event_t) errs = spn_test_drain_errs(mem);

@@ -137,15 +137,22 @@ SP_PRIVATE spn_err_t spn_toolchain_provision_fill(spn_toolchain_store_t* store, 
   return SPN_OK;
 }
 
-spn_err_t spn_toolchain_provision(spn_toolchain_store_t* store, spn_toolchain_info_t* toolchain, spn_opt_artifact_t selected, sp_str_t* root) {
+spn_err_t spn_toolchain_provision(spn_toolchain_store_t* store, spn_toolchain_info_t* toolchain, sp_str_t* root) {
   *root = sp_str_lit("");
-  if (toolchain->source == SPN_TOOLCHAIN_SOURCE_LOCAL) {
-    sp_assert(sp_opt_is_null(selected));
-    return SPN_OK;
+  spn_artifact_t artifact = sp_zero;
+  switch (toolchain->support.kind) {
+    case SPN_TOOLCHAIN_SUPPORT_LOCAL: {
+      return SPN_OK;
+    }
+    case SPN_TOOLCHAIN_SUPPORT_ARTIFACT: {
+      artifact = toolchain->support.artifact;
+      break;
+    }
+    case SPN_TOOLCHAIN_SUPPORT_NONE: {
+      sp_unreachable_case();
+    }
   }
 
-  sp_assert(!sp_opt_is_null(selected));
-  spn_artifact_t artifact = sp_opt_get(selected);
   if (sp_str_empty(artifact.sha256)) {
     return spn_err_emit(&spn, (spn_err_union_t) {
       .kind = SPN_ERR_TOOLCHAIN_NO_SHA,

@@ -25,7 +25,6 @@ static const parse_test_t tests [] = {
           .name = "A",
           .version = "1.0.0",
           .driver = SPN_CC_DRIVER_CLANG,
-          .source = SPN_TOOLCHAIN_SOURCE_DISTRIBUTION,
           .compiler = { .program = "A", .args = { "cc" } },
           .cxx = { .program = "A", .args = { "c++" } },
           .linker = { .program = "A", .args = { "cc" } },
@@ -80,7 +79,6 @@ static const parse_test_t tests [] = {
           .name = "A",
           .version = "",
           .driver = SPN_CC_DRIVER_GCC,
-          .source = SPN_TOOLCHAIN_SOURCE_LOCAL,
           .compiler = { .program = "A" },
           .hosts = {
             {
@@ -93,7 +91,6 @@ static const parse_test_t tests [] = {
         {
           .name = "B",
           .driver = SPN_CC_DRIVER_GCC,
-          .source = SPN_TOOLCHAIN_SOURCE_LOCAL,
           .compiler = { .program = "B" },
         },
       },
@@ -144,7 +141,8 @@ sp_test_each(parse, catalog, parse_test_t, tests) {
   if (fixture_read_json(t, it->file, &json)) return SP_ERR;
 
   spn_toolchain_catalog_t catalog = sp_zero;
-  sp_must_eq(t, (u32)it->expect.err, (u32)spn_toolchain_catalog_init(&catalog, json, sp_test_arena(t)));
+  spn_toolchain_catalog_init(&catalog, (spn_triple_t) HOST_X64_LINUX, sp_test_arena(t));
+  sp_must_eq(t, (u32)it->expect.err, (u32)spn_toolchain_catalog_load(&catalog, json));
   if (it->expect.err) {
     return SP_OK;
   }
@@ -156,7 +154,7 @@ sp_test_each(parse, catalog, parse_test_t, tests) {
     if (!toolchain.name) {
       break;
     }
-    if (fixture_check_entry(t, spn_toolchain_catalog_get(&catalog, sp_str_view(toolchain.name)), toolchain)) return SP_ERR;
+    if (fixture_check_entry(t, spn_toolchain_catalog_get(&catalog, sp_cstr_as_str(toolchain.name)), toolchain)) return SP_ERR;
   }
 
   return SP_OK;

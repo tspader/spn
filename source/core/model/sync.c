@@ -56,10 +56,19 @@ static spn_err_t setup_toolchain_unit(spn_toolchain_store_t* store, spn_toolchai
 
   bool cached = true;
   sp_str_t url = sp_zero;
-  if (toolchain->source == SPN_TOOLCHAIN_SOURCE_DISTRIBUTION) {
-    spn_artifact_t artifact = sp_opt_get(unit->artifact);
-    url = spn_artifact_resolve_url(spn.mem, artifact, store->mirror);
-    cached = sp_fs_is_dir(spn_toolchain_store_path(store, artifact));
+  switch (toolchain->support.kind) {
+    case SPN_TOOLCHAIN_SUPPORT_LOCAL: {
+      break;
+    }
+    case SPN_TOOLCHAIN_SUPPORT_ARTIFACT: {
+      spn_artifact_t artifact = toolchain->support.artifact;
+      url = spn_artifact_resolve_url(spn.mem, artifact, store->mirror);
+      cached = sp_fs_is_dir(spn_toolchain_store_path(store, artifact));
+      break;
+    }
+    case SPN_TOOLCHAIN_SUPPORT_NONE: {
+      sp_unreachable_case();
+    }
   }
 
   if (!cached) {
@@ -71,7 +80,7 @@ static spn_err_t setup_toolchain_unit(spn_toolchain_store_t* store, spn_toolchai
       }});
   }
 
-  spn_try(spn_toolchain_provision(store, toolchain, unit->artifact, &unit->root));
+  spn_try(spn_toolchain_provision(store, toolchain, &unit->root));
 
   spn_event_buffer_push(spn.events, (spn_event_t){
     .kind = SPN_EVENT_SYNC_PACKAGE,
@@ -102,15 +111,18 @@ static spn_err_t setup_toolchain_unit(spn_toolchain_store_t* store, spn_toolchai
     unit->cc.archiver = spn_toolchain_launcher_with_root(spn.mem, toolchain->archiver, root);
   }
 
-  switch (toolchain->source) {
-    case SPN_TOOLCHAIN_SOURCE_LOCAL: {
+  switch (toolchain->support.kind) {
+    case SPN_TOOLCHAIN_SUPPORT_LOCAL: {
       spn_try(spn_toolchain_probe(&unit->cc, spn_probe_split_path(spn.mem, sp_env_get_path(spn.env)), &store->probes, spn.mem, &unit->identity));
       spn_probe_cache_flush(&store->probes);
       break;
     }
-    case SPN_TOOLCHAIN_SOURCE_DISTRIBUTION: {
+    case SPN_TOOLCHAIN_SUPPORT_ARTIFACT: {
       unit->version = toolchain->version;
       break;
+    }
+    case SPN_TOOLCHAIN_SUPPORT_NONE: {
+      sp_unreachable_case();
     }
   }
 

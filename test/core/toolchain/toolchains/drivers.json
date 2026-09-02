@@ -1,0 +1,32 @@
+{
+  "toolchain": [
+    {
+      "name": "A",
+      "driver": "gcc",
+      "compiler": { "program": "A" },
+      "linker":   { "program": "A" },
+      "archiver": { "program": "ar" }
+    },
+    {
+      "name": "B",
+      "driver": "clang",
+      "compiler": { "program": "B" },
+      "linker":   { "program": "B" },
+      "archiver": { "program": "ar" }
+    },
+    {
+      "name": "C",
+      "driver": "msvc",
+      "compiler": { "program": "cl" },
+      "linker":   { "program": "cl" },
+      "archiver": { "program": "lib" }
+    },
+    {
+      "name": "D",
+      "driver": "zig",
+      "compiler": { "program": "D", "args": ["cc"] },
+      "linker":   { "program": "D", "args": ["cc"] },
+      "archiver": { "program": "D", "args": ["ar"] }
+    }
+  ]
+}
