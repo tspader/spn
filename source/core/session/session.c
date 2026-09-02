@@ -126,12 +126,16 @@ spn_err_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem, spn_p
     }
   }
 
-  spn_build_config_t metaprogram = spn_build_config_metaprogram();
+  spn_profile_info_t metaprogram = spn_build_metaprogram_profile();
   spn_toolchain_selection_t script = sp_zero;
-  spn_try(spn_toolchain_select(&ctx->catalog, spn_profile_query(&metaprogram.profile, host), &script));
+  spn_try(spn_toolchain_select(&ctx->catalog, spn_profile_query(&metaprogram, host), &script));
 
-  spn_try(spn_build_add(s, spn_build_config_target(s->profile), target.toolchain, &s->units.target));
-  spn_try(spn_build_add(s, metaprogram, script.toolchain, &s->units.metaprogram));
+  spn_path_t target_root = spn_path_join(s->mem, s->paths.build, spn_profile_build_dir(s->mem, &s->profile));
+  spn_try(spn_build_add(s, s->profile, target_root, target.toolchain, &s->units.target));
+
+  spn_triple_t metaprogram_triple = { metaprogram.arch, metaprogram.os, metaprogram.abi };
+  spn_path_t metaprogram_root = spn_path_join(s->mem, s->paths.build, spn_triple_to_str(s->mem, metaprogram_triple));
+  spn_try(spn_build_add(s, metaprogram, metaprogram_root, script.toolchain, &s->units.metaprogram));
   sp_da_push(s->units.metaprogram->include, spn_path_join(s->mem, spn_path_from_root(SPN_PATH_ROOT_RUNTIME), sp_str_lit("include")));
 
   spn_path_t log_path = spn_path_join(s->mem, s->units.target->paths.root, sp_str_lit(".spn/build.jsonl"));

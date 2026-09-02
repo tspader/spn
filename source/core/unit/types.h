@@ -14,16 +14,6 @@
 #include "target/types.h"
 #include "external/wasm/types.h"
 
-typedef enum {
-  SPN_BUILD_ROLE_TARGET,
-  SPN_BUILD_ROLE_METAPROGRAM,
-} spn_build_role_t;
-
-typedef struct {
-  spn_profile_info_t profile;
-  spn_build_role_t role;
-} spn_build_config_t;
-
 struct spn_build_unit_t {
   spn_build_id_t id;
   spn_profile_info_t profile;
