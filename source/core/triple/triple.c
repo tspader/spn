@@ -69,6 +69,14 @@ spn_err_t spn_triple_parse(sp_str_t str, spn_triple_t* triple) {
   return SPN_OK;
 }
 
+spn_err_t spn_triple_parse_host(sp_str_t str, spn_triple_t* triple) {
+  spn_try(spn_triple_parse(str, triple));
+  if (!triple->os) {
+    return SPN_ERR_TRIPLE_INVALID;
+  }
+  return SPN_OK;
+}
+
 sp_str_t spn_triple_to_str(sp_mem_t mem, spn_triple_t triple) {
   sp_str_t arch = spn_arch_to_str(triple.arch);
   sp_str_t os = spn_os_to_str(triple.os);

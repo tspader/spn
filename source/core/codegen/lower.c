@@ -312,8 +312,17 @@ static void lower_toolchains(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg
 
     toolchain.hosts = sp_da_new(ctx->mem, spn_toolchain_host_t);
     sp_da_for(t->host, it) {
+      spn_triple_t host = sp_zero;
+      if (spn_triple_parse_host(t->host[it].key, &host)) {
+        spn_toml_loader_push_key(ctx, "toolchain");
+        spn_toml_loader_push_index(ctx, n);
+        spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "host");
+        spn_toml_loader_pop(ctx);
+        spn_toml_loader_pop(ctx);
+        continue;
+      }
       sp_da_push(toolchain.hosts, ((spn_toolchain_host_t) {
-        .triple = spn_triple_from_str(t->host[it].key),
+        .triple = host,
         .artifact = {
           .url = t->host[it].value.url,
           .sha256 = t->host[it].value.sha256,
@@ -1082,10 +1091,6 @@ static void validate_inline_toolchains(spn_toml_loader_t* ctx, const spn_cg_mani
       spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, "driver");
     }
     sp_da_for(t->host, h) {
-      spn_triple_t host_triple = sp_zero;
-      if (spn_triple_parse(t->host[h].key, &host_triple) || !host_triple.os) {
-        spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "host");
-      }
       bool url = !sp_str_empty(t->host[h].value.url);
       bool sha = !sp_str_empty(t->host[h].value.sha256);
       if (url && !sha) {

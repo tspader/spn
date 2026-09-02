@@ -351,6 +351,32 @@ sp_test_each(triple, entry, entry_t, entry_tests) {
   return SP_OK;
 }
 
+typedef struct {
+  const c8* name;
+  const c8* str;
+  struct {
+    spn_err_t err;
+    spn_triple_t triple;
+  } expect;
+} parse_host_t;
+
+static const parse_host_t parse_host_tests [] = {
+  { "arch_and_os",     "x86_64-linux",     { .triple = { SPN_ARCH_X64, SPN_OS_LINUX } } },
+  { "abi_is_optional", "x86_64-linux-gnu", { .triple = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU } } },
+  { "os_is_required",  "x86_64",           { .err = SPN_ERR_TRIPLE_INVALID } },
+  { "unknown_arch",    "x86-linux",        { .err = SPN_ERR_TRIPLE_INVALID } },
+  { "unknown_os",      "x86_64-plan9",     { .err = SPN_ERR_TRIPLE_INVALID } },
+};
+
+sp_test_each(triple, parse_host, parse_host_t, parse_host_tests) {
+  spn_triple_t triple = sp_zero;
+  spn_err_t err = spn_triple_parse_host(sp_cstr_as_str(it->str), &triple);
+  sp_expect_eq(t, (u32)it->expect.err, (u32)err);
+  if (!err) {
+    sp_expect(t, spn_triple_equal(it->expect.triple, triple));
+  }
+  return SP_OK;
+}
 
 #define TRIPLE_MAX_ABIS 3
 

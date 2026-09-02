@@ -87,7 +87,7 @@ spn_err_t spn_toolchain_catalog_load(spn_toolchain_catalog_t* catalog, sp_str_t 
     toolchain.hosts = sp_da_new(catalog->mem, spn_toolchain_host_t);
     sp_da_for(t->host, it) {
       spn_triple_t host_triple = sp_zero;
-      if (spn_triple_parse(t->host[it].key, &host_triple) || !host_triple.os) {
+      if (spn_triple_parse_host(t->host[it].key, &host_triple)) {
         return SPN_ERROR;
       }
       sp_da_push(toolchain.hosts, ((spn_toolchain_host_t) {
