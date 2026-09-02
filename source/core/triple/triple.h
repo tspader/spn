@@ -25,6 +25,7 @@ u32 spn_os_archs(spn_os_t os, const spn_arch_t** archs);
 spn_triple_entry_t spn_triple_entry(spn_triple_t partial, spn_triple_t* full);
 spn_triple_t spn_triple_merge(spn_triple_t base, spn_triple_t partial);
 bool spn_triple_match(spn_triple_t entry, spn_triple_t target);
+bool spn_triple_equal(spn_triple_t a, spn_triple_t b);
 sp_str_t spn_triple_lib_file_name(sp_mem_t mem, spn_triple_t triple, sp_str_t name, sp_os_lib_kind_t kind);
 sp_str_t spn_triple_exe_file_name(sp_mem_t mem, spn_triple_t triple, sp_str_t name);
 
