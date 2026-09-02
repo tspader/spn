@@ -100,9 +100,7 @@ spn_err_t spn_toolchain_catalog_load(spn_toolchain_catalog_t* catalog, sp_str_t 
       }));
     }
 
-    if (!sp_da_empty(t->target)) {
-      toolchain.targets = sp_da_new(catalog->mem, spn_triple_t);
-    }
+    toolchain.targets = sp_da_new(catalog->mem, spn_triple_t);
     sp_da_for(t->target, it) {
       spn_triple_t partial = {
         .arch = sp_opt_is_null(t->target[it].arch) ? SPN_ARCH_NONE : sp_opt_get(t->target[it].arch),
