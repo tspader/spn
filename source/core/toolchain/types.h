@@ -79,6 +79,22 @@ struct spn_toolchain_catalog_t {
   sp_str_om(spn_toolchain_info_t) entries;
 };
 
+typedef struct {
+  spn_abi_t items [SPN_ABI_BARE + 1];
+  u32 count;
+} spn_abi_list_t;
+
+typedef struct {
+  sp_str_t name;
+  spn_triple_t target;
+  spn_abi_list_t abis;
+} spn_toolchain_query_t;
+
+typedef struct {
+  spn_toolchain_info_t* toolchain;
+  spn_triple_t triple;
+} spn_toolchain_selection_t;
+
 typedef spn_err_t (*spn_fetch_fn)(sp_str_t url, sp_str_t dest, void* user_data);
 
 typedef struct {
