@@ -4,10 +4,12 @@
 #include "intern/intern.h"
 #include "profile/profile.h"
 #include "pkg/types.h"
-#include "toolchain/catalog.h"
-#include "toolchain/select.h"
+#include "target/types.h"
+#include "triple/triple.h"
 
 sp_test_suite(profile, .serial = true);
+
+#define PROFILE_MAX_ABIS 3
 
 #define PROFILE_HOST_LINUX_GNU  { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU }
 #define PROFILE_HOST_LINUX_MUSL { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL }
@@ -29,7 +31,6 @@ typedef struct {
   spn_triple_t target;
   spn_linkage_t linkage;
   const c8* toolchain;
-  const c8* selected;
   bool targeted;
 } expect_t;
 
@@ -40,53 +41,48 @@ typedef struct {
   profile_desc_t overrides;
   spn_triple_t host;
   bool shared_demand;
+  spn_abi_t abi;
   expect_t expect;
 } test_t;
 
 static const test_t tests [] = {
   {
-    .name = "default_is_musl_static",
+    .name = "default_pins_to_host",
     .host = PROFILE_HOST_LINUX_GNU,
+    .abi = SPN_ABI_MUSL,
     .expect = {
-      .target = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL },
+      .target = { SPN_ARCH_X64, SPN_OS_LINUX },
       .linkage = SPN_LIB_KIND_STATIC,
       .toolchain = "auto",
-      .selected = "zig",
     },
   },
   {
-    .name = "shared_linkage_defaults_to_gnu",
+    .name = "explicit_shared_is_kept",
     .profile = { .name = "default", .linkage = SPN_LIB_KIND_SHARED },
     .host = PROFILE_HOST_LINUX_GNU,
+    .abi = SPN_ABI_GNU,
     .expect = {
-      .target = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU },
+      .target = { SPN_ARCH_X64, SPN_OS_LINUX },
       .linkage = SPN_LIB_KIND_SHARED,
     },
   },
   {
-    .name = "static_linkage_defaults_to_musl",
+    .name = "explicit_static_is_kept",
     .profile = { .name = "default", .linkage = SPN_LIB_KIND_STATIC },
     .host = PROFILE_HOST_LINUX_GNU,
+    .abi = SPN_ABI_MUSL,
     .expect = {
-      .target = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL },
+      .target = { SPN_ARCH_X64, SPN_OS_LINUX },
       .linkage = SPN_LIB_KIND_STATIC,
     },
   },
   {
-    .name = "shared_demand_defaults_to_gnu",
+    .name = "shared_demand_defaults_to_shared",
     .host = PROFILE_HOST_LINUX_GNU,
     .shared_demand = true,
+    .abi = SPN_ABI_GNU,
     .expect = {
-      .target = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU },
-      .linkage = SPN_LIB_KIND_SHARED,
-    },
-  },
-  {
-    .name = "shared_demand_on_musl_host_prefers_musl",
-    .host = PROFILE_HOST_LINUX_MUSL,
-    .shared_demand = true,
-    .expect = {
-      .target = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL },
+      .target = { SPN_ARCH_X64, SPN_OS_LINUX },
       .linkage = SPN_LIB_KIND_SHARED,
     },
   },
@@ -95,8 +91,9 @@ static const test_t tests [] = {
     .profile = { .name = "default", .linkage = SPN_LIB_KIND_STATIC },
     .host = PROFILE_HOST_LINUX_GNU,
     .shared_demand = true,
+    .abi = SPN_ABI_MUSL,
     .expect = {
-      .target = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL },
+      .target = { SPN_ARCH_X64, SPN_OS_LINUX },
       .linkage = SPN_LIB_KIND_STATIC,
     },
   },
@@ -112,7 +109,7 @@ static const test_t tests [] = {
     },
   },
   {
-    .name = "explicit_gnu_defaults_to_shared",
+    .name = "gnu_defaults_to_shared",
     .overrides = { .abi = SPN_ABI_GNU },
     .host = PROFILE_HOST_LINUX_GNU,
     .expect = {
@@ -122,7 +119,7 @@ static const test_t tests [] = {
     },
   },
   {
-    .name = "explicit_musl_defaults_to_static",
+    .name = "musl_defaults_to_static",
     .overrides = { .abi = SPN_ABI_MUSL },
     .host = PROFILE_HOST_LINUX_GNU,
     .expect = {
@@ -154,70 +151,19 @@ static const test_t tests [] = {
     },
   },
   {
-    .name = "windows_host_defaults_to_gnu",
-    .host = PROFILE_HOST_WIN_MSVC,
-    .expect = {
-      .target = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU },
-      .linkage = SPN_LIB_KIND_SHARED,
-      .selected = "zig",
-    },
-  },
-  {
-    .name = "windows_host_shared_demand_defaults_to_gnu",
-    .host = PROFILE_HOST_WIN_MSVC,
-    .shared_demand = true,
-    .expect = {
-      .target = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU },
-      .linkage = SPN_LIB_KIND_SHARED,
-    },
-  },
-  {
-    .name = "macos_host_uses_apple_abi",
-    .host = PROFILE_HOST_ARM_MACOS,
-    .expect = {
-      .target = { SPN_ARCH_ARM64, SPN_OS_MACOS, SPN_ABI_APPLE },
-      .linkage = SPN_LIB_KIND_SHARED,
-    },
-  },
-  {
-    .name = "wasi_target_uses_musl_abi",
-    .overrides = { .arch = SPN_ARCH_WASM32, .os = SPN_OS_WASI },
-    .host = PROFILE_HOST_LINUX_GNU,
-    .expect = {
-      .target = { SPN_ARCH_WASM32, SPN_OS_WASI, SPN_ABI_MUSL },
-      .linkage = SPN_LIB_KIND_STATIC,
-      .targeted = true,
-    },
-  },
-  {
     .name = "freestanding_defaults_to_static",
     .overrides = { .arch = SPN_ARCH_ARM64, .os = SPN_OS_FREESTANDING },
     .host = PROFILE_HOST_LINUX_GNU,
     .shared_demand = true,
+    .abi = SPN_ABI_BARE,
     .expect = {
-      .target = { SPN_ARCH_ARM64, SPN_OS_FREESTANDING, SPN_ABI_BARE },
+      .target = { SPN_ARCH_ARM64, SPN_OS_FREESTANDING },
       .linkage = SPN_LIB_KIND_STATIC,
       .targeted = true,
     },
   },
   {
-    .name = "macos_target_uses_apple_abi",
-    .overrides = { .arch = SPN_ARCH_ARM64, .os = SPN_OS_MACOS },
-    .host = PROFILE_HOST_LINUX_GNU,
-    .expect = {
-      .target = { SPN_ARCH_ARM64, SPN_OS_MACOS, SPN_ABI_APPLE },
-      .linkage = SPN_LIB_KIND_SHARED,
-      .targeted = true,
-    },
-  },
-  {
-    .name = "cross_windows_requires_abi",
-    .overrides = { .os = SPN_OS_WINDOWS },
-    .host = PROFILE_HOST_LINUX_GNU,
-    .expect = { .err = SPN_ERR_TARGET_ABI },
-  },
-  {
-    .name = "cross_windows_with_abi",
+    .name = "override_os_keeps_host_arch",
     .overrides = { .os = SPN_OS_WINDOWS, .abi = SPN_ABI_GNU },
     .host = PROFILE_HOST_LINUX_GNU,
     .expect = {
@@ -227,19 +173,7 @@ static const test_t tests [] = {
     },
   },
   {
-    .name = "cross_linux_requires_abi",
-    .overrides = { .os = SPN_OS_LINUX },
-    .host = PROFILE_HOST_ARM_MACOS,
-    .expect = { .err = SPN_ERR_TARGET_ABI },
-  },
-  {
-    .name = "cross_arch_requires_abi",
-    .overrides = { .arch = SPN_ARCH_ARM64 },
-    .host = PROFILE_HOST_LINUX_GNU,
-    .expect = { .err = SPN_ERR_TARGET_ABI },
-  },
-  {
-    .name = "cross_arch_with_abi",
+    .name = "override_arch_keeps_host_os",
     .overrides = { .arch = SPN_ARCH_ARM64, .abi = SPN_ABI_MUSL },
     .host = PROFILE_HOST_LINUX_GNU,
     .expect = {
@@ -249,7 +183,7 @@ static const test_t tests [] = {
     },
   },
   {
-    .name = "cross_linux_with_abi",
+    .name = "override_os_pins_foreign_host_arch",
     .overrides = { .os = SPN_OS_LINUX, .abi = SPN_ABI_MUSL },
     .host = PROFILE_HOST_ARM_MACOS,
     .expect = {
@@ -259,61 +193,26 @@ static const test_t tests [] = {
     },
   },
   {
-    .name = "explicit_abi_wins",
-    .overrides = { .os = SPN_OS_WINDOWS, .abi = SPN_ABI_MSVC },
-    .host = PROFILE_HOST_WIN_MSVC,
-    .expect = {
-      .target = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MSVC },
-      .linkage = SPN_LIB_KIND_SHARED,
-      .selected = "msvc",
-      .targeted = true,
-    },
-  },
-  {
-    .name = "msvc_completes_abi_from_target_list",
-    .overrides = { .toolchain = "msvc" },
-    .host = PROFILE_HOST_WIN_GNU,
-    .expect = {
-      .target = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MSVC },
-      .linkage = SPN_LIB_KIND_SHARED,
-      .toolchain = "msvc",
-      .selected = "msvc",
-    },
-  },
-  {
-    .name = "msvc_cant_target_linux_host",
-    .overrides = { .toolchain = "msvc" },
-    .host = PROFILE_HOST_LINUX_GNU,
-    .expect = { .err = SPN_ERR_TOOLCHAIN_TARGET },
-  },
-  {
-    .name = "host_only_toolchain_completes_to_host",
+    .name = "manifest_toolchain_applies",
     .profile = { .name = "default", .toolchain = "gcc" },
     .host = PROFILE_HOST_LINUX_GNU,
+    .abi = SPN_ABI_GNU,
     .expect = {
-      .target = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU },
+      .target = { SPN_ARCH_X64, SPN_OS_LINUX },
       .linkage = SPN_LIB_KIND_SHARED,
       .toolchain = "gcc",
-      .selected = "gcc",
     },
-  },
-  {
-    .name = "host_only_toolchain_rejects_cross",
-    .profile = { .name = "default", .toolchain = "gcc" },
-    .overrides = { .os = SPN_OS_WINDOWS },
-    .host = PROFILE_HOST_LINUX_GNU,
-    .expect = { .err = SPN_ERR_TOOLCHAIN_TARGET },
   },
   {
     .name = "override_toolchain_wins",
     .profile = { .name = "default", .toolchain = "gcc" },
     .overrides = { .toolchain = "clang" },
     .host = PROFILE_HOST_LINUX_GNU,
+    .abi = SPN_ABI_GNU,
     .expect = {
-      .target = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU },
+      .target = { SPN_ARCH_X64, SPN_OS_LINUX },
       .linkage = SPN_LIB_KIND_SHARED,
       .toolchain = "clang",
-      .selected = "clang",
     },
   },
   {
@@ -331,18 +230,12 @@ static const test_t tests [] = {
     .profile = { .name = "default", .abi = SPN_ABI_GNU },
     .overrides = { .arch = SPN_ARCH_ARM64, .os = SPN_OS_MACOS },
     .host = PROFILE_HOST_LINUX_GNU,
+    .abi = SPN_ABI_APPLE,
     .expect = {
-      .target = { SPN_ARCH_ARM64, SPN_OS_MACOS, SPN_ABI_APPLE },
+      .target = { SPN_ARCH_ARM64, SPN_OS_MACOS },
       .linkage = SPN_LIB_KIND_SHARED,
       .targeted = true,
     },
-  },
-  {
-    .name = "os_override_drops_manifest_abi_and_requires_one",
-    .profile = { .name = "default", .abi = SPN_ABI_MUSL },
-    .overrides = { .os = SPN_OS_WINDOWS },
-    .host = PROFILE_HOST_LINUX_GNU,
-    .expect = { .err = SPN_ERR_TARGET_ABI },
   },
   {
     .name = "arch_override_keeps_manifest_abi",
@@ -363,7 +256,6 @@ static const test_t tests [] = {
     .expect = {
       .target = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MSVC },
       .linkage = SPN_LIB_KIND_SHARED,
-      .selected = "msvc",
       .targeted = true,
     },
   },
@@ -373,8 +265,9 @@ static const test_t tests [] = {
     .derived = { .name = "mac", .os = SPN_OS_MACOS },
     .overrides = { .name = "mac" },
     .host = PROFILE_HOST_LINUX_GNU,
+    .abi = SPN_ABI_APPLE,
     .expect = {
-      .target = { SPN_ARCH_X64, SPN_OS_MACOS, SPN_ABI_APPLE },
+      .target = { SPN_ARCH_X64, SPN_OS_MACOS },
       .linkage = SPN_LIB_KIND_SHARED,
       .targeted = true,
     },
@@ -399,10 +292,112 @@ static const test_t tests [] = {
   },
 };
 
+typedef struct {
+  spn_abi_t abis [PROFILE_MAX_ABIS];
+} query_expect_t;
+
+typedef struct {
+  const c8* name;
+  spn_triple_t target;
+  spn_linkage_t linkage;
+  spn_triple_t host;
+  query_expect_t expect;
+} query_test_t;
+
+static const query_test_t query_tests [] = {
+  {
+    .name = "native_static_prefers_musl",
+    .target = { SPN_ARCH_X64, SPN_OS_LINUX },
+    .host = PROFILE_HOST_LINUX_GNU,
+    .expect = { .abis = { SPN_ABI_MUSL, SPN_ABI_GNU } },
+  },
+  {
+    .name = "native_shared_prefers_host_libc",
+    .target = { SPN_ARCH_X64, SPN_OS_LINUX },
+    .linkage = SPN_LIB_KIND_SHARED,
+    .host = PROFILE_HOST_LINUX_GNU,
+    .expect = { .abis = { SPN_ABI_GNU, SPN_ABI_MUSL } },
+  },
+  {
+    .name = "native_shared_on_musl_host_prefers_musl",
+    .target = { SPN_ARCH_X64, SPN_OS_LINUX },
+    .linkage = SPN_LIB_KIND_SHARED,
+    .host = PROFILE_HOST_LINUX_MUSL,
+    .expect = { .abis = { SPN_ABI_MUSL, SPN_ABI_GNU } },
+  },
+  {
+    .name = "native_windows_prefers_gnu",
+    .target = { SPN_ARCH_X64, SPN_OS_WINDOWS },
+    .host = PROFILE_HOST_WIN_MSVC,
+    .expect = { .abis = { SPN_ABI_GNU, SPN_ABI_MSVC } },
+  },
+  {
+    .name = "native_macos_is_apple",
+    .target = { SPN_ARCH_ARM64, SPN_OS_MACOS },
+    .host = PROFILE_HOST_ARM_MACOS,
+    .expect = { .abis = { SPN_ABI_APPLE } },
+  },
+  {
+    .name = "explicit_abi_is_the_only_candidate",
+    .target = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU },
+    .host = PROFILE_HOST_LINUX_GNU,
+    .expect = { .abis = { SPN_ABI_GNU } },
+  },
+  {
+    .name = "explicit_abi_ignores_linkage",
+    .target = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL },
+    .linkage = SPN_LIB_KIND_SHARED,
+    .host = PROFILE_HOST_LINUX_GNU,
+    .expect = { .abis = { SPN_ABI_MUSL } },
+  },
+  {
+    .name = "native_windows_ignores_shared",
+    .target = { SPN_ARCH_X64, SPN_OS_WINDOWS },
+    .linkage = SPN_LIB_KIND_SHARED,
+    .host = PROFILE_HOST_WIN_MSVC,
+    .expect = { .abis = { SPN_ABI_GNU, SPN_ABI_MSVC } },
+  },
+  {
+    .name = "cross_explicit_abi_is_the_only_candidate",
+    .target = { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_MUSL },
+    .host = PROFILE_HOST_LINUX_GNU,
+    .expect = { .abis = { SPN_ABI_MUSL } },
+  },
+  {
+    .name = "cross_os_with_many_abis_has_no_candidates",
+    .target = { SPN_ARCH_X64, SPN_OS_WINDOWS },
+    .host = PROFILE_HOST_LINUX_GNU,
+  },
+  {
+    .name = "cross_arch_with_many_abis_has_no_candidates",
+    .target = { SPN_ARCH_ARM64, SPN_OS_LINUX },
+    .linkage = SPN_LIB_KIND_SHARED,
+    .host = PROFILE_HOST_LINUX_GNU,
+  },
+  {
+    .name = "cross_macos_is_apple",
+    .target = { SPN_ARCH_ARM64, SPN_OS_MACOS },
+    .host = PROFILE_HOST_LINUX_GNU,
+    .expect = { .abis = { SPN_ABI_APPLE } },
+  },
+  {
+    .name = "cross_wasi_is_musl",
+    .target = { SPN_ARCH_WASM32, SPN_OS_WASI },
+    .host = PROFILE_HOST_LINUX_GNU,
+    .expect = { .abis = { SPN_ABI_MUSL } },
+  },
+  {
+    .name = "cross_freestanding_is_bare",
+    .target = { SPN_ARCH_ARM64, SPN_OS_FREESTANDING },
+    .host = PROFILE_HOST_LINUX_GNU,
+    .expect = { .abis = { SPN_ABI_BARE } },
+  },
+};
+
 static spn_profile_info_t desc_to_info(const profile_desc_t* d) {
   return (spn_profile_info_t) {
-    .name = d->name ? sp_str_view(d->name) : (sp_str_t) sp_zero,
-    .toolchain = d->toolchain ? sp_str_view(d->toolchain) : (sp_str_t) sp_zero,
+    .name = d->name ? sp_cstr_as_str(d->name) : (sp_str_t) sp_zero,
+    .toolchain = d->toolchain ? sp_cstr_as_str(d->toolchain) : (sp_str_t) sp_zero,
     .os = d->os,
     .arch = d->arch,
     .abi = d->abi,
@@ -416,16 +411,6 @@ static spn_profile_override_t desc_to_override(const profile_desc_t* d) {
     .toolchain = d->toolchain ? sp_cstr_as_str(d->toolchain) : (sp_str_t) sp_zero,
     .triple = { .arch = d->arch, .os = d->os, .abi = d->abi },
   };
-}
-
-static sp_err_t profile_catalog(sp_test_t* t, spn_toolchain_catalog_t* catalog) {
-  sp_mem_t mem = sp_test_arena(t);
-  sp_str_t path = test_repo_path(mem, sp_str_lit("source/core/toolchain/toolchains.json"));
-
-  sp_str_t json = sp_zero;
-  sp_must_ok(t, sp_io_read_file(mem, path, &json));
-  sp_must_eq(t, (u32)SPN_OK, (u32)spn_toolchain_catalog_init(catalog, json, mem));
-  return SP_OK;
 }
 
 sp_test_each(profile, resolve, test_t, tests, .setup = spn_test_ctx_setup) {
@@ -442,51 +427,53 @@ sp_test_each(profile, resolve, test_t, tests, .setup = spn_test_ctx_setup) {
   if (!sp_str_empty(derived.name)) {
     sp_str_om_insert(pkg.profiles, derived.name, derived);
   }
+  if (it->shared_demand) {
+    sp_str_om_insert(pkg.libs, sp_str_lit("L"), ((spn_target_info_t) { .name = sp_str_lit("L"), .linkages = { .shared = true } }));
+  }
 
   spn_profile_table_t table = SP_NULLPTR;
   sp_str_ht_init(mem, table);
   spn_profile_populate(&table, &pkg);
 
-  spn_toolchain_catalog_t catalog = sp_zero;
-  if (profile_catalog(t, &catalog)) return SP_ERR;
-
   spn_profile_info_t result = sp_zero;
-  spn_toolchain_resolution_t resolution = sp_zero;
-  spn_err_t err = spn_profile_resolve(table, &overrides, &result);
-  if (!err) {
-    bool shared = spn_profile_shared(&result, it->shared_demand);
-    err = spn_toolchain_select(&catalog, (spn_toolchain_query_t) {
-      .name = result.toolchain,
-      .target = { result.arch, result.os, result.abi },
-      .host = it->host,
-      .role = SPN_TOOLCHAIN_ROLE_BUILD,
-      .shared = shared,
-    }, sp_test_arena(t), &resolution);
-    if (!err) {
-      spn_profile_finalize(&result, resolution.triple, shared);
-    }
-  }
-
+  spn_err_t err = spn_profile_resolve(table, &overrides, it->host, &pkg, &result);
   sp_must_eq(t, (u32)it->expect.err, (u32)err);
-  if (it->expect.err) {
+  if (err) {
     sp_da(spn_event_t) errs = spn_test_drain_errs(mem);
     sp_must_eq(t, 1, sp_da_size(errs));
-    sp_expect_eq(t, errs[0].err.kind, it->expect.err);
+    sp_expect_eq(t, errs[0].err.kind, err);
     return SP_OK;
   }
 
-  sp_expect_eq(t, it->expect.target.arch, result.arch);
-  sp_expect_eq(t, it->expect.target.os, result.os);
-  sp_expect_eq(t, it->expect.target.abi, result.abi);
+  sp_expect(t, spn_triple_equal(it->expect.target, (spn_triple_t) { result.arch, result.os, result.abi }));
   sp_expect_eq(t, it->expect.targeted, result.targeted);
-  sp_expect_eq(t, (u32)it->expect.linkage, (u32)result.linkage);
   if (it->expect.toolchain) {
     sp_expect_str_eq_c(t, result.toolchain, it->expect.toolchain);
   }
-  if (it->expect.selected) {
-    sp_must(t, resolution.info);
-    sp_expect_str_eq_c(t, resolution.info->name, it->expect.selected);
-  }
 
+  spn_profile_finalize(&result, it->abi ? it->abi : result.abi);
+  sp_expect_eq(t, (u32)it->expect.linkage, (u32)result.linkage);
+  return SP_OK;
+}
+
+sp_test_each(profile, query, query_test_t, query_tests) {
+  spn_profile_info_t profile = {
+    .toolchain = sp_str_lit("T"),
+    .arch = it->target.arch,
+    .os = it->target.os,
+    .abi = it->target.abi,
+    .linkage = it->linkage,
+  };
+
+  spn_toolchain_query_t query = spn_profile_query(&profile, it->host);
+  sp_expect_str_eq(t, query.name, profile.toolchain);
+  sp_expect(t, spn_triple_equal(query.target, it->target));
+
+  u32 abis = 0;
+  sp_carr_detect_len(it->expect.abis, abis, it->expect.abis[abis]);
+  sp_must_eq(t, abis, query.abis.count);
+  sp_for(at, abis) {
+    sp_expect_eq(t, (u32)it->expect.abis[at], (u32)query.abis.items[at]);
+  }
   return SP_OK;
 }
