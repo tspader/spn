@@ -27,11 +27,6 @@ typedef enum {
 
 typedef u32 spn_cc_cap_set_t;
 
-typedef enum {
-  SPN_TOOLCHAIN_ROLE_BUILD,
-  SPN_TOOLCHAIN_ROLE_SCRIPT,
-} spn_toolchain_role_t;
-
 typedef struct {
   spn_arg_t program;
   sp_da(sp_str_t) args;

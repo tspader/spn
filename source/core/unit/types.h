@@ -14,10 +14,14 @@
 #include "target/types.h"
 #include "external/wasm/types.h"
 
+typedef enum {
+  SPN_BUILD_ROLE_TARGET,
+  SPN_BUILD_ROLE_METAPROGRAM,
+} spn_build_role_t;
+
 typedef struct {
-  spn_triple_t host;
   spn_profile_info_t profile;
-  spn_toolchain_role_t role;
+  spn_build_role_t role;
 } spn_build_config_t;
 
 struct spn_build_unit_t {
@@ -179,7 +183,6 @@ struct spn_pkg_unit_t {
 
 struct spn_toolchain_unit_t {
   spn_toolchain_info_t* info;
-  spn_triple_t host;
   sp_str_t root;
   spn_cc_toolchain_t cc;
   sp_hash_t identity;
