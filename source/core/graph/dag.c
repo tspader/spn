@@ -677,6 +677,9 @@ spn_err_t spn_dag_build_add_target(spn_dag_build_t* b, spn_target_unit_t* target
   sp_da_for(link->objects, it) {
     spn_dag_action_add_input(g, ids.action, link->objects[it]);
   }
+  sp_da_for(target->link.cc.scripts, it) {
+    spn_dag_action_add_input(g, ids.action, spn_dag_add_file(g, target->link.cc.scripts[it]));
+  }
   if (link->exports.occupied) {
     spn_dag_action_add_input(g, ids.action, link->exports);
   }
