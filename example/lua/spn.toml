@@ -1,0 +1,11 @@
+[package]
+name = "script"
+version = "0.1.0"
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+
+[deps.package]
+lua = "5.4.6"
+sp = "3.5.0"

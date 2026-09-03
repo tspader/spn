@@ -1,0 +1,16 @@
+[package]
+name = "window"
+version = "0.1.0"
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+
+[deps.package]
+raylib = "6.0.0"
+
+[profile.linux]
+abi = "gnu"
+
+[profile.macos]
+toolchain = "clang"

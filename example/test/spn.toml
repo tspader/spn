@@ -1,0 +1,19 @@
+[package]
+name = "calc"
+version = "0.1.0"
+
+[[lib]]
+name = "calc"
+kinds = ["static"]
+source = ["calc.c"]
+headers = ["calc.h"]
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+deps = ["calc"]
+
+[[test]]
+name = "calc_test"
+source = ["test.c"]
+deps = ["calc"]

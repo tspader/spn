@@ -34,3 +34,7 @@ compile_commands.json
 *.actual
 /.spn
 /test/render/.out
+/example/*/build
+/example/*/generated
+/example/*/imgui.ini
+/example/*/spn.lock

@@ -1,0 +1,19 @@
+[package]
+name = "window"
+version = "0.1.0"
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+
+[deps.package]
+sdl3 = "3.4.15"
+
+[config.sdl3]
+options = { x11 = true }
+
+[profile.linux]
+abi = "gnu"
+
+[profile.macos]
+toolchain = "clang"

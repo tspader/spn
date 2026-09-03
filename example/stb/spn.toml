@@ -1,0 +1,10 @@
+[package]
+name = "png"
+version = "0.1.0"
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+
+[deps.package]
+stb = "2.15.0"
