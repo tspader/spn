@@ -103,21 +103,36 @@ static bool lower_path_ok(spn_toml_loader_t* ctx, sp_str_t path) {
   return false;
 }
 
-static spn_gated_path_list_t lower_gated_sources(spn_toml_loader_t* ctx, sp_da(spn_cg_source_entry_t) entries, bool tree_root) {
+static void push_gated_path(spn_gated_path_list_t* values, const spn_cg_source_entry_t* entry, sp_str_t path) {
+  sp_da_push(*values, ((spn_gated_path_t) {
+    .path = path,
+    .tree = sp_opt_is_null(entry->tree) ? SPN_TREE_SOURCE : sp_opt_get(entry->tree),
+    .when = entry->when,
+  }));
+}
+
+static spn_gated_path_list_t lower_gated_paths(spn_toml_loader_t* ctx, sp_da(spn_cg_source_entry_t) entries) {
   spn_gated_path_list_t values = sp_da_new(ctx->mem, spn_gated_path_t);
   sp_da_for(entries, it) {
-    sp_str_t path = entries[it].path;
-    if (tree_root && sp_str_equal_cstr(path, ".")) {
-      path = sp_str_lit("");
-    }
-    else if (!lower_path_ok(ctx, path)) {
+    if (!lower_path_ok(ctx, entries[it].path)) {
       continue;
     }
-    sp_da_push(values, ((spn_gated_path_t) {
-      .path = path,
-      .tree = sp_opt_is_null(entries[it].tree) ? SPN_TREE_SOURCE : sp_opt_get(entries[it].tree),
-      .when = entries[it].when,
-    }));
+    push_gated_path(&values, &entries[it], entries[it].path);
+  }
+  return values;
+}
+
+static spn_gated_path_list_t lower_gated_dirs(spn_toml_loader_t* ctx, sp_da(spn_cg_source_entry_t) entries) {
+  spn_gated_path_list_t values = sp_da_new(ctx->mem, spn_gated_path_t);
+  sp_da_for(entries, it) {
+    if (sp_str_equal_cstr(entries[it].path, ".")) {
+      push_gated_path(&values, &entries[it], sp_str_lit(""));
+      continue;
+    }
+    if (!lower_path_ok(ctx, entries[it].path)) {
+      continue;
+    }
+    push_gated_path(&values, &entries[it], entries[it].path);
   }
   return values;
 }
@@ -144,9 +159,9 @@ static spn_target_info_t lower_target(spn_toml_loader_t* ctx, const spn_cg_targe
       .subsystem = sp_opt_is_null(cg->windows.subsystem) ? SPN_WIN_SUBSYSTEM_NONE : sp_opt_get(cg->windows.subsystem),
     },
     .gated = {
-      .source = lower_gated_sources(ctx, cg->source, false),
-      .headers = lower_gated_sources(ctx, cg->headers, false),
-      .include = lower_gated_sources(ctx, cg->include, true),
+      .source = lower_gated_paths(ctx, cg->source),
+      .headers = lower_gated_paths(ctx, cg->headers),
+      .include = lower_gated_dirs(ctx, cg->include),
       .define = lower_gated_values(ctx, cg->define),
       .flags = lower_gated_values(ctx, cg->flags),
       .system_deps = lower_gated_values(ctx, cg->system_deps),
@@ -174,8 +189,8 @@ static spn_target_info_t lower_metaprogram(spn_toml_loader_t* ctx, const spn_cg_
     .name = name,
     .kind = kind,
     .gated = {
-      .source = lower_gated_sources(ctx, cg->source, false),
-      .include = lower_gated_sources(ctx, cg->include, true),
+      .source = lower_gated_paths(ctx, cg->source),
+      .include = lower_gated_dirs(ctx, cg->include),
       .define = lower_gated_values(ctx, cg->define),
       .flags = lower_gated_values(ctx, cg->flags),
     },
@@ -239,7 +254,7 @@ static void lower_package(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, s
     spn_toml_loader_pop(ctx);
   }
   info->include = sp_da_new(ctx->mem, spn_path_t);
-  info->gated.include = lower_gated_sources(ctx, p->include, true);
+  info->gated.include = lower_gated_dirs(ctx, p->include);
   info->define = sp_da_new(ctx->mem, sp_str_t);
   info->gated.define = lower_gated_values(ctx, p->define);
   info->public_define = sp_da_new(ctx->mem, sp_str_t);
