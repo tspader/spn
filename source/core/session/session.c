@@ -112,8 +112,12 @@ spn_err_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem, spn_p
 
   spn_try(spn_profile_resolve(s->profiles, &config.profile, host, root, &s->profile));
 
+  spn_toolchain_query_t query = spn_profile_query(&s->profile, host);
+  if (!query.abis.count) {
+    return spn_toolchain_incomplete(&ctx->catalog, query);
+  }
   spn_toolchain_selection_t target = sp_zero;
-  spn_try(spn_toolchain_select(&ctx->catalog, spn_profile_query(&s->profile, host), &target));
+  spn_try(spn_toolchain_select(&ctx->catalog, query, &target));
   spn_profile_finalize(&s->profile, target.triple.abi);
 
   switch (s->profile.os) {

@@ -148,14 +148,28 @@ static spn_err_t incomplete_named(spn_toolchain_catalog_t* catalog, spn_toolchai
 }
 
 spn_err_t spn_toolchain_select(spn_toolchain_catalog_t* catalog, spn_toolchain_query_t query, spn_toolchain_selection_t* selection) {
+  sp_assert(query.abis.count);
   *selection = sp_zero_s(spn_toolchain_selection_t);
-  bool incomplete = !query.abis.count;
   switch (query.kind) {
     case SPN_TOOLCHAIN_QUERY_AUTO: {
-      return incomplete ? incomplete_auto(catalog, query) : select_auto(catalog, query, selection);
+      return select_auto(catalog, query, selection);
     }
     case SPN_TOOLCHAIN_QUERY_NAMED: {
-      return incomplete ? incomplete_named(catalog, query) : select_named(catalog, query, selection);
+      return select_named(catalog, query, selection);
+    }
+  }
+
+  sp_unreachable_return(SPN_ERROR);
+}
+
+spn_err_t spn_toolchain_incomplete(spn_toolchain_catalog_t* catalog, spn_toolchain_query_t query) {
+  sp_assert(!query.abis.count);
+  switch (query.kind) {
+    case SPN_TOOLCHAIN_QUERY_AUTO: {
+      return incomplete_auto(catalog, query);
+    }
+    case SPN_TOOLCHAIN_QUERY_NAMED: {
+      return incomplete_named(catalog, query);
     }
   }
 

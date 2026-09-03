@@ -234,6 +234,13 @@ static sp_err_t check_failure(sp_test_t* t, sp_mem_t mem, spn_toolchain_catalog_
   return SP_OK;
 }
 
+static spn_err_t query_catalog(spn_toolchain_catalog_t* catalog, spn_toolchain_query_t query, spn_toolchain_selection_t* selection) {
+  if (!query.abis.count) {
+    return spn_toolchain_incomplete(catalog, query);
+  }
+  return spn_toolchain_select(catalog, query, selection);
+}
+
 static sp_err_t check_selection(sp_test_t* t, const spn_toolchain_selection_t* selection, const c8* name, spn_triple_t triple) {
   sp_must(t, selection->toolchain);
   sp_expect_str_eq_c(t, selection->toolchain->name, name);
@@ -269,7 +276,7 @@ sp_test_each(select, complete, complete_test_t, complete_tests, .setup = spn_tes
       .abis = abi_list(check->abis),
     };
     spn_toolchain_selection_t selection = sp_zero;
-    spn_err_t err = spn_toolchain_select(&catalog, query, &selection);
+    spn_err_t err = query_catalog(&catalog, query, &selection);
     sp_must_eq(t, (u32)check->expect.err, (u32)err);
 
     if (err) {
@@ -304,7 +311,7 @@ sp_test_each(select, resolve, resolve_test_t, resolve_tests, .setup = spn_test_c
     query.name = sp_cstr_as_str(it->toolchain);
   }
   spn_toolchain_selection_t selection = sp_zero;
-  spn_err_t err = spn_toolchain_select(&catalog, query, &selection);
+  spn_err_t err = query_catalog(&catalog, query, &selection);
   sp_must_eq(t, (u32)it->expect.err, (u32)err);
 
   if (err) {
