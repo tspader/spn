@@ -109,6 +109,16 @@ spn build --target aarch64-macos
 spn build --target aarch64-freestanding
 ```
 
+A kernel image needs its own memory layout. Give the target a linker script and any raw flags the link needs:
+
+```toml
+[[bin]]
+name = "kernel"
+source = ["kernel.c", "start.S"]
+linker_script = ["kernel.ld"]
+link_flags = ["-Wl,--build-id=none", "-Wl,-n"]
+```
+
 Congratulations! You now have a C program which:
 - Can be compiled to any OS, architecture, and ABI
 - Builds extremely quickly and incrementally
