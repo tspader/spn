@@ -277,6 +277,22 @@ bool spn_os_has_abi(spn_os_t os, spn_abi_t abi) {
   return false;
 }
 
+bool spn_os_dynamic(spn_os_t os) {
+  switch (os) {
+    case SPN_OS_LINUX:
+    case SPN_OS_WINDOWS:
+    case SPN_OS_MACOS: {
+      return true;
+    }
+    case SPN_OS_WASI:
+    case SPN_OS_FREESTANDING:
+    case SPN_OS_NONE: {
+      return false;
+    }
+  }
+  SP_UNREACHABLE_RETURN(false);
+}
+
 spn_triple_entry_t spn_triple_entry(spn_triple_t partial, spn_triple_t* full) {
   *full = sp_zero_s(spn_triple_t);
   if (!partial.arch) {

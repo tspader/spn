@@ -6,6 +6,7 @@
 #include "error/error.h"
 #include "paths/paths.h"
 #include "toolchain/driver.h"
+#include "triple/triple.h"
 
 void spn_cc_push(sp_mem_t mem, spn_invocation_t* invocation, spn_arg_t arg) {
   if (!invocation->args) sp_da_init(mem, invocation->args);
@@ -132,13 +133,8 @@ static spn_err_t feature_unsupported(const spn_cc_toolchain_t* toolchain, const 
 }
 
 spn_err_t spn_cc_validate_profile(const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile) {
-  if (profile->os == SPN_OS_FREESTANDING) {
-    if (!spn_cc_has(toolchain, SPN_CC_CAP_FREESTANDING)) {
-      return feature_unsupported(toolchain, profile, SPN_CC_FEATURE_COMPILE);
-    }
-    if (profile->linkage == SPN_LIB_KIND_SHARED) {
-      return feature_unsupported(toolchain, profile, SPN_CC_FEATURE_LINK_SHARED);
-    }
+  if (profile->os == SPN_OS_FREESTANDING && !spn_cc_has(toolchain, SPN_CC_CAP_FREESTANDING)) {
+    return feature_unsupported(toolchain, profile, SPN_CC_FEATURE_COMPILE);
   }
   spn_triple_t target = { profile->arch, profile->os, profile->abi };
   spn_sanitizer_set_t supported = get_supported_sanitizers(toolchain, target);
@@ -256,7 +252,7 @@ spn_err_t spn_cc_validate_link(const spn_cc_toolchain_t* toolchain, const spn_pr
   if (kind == SPN_CC_OUTPUT_REACTOR && profile->os != SPN_OS_WASI) {
     return feature_unsupported(toolchain, profile, feature);
   }
-  if (kind == SPN_CC_OUTPUT_SHARED_LIB && (profile->os == SPN_OS_WASI || profile->os == SPN_OS_FREESTANDING)) {
+  if (kind == SPN_CC_OUTPUT_SHARED_LIB && !spn_os_dynamic(profile->os)) {
     return feature_unsupported(toolchain, profile, feature);
   }
   if (profile->os == SPN_OS_MACOS && frameworks && spn_path_empty(profile->sysroot)) {

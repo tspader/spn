@@ -163,6 +163,18 @@ static const test_t tests [] = {
     },
   },
   {
+    .name = "wasi_defaults_to_static",
+    .overrides = { .arch = SPN_ARCH_WASM32, .os = SPN_OS_WASI },
+    .host = PROFILE_HOST_LINUX_GNU,
+    .shared_demand = true,
+    .abi = SPN_ABI_MUSL,
+    .expect = {
+      .target = { SPN_ARCH_WASM32, SPN_OS_WASI },
+      .linkage = SPN_LIB_KIND_STATIC,
+      .targeted = true,
+    },
+  },
+  {
     .name = "override_os_keeps_host_arch",
     .overrides = { .os = SPN_OS_WINDOWS, .abi = SPN_ABI_GNU },
     .host = PROFILE_HOST_LINUX_GNU,
@@ -301,6 +313,13 @@ static const test_t tests [] = {
     .overrides = { .os = SPN_OS_MACOS, .abi = SPN_ABI_GNU },
     .host = PROFILE_HOST_LINUX_GNU,
     .expect = { .err = SPN_ERR_PROFILE_ABI },
+  },
+  {
+    .name = "explicit_shared_on_freestanding_is_rejected",
+    .profile = { .name = "default", .linkage = SPN_LIB_KIND_SHARED },
+    .overrides = { .arch = SPN_ARCH_ARM64, .os = SPN_OS_FREESTANDING },
+    .host = PROFILE_HOST_LINUX_GNU,
+    .expect = { .err = SPN_ERR_PROFILE_LINKAGE },
   },
   {
     .name = "manifest_foreign_abi_is_rejected",

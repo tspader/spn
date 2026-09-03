@@ -25,6 +25,7 @@ u32 spn_os_abis(spn_os_t os, const spn_abi_t** abis);
 u32 spn_os_archs(spn_os_t os, const spn_arch_t** archs);
 bool spn_os_has_arch(spn_os_t os, spn_arch_t arch);
 bool spn_os_has_abi(spn_os_t os, spn_abi_t abi);
+bool spn_os_dynamic(spn_os_t os);
 spn_triple_entry_t spn_triple_entry(spn_triple_t partial, spn_triple_t* full);
 spn_triple_t spn_triple_merge(spn_triple_t base, spn_triple_t partial);
 bool spn_triple_match(spn_triple_t entry, spn_triple_t target);

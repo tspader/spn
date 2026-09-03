@@ -47,6 +47,7 @@
     "profile_undefined": { "ref": "profile" },
     "profile_arch": { "ref": "profile" },
     "profile_abi": { "ref": "profile" },
+    "profile_linkage": { "ref": "profile" },
     "sanitizer_unsupported": { "ref": "sanitizer" },
     "sanitizer_static": { "ref": "sanitizer" },
     "compiler_feature_unsupported": { "ref": "compiler" },

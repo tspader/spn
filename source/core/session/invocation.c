@@ -10,6 +10,7 @@
 #include "session/session.h"
 #include "unit/unit.h"
 #include "graph/build.h"
+#include "triple/triple.h"
 
 static spn_cc_compile_t compile_desc(sp_mem_t mem, spn_compile_unit_t* unit) {
   spn_pkg_unit_t* pkg = unit->target->pkg;
@@ -18,7 +19,7 @@ static spn_cc_compile_t compile_desc(sp_mem_t mem, spn_compile_unit_t* unit) {
   spn_cc_compile_t compile = {
     .lang = unit->lang,
     .cxx = unit->target->info->cxx,
-    .pic = unit->target->info->kind == SPN_TARGET_KIND_LIB && build->profile.os != SPN_OS_FREESTANDING,
+    .pic = unit->target->info->kind == SPN_TARGET_KIND_LIB && spn_os_dynamic(build->profile.os),
   };
   if (build->profile.os == SPN_OS_MACOS) {
     compile.min_os = unit->target->link.cc.min_os;

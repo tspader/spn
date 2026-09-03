@@ -702,6 +702,16 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
           );
           break;
         }
+        case SPN_ERR_PROFILE_LINKAGE: {
+          sp_tty_fmt(
+            &w,
+            "target {.yellow} can't link {.red}; {} has no dynamic loader",
+            sp_fmt_str(spn_triple_to_str(mem, event->err.profile.target)),
+            sp_fmt_str(sp_str_lit("shared")),
+            sp_fmt_str(spn_os_to_str(event->err.profile.target.os))
+          );
+          break;
+        }
         case SPN_ERR_SANITIZER_UNSUPPORTED: {
           if (event->err.sanitizer.supported) {
             sp_tty_fmt(

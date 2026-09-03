@@ -221,7 +221,7 @@ static spn_linkage_t resolve_linkage(spn_linkage_t linkage, spn_os_t os, const s
   if (linkage) {
     return linkage;
   }
-  if (os == SPN_OS_FREESTANDING) {
+  if (!spn_os_dynamic(os)) {
     return SPN_LIB_KIND_STATIC;
   }
   if (shared_demand(pkg)) {
@@ -280,6 +280,12 @@ spn_err_t spn_profile_resolve(spn_profile_table_t profiles, const spn_profile_ov
   if (pinned.abi && !spn_os_has_abi(pinned.os, pinned.abi)) {
     return spn_err_emit(&spn, (spn_err_union_t) {
       .kind = SPN_ERR_PROFILE_ABI,
+      .profile = { .name = name, .target = pinned },
+    });
+  }
+  if (merged.linkage == SPN_LIB_KIND_SHARED && !spn_os_dynamic(pinned.os)) {
+    return spn_err_emit(&spn, (spn_err_union_t) {
+      .kind = SPN_ERR_PROFILE_LINKAGE,
       .profile = { .name = name, .target = pinned },
     });
   }
