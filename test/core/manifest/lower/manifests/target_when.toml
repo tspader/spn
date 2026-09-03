@@ -4,7 +4,7 @@ version = "1.0.0"
 
 [[lib]]
 name = "t"
-kinds = ["static"]
+kinds = ["static", "shared"]
 source = ["a.c", { path = "b.c", when = { os = "linux" } }]
 define = ["X", { value = "Y", when = { os = "windows" } }]
 flags = [{ value = "-g", when = { mode = "debug" } }]
