@@ -202,6 +202,9 @@ void spn_msvc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, con
   if (link->kind == SPN_CC_OUTPUT_EXE && link->subsystem == SPN_WIN_SUBSYSTEM_WINDOWS) {
     sp_da_push(linker, spn_arg_lit(sp_str_lit("/SUBSYSTEM:WINDOWS")));
   }
+  sp_da_for(link->args, it) {
+    sp_da_push(linker, spn_arg_lit(link->args[it]));
+  }
 
   if (!sp_da_empty(linker)) {
     spn_cc_push_c(mem, invocation, "/link");
