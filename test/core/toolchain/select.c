@@ -251,7 +251,7 @@ static sp_err_t check_selection(sp_test_t* t, const spn_toolchain_selection_t* s
 sp_test_each(select, complete, complete_test_t, complete_tests, .setup = spn_test_ctx_setup) {
   sp_mem_t mem = sp_test_arena(t);
 
-  spn_toolchain_info_t toolchain = fixture_local_toolchain("A", "cc");
+  spn_toolchain_decl_t toolchain = fixture_local_toolchain("A", "cc");
   u32 declared = 0;
   sp_carr_detect_len(it->targets, declared, !fixture_triple_empty(it->targets[declared]));
   if (declared) {

@@ -71,6 +71,17 @@ typedef struct {
   spn_toolchain_source_t source;
   sp_da(spn_toolchain_host_t) hosts;
   sp_da(spn_triple_t) targets;
+} spn_toolchain_decl_t;
+
+typedef struct {
+  sp_str_t name;
+  sp_str_t version;
+  spn_cc_driver_t driver;
+  spn_toolchain_launcher_t compiler;
+  spn_toolchain_launcher_t cxx;
+  spn_toolchain_launcher_t linker;
+  spn_toolchain_launcher_t archiver;
+  sp_da(spn_triple_t) targets;
   spn_toolchain_support_t support;
 } spn_toolchain_info_t;
 

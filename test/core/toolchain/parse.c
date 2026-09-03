@@ -141,25 +141,24 @@ static const parse_test_t tests [] = {
   },
 };
 
-sp_test_each(parse, catalog, parse_test_t, tests) {
+sp_test_each(parse, decls, parse_test_t, tests) {
   sp_str_t json = sp_zero;
   if (fixture_read_json(t, it->file, &json)) return SP_ERR;
 
-  spn_toolchain_catalog_t catalog = sp_zero;
-  spn_toolchain_catalog_init(&catalog, (spn_triple_t) HOST_X64_LINUX, sp_test_arena(t));
-  sp_must_eq(t, (u32)it->expect.err, (u32)spn_toolchain_catalog_load(&catalog, json));
+  sp_da(spn_toolchain_decl_t) decls = SP_NULLPTR;
+  sp_must_eq(t, (u32)it->expect.err, (u32)spn_toolchain_decls_parse(sp_test_arena(t), json, &decls));
   if (it->expect.err) {
     return SP_OK;
   }
 
-  sp_must_eq(t, it->expect.entries, fixture_catalog_size(&catalog));
+  sp_must_eq(t, it->expect.entries, (u32)sp_da_size(decls));
 
   sp_carr_for(it->expect.toolchains, at) {
     fixture_toolchain_t toolchain = it->expect.toolchains[at];
     if (!toolchain.name) {
       break;
     }
-    if (fixture_check_entry(t, spn_toolchain_catalog_get(&catalog, sp_cstr_as_str(toolchain.name)), toolchain)) return SP_ERR;
+    if (fixture_check_decl(t, fixture_decl(decls, toolchain.name), toolchain)) return SP_ERR;
   }
 
   return SP_OK;

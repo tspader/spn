@@ -312,7 +312,7 @@ static void lower_toolchains(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg
       spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, "driver");
     }
 
-    spn_toolchain_info_t toolchain = sp_zero;
+    spn_toolchain_decl_t toolchain = sp_zero;
     toolchain.name = t->name;
     toolchain.driver = sp_opt_is_null(t->driver) ? SPN_CC_DRIVER_NONE : sp_opt_get(t->driver);
     toolchain.compiler = lower_launcher(ctx, t->compiler);

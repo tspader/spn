@@ -32,13 +32,19 @@ sp_da(spn_event_t) spn_test_drain_errs(sp_mem_t mem) {
   return errs;
 }
 
-sp_err_t spn_test_builtin_catalog(sp_test_t* t, spn_toolchain_catalog_t* catalog, spn_triple_t host) {
+sp_err_t spn_test_builtin_json(sp_test_t* t, sp_str_t* json) {
   sp_mem_t mem = sp_test_arena(t);
   sp_str_t path = test_repo_path(mem, sp_str_lit("source/core/toolchain/toolchains.json"));
+  sp_must_ok(t, sp_io_read_file(mem, path, json));
+  return SP_OK;
+}
 
+sp_err_t spn_test_builtin_catalog(sp_test_t* t, spn_toolchain_catalog_t* catalog, spn_triple_t host) {
   sp_str_t json = sp_zero;
-  sp_must_ok(t, sp_io_read_file(mem, path, &json));
-  spn_toolchain_catalog_init(catalog, host, mem);
+  if (spn_test_builtin_json(t, &json)) {
+    return SP_ERR;
+  }
+  spn_toolchain_catalog_init(catalog, host, sp_test_arena(t));
   sp_must_eq(t, (u32)SPN_OK, (u32)spn_toolchain_catalog_load(catalog, json));
   return SP_OK;
 }

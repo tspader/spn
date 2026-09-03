@@ -88,12 +88,21 @@ static bool builtins_is_sha256(sp_str_t str) {
   return str.len == 64 && test_str_is_hex(str);
 }
 
-sp_test_each(builtins, entries, test_t, tests) {
-  spn_toolchain_catalog_t catalog = sp_zero;
-  if (spn_test_builtin_catalog(t, &catalog, (spn_triple_t) HOST_X64_LINUX)) {
+static sp_err_t builtins_decls(sp_test_t* t, sp_da(spn_toolchain_decl_t)* decls) {
+  sp_str_t json = sp_zero;
+  if (spn_test_builtin_json(t, &json)) {
     return SP_ERR;
   }
-  return fixture_check_entry(t, spn_toolchain_catalog_get(&catalog, sp_cstr_as_str(it->name)), it->expect);
+  sp_must_eq(t, (u32)SPN_OK, (u32)spn_toolchain_decls_parse(sp_test_arena(t), json, decls));
+  return SP_OK;
+}
+
+sp_test_each(builtins, entries, test_t, tests) {
+  sp_da(spn_toolchain_decl_t) decls = SP_NULLPTR;
+  if (builtins_decls(t, &decls)) {
+    return SP_ERR;
+  }
+  return fixture_check_decl(t, fixture_decl(decls, it->name), it->expect);
 }
 
 sp_test(builtins, declared_order) {
@@ -111,45 +120,33 @@ sp_test(builtins, declared_order) {
 }
 
 sp_test(builtins, well_formed) {
-  spn_toolchain_catalog_t catalog = sp_zero;
-  if (spn_test_builtin_catalog(t, &catalog, (spn_triple_t) HOST_X64_LINUX)) {
+  sp_da(spn_toolchain_decl_t) decls = SP_NULLPTR;
+  if (builtins_decls(t, &decls)) {
     return SP_ERR;
   }
-  sp_must(t, fixture_catalog_size(&catalog));
+  sp_must(t, !sp_da_empty(decls));
 
-  sp_om_for(catalog.entries, it) {
-    spn_toolchain_info_t* info = sp_om_at(catalog.entries, it);
+  sp_da_for(decls, it) {
+    spn_toolchain_decl_t* decl = &decls[it];
+    sp_expect(t, !spn_arg_empty(decl->cxx.program));
 
-    sp_expect(t, spn_toolchain_catalog_get(&catalog, info->name) == info);
-    sp_expect(t, !sp_str_empty(info->name));
-    sp_expect_ne(t, (u32)SPN_CC_DRIVER_NONE, (u32)info->driver);
-    sp_expect(t, !spn_arg_empty(info->compiler.program));
-    sp_expect(t, !spn_arg_empty(info->linker.program));
-    sp_expect(t, !spn_arg_empty(info->archiver.program));
-    sp_expect(t, spn_toolchain_has_cxx(info));
-
-    bool distribution = false;
-    sp_da_for(info->hosts, ht) {
-      spn_toolchain_host_t host = info->hosts[ht];
-      sp_expect_ne(t, (u32)SPN_ARCH_NONE, (u32)host.triple.arch);
-      sp_expect_ne(t, (u32)SPN_OS_NONE, (u32)host.triple.os);
-      if (sp_str_empty(host.artifact.url)) {
-        sp_expect(t, sp_str_empty(host.artifact.sha256));
-        continue;
+    switch (decl->source) {
+      case SPN_TOOLCHAIN_SOURCE_LOCAL: {
+        break;
       }
-      distribution = true;
-      sp_expect(t, sp_str_starts_with(host.artifact.url, sp_str_lit("https://")));
-      sp_expect(t, builtins_is_sha256(host.artifact.sha256));
-      sp_expect(t, !sp_str_empty(host.artifact.mirror_list));
-    }
-    if (distribution) {
-      sp_expect(t, !sp_str_empty(info->version));
-    }
-
-    sp_da_for(info->targets, tt) {
-      sp_expect_ne(t, (u32)SPN_ARCH_NONE, (u32)info->targets[tt].arch);
-      sp_expect_ne(t, (u32)SPN_OS_NONE, (u32)info->targets[tt].os);
-      sp_expect_ne(t, (u32)SPN_ABI_NONE, (u32)info->targets[tt].abi);
+      case SPN_TOOLCHAIN_SOURCE_DISTRIBUTION: {
+        sp_expect(t, !sp_str_empty(decl->version));
+        sp_da_for(decl->hosts, ht) {
+          spn_artifact_t artifact = decl->hosts[ht].artifact;
+          sp_expect(t, sp_str_starts_with(artifact.url, sp_str_lit("https://")));
+          sp_expect(t, builtins_is_sha256(artifact.sha256));
+          sp_expect(t, !sp_str_empty(artifact.mirror_list));
+        }
+        break;
+      }
+      case SPN_TOOLCHAIN_SOURCE_MIXED: {
+        sp_unreachable_case();
+      }
     }
   }
 

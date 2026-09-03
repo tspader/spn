@@ -1297,7 +1297,7 @@ sp_test_each(lower, cases, test_t, tests) {
     toolchain_t expected = it->toolchains[c];
     if (!expected.name) break;
 
-    spn_toolchain_info_t* tc = sp_str_om_get(pkg.toolchains, sp_str_view(expected.name));
+    spn_toolchain_decl_t* tc = sp_str_om_get(pkg.toolchains, sp_str_view(expected.name));
     sp_must(t, tc);
 
     if (expected.url)      sp_expect_str_eq_c(t, tc->hosts[0].artifact.url, expected.url);

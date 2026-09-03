@@ -85,6 +85,58 @@ static sp_err_t fixture_check_targets(sp_test_t* t, sp_da(spn_triple_t) targets,
   return SP_OK;
 }
 
+static sp_err_t fixture_check_launchers(sp_test_t* t, spn_toolchain_launcher_t compiler, spn_toolchain_launcher_t cxx, spn_toolchain_launcher_t linker, spn_toolchain_launcher_t archiver, fixture_toolchain_t expect) {
+  if (fixture_check_launcher(t, compiler, expect.compiler)) {
+    return SP_ERR;
+  }
+  if (fixture_check_launcher(t, cxx, expect.cxx)) {
+    return SP_ERR;
+  }
+  if (fixture_check_launcher(t, linker, expect.linker)) {
+    return SP_ERR;
+  }
+  if (fixture_check_launcher(t, archiver, expect.archiver)) {
+    return SP_ERR;
+  }
+  return SP_OK;
+}
+
+static sp_err_t fixture_check_declared_targets(sp_test_t* t, sp_da(spn_triple_t) targets, fixture_toolchain_t expect) {
+  u32 count = 0;
+  sp_carr_detect_len(expect.targets, count, !fixture_triple_empty(expect.targets[count]));
+  if (!count) {
+    return SP_OK;
+  }
+  return fixture_check_targets(t, targets, expect.targets, count);
+}
+
+static sp_err_t fixture_check_decl(sp_test_t* t, const spn_toolchain_decl_t* decl, fixture_toolchain_t expect) {
+  if (expect.absent) {
+    sp_expect(t, !decl);
+    return SP_OK;
+  }
+  sp_must(t, decl);
+
+  if (expect.version) {
+    sp_expect_str_eq_c(t, decl->version, expect.version);
+  }
+  sp_expect_eq(t, (u32)expect.driver, (u32)decl->driver);
+  if (fixture_check_launchers(t, decl->compiler, decl->cxx, decl->linker, decl->archiver, expect)) {
+    return SP_ERR;
+  }
+
+  u32 hosts = 0;
+  sp_carr_detect_len(expect.hosts, hosts, !fixture_triple_empty(expect.hosts[hosts].triple));
+  sp_must_eq(t, hosts, (u32)sp_da_size(decl->hosts));
+  sp_for(it, hosts) {
+    if (fixture_check_host(t, decl->hosts[it], expect.hosts[it])) {
+      return SP_ERR;
+    }
+  }
+
+  return fixture_check_declared_targets(t, decl->targets, expect);
+}
+
 static sp_err_t fixture_check_entry(sp_test_t* t, spn_toolchain_info_t* info, fixture_toolchain_t expect) {
   if (expect.absent) {
     sp_expect(t, !info);
@@ -96,38 +148,11 @@ static sp_err_t fixture_check_entry(sp_test_t* t, spn_toolchain_info_t* info, fi
     sp_expect_str_eq_c(t, info->version, expect.version);
   }
   sp_expect_eq(t, (u32)expect.driver, (u32)info->driver);
-
-  if (fixture_check_launcher(t, info->compiler, expect.compiler)) {
-    return SP_ERR;
-  }
-  if (fixture_check_launcher(t, info->cxx, expect.cxx)) {
-    return SP_ERR;
-  }
-  if (fixture_check_launcher(t, info->linker, expect.linker)) {
-    return SP_ERR;
-  }
-  if (fixture_check_launcher(t, info->archiver, expect.archiver)) {
+  if (fixture_check_launchers(t, info->compiler, info->cxx, info->linker, info->archiver, expect)) {
     return SP_ERR;
   }
 
-  u32 hosts = 0;
-  sp_carr_detect_len(expect.hosts, hosts, !fixture_triple_empty(expect.hosts[hosts].triple));
-  sp_must_eq(t, hosts, (u32)sp_da_size(info->hosts));
-  sp_for(it, hosts) {
-    if (fixture_check_host(t, info->hosts[it], expect.hosts[it])) {
-      return SP_ERR;
-    }
-  }
-
-  u32 targets = 0;
-  sp_carr_detect_len(expect.targets, targets, !fixture_triple_empty(expect.targets[targets]));
-  if (targets) {
-    if (fixture_check_targets(t, info->targets, expect.targets, targets)) {
-      return SP_ERR;
-    }
-  }
-
-  return SP_OK;
+  return fixture_check_declared_targets(t, info->targets, expect);
 }
 
 static sp_err_t fixture_read_json(sp_test_t* t, const c8* file, sp_str_t* json) {
@@ -135,6 +160,15 @@ static sp_err_t fixture_read_json(sp_test_t* t, const c8* file, sp_str_t* json) 
   sp_str_t path = sp_fs_join_path(mem, sp_str_lit(TOOLCHAINS_DIR), sp_cstr_as_str(file));
   sp_must_ok(t, sp_io_read_file(mem, path, json));
   return SP_OK;
+}
+
+static const spn_toolchain_decl_t* fixture_decl(sp_da(spn_toolchain_decl_t) decls, const c8* name) {
+  sp_da_for(decls, it) {
+    if (sp_str_equal_cstr(decls[it].name, name)) {
+      return &decls[it];
+    }
+  }
+  return SP_NULLPTR;
 }
 
 static sp_err_t fixture_catalog(sp_test_t* t, spn_toolchain_catalog_t* catalog, const c8* file, spn_triple_t host) {
@@ -155,8 +189,8 @@ static spn_toolchain_info_t* fixture_catalog_at(spn_toolchain_catalog_t* catalog
   return sp_str_om_at(catalog->entries, index);
 }
 
-static spn_toolchain_info_t fixture_local_toolchain(const c8* name, const c8* compiler) {
-  return (spn_toolchain_info_t) {
+static spn_toolchain_decl_t fixture_local_toolchain(const c8* name, const c8* compiler) {
+  return (spn_toolchain_decl_t) {
     .name = sp_cstr_as_str(name),
     .driver = SPN_CC_DRIVER_GCC,
     .compiler = { .program = spn_arg_lit(sp_cstr_as_str(compiler)) },

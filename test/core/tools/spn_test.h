@@ -15,6 +15,7 @@
 
 sp_err_t spn_test_ctx_setup(sp_test_t* t);
 sp_da(spn_event_t) spn_test_drain_errs(sp_mem_t mem);
+sp_err_t spn_test_builtin_json(sp_test_t* t, sp_str_t* json);
 sp_err_t spn_test_builtin_catalog(sp_test_t* t, spn_toolchain_catalog_t* catalog, spn_triple_t host);
 
 #endif
