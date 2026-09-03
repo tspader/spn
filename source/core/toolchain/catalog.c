@@ -119,7 +119,7 @@ static spn_toolchain_support_t bind_support(spn_toolchain_catalog_t* catalog, co
   sp_unreachable_return(sp_zero_struct(spn_toolchain_support_t));
 }
 
-static spn_toolchain_info_t bind(spn_toolchain_catalog_t* catalog, const spn_toolchain_decl_t* decl) {
+static spn_toolchain_info_t bind_toolchain(spn_toolchain_catalog_t* catalog, const spn_toolchain_decl_t* decl) {
   return (spn_toolchain_info_t) {
     .name = decl->name,
     .version = decl->version,
@@ -149,7 +149,7 @@ spn_err_t spn_toolchain_catalog_load(spn_toolchain_catalog_t* catalog, sp_str_t 
 }
 
 void spn_toolchain_catalog_add(spn_toolchain_catalog_t* catalog, spn_toolchain_decl_t decl) {
-  spn_toolchain_info_t toolchain = bind(catalog, &decl);
+  spn_toolchain_info_t toolchain = bind_toolchain(catalog, &decl);
   spn_toolchain_info_t* existing = spn_toolchain_catalog_get(catalog, toolchain.name);
   if (existing) {
     *existing = toolchain;
