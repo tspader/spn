@@ -283,6 +283,49 @@ static const link_test_t tests [] = {
     },
   },
   {
+    .name = "macos_linker_script_unsupported",
+    .driver = SPN_CC_DRIVER_CLANG,
+    .profile = {
+      .arch = SPN_ARCH_ARM64,
+      .os = SPN_OS_MACOS,
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .script = "A.ld",
+    .expect = {
+      .err = SPN_ERR_COMPILER_FEATURE_UNSUPPORTED,
+      .feature = SPN_CC_FEATURE_LINKER_SCRIPT,
+    },
+  },
+  {
+    .name = "wasi_linker_script_unsupported",
+    .driver = SPN_CC_DRIVER_CLANG,
+    .profile = {
+      .arch = SPN_ARCH_WASM32,
+      .os = SPN_OS_WASI,
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .script = "A.ld",
+    .expect = {
+      .err = SPN_ERR_COMPILER_FEATURE_UNSUPPORTED,
+      .feature = SPN_CC_FEATURE_LINKER_SCRIPT,
+    },
+  },
+  {
+    .name = "msvc_linker_script_unsupported",
+    .driver = SPN_CC_DRIVER_MSVC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_MSVC,
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .script = "A.ld",
+    .expect = {
+      .err = SPN_ERR_COMPILER_FEATURE_UNSUPPORTED,
+      .feature = SPN_CC_FEATURE_LINKER_SCRIPT,
+    },
+  },
+  {
     .name = "windows_gnu_subsystem",
     .driver = SPN_CC_DRIVER_GCC,
     .profile = {

@@ -255,6 +255,9 @@ spn_err_t spn_cc_validate_link(const spn_cc_toolchain_t* toolchain, const spn_pr
   if (profile->os == SPN_OS_MACOS && !sp_da_empty(link->frameworks) && spn_path_empty(profile->sysroot)) {
     return feature_unsupported(toolchain, profile, SPN_CC_FEATURE_FRAMEWORKS);
   }
+  if (!sp_da_empty(link->scripts) && (!spn_cc_has(toolchain, SPN_CC_CAP_LINKER_SCRIPT) || profile->os == SPN_OS_MACOS || profile->os == SPN_OS_WASI)) {
+    return feature_unsupported(toolchain, profile, SPN_CC_FEATURE_LINKER_SCRIPT);
+  }
   if (toolchain->driver == SPN_CC_DRIVER_MSVC && link->kind == SPN_CC_OUTPUT_REACTOR) {
     return feature_unsupported(toolchain, profile, feature);
   }
