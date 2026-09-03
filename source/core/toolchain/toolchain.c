@@ -28,6 +28,23 @@ spn_toolchain_ref_t spn_toolchain_ref_from_str(sp_str_t str) {
   return (spn_toolchain_ref_t) { .kind = SPN_TOOLCHAIN_REF_NAMED, .name = str };
 }
 
+spn_toolchain_source_t spn_toolchain_source(sp_da(spn_toolchain_host_t) hosts) {
+  bool local = false;
+  bool distributed = false;
+  sp_da_for(hosts, it) {
+    if (sp_str_empty(hosts[it].artifact.url)) {
+      local = true;
+    }
+    else {
+      distributed = true;
+    }
+  }
+  if (local && distributed) {
+    return SPN_TOOLCHAIN_SOURCE_MIXED;
+  }
+  return distributed ? SPN_TOOLCHAIN_SOURCE_DISTRIBUTION : SPN_TOOLCHAIN_SOURCE_LOCAL;
+}
+
 spn_cc_cap_set_t spn_toolchain_driver_caps(spn_cc_driver_t driver) {
   switch (driver) {
     case SPN_CC_DRIVER_GCC: return SPN_CC_CAP_EXCLUDE_LIBS | SPN_CC_CAP_NOLIBC | SPN_CC_CAP_FREESTANDING;

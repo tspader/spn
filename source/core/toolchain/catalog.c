@@ -1,7 +1,7 @@
 #include "toolchain/catalog.h"
 
 #include "paths/paths.h"
-#include "toolchain/driver.h"
+#include "toolchain/toolchain.h"
 #include "toolchains.gen.h"
 #include "triple/triple.h"
 
@@ -27,15 +27,6 @@ static sp_da(spn_triple_t) bind_targets(spn_toolchain_catalog_t* catalog, const 
   return targets;
 }
 
-static bool is_local(sp_da(spn_toolchain_host_t) hosts) {
-  sp_da_for(hosts, it) {
-    if (!sp_str_empty(hosts[it].artifact.url)) {
-      return false;
-    }
-  }
-  return true;
-}
-
 static bool has_host(sp_da(spn_toolchain_host_t) hosts, spn_triple_t host) {
   sp_da_for(hosts, it) {
     if (spn_triple_match(hosts[it].triple, host)) {
@@ -47,17 +38,24 @@ static bool has_host(sp_da(spn_toolchain_host_t) hosts, spn_triple_t host) {
 
 static spn_toolchain_support_t bind_support(spn_toolchain_catalog_t* catalog, const spn_toolchain_info_t* toolchain) {
   sp_da(spn_toolchain_host_t) hosts = toolchain->hosts;
-  if (is_local(hosts)) {
-    bool supported = sp_da_empty(hosts) || has_host(hosts, catalog->host);
-    return (spn_toolchain_support_t) { .kind = supported ? SPN_TOOLCHAIN_SUPPORT_LOCAL : SPN_TOOLCHAIN_SUPPORT_NONE };
-  }
-
-  sp_da_for(hosts, it) {
-    if (spn_triple_match(hosts[it].triple, catalog->host) && !sp_str_empty(hosts[it].artifact.url)) {
-      return (spn_toolchain_support_t) { .kind = SPN_TOOLCHAIN_SUPPORT_ARTIFACT, .artifact = hosts[it].artifact };
+  switch (toolchain->source) {
+    case SPN_TOOLCHAIN_SOURCE_LOCAL: {
+      bool supported = sp_da_empty(hosts) || has_host(hosts, catalog->host);
+      return (spn_toolchain_support_t) { .kind = supported ? SPN_TOOLCHAIN_SUPPORT_LOCAL : SPN_TOOLCHAIN_SUPPORT_NONE };
+    }
+    case SPN_TOOLCHAIN_SOURCE_DISTRIBUTION: {
+      sp_da_for(hosts, it) {
+        if (spn_triple_match(hosts[it].triple, catalog->host)) {
+          return (spn_toolchain_support_t) { .kind = SPN_TOOLCHAIN_SUPPORT_ARTIFACT, .artifact = hosts[it].artifact };
+        }
+      }
+      return (spn_toolchain_support_t) { .kind = SPN_TOOLCHAIN_SUPPORT_NONE };
+    }
+    case SPN_TOOLCHAIN_SOURCE_MIXED: {
+      sp_unreachable_case();
     }
   }
-  return (spn_toolchain_support_t) { .kind = SPN_TOOLCHAIN_SUPPORT_NONE };
+  sp_unreachable_return(sp_zero_struct(spn_toolchain_support_t));
 }
 
 void spn_toolchain_catalog_init(spn_toolchain_catalog_t* catalog, spn_triple_t host, sp_mem_t mem) {
@@ -98,6 +96,10 @@ spn_err_t spn_toolchain_catalog_load(spn_toolchain_catalog_t* catalog, sp_str_t 
           .mirror_list = t->mirrors,
         },
       }));
+    }
+    toolchain.source = spn_toolchain_source(toolchain.hosts);
+    if (toolchain.source == SPN_TOOLCHAIN_SOURCE_MIXED) {
+      return SPN_ERROR;
     }
 
     toolchain.targets = sp_da_new(catalog->mem, spn_triple_t);

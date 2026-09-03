@@ -182,13 +182,6 @@ static const support_test_t support_tests [] = {
     .toolchain = "A",
     .expect = { .kind = SPN_TOOLCHAIN_SUPPORT_NONE },
   },
-  {
-    .name = "distribution_rejects_host_without_artifact",
-    .file = "mixed.json",
-    .host = HOST_ARM_MACOS,
-    .toolchain = "A",
-    .expect = { .kind = SPN_TOOLCHAIN_SUPPORT_NONE },
-  },
 };
 
 sp_test_each(catalog, add, add_test_t, add_tests) {

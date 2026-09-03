@@ -44,6 +44,12 @@ typedef struct {
 } spn_toolchain_host_t;
 
 typedef enum {
+  SPN_TOOLCHAIN_SOURCE_LOCAL,
+  SPN_TOOLCHAIN_SOURCE_DISTRIBUTION,
+  SPN_TOOLCHAIN_SOURCE_MIXED,
+} spn_toolchain_source_t;
+
+typedef enum {
   SPN_TOOLCHAIN_SUPPORT_NONE,
   SPN_TOOLCHAIN_SUPPORT_LOCAL,
   SPN_TOOLCHAIN_SUPPORT_ARTIFACT,
@@ -62,6 +68,7 @@ typedef struct {
   spn_toolchain_launcher_t cxx;
   spn_toolchain_launcher_t linker;
   spn_toolchain_launcher_t archiver;
+  spn_toolchain_source_t source;
   sp_da(spn_toolchain_host_t) hosts;
   sp_da(spn_triple_t) targets;
   spn_toolchain_support_t support;

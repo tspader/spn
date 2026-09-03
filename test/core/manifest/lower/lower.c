@@ -488,6 +488,13 @@ static const test_t tests [] = {
     }
   },
   {
+    .name = "validate_toolchain_host_mixed",
+    .manifest = "toolchain_host_mixed",
+    .issues = {
+      { SPN_ERR_CODEGEN_MISSING_KEY, "toolchain[0].host.aarch64-macos.url" }
+    }
+  },
+  {
     .name = "validate_toolchain_target_foreign_abi",
     .manifest = "toolchain_target_foreign_abi",
     .issues = {

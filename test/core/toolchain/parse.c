@@ -134,6 +134,11 @@ static const parse_test_t tests [] = {
     .file = "bad_host.json",
     .expect = { .err = SPN_ERROR },
   },
+  {
+    .name = "mixed_hosts",
+    .file = "mixed.json",
+    .expect = { .err = SPN_ERROR },
+  },
 };
 
 sp_test_each(parse, catalog, parse_test_t, tests) {

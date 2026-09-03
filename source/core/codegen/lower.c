@@ -345,6 +345,18 @@ static void lower_toolchains(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg
         },
       }));
     }
+    toolchain.source = spn_toolchain_source(toolchain.hosts);
+    if (toolchain.source == SPN_TOOLCHAIN_SOURCE_MIXED) {
+      spn_toml_loader_push_key(ctx, "host");
+      sp_da_for(toolchain.hosts, it) {
+        if (sp_str_empty(toolchain.hosts[it].artifact.url)) {
+          spn_toml_loader_push_key(ctx, sp_str_to_cstr(ctx->mem, spn_triple_to_str(ctx->mem, toolchain.hosts[it].triple)));
+          spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, "url");
+          spn_toml_loader_pop(ctx);
+        }
+      }
+      spn_toml_loader_pop(ctx);
+    }
 
     toolchain.targets = sp_da_new(ctx->mem, spn_triple_t);
     spn_toml_loader_push_key(ctx, "target");
