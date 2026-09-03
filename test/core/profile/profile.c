@@ -156,9 +156,8 @@ static const test_t tests [] = {
     .overrides = { .arch = SPN_ARCH_ARM64, .os = SPN_OS_FREESTANDING },
     .host = PROFILE_HOST_LINUX_GNU,
     .shared_demand = true,
-    .abi = SPN_ABI_BARE,
     .expect = {
-      .target = { SPN_ARCH_ARM64, SPN_OS_FREESTANDING },
+      .target = { SPN_ARCH_ARM64, SPN_OS_FREESTANDING, SPN_ABI_BARE },
       .linkage = SPN_LIB_KIND_STATIC,
       .targeted = true,
     },
@@ -168,9 +167,8 @@ static const test_t tests [] = {
     .overrides = { .arch = SPN_ARCH_WASM32, .os = SPN_OS_WASI },
     .host = PROFILE_HOST_LINUX_GNU,
     .shared_demand = true,
-    .abi = SPN_ABI_MUSL,
     .expect = {
-      .target = { SPN_ARCH_WASM32, SPN_OS_WASI },
+      .target = { SPN_ARCH_WASM32, SPN_OS_WASI, SPN_ABI_MUSL },
       .linkage = SPN_LIB_KIND_STATIC,
       .targeted = true,
     },
@@ -243,9 +241,8 @@ static const test_t tests [] = {
     .profile = { .name = "default", .abi = SPN_ABI_GNU },
     .overrides = { .arch = SPN_ARCH_ARM64, .os = SPN_OS_MACOS },
     .host = PROFILE_HOST_LINUX_GNU,
-    .abi = SPN_ABI_APPLE,
     .expect = {
-      .target = { SPN_ARCH_ARM64, SPN_OS_MACOS },
+      .target = { SPN_ARCH_ARM64, SPN_OS_MACOS, SPN_ABI_APPLE },
       .linkage = SPN_LIB_KIND_SHARED,
       .targeted = true,
     },
@@ -278,9 +275,8 @@ static const test_t tests [] = {
     .derived = { .name = "mac", .os = SPN_OS_MACOS },
     .overrides = { .name = "mac" },
     .host = PROFILE_HOST_LINUX_GNU,
-    .abi = SPN_ABI_APPLE,
     .expect = {
-      .target = { SPN_ARCH_X64, SPN_OS_MACOS },
+      .target = { SPN_ARCH_X64, SPN_OS_MACOS, SPN_ABI_APPLE },
       .linkage = SPN_LIB_KIND_SHARED,
       .targeted = true,
     },
@@ -370,12 +366,6 @@ static const query_test_t query_tests [] = {
     .expect = { .abis = { SPN_ABI_GNU, SPN_ABI_MSVC } },
   },
   {
-    .name = "native_macos_is_apple",
-    .target = { SPN_ARCH_ARM64, SPN_OS_MACOS },
-    .host = PROFILE_HOST_ARM_MACOS,
-    .expect = { .abis = { SPN_ABI_APPLE } },
-  },
-  {
     .name = "explicit_abi_is_the_only_candidate",
     .target = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU },
     .host = PROFILE_HOST_LINUX_GNU,
@@ -411,24 +401,6 @@ static const query_test_t query_tests [] = {
     .target = { SPN_ARCH_ARM64, SPN_OS_LINUX },
     .linkage = SPN_LIB_KIND_SHARED,
     .host = PROFILE_HOST_LINUX_GNU,
-  },
-  {
-    .name = "cross_macos_is_apple",
-    .target = { SPN_ARCH_ARM64, SPN_OS_MACOS },
-    .host = PROFILE_HOST_LINUX_GNU,
-    .expect = { .abis = { SPN_ABI_APPLE } },
-  },
-  {
-    .name = "cross_wasi_is_musl",
-    .target = { SPN_ARCH_WASM32, SPN_OS_WASI },
-    .host = PROFILE_HOST_LINUX_GNU,
-    .expect = { .abis = { SPN_ABI_MUSL } },
-  },
-  {
-    .name = "cross_freestanding_is_bare",
-    .target = { SPN_ARCH_ARM64, SPN_OS_FREESTANDING },
-    .host = PROFILE_HOST_LINUX_GNU,
-    .expect = { .abis = { SPN_ABI_BARE } },
   },
 };
 

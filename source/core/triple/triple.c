@@ -2,37 +2,6 @@
 #include "triple/triple.h"
 #include "enum/enum.h"
 
-spn_triple_t spn_triple_from_str(sp_str_t str) {
-  spn_triple_t result = {0};
-  if (sp_str_empty(str)) return result;
-
-  // Split on '-': arch-os-abi
-  sp_str_t remaining = str;
-
-  // First component: arch
-  s32 sep = sp_str_find(remaining, sp_str_lit("-"));
-  if (sep < 0) {
-    result.arch = spn_arch_from_str(remaining);
-    return result;
-  }
-  result.arch = spn_arch_from_str(sp_str_prefix(remaining, sep));
-  remaining = sp_str_suffix(remaining, remaining.len - sep - 1);
-
-  // Second component: os
-  sep = sp_str_find(remaining, sp_str_lit("-"));
-  if (sep < 0) {
-    result.os = spn_os_from_str(remaining);
-    return result;
-  }
-  result.os = spn_os_from_str(sp_str_prefix(remaining, sep));
-  remaining = sp_str_suffix(remaining, remaining.len - sep - 1);
-
-  // Third component: abi
-  result.abi = spn_abi_from_str(remaining);
-
-  return result;
-}
-
 spn_err_t spn_triple_parse(sp_str_t str, spn_triple_t* triple) {
   *triple = sp_zero_s(spn_triple_t);
 
@@ -255,7 +224,7 @@ u32 spn_os_archs(spn_os_t os, const spn_arch_t** archs) {
   SP_UNREACHABLE_RETURN(0);
 }
 
-bool spn_os_has_arch(spn_os_t os, spn_arch_t arch) {
+static bool os_has_arch(spn_os_t os, spn_arch_t arch) {
   const spn_arch_t* archs = SP_NULLPTR;
   u32 count = spn_os_archs(os, &archs);
   sp_for(it, count) {
@@ -266,7 +235,7 @@ bool spn_os_has_arch(spn_os_t os, spn_arch_t arch) {
   return false;
 }
 
-bool spn_os_has_abi(spn_os_t os, spn_abi_t abi) {
+static bool os_has_abi(spn_os_t os, spn_abi_t abi) {
   const spn_abi_t* abis = SP_NULLPTR;
   u32 count = spn_os_abis(os, &abis);
   sp_for(it, count) {
@@ -301,12 +270,12 @@ spn_triple_entry_t spn_triple_entry(spn_triple_t partial, spn_triple_t* full) {
   if (!partial.os) {
     return SPN_TRIPLE_ENTRY_MISSING_OS;
   }
-  if (!spn_os_has_arch(partial.os, partial.arch)) {
+  if (!os_has_arch(partial.os, partial.arch)) {
     return SPN_TRIPLE_ENTRY_FOREIGN_ARCH;
   }
 
   if (partial.abi) {
-    if (!spn_os_has_abi(partial.os, partial.abi)) {
+    if (!os_has_abi(partial.os, partial.abi)) {
       return SPN_TRIPLE_ENTRY_FOREIGN_ABI;
     }
     *full = partial;

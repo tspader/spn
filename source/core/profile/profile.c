@@ -150,15 +150,15 @@ static spn_abi_list_t abi_order(const spn_profile_info_t* profile, spn_triple_t 
     return list;
   }
 
-  const spn_abi_t* abis = SP_NULLPTR;
-  u32 count = spn_os_abis(profile->os, &abis);
   bool native = profile->arch == host.arch && profile->os == host.os;
-  if (!native && count > 1) {
+  if (!native) {
     return list;
   }
-  if (native && profile->os == SPN_OS_LINUX) {
+  if (profile->os == SPN_OS_LINUX) {
     push_abi(&list, profile->linkage == SPN_LIB_KIND_SHARED ? host.abi : SPN_ABI_MUSL);
   }
+  const spn_abi_t* abis = SP_NULLPTR;
+  u32 count = spn_os_abis(profile->os, &abis);
   sp_for(it, count) {
     push_abi(&list, abis[it]);
   }
@@ -239,7 +239,8 @@ spn_err_t spn_profile_resolve(spn_profile_table_t profiles, const spn_profile_ov
     });
   }
 
-  if (spn_triple_from_str(name).arch) {
+  spn_triple_t collision = sp_zero;
+  if (spn_triple_parse(name, &collision) == SPN_OK) {
     return spn_err_emit(&spn, (spn_err_union_t) {
       .kind = SPN_ERR_PROFILE_INVALID,
       .profile = { .name = name },
@@ -270,17 +271,31 @@ spn_err_t spn_profile_resolve(spn_profile_table_t profiles, const spn_profile_ov
     .os = target.os ? target.os : host.os,
     .abi = target.abi,
   };
-  if (!spn_os_has_arch(pinned.os, pinned.arch)) {
-    return spn_err_emit(&spn, (spn_err_union_t) {
-      .kind = SPN_ERR_PROFILE_ARCH,
-      .profile = { .name = name, .target = pinned },
-    });
-  }
-  if (pinned.abi && !spn_os_has_abi(pinned.os, pinned.abi)) {
-    return spn_err_emit(&spn, (spn_err_union_t) {
-      .kind = SPN_ERR_PROFILE_ABI,
-      .profile = { .name = name, .target = pinned },
-    });
+  spn_triple_t full = sp_zero;
+  switch (spn_triple_entry(pinned, &full)) {
+    case SPN_TRIPLE_ENTRY_OK: {
+      pinned = full;
+      break;
+    }
+    case SPN_TRIPLE_ENTRY_MISSING_ABI: {
+      break;
+    }
+    case SPN_TRIPLE_ENTRY_FOREIGN_ARCH: {
+      return spn_err_emit(&spn, (spn_err_union_t) {
+        .kind = SPN_ERR_PROFILE_ARCH,
+        .profile = { .name = name, .target = pinned },
+      });
+    }
+    case SPN_TRIPLE_ENTRY_FOREIGN_ABI: {
+      return spn_err_emit(&spn, (spn_err_union_t) {
+        .kind = SPN_ERR_PROFILE_ABI,
+        .profile = { .name = name, .target = pinned },
+      });
+    }
+    case SPN_TRIPLE_ENTRY_MISSING_ARCH:
+    case SPN_TRIPLE_ENTRY_MISSING_OS: {
+      sp_unreachable_case();
+    }
   }
   if (merged.linkage == SPN_LIB_KIND_SHARED && !spn_os_dynamic(pinned.os)) {
     return spn_err_emit(&spn, (spn_err_union_t) {

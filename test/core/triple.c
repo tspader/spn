@@ -13,34 +13,39 @@ typedef struct {
 typedef struct {
   const c8* name;
   const c8* triple;
+  spn_err_t err;
   triple_expect_t expect;
-} from_str_t;
+} parse_t;
 
-static const from_str_t from_str_tests [] = {
-  { "x64_linux_gnu",      "x86_64-linux-gnu",      { SPN_ARCH_X64,   SPN_OS_LINUX,   SPN_ABI_GNU } },
-  { "x64_linux_musl",     "x86_64-linux-musl",     { SPN_ARCH_X64,   SPN_OS_LINUX,   SPN_ABI_MUSL } },
-  { "arm64_linux_gnu",    "aarch64-linux-gnu",     { SPN_ARCH_ARM64, SPN_OS_LINUX,   SPN_ABI_GNU } },
-  { "arm64_linux_musl",   "aarch64-linux-musl",    { SPN_ARCH_ARM64, SPN_OS_LINUX,   SPN_ABI_MUSL } },
-  { "x64_windows_gnu",    "x86_64-windows-gnu",    { SPN_ARCH_X64,   SPN_OS_WINDOWS, SPN_ABI_GNU } },
-  { "mingw_is_not_an_abi", "x86_64-windows-mingw", { SPN_ARCH_X64,   SPN_OS_WINDOWS } },
-  { "x64_macos",          "x86_64-macos",          { SPN_ARCH_X64,   SPN_OS_MACOS } },
-  { "arm64_macos",        "aarch64-macos",         { SPN_ARCH_ARM64, SPN_OS_MACOS } },
-  { "arm64_macos_apple",  "aarch64-macos-apple",   { SPN_ARCH_ARM64, SPN_OS_MACOS,   SPN_ABI_APPLE } },
-  { "arm64_freestanding_none", "aarch64-freestanding-none", { SPN_ARCH_ARM64, SPN_OS_FREESTANDING, SPN_ABI_BARE } },
-  { "x64_freestanding",   "x86_64-freestanding",   { SPN_ARCH_X64,   SPN_OS_FREESTANDING } },
-  { "x64_linux_no_abi",   "x86_64-linux",          { SPN_ARCH_X64,   SPN_OS_LINUX } },
-  { "arm64_linux_no_abi", "aarch64-linux",         { SPN_ARCH_ARM64, SPN_OS_LINUX } },
-  { "x64_bare",           "x86_64",                { SPN_ARCH_X64 } },
-  { "arm64_bare",         "aarch64",               { SPN_ARCH_ARM64 } },
-  { "unknown_abi",        "x86_64-linux-banana",   { SPN_ARCH_X64,   SPN_OS_LINUX } },
-  { "empty",              "",                      { SPN_ARCH_NONE } },
+static const parse_t parse_tests [] = {
+  { "x64_linux_gnu",           "x86_64-linux-gnu",          .expect = { SPN_ARCH_X64,   SPN_OS_LINUX,   SPN_ABI_GNU } },
+  { "x64_linux_musl",          "x86_64-linux-musl",         .expect = { SPN_ARCH_X64,   SPN_OS_LINUX,   SPN_ABI_MUSL } },
+  { "arm64_linux_gnu",         "aarch64-linux-gnu",         .expect = { SPN_ARCH_ARM64, SPN_OS_LINUX,   SPN_ABI_GNU } },
+  { "arm64_linux_musl",        "aarch64-linux-musl",        .expect = { SPN_ARCH_ARM64, SPN_OS_LINUX,   SPN_ABI_MUSL } },
+  { "x64_windows_gnu",         "x86_64-windows-gnu",        .expect = { SPN_ARCH_X64,   SPN_OS_WINDOWS, SPN_ABI_GNU } },
+  { "x64_macos",               "x86_64-macos",              .expect = { SPN_ARCH_X64,   SPN_OS_MACOS } },
+  { "arm64_macos_apple",       "aarch64-macos-apple",       .expect = { SPN_ARCH_ARM64, SPN_OS_MACOS,   SPN_ABI_APPLE } },
+  { "arm64_freestanding_none", "aarch64-freestanding-none", .expect = { SPN_ARCH_ARM64, SPN_OS_FREESTANDING, SPN_ABI_BARE } },
+  { "x64_freestanding",        "x86_64-freestanding",       .expect = { SPN_ARCH_X64,   SPN_OS_FREESTANDING } },
+  { "x64_linux_no_abi",        "x86_64-linux",              .expect = { SPN_ARCH_X64,   SPN_OS_LINUX } },
+  { "x64_bare",                "x86_64",                    .expect = { SPN_ARCH_X64 } },
+  { "mingw_is_not_an_abi",     "x86_64-windows-mingw",      SPN_ERR_TRIPLE_INVALID },
+  { "unknown_abi",             "x86_64-linux-banana",       SPN_ERR_TRIPLE_INVALID },
+  { "unknown_arch",            "x86-linux",                 SPN_ERR_TRIPLE_INVALID },
+  { "too_many_parts",          "x86_64-linux-gnu-extra",    SPN_ERR_TRIPLE_INVALID },
+  { "empty_part",              "x86_64--gnu",               SPN_ERR_TRIPLE_INVALID },
+  { "empty",                   "",                          SPN_ERR_TRIPLE_INVALID },
 };
 
-sp_test_each(triple, from_str, from_str_t, from_str_tests) {
-  spn_triple_t triple = spn_triple_from_str(sp_str_view(it->triple));
-  sp_expect_eq(t, triple.arch, it->expect.arch);
-  sp_expect_eq(t, triple.os, it->expect.os);
-  sp_expect_eq(t, triple.abi, it->expect.abi);
+sp_test_each(triple, parse, parse_t, parse_tests) {
+  spn_triple_t triple = sp_zero;
+  spn_err_t err = spn_triple_parse(sp_str_view(it->triple), &triple);
+  sp_expect_eq(t, (u32)it->err, (u32)err);
+  if (!err) {
+    sp_expect_eq(t, triple.arch, it->expect.arch);
+    sp_expect_eq(t, triple.os, it->expect.os);
+    sp_expect_eq(t, triple.abi, it->expect.abi);
+  }
   return SP_OK;
 }
 
@@ -153,9 +158,10 @@ sp_test(triple, host) {
   sp_expect_ne(t, host.os, SPN_OS_NONE);
   sp_expect_ne(t, host.abi, SPN_ABI_NONE);
 
-  // roundtrip: to_str then from_str should match
+  // roundtrip: to_str then parse should match
   sp_str_t str = spn_triple_to_str(sp_test_arena(t), host);
-  spn_triple_t roundtrip = spn_triple_from_str(str);
+  spn_triple_t roundtrip = sp_zero;
+  sp_expect_eq(t, (u32)SPN_OK, (u32)spn_triple_parse(str, &roundtrip));
   sp_expect_eq(t, roundtrip.arch, host.arch);
   sp_expect_eq(t, roundtrip.os, host.os);
   sp_expect_eq(t, roundtrip.abi, host.abi);

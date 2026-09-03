@@ -74,12 +74,18 @@ spn_triple_t test_host(void) {
   return host;
 }
 
+static spn_triple_t parse_triple(const c8* str) {
+  spn_triple_t triple = sp_zero;
+  sp_assert(spn_triple_parse(sp_cstr_as_str(str), &triple) == SPN_OK);
+  return triple;
+}
+
 static spn_triple_t when_target(const test_when_t* when) {
   spn_triple_t host = test_host();
   if (!when->target) {
     return host;
   }
-  spn_triple_t partial = spn_triple_from_str(sp_cstr_as_str(when->target));
+  spn_triple_t partial = parse_triple(when->target);
   return (spn_triple_t) {
     .arch = partial.arch ? partial.arch : host.arch,
     .os = partial.os ? partial.os : host.os,
@@ -99,7 +105,7 @@ static bool toolchain_targets(const test_toolchain_t* toolchain, spn_triple_t ta
     if (!toolchain->targets[it]) {
       break;
     }
-    if (triple_agrees(spn_triple_from_str(sp_cstr_as_str(toolchain->targets[it])), target)) {
+    if (triple_agrees(parse_triple(toolchain->targets[it]), target)) {
       return true;
     }
   }
@@ -114,7 +120,7 @@ const c8* test_target_alternate(void) {
     if (!toolchain->targets[it]) {
       break;
     }
-    spn_triple_t target = spn_triple_from_str(sp_cstr_as_str(toolchain->targets[it]));
+    spn_triple_t target = parse_triple(toolchain->targets[it]);
     if (target.os == SPN_OS_FREESTANDING) {
       continue;
     }

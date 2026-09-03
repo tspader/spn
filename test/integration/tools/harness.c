@@ -64,7 +64,9 @@ sp_str_t test_lib(const c8* name) {
 static sp_str_t exe_file_name(const c8* name, const c8* triple) {
   spn_triple_t target = test_host();
   if (triple) {
-    target = spn_triple_merge(target, spn_triple_from_str(sp_str_view(triple)));
+    spn_triple_t partial = sp_zero;
+    sp_assert(spn_triple_parse(sp_str_view(triple), &partial) == SPN_OK);
+    target = spn_triple_merge(target, partial);
   }
   if (sp_str_find_c8(sp_fs_get_name(sp_str_view(name)), '.') >= 0) {
     return sp_str_view(name);
