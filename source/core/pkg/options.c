@@ -262,6 +262,8 @@ static void apply_target(apply_ctx_t* ctx, spn_target_info_t* target) {
   apply_gated_paths(ctx, &target->include, target->gated.include);
   apply_gated(ctx, &target->define, target->gated.define);
   apply_gated(ctx, &target->flags, target->gated.flags);
+  apply_gated(ctx, &target->link_flags, target->gated.link_flags);
+  apply_gated_paths(ctx, &target->linker_script, target->gated.linker_script);
   apply_gated(ctx, &target->system_deps, target->gated.system_deps);
   apply_gated(ctx, &target->deps, target->gated.deps);
   apply_gated(ctx, &target->macos.frameworks, target->gated.frameworks);

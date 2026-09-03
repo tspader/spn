@@ -164,6 +164,8 @@ static spn_target_info_t lower_target(spn_toml_loader_t* ctx, const spn_cg_targe
       .include = lower_gated_dirs(ctx, cg->include),
       .define = lower_gated_values(ctx, cg->define),
       .flags = lower_gated_values(ctx, cg->flags),
+      .link_flags = lower_gated_values(ctx, cg->link_flags),
+      .linker_script = lower_gated_paths(ctx, cg->linker_script),
       .system_deps = lower_gated_values(ctx, cg->system_deps),
       .deps = sp_da_new(ctx->mem, spn_gated_str_t),
       .frameworks = lower_gated_values(ctx, cg->macos.frameworks),
@@ -736,6 +738,8 @@ static void validate_target_whens(spn_toml_loader_t* ctx, spn_cg_target_om_t tar
     validate_source_whens(ctx, target->include, "include", out);
     validate_value_whens(ctx, target->define, "define", out);
     validate_value_whens(ctx, target->flags, "flags", out);
+    validate_value_whens(ctx, target->link_flags, "link_flags", out);
+    validate_source_whens(ctx, target->linker_script, "linker_script", out);
     validate_value_whens(ctx, target->system_deps, "system_deps", out);
     spn_toml_loader_push_key(ctx, "macos");
     validate_value_whens(ctx, target->macos.frameworks, "frameworks", out);
@@ -1021,6 +1025,7 @@ static void validate_collection_trees(spn_toml_loader_t* ctx, spn_cg_target_om_t
     validate_entry_trees(ctx, target->source, "source");
     validate_entry_trees(ctx, target->headers, "headers");
     validate_entry_trees(ctx, target->include, "include");
+    validate_entry_trees(ctx, target->linker_script, "linker_script");
     spn_toml_loader_pop(ctx);
   }
   spn_toml_loader_pop(ctx);

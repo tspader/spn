@@ -46,6 +46,8 @@ static spn_target_info_t clone_target_info(sp_mem_t mem, spn_target_info_t* sour
   target.include = clone_path_list(mem, source->include);
   target.define = clone_str_list(mem, source->define);
   target.flags = clone_str_list(mem, source->flags);
+  target.link_flags = clone_str_list(mem, source->link_flags);
+  target.linker_script = clone_path_list(mem, source->linker_script);
   target.system_deps = clone_str_list(mem, source->system_deps);
   target.deps = clone_str_list(mem, source->deps);
   target.embed = clone_embed_list(mem, source->embed);
