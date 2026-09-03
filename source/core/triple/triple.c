@@ -201,7 +201,7 @@ u32 spn_os_abis(spn_os_t os, const spn_abi_t** abis) {
 }
 
 u32 spn_os_archs(spn_os_t os, const spn_arch_t** archs) {
-  static const spn_arch_t native_archs [] = { SPN_ARCH_X64, SPN_ARCH_ARM64 };
+  static const spn_arch_t machine_archs [] = { SPN_ARCH_X64, SPN_ARCH_ARM64 };
   static const spn_arch_t wasi_archs [] = { SPN_ARCH_WASM32 };
 
   switch (os) {
@@ -209,8 +209,8 @@ u32 spn_os_archs(spn_os_t os, const spn_arch_t** archs) {
     case SPN_OS_WINDOWS:
     case SPN_OS_MACOS:
     case SPN_OS_FREESTANDING: {
-      *archs = native_archs;
-      return sp_carr_len(native_archs);
+      *archs = machine_archs;
+      return sp_carr_len(machine_archs);
     }
     case SPN_OS_WASI: {
       *archs = wasi_archs;

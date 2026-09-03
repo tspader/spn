@@ -321,6 +321,20 @@ spn_err_t spn_profile_resolve(spn_profile_table_t profiles, const spn_profile_ov
   return SPN_OK;
 }
 
+spn_profile_info_t spn_profile_metaprogram(void) {
+  return (spn_profile_info_t) {
+    .name = sp_str_lit("metaprogram"),
+    .toolchain = { .kind = SPN_TOOLCHAIN_REF_AUTO },
+    .arch = SPN_ARCH_WASM32,
+    .os = SPN_OS_WASI,
+    .abi = SPN_ABI_MUSL,
+    .mode = SPN_MODE_DEBUG,
+    .opt = SPN_OPT_LEVEL_2,
+    .standard = SPN_C99,
+    .linkage = SPN_LIB_KIND_STATIC,
+  };
+}
+
 spn_when_facts_t spn_profile_facts(const spn_profile_info_t* profile) {
   return (spn_when_facts_t) {
     .os = profile->os,

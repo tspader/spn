@@ -78,9 +78,7 @@ static sp_da(spn_triple_t) bind_targets(spn_toolchain_catalog_t* catalog, const 
 
   sp_da(spn_triple_t) targets = sp_da_new(catalog->mem, spn_triple_t);
   sp_da_push(targets, catalog->host);
-  bool elf = catalog->host.os == SPN_OS_LINUX;
-  bool bare_metal = spn_toolchain_driver_caps(decl->driver) & SPN_CC_CAP_FREESTANDING;
-  if (elf && bare_metal) {
+  if (catalog->host.os == SPN_OS_LINUX && (spn_toolchain_driver_caps(decl->driver) & SPN_CC_CAP_FREESTANDING)) {
     sp_da_push(targets, ((spn_triple_t) { catalog->host.arch, SPN_OS_FREESTANDING, SPN_ABI_BARE }));
   }
   return targets;

@@ -10,20 +10,6 @@
 #include "triple/triple.h"
 #include "when/when.h"
 
-spn_profile_info_t spn_build_metaprogram_profile() {
-  return (spn_profile_info_t) {
-    .name = sp_str_lit("metaprogram"),
-    .toolchain = { .kind = SPN_TOOLCHAIN_REF_AUTO },
-    .arch = SPN_ARCH_WASM32,
-    .os = SPN_OS_WASI,
-    .abi = SPN_ABI_MUSL,
-    .mode = SPN_MODE_DEBUG,
-    .opt = SPN_OPT_LEVEL_2,
-    .standard = SPN_C99,
-    .linkage = SPN_LIB_KIND_STATIC,
-  };
-}
-
 spn_build_id_t spn_build_id(const spn_profile_info_t* profile) {
   sp_hash_t parts [] = {
     spn_digest_hash_str(profile->name),
