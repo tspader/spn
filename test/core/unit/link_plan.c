@@ -10,6 +10,8 @@ typedef struct {
   const c8* deps [UNIT_TEST_MAX_STRS];
   const c8* system_deps [UNIT_TEST_MAX_STRS];
   const c8* frameworks [UNIT_TEST_MAX_STRS];
+  const c8* link_flags [UNIT_TEST_MAX_STRS];
+  const c8* linker_script [UNIT_TEST_MAX_STRS];
   spn_os_version_t min_os;
 } plan_target_t;
 
@@ -19,6 +21,8 @@ typedef struct {
   const c8* private_libs [UNIT_TEST_MAX_STRS];
   const c8* system_libs [UNIT_TEST_MAX_STRS];
   const c8* frameworks [UNIT_TEST_MAX_STRS];
+  const c8* args [UNIT_TEST_MAX_STRS];
+  const c8* scripts [UNIT_TEST_MAX_STRS];
   spn_os_version_t min_os;
   spn_lang_t lang;
 } plan_expect_t;
@@ -185,6 +189,34 @@ static const plan_test_t tests [] = {
       .system_libs = { "m", "pthread", "dl", "rt" },
     },
   },
+  // Link flags and linker scripts belong to the linked target alone; a dep's
+  // own never reach the consumer's link line
+  {
+    .name = "exe_link_inputs_come_from_target",
+    .target = { .kind = SPN_TARGET_KIND_EXE, .source = { "main.c" }, .link_flags = { "-A" }, .linker_script = { "A.ld" } },
+    .graph = {
+      .pkgs = {
+        { .name = "P1", .deps = { { "D1" } } },
+        { .name = "D1", .libs = { { "D1", SHARED_ONLY, .source = { "s.c" }, .link_flags = { "-B" }, .linker_script = { "B.ld" } } } },
+      },
+    },
+    .expect = {
+      .libs = { "D1" },
+      .args = { "-A" },
+      .scripts = { "A.ld" },
+    },
+  },
+  // A lib that could be shared but is selected static is archived, not linked,
+  // so its link inputs stay off the plan
+  {
+    .name = "static_selection_drops_link_inputs",
+    .target = { .kind = SPN_TARGET_KIND_LIB, .linkages = { .static_lib = true, .shared = true }, .source = { "a.c" }, .link_flags = { "-A" }, .linker_script = { "A.ld" } },
+    .graph = {
+      .pkgs = {
+        { .name = "P1" },
+      },
+    },
+  },
   {
     .name = "test_target_links_test_deps",
     .target = { .kind = SPN_TARGET_KIND_TEST, .source = { "main.c" } },
@@ -211,6 +243,8 @@ static spn_target_info_t target_info(sp_mem_t mem, spn_tree_roots_t trees, const
   info.system_deps = test_str_list(mem, spec->system_deps, UNIT_TEST_MAX_STRS);
   info.macos.frameworks = test_str_list(mem, spec->frameworks, UNIT_TEST_MAX_STRS);
   info.macos.min_os = spec->min_os;
+  info.link_flags = test_str_list(mem, spec->link_flags, UNIT_TEST_MAX_STRS);
+  info.linker_script = test_path_list(mem, trees, spec->linker_script, UNIT_TEST_MAX_STRS);
   return info;
 }
 
@@ -250,6 +284,10 @@ sp_test_each(link_plan, plan, plan_test_t, tests, .setup = spn_test_ctx_setup) {
   sp_must_strs_eq(t, plan->cc.private_libs, sp_da_size(plan->cc.private_libs), it->expect.private_libs);
   sp_must_strs_eq(t, plan->cc.system_libs, sp_da_size(plan->cc.system_libs), it->expect.system_libs);
   sp_must_strs_eq(t, plan->cc.frameworks, sp_da_size(plan->cc.frameworks), it->expect.frameworks);
+  sp_must_strs_eq(t, plan->cc.args, sp_da_size(plan->cc.args), it->expect.args);
+  u32 num_scripts = 0;
+  sp_carr_detect_len(it->expect.scripts, num_scripts, it->expect.scripts[num_scripts]);
+  sp_try(expect_path_suffixes(t, plan->cc.scripts, it->expect.scripts, num_scripts));
   sp_expect_eq(t, it->expect.min_os.major, plan->cc.min_os.major);
   sp_expect_eq(t, it->expect.min_os.minor, plan->cc.min_os.minor);
   sp_expect_eq(t, it->expect.lang, plan->cc.lang);

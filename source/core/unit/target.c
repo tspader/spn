@@ -412,6 +412,21 @@ static spn_link_plan_t link_plan(spn_target_unit_t* target) {
 
   link_plan_frameworks(target, closure, &plan.cc.frameworks);
   link_plan_system_libs(target, closure, &plan.cc.system_libs);
+  switch (target->kind) {
+    case SPN_CC_OUTPUT_EXE:
+    case SPN_CC_OUTPUT_SHARED_LIB:
+    case SPN_CC_OUTPUT_REACTOR: {
+      plan.cc.args = target->info->link_flags;
+      plan.cc.scripts = target->info->linker_script;
+      break;
+    }
+    case SPN_CC_OUTPUT_STATIC_LIB:
+    case SPN_CC_OUTPUT_OBJECT: {
+      sp_da_init(mem, plan.cc.args);
+      sp_da_init(mem, plan.cc.scripts);
+      break;
+    }
+  }
 
   sp_da_for(plan.libs, it) {
     spn_link_lib_t* lib = &plan.libs[it];
