@@ -68,6 +68,8 @@ struct spn_target_info {
   sp_da(spn_path_t) include;
   sp_da(sp_str_t) define;
   sp_da(sp_str_t) flags;
+  sp_da(sp_str_t) link_flags;
+  sp_da(spn_path_t) linker_script;
   sp_da(sp_str_t) system_deps;
   sp_da(sp_str_t) deps;
   sp_da(spn_embed_t) embed;
@@ -85,6 +87,8 @@ struct spn_target_info {
     spn_gated_path_list_t include;
     spn_gated_list_t define;
     spn_gated_list_t flags;
+    spn_gated_list_t link_flags;
+    spn_gated_path_list_t linker_script;
     spn_gated_list_t system_deps;
     spn_gated_list_t deps;
     spn_gated_list_t frameworks;
