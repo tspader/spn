@@ -70,7 +70,7 @@ static spn_err_t emit(spn_err_t kind, spn_toolchain_catalog_t* catalog, spn_tool
   return spn_err_emit(&spn, (spn_err_union_t) {
     .kind = kind,
     .toolchain = {
-      .name = query.name,
+      .name = query.toolchain.name,
       .target = query.target,
       .host = catalog->host,
       .candidates = candidates,
@@ -111,7 +111,7 @@ static spn_err_t select_auto(spn_toolchain_catalog_t* catalog, spn_toolchain_que
 }
 
 static spn_err_t select_named(spn_toolchain_catalog_t* catalog, spn_toolchain_query_t query, spn_toolchain_selection_t* selection) {
-  spn_toolchain_info_t* toolchain = spn_toolchain_catalog_get(catalog, query.name);
+  spn_toolchain_info_t* toolchain = spn_toolchain_catalog_get(catalog, query.toolchain.name);
   if (!toolchain) {
     return emit(SPN_ERR_TOOLCHAIN_UNKNOWN, catalog, query, satisfying(catalog, query), SP_NULLPTR);
   }
@@ -137,7 +137,7 @@ static spn_err_t incomplete_auto(spn_toolchain_catalog_t* catalog, spn_toolchain
 }
 
 static spn_err_t incomplete_named(spn_toolchain_catalog_t* catalog, spn_toolchain_query_t query) {
-  spn_toolchain_info_t* toolchain = spn_toolchain_catalog_get(catalog, query.name);
+  spn_toolchain_info_t* toolchain = spn_toolchain_catalog_get(catalog, query.toolchain.name);
   if (!toolchain) {
     return emit(SPN_ERR_TOOLCHAIN_UNKNOWN, catalog, query, reaching(catalog, query.target), SP_NULLPTR);
   }
@@ -150,12 +150,15 @@ static spn_err_t incomplete_named(spn_toolchain_catalog_t* catalog, spn_toolchai
 spn_err_t spn_toolchain_select(spn_toolchain_catalog_t* catalog, spn_toolchain_query_t query, spn_toolchain_selection_t* selection) {
   sp_assert(query.abis.count);
   *selection = sp_zero_s(spn_toolchain_selection_t);
-  switch (query.kind) {
-    case SPN_TOOLCHAIN_QUERY_AUTO: {
+  switch (query.toolchain.kind) {
+    case SPN_TOOLCHAIN_REF_AUTO: {
       return select_auto(catalog, query, selection);
     }
-    case SPN_TOOLCHAIN_QUERY_NAMED: {
+    case SPN_TOOLCHAIN_REF_NAMED: {
       return select_named(catalog, query, selection);
+    }
+    case SPN_TOOLCHAIN_REF_NONE: {
+      sp_unreachable_case();
     }
   }
 
@@ -164,12 +167,15 @@ spn_err_t spn_toolchain_select(spn_toolchain_catalog_t* catalog, spn_toolchain_q
 
 spn_err_t spn_toolchain_incomplete(spn_toolchain_catalog_t* catalog, spn_toolchain_query_t query) {
   sp_assert(!query.abis.count);
-  switch (query.kind) {
-    case SPN_TOOLCHAIN_QUERY_AUTO: {
+  switch (query.toolchain.kind) {
+    case SPN_TOOLCHAIN_REF_AUTO: {
       return incomplete_auto(catalog, query);
     }
-    case SPN_TOOLCHAIN_QUERY_NAMED: {
+    case SPN_TOOLCHAIN_REF_NAMED: {
       return incomplete_named(catalog, query);
+    }
+    case SPN_TOOLCHAIN_REF_NONE: {
+      sp_unreachable_case();
     }
   }
 

@@ -6,6 +6,7 @@
 #include "intern/intern.h"
 #include "pkg/types.h"
 #include "spn/core.h"
+#include "toolchain/toolchain.h"
 #include "triple/triple.h"
 
 sp_str_t spn_profile_build_dir(sp_mem_t mem, const spn_profile_info_t* profile) {
@@ -20,7 +21,7 @@ static void overlay_profile(spn_profile_info_t* to, spn_profile_info_t* from) {
   if (!sp_str_empty(from->name)) {
     to->name = from->name;
   }
-  if (!sp_str_empty(from->toolchain)) {
+  if (from->toolchain.kind) {
     to->toolchain = from->toolchain;
   }
   if (from->linkage) {
@@ -67,7 +68,7 @@ static sp_str_t select_name(const spn_profile_override_t* override) {
 static spn_profile_info_t override_to_info(const spn_profile_override_t* override) {
   return (spn_profile_info_t) {
     .name = override->name,
-    .toolchain = override->toolchain,
+    .toolchain = spn_toolchain_ref_from_str(override->toolchain),
     .mode = override->mode,
     .opt = override->opt,
     .sanitizers = override->sanitizers,
@@ -87,7 +88,7 @@ void spn_profile_populate(spn_profile_table_t* profiles, spn_pkg_info_t* pkg) {
   fallback.name = spn_intern_cstr("default");
   fallback.automatic = (spn_profile_info_t) {
     .name      = fallback.name,
-    .toolchain = spn_intern_cstr("auto"),
+    .toolchain = { .kind = SPN_TOOLCHAIN_REF_AUTO },
     .standard  = SPN_C11,
     .mode      = SPN_MODE_DEBUG,
   };
@@ -165,10 +166,8 @@ static spn_abi_list_t abi_order(const spn_profile_info_t* profile, spn_triple_t 
 }
 
 spn_toolchain_query_t spn_profile_query(const spn_profile_info_t* profile, spn_triple_t host) {
-  bool automatic = sp_str_equal_cstr(profile->toolchain, "auto");
   return (spn_toolchain_query_t) {
-    .kind = automatic ? SPN_TOOLCHAIN_QUERY_AUTO : SPN_TOOLCHAIN_QUERY_NAMED,
-    .name = profile->toolchain,
+    .toolchain = profile->toolchain,
     .target = { profile->arch, profile->os, profile->abi },
     .abis = abi_order(profile, host),
   };

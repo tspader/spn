@@ -105,7 +105,7 @@ spn_session_t* build_session(sp_mem_t mem, unit_graph_test_t* g) {
 
   spn_profile_info_t profile = {
     .name = sp_str_lit("debug"),
-    .toolchain = sp_str_lit("auto"),
+    .toolchain = { .kind = SPN_TOOLCHAIN_REF_AUTO },
     .standard = SPN_C11,
     .mode = SPN_MODE_DEBUG,
     .os = g->os ? g->os : SPN_OS_LINUX,

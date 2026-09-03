@@ -18,6 +18,16 @@ bool spn_toolchain_has_cxx(spn_toolchain_info_t* toolchain) {
   return !spn_arg_empty(toolchain->cxx.program);
 }
 
+spn_toolchain_ref_t spn_toolchain_ref_from_str(sp_str_t str) {
+  if (sp_str_empty(str)) {
+    return (spn_toolchain_ref_t) { .kind = SPN_TOOLCHAIN_REF_NONE };
+  }
+  if (sp_str_equal_cstr(str, "auto")) {
+    return (spn_toolchain_ref_t) { .kind = SPN_TOOLCHAIN_REF_AUTO };
+  }
+  return (spn_toolchain_ref_t) { .kind = SPN_TOOLCHAIN_REF_NAMED, .name = str };
+}
+
 spn_cc_cap_set_t spn_toolchain_driver_caps(spn_cc_driver_t driver) {
   switch (driver) {
     case SPN_CC_DRIVER_GCC: return SPN_CC_CAP_EXCLUDE_LIBS | SPN_CC_CAP_NOLIBC | SPN_CC_CAP_FREESTANDING;

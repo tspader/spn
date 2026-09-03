@@ -1332,7 +1332,7 @@ sp_test_each(lower, cases, test_t, tests) {
     spn_profile_info_t* p = sp_str_om_get(pkg.profiles, sp_str_view(expected.name));
     sp_must(t, p);
     sp_expect_str_eq_c(t, p->name, expected.name);
-    if (expected.toolchain) sp_expect_str_eq_c(t, p->toolchain, expected.toolchain);
+    if (expected.toolchain) sp_expect_str_eq_c(t, p->toolchain.name, expected.toolchain);
     sp_expect_eq(t, (u32)expected.linkage, (u32)p->linkage);
     if (expected.standard) sp_expect_eq(t, (u32)expected.standard, (u32)p->standard);
     if (expected.mode) sp_expect_eq(t, (u32)expected.mode, (u32)p->mode);

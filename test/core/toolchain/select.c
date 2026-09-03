@@ -220,7 +220,7 @@ static sp_err_t check_failure(sp_test_t* t, sp_mem_t mem, spn_toolchain_catalog_
   }
 
   spn_err_toolchain_t* err = &errs[0].err.toolchain;
-  sp_expect_str_eq(t, err->name, query.name);
+  sp_expect_str_eq(t, err->name, query.toolchain.name);
   sp_expect(t, spn_triple_equal(err->target, query.target));
   sp_expect(t, spn_triple_equal(err->host, catalog->host));
 
@@ -270,8 +270,7 @@ sp_test_each(select, complete, complete_test_t, complete_tests, .setup = spn_tes
   sp_for(at, checks) {
     const check_t* check = &it->checks[at];
     spn_toolchain_query_t query = {
-      .kind = SPN_TOOLCHAIN_QUERY_NAMED,
-      .name = sp_str_lit("A"),
+      .toolchain = { SPN_TOOLCHAIN_REF_NAMED, sp_str_lit("A") },
       .target = check->target,
       .abis = abi_list(check->abis),
     };
@@ -303,12 +302,12 @@ sp_test_each(select, resolve, resolve_test_t, resolve_tests, .setup = spn_test_c
   }
 
   spn_toolchain_query_t query = {
+    .toolchain = { .kind = SPN_TOOLCHAIN_REF_AUTO },
     .target = it->target,
     .abis = abi_list(it->abis),
   };
   if (it->toolchain) {
-    query.kind = SPN_TOOLCHAIN_QUERY_NAMED;
-    query.name = sp_cstr_as_str(it->toolchain);
+    query.toolchain = (spn_toolchain_ref_t) { SPN_TOOLCHAIN_REF_NAMED, sp_cstr_as_str(it->toolchain) };
   }
   spn_toolchain_selection_t selection = sp_zero;
   spn_err_t err = query_catalog(&catalog, query, &selection);

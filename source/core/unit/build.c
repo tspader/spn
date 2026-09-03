@@ -13,7 +13,7 @@
 spn_profile_info_t spn_build_metaprogram_profile() {
   return (spn_profile_info_t) {
     .name = sp_str_lit("metaprogram"),
-    .toolchain = sp_str_lit("auto"),
+    .toolchain = { .kind = SPN_TOOLCHAIN_REF_AUTO },
     .arch = SPN_ARCH_WASM32,
     .os = SPN_OS_WASI,
     .abi = SPN_ABI_MUSL,
@@ -27,7 +27,8 @@ spn_profile_info_t spn_build_metaprogram_profile() {
 spn_build_id_t spn_build_id(const spn_profile_info_t* profile) {
   sp_hash_t parts [] = {
     spn_digest_hash_str(profile->name),
-    spn_digest_hash_str(profile->toolchain),
+    (sp_hash_t)profile->toolchain.kind,
+    spn_digest_hash_str(profile->toolchain.name),
     (sp_hash_t)profile->sysroot.root,
     spn_digest_hash_str(profile->sysroot.sub),
     (sp_hash_t)profile->os,

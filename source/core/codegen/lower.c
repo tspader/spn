@@ -8,8 +8,7 @@
 #include "semver/parser.h"
 #include "target/types.h"
 #include "target/mutate.h"
-#include "toolchain/catalog.h"
-#include "toolchain/types.h"
+#include "toolchain/toolchain.h"
 #include "triple/triple.h"
 #include "profile/types.h"
 #include "index/types.h"
@@ -368,7 +367,7 @@ static void lower_profiles(const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
     const spn_cg_profile_t* p = &cg->profile[i].value;
     spn_profile_info_t info = {
       .name = cg->profile[i].key,
-      .toolchain = p->toolchain,
+      .toolchain = spn_toolchain_ref_from_str(p->toolchain),
       .os = sp_opt_is_null(p->os) ? SPN_OS_NONE : sp_opt_get(p->os),
       .arch = sp_opt_is_null(p->arch) ? SPN_ARCH_NONE : sp_opt_get(p->arch),
       .abi = sp_opt_is_null(p->abi) ? SPN_ABI_NONE : sp_opt_get(p->abi),
@@ -1083,7 +1082,7 @@ static void validate_inline_toolchains(spn_toml_loader_t* ctx, const spn_cg_mani
 
     spn_toml_loader_push_index(ctx, it);
     if (sp_str_empty(t->name))     { spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, "name"); }
-    if (sp_str_equal_cstr(t->name, "auto")) { spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "name"); }
+    if (spn_toolchain_ref_from_str(t->name).kind == SPN_TOOLCHAIN_REF_AUTO) { spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "name"); }
     if (sp_str_empty(t->compiler)) { spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, "compiler"); }
     if (sp_str_empty(t->linker))   { spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, "linker"); }
     if (sp_str_empty(t->archiver)) { spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, "archiver"); }

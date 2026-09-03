@@ -5,6 +5,7 @@
 #include "profile/profile.h"
 #include "pkg/types.h"
 #include "target/types.h"
+#include "toolchain/toolchain.h"
 #include "triple/triple.h"
 
 sp_test_suite(profile, .serial = true);
@@ -449,32 +450,10 @@ static const linkage_test_t linkage_tests [] = {
   { .name = "bare_is_static",  .abi = SPN_ABI_BARE,  .expect = { .linkage = SPN_LIB_KIND_STATIC } },
 };
 
-typedef struct {
-  spn_toolchain_query_kind_t kind;
-} kind_expect_t;
-
-typedef struct {
-  const c8* name;
-  const c8* toolchain;
-  kind_expect_t expect;
-} kind_test_t;
-
-static const kind_test_t kind_tests [] = {
-  {
-    .name = "auto_is_automatic",
-    .toolchain = "auto",
-  },
-  {
-    .name = "anything_else_is_named",
-    .toolchain = "T",
-    .expect = { .kind = SPN_TOOLCHAIN_QUERY_NAMED },
-  },
-};
-
 static spn_profile_info_t desc_to_info(const profile_desc_t* d) {
   return (spn_profile_info_t) {
     .name = d->name ? sp_cstr_as_str(d->name) : (sp_str_t) sp_zero,
-    .toolchain = d->toolchain ? sp_cstr_as_str(d->toolchain) : (sp_str_t) sp_zero,
+    .toolchain = spn_toolchain_ref_from_str(sp_cstr_as_str(d->toolchain)),
     .os = d->os,
     .arch = d->arch,
     .abi = d->abi,
@@ -525,7 +504,9 @@ sp_test_each(profile, resolve, test_t, tests, .setup = spn_test_ctx_setup) {
   sp_expect(t, spn_triple_equal(it->expect.target, (spn_triple_t) { result.arch, result.os, result.abi }));
   sp_expect_eq(t, it->expect.targeted, result.targeted);
   if (it->expect.toolchain) {
-    sp_expect_str_eq_c(t, result.toolchain, it->expect.toolchain);
+    spn_toolchain_ref_t toolchain = spn_toolchain_ref_from_str(sp_cstr_as_str(it->expect.toolchain));
+    sp_expect_eq(t, (u32)toolchain.kind, (u32)result.toolchain.kind);
+    sp_expect_str_eq(t, toolchain.name, result.toolchain.name);
   }
 
   spn_profile_finalize(&result, it->abi ? it->abi : result.abi);
@@ -535,7 +516,7 @@ sp_test_each(profile, resolve, test_t, tests, .setup = spn_test_ctx_setup) {
 
 sp_test_each(profile, query, query_test_t, query_tests) {
   spn_profile_info_t profile = {
-    .toolchain = sp_str_lit("T"),
+    .toolchain = { SPN_TOOLCHAIN_REF_NAMED, sp_str_lit("T") },
     .arch = it->target.arch,
     .os = it->target.os,
     .abi = it->target.abi,
@@ -543,7 +524,8 @@ sp_test_each(profile, query, query_test_t, query_tests) {
   };
 
   spn_toolchain_query_t query = spn_profile_query(&profile, it->host);
-  sp_expect_str_eq(t, query.name, profile.toolchain);
+  sp_expect_eq(t, (u32)profile.toolchain.kind, (u32)query.toolchain.kind);
+  sp_expect_str_eq(t, query.toolchain.name, profile.toolchain.name);
   sp_expect(t, spn_triple_equal(query.target, it->target));
 
   u32 abis = 0;
@@ -552,14 +534,6 @@ sp_test_each(profile, query, query_test_t, query_tests) {
   sp_for(at, abis) {
     sp_expect_eq(t, (u32)it->expect.abis[at], (u32)query.abis.items[at]);
   }
-  return SP_OK;
-}
-
-sp_test_each(profile, kind, kind_test_t, kind_tests) {
-  spn_profile_info_t profile = { .toolchain = sp_cstr_as_str(it->toolchain) };
-  spn_toolchain_query_t query = spn_profile_query(&profile, (spn_triple_t) PROFILE_HOST_LINUX_GNU);
-  sp_expect_eq(t, (u32)it->expect.kind, (u32)query.kind);
-  sp_expect_str_eq_c(t, query.name, it->toolchain);
   return SP_OK;
 }
 

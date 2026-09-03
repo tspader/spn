@@ -80,13 +80,18 @@ typedef struct {
 } spn_abi_list_t;
 
 typedef enum {
-  SPN_TOOLCHAIN_QUERY_AUTO,
-  SPN_TOOLCHAIN_QUERY_NAMED,
-} spn_toolchain_query_kind_t;
+  SPN_TOOLCHAIN_REF_NONE,
+  SPN_TOOLCHAIN_REF_AUTO,
+  SPN_TOOLCHAIN_REF_NAMED,
+} spn_toolchain_ref_kind_t;
 
 typedef struct {
-  spn_toolchain_query_kind_t kind;
+  spn_toolchain_ref_kind_t kind;
   sp_str_t name;
+} spn_toolchain_ref_t;
+
+typedef struct {
+  spn_toolchain_ref_t toolchain;
   spn_triple_t target;
   spn_abi_list_t abis;
 } spn_toolchain_query_t;
