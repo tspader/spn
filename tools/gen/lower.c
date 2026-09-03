@@ -143,18 +143,6 @@ static bool lower_field(gen_t* g, gen_type_t* type, jtd_property_t property) {
     field.name = rename;
   }
 
-  sp_str_t extern_name = jtd_metadata(property.schema, "extern");
-  if (!sp_str_empty(extern_name)) {
-    if (property.schema->form != JTD_FORM_EMPTY) {
-      return fail(g, type->name, property.key, sp_str_lit("extern fields must use the empty form"));
-    }
-    field.kind = FIELD_EXTERN;
-    field.as.ext = extern_name;
-    add_include(g, property.schema);
-    sp_da_push(type->fields, field);
-    return true;
-  }
-
   jtd_schema_t* value = property.schema;
   card_t card = CARD_SCALAR;
   if (property.schema->form == JTD_FORM_ELEMENTS) {
@@ -164,6 +152,24 @@ static bool lower_field(gen_t* g, gen_type_t* type, jtd_property_t property) {
   else if (property.schema->form == JTD_FORM_VALUES) {
     card = CARD_MAP;
     value = property.schema->as.values.schema;
+  }
+
+  sp_str_t extern_name = jtd_metadata(value, "extern");
+  if (!sp_str_empty(extern_name)) {
+    if (value->form != JTD_FORM_EMPTY) {
+      return fail(g, type->name, property.key, sp_str_lit("extern fields must use the empty form"));
+    }
+    if (card == CARD_MAP) {
+      return fail(g, type->name, property.key, sp_str_lit("extern maps are not supported"));
+    }
+    if (card == CARD_ARRAY && g->format != GEN_FORMAT_ERRORS && g->format != GEN_FORMAT_EVENTS) {
+      return fail(g, type->name, property.key, sp_str_lit("extern arrays are only supported in union schemas"));
+    }
+    field.kind = card == CARD_ARRAY ? FIELD_EXTERN_ARRAY : FIELD_EXTERN;
+    field.as.ext = extern_name;
+    add_include(g, value);
+    sp_da_push(type->fields, field);
+    return true;
   }
 
   sp_str_t name = value->form == JTD_FORM_REF ? value->as.ref.name : property.key;

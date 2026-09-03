@@ -2,11 +2,12 @@
 #define SPN_PROFILE_TYPES_H
 
 #include "core/types.h"
+#include "toolchain/types.h"
 #include "when/types.h"
 
 struct spn_profile_info {
   sp_str_t name;
-  sp_str_t toolchain;
+  spn_toolchain_ref_t toolchain;
   spn_os_t os;
   spn_arch_t arch;
   spn_abi_t abi;

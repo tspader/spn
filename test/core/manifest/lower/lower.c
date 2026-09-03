@@ -71,7 +71,6 @@ typedef struct {
 
 typedef struct {
   const c8* name;
-  bool remote;
   const c8* url;
   const c8* sha256;
   const c8* mirrors;
@@ -440,6 +439,13 @@ static const test_t tests [] = {
     }
   },
   {
+    .name = "validate_toolchain_name_auto",
+    .manifest = "toolchain_name_auto",
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].name" }
+    }
+  },
+  {
     .name = "validate_toolchain_target_abi",
     .manifest = "toolchain_target_abi",
     .issues = {
@@ -451,6 +457,20 @@ static const test_t tests [] = {
     .manifest = "toolchain_target_os",
     .issues = {
       { SPN_ERR_CODEGEN_MISSING_KEY, "toolchain[0].target[0].os" }
+    }
+  },
+  {
+    .name = "validate_toolchain_target_foreign_arch",
+    .manifest = "toolchain_target_arch",
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].target[0].arch" }
+    }
+  },
+  {
+    .name = "validate_toolchain_target_beyond_driver",
+    .manifest = "toolchain_target_driver",
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].target[0].os" }
     }
   },
   {
@@ -472,6 +492,13 @@ static const test_t tests [] = {
     .manifest = "toolchain_host_invalid",
     .issues = {
       { SPN_ERR_CODEGEN_INVALID, "toolchain[0].host" }
+    }
+  },
+  {
+    .name = "validate_toolchain_host_mixed",
+    .manifest = "toolchain_host_mixed",
+    .issues = {
+      { SPN_ERR_CODEGEN_MISSING_KEY, "toolchain[0].host.aarch64-macos.url" }
     }
   },
   {
@@ -627,7 +654,6 @@ static const test_t tests [] = {
     .toolchains = {
       {
         .name = "zig",
-        .remote = true,
         .url = "https://tc",
         .sha256 = "deadbeef",
         .mirrors = "https://mirrors",
@@ -1278,9 +1304,8 @@ sp_test_each(lower, cases, test_t, tests) {
     toolchain_t expected = it->toolchains[c];
     if (!expected.name) break;
 
-    spn_toolchain_info_t* tc = sp_str_om_get(pkg.toolchains, sp_str_view(expected.name));
+    spn_toolchain_decl_t* tc = sp_str_om_get(pkg.toolchains, sp_str_view(expected.name));
     sp_must(t, tc);
-    sp_expect_eq(t, expected.remote, tc->source == SPN_TOOLCHAIN_SOURCE_DISTRIBUTION);
 
     if (expected.url)      sp_expect_str_eq_c(t, tc->hosts[0].artifact.url, expected.url);
     if (expected.sha256)   sp_expect_str_eq_c(t, tc->hosts[0].artifact.sha256, expected.sha256);
@@ -1321,7 +1346,7 @@ sp_test_each(lower, cases, test_t, tests) {
     spn_profile_info_t* p = sp_str_om_get(pkg.profiles, sp_str_view(expected.name));
     sp_must(t, p);
     sp_expect_str_eq_c(t, p->name, expected.name);
-    if (expected.toolchain) sp_expect_str_eq_c(t, p->toolchain, expected.toolchain);
+    if (expected.toolchain) sp_expect_str_eq_c(t, p->toolchain.name, expected.toolchain);
     sp_expect_eq(t, (u32)expected.linkage, (u32)p->linkage);
     if (expected.standard) sp_expect_eq(t, (u32)expected.standard, (u32)p->standard);
     if (expected.mode) sp_expect_eq(t, (u32)expected.mode, (u32)p->mode);

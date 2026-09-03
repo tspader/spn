@@ -6,6 +6,7 @@
 #include "intern/intern.h"
 #include "pkg/types.h"
 #include "spn/core.h"
+#include "toolchain/toolchain.h"
 #include "triple/triple.h"
 
 sp_str_t spn_profile_build_dir(sp_mem_t mem, const spn_profile_info_t* profile) {
@@ -16,11 +17,11 @@ sp_str_t spn_profile_build_dir(sp_mem_t mem, const spn_profile_info_t* profile) 
   return sp_fs_join_path(mem, spn_triple_to_str(mem, target), profile->name);
 }
 
-void overlay_profile(spn_profile_info_t* to, spn_profile_info_t* from) {
+static void overlay_profile(spn_profile_info_t* to, spn_profile_info_t* from) {
   if (!sp_str_empty(from->name)) {
     to->name = from->name;
   }
-  if (!sp_str_empty(from->toolchain)) {
+  if (from->toolchain.kind) {
     to->toolchain = from->toolchain;
   }
   if (from->linkage) {
@@ -67,7 +68,7 @@ static sp_str_t select_name(const spn_profile_override_t* override) {
 static spn_profile_info_t override_to_info(const spn_profile_override_t* override) {
   return (spn_profile_info_t) {
     .name = override->name,
-    .toolchain = override->toolchain,
+    .toolchain = spn_toolchain_ref_from_str(override->toolchain),
     .mode = override->mode,
     .opt = override->opt,
     .sanitizers = override->sanitizers,
@@ -87,7 +88,7 @@ void spn_profile_populate(spn_profile_table_t* profiles, spn_pkg_info_t* pkg) {
   fallback.name = spn_intern_cstr("default");
   fallback.automatic = (spn_profile_info_t) {
     .name      = fallback.name,
-    .toolchain = spn_intern_cstr("auto"),
+    .toolchain = { .kind = SPN_TOOLCHAIN_REF_AUTO },
     .standard  = SPN_C11,
     .mode      = SPN_MODE_DEBUG,
   };
@@ -133,30 +134,102 @@ void spn_profile_populate(spn_profile_table_t* profiles, spn_pkg_info_t* pkg) {
   }
 }
 
-bool spn_profile_shared(const spn_profile_info_t* profile, bool shared_demand) {
-  return profile->linkage == SPN_LIB_KIND_SHARED || (!profile->linkage && shared_demand);
+static void push_abi(spn_abi_list_t* list, spn_abi_t abi) {
+  sp_for(it, list->count) {
+    if (list->items[it] == abi) {
+      return;
+    }
+  }
+  list->items[list->count++] = abi;
 }
 
-static spn_linkage_t default_linkage(spn_triple_t triple, bool shared) {
-  if (triple.os == SPN_OS_FREESTANDING) {
-    return SPN_LIB_KIND_STATIC;
+static spn_abi_list_t abi_order(const spn_profile_info_t* profile, spn_triple_t host) {
+  spn_abi_list_t list = sp_zero;
+  if (profile->abi) {
+    push_abi(&list, profile->abi);
+    return list;
   }
-  if (!shared && triple.abi == SPN_ABI_MUSL) {
-    return SPN_LIB_KIND_STATIC;
+
+  bool native = profile->arch == host.arch && profile->os == host.os;
+  if (!native) {
+    return list;
   }
-  return SPN_LIB_KIND_SHARED;
+  if (profile->os == SPN_OS_LINUX) {
+    push_abi(&list, profile->linkage == SPN_LIB_KIND_SHARED ? host.abi : SPN_ABI_MUSL);
+  }
+  const spn_abi_t* abis = SP_NULLPTR;
+  u32 count = spn_os_abis(profile->os, &abis);
+  sp_for(it, count) {
+    push_abi(&list, abis[it]);
+  }
+  return list;
 }
 
-void spn_profile_finalize(spn_profile_info_t* profile, spn_triple_t triple, bool shared) {
-  profile->arch = triple.arch;
-  profile->os = triple.os;
-  profile->abi = triple.abi;
+spn_toolchain_query_t spn_profile_query(const spn_profile_info_t* profile, spn_triple_t host) {
+  return (spn_toolchain_query_t) {
+    .toolchain = profile->toolchain,
+    .target = { profile->arch, profile->os, profile->abi },
+    .abis = abi_order(profile, host),
+  };
+}
+
+static spn_linkage_t abi_linkage(spn_abi_t abi) {
+  switch (abi) {
+    case SPN_ABI_GNU:
+    case SPN_ABI_MSVC:
+    case SPN_ABI_APPLE: {
+      return SPN_LIB_KIND_SHARED;
+    }
+    case SPN_ABI_MUSL:
+    case SPN_ABI_BARE: {
+      return SPN_LIB_KIND_STATIC;
+    }
+    case SPN_ABI_NONE:
+    case SPN_ABI_COUNT: {
+      sp_unreachable_case();
+    }
+  }
+
+  sp_unreachable_return(SPN_LIB_KIND_NONE);
+}
+
+void spn_profile_finalize(spn_profile_info_t* profile, spn_abi_t abi) {
+  profile->abi = abi;
   if (!profile->linkage) {
-    profile->linkage = default_linkage(triple, shared);
+    profile->linkage = abi_linkage(abi);
   }
 }
 
-spn_err_t spn_profile_resolve(spn_profile_table_t profiles, const spn_profile_override_t* override, spn_profile_info_t* result) {
+static bool shared_demand(const spn_pkg_info_t* pkg) {
+  sp_da_for(pkg->config, it) {
+    const spn_pkg_config_t* config = &pkg->config[it].value;
+    if (!sp_opt_is_null(config->kind) && config->kind.value == SPN_LIB_KIND_SHARED) {
+      return true;
+    }
+  }
+  sp_str_om_for(pkg->libs, it) {
+    spn_linkage_set_t linkages = sp_str_om_at(pkg->libs, it)->linkages;
+    if (linkages.shared && !linkages.static_lib && !linkages.source) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static spn_linkage_t resolve_linkage(spn_linkage_t linkage, spn_os_t os, const spn_pkg_info_t* pkg) {
+  if (linkage) {
+    return linkage;
+  }
+  if (!spn_os_dynamic(os)) {
+    return SPN_LIB_KIND_STATIC;
+  }
+  if (shared_demand(pkg)) {
+    return SPN_LIB_KIND_SHARED;
+  }
+  return SPN_LIB_KIND_NONE;
+}
+
+spn_err_t spn_profile_resolve(spn_profile_table_t profiles, const spn_profile_override_t* override, spn_triple_t host, const spn_pkg_info_t* pkg, spn_profile_info_t* result) {
   sp_str_t name = select_name(override);
 
   if (sp_str_find_c8(name, '/') >= 0 || sp_str_find_c8(name, '\\') >= 0) {
@@ -166,7 +239,8 @@ spn_err_t spn_profile_resolve(spn_profile_table_t profiles, const spn_profile_ov
     });
   }
 
-  if (spn_triple_from_str(name).arch) {
+  spn_triple_t collision = sp_zero;
+  if (spn_triple_parse(name, &collision) == SPN_OK) {
     return spn_err_emit(&spn, (spn_err_union_t) {
       .kind = SPN_ERR_PROFILE_INVALID,
       .profile = { .name = name },
@@ -192,13 +266,51 @@ spn_err_t spn_profile_resolve(spn_profile_table_t profiles, const spn_profile_ov
     merged.opt = merged.mode == SPN_MODE_RELEASE ? SPN_OPT_LEVEL_2 : SPN_OPT_LEVEL_0;
   }
 
+  spn_triple_t pinned = {
+    .arch = target.arch ? target.arch : host.arch,
+    .os = target.os ? target.os : host.os,
+    .abi = target.abi,
+  };
+  spn_triple_t full = sp_zero;
+  switch (spn_triple_entry(pinned, &full)) {
+    case SPN_TRIPLE_ENTRY_OK: {
+      pinned = full;
+      break;
+    }
+    case SPN_TRIPLE_ENTRY_MISSING_ABI: {
+      break;
+    }
+    case SPN_TRIPLE_ENTRY_FOREIGN_ARCH: {
+      return spn_err_emit(&spn, (spn_err_union_t) {
+        .kind = SPN_ERR_PROFILE_ARCH,
+        .profile = { .name = name, .target = pinned },
+      });
+    }
+    case SPN_TRIPLE_ENTRY_FOREIGN_ABI: {
+      return spn_err_emit(&spn, (spn_err_union_t) {
+        .kind = SPN_ERR_PROFILE_ABI,
+        .profile = { .name = name, .target = pinned },
+      });
+    }
+    case SPN_TRIPLE_ENTRY_MISSING_ARCH:
+    case SPN_TRIPLE_ENTRY_MISSING_OS: {
+      sp_unreachable_case();
+    }
+  }
+  if (merged.linkage == SPN_LIB_KIND_SHARED && !spn_os_dynamic(pinned.os)) {
+    return spn_err_emit(&spn, (spn_err_union_t) {
+      .kind = SPN_ERR_PROFILE_LINKAGE,
+      .profile = { .name = name, .target = pinned },
+    });
+  }
+
   *result = (spn_profile_info_t) {
     .name       = merged.name,
     .toolchain  = merged.toolchain,
-    .os         = target.os,
-    .arch       = target.arch,
-    .abi        = target.abi,
-    .linkage    = merged.linkage,
+    .os         = pinned.os,
+    .arch       = pinned.arch,
+    .abi        = pinned.abi,
+    .linkage    = resolve_linkage(merged.linkage, pinned.os, pkg),
     .standard   = merged.standard,
     .mode       = merged.mode,
     .opt        = merged.opt,
@@ -207,6 +319,20 @@ spn_err_t spn_profile_resolve(spn_profile_table_t profiles, const spn_profile_ov
     .targeted   = targeted,
   };
   return SPN_OK;
+}
+
+spn_profile_info_t spn_profile_metaprogram(void) {
+  return (spn_profile_info_t) {
+    .name = sp_str_lit("metaprogram"),
+    .toolchain = { .kind = SPN_TOOLCHAIN_REF_AUTO },
+    .arch = SPN_ARCH_WASM32,
+    .os = SPN_OS_WASI,
+    .abi = SPN_ABI_MUSL,
+    .mode = SPN_MODE_DEBUG,
+    .opt = SPN_OPT_LEVEL_2,
+    .standard = SPN_C99,
+    .linkage = SPN_LIB_KIND_STATIC,
+  };
 }
 
 spn_when_facts_t spn_profile_facts(const spn_profile_info_t* profile) {

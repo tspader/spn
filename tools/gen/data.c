@@ -17,6 +17,7 @@ static const c8* kind_name(gen_field_kind_t kind) {
     case FIELD_PRIM:
     case FIELD_ENUM:
     case FIELD_EXTERN:
+    case FIELD_EXTERN_ARRAY:
     case FIELD_ENUM_ARRAY:
     case FIELD_KEYED:
     case FIELD_MAP: {

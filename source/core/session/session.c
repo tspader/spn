@@ -84,22 +84,6 @@ static spn_session_config_t copy_config(sp_mem_t mem, spn_session_config_t confi
   };
 }
 
-static bool is_shared_linkage(spn_pkg_info_t* pkg) {
-  sp_da_for(pkg->config, it) {
-    spn_pkg_config_t* config = &pkg->config[it].value;
-    if (!sp_opt_is_null(config->kind) && config->kind.value == SPN_LIB_KIND_SHARED) {
-      return true;
-    }
-  }
-  sp_str_om_for(pkg->libs, it) {
-    spn_linkage_set_t linkages = sp_str_om_at(pkg->libs, it)->linkages;
-    if (linkages.shared && !linkages.static_lib && !linkages.source) {
-      return true;
-    }
-  }
-  return false;
-}
-
 spn_err_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem, spn_project_t* project, spn_session_config_t config) {
   spn_pkg_info_t* root = &project->package;
   s->ctx = ctx;
@@ -126,18 +110,15 @@ spn_err_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem, spn_p
   sp_om_new(s->units.targets);
   sp_om_new(s->units.objects);
 
-  spn_try(spn_profile_resolve(s->profiles, &config.profile, &s->profile));
+  spn_try(spn_profile_resolve(s->profiles, &config.profile, host, root, &s->profile));
 
-  bool shared = spn_profile_shared(&s->profile, is_shared_linkage(root));
-  spn_toolchain_resolution_t resolution = sp_zero;
-  spn_try(spn_toolchain_select(&ctx->catalog, (spn_toolchain_query_t) {
-    .name = s->profile.toolchain,
-    .target = { s->profile.arch, s->profile.os, s->profile.abi },
-    .host = host,
-    .role = SPN_TOOLCHAIN_ROLE_BUILD,
-    .shared = shared,
-  }, s->mem, &resolution));
-  spn_profile_finalize(&s->profile, resolution.triple, shared);
+  spn_toolchain_query_t query = spn_profile_query(&s->profile, host);
+  if (!query.abis.count) {
+    return spn_toolchain_incomplete(&ctx->catalog, query);
+  }
+  spn_toolchain_selection_t target = sp_zero;
+  spn_try(spn_toolchain_select(&ctx->catalog, query, &target));
+  spn_profile_finalize(&s->profile, target.triple.abi);
 
   switch (s->profile.os) {
     case SPN_OS_MACOS: {
@@ -149,8 +130,16 @@ spn_err_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem, spn_p
     }
   }
 
-  spn_try(spn_build_add(s, spn_build_config_target(host, s->profile), &s->units.target));
-  spn_try(spn_build_add(s, spn_build_config_metaprogram(host), &s->units.metaprogram));
+  spn_profile_info_t metaprogram = spn_profile_metaprogram();
+  spn_toolchain_selection_t script = sp_zero;
+  spn_try(spn_toolchain_select(&ctx->catalog, spn_profile_query(&metaprogram, host), &script));
+
+  spn_path_t target_root = spn_path_join(s->mem, s->paths.build, spn_profile_build_dir(s->mem, &s->profile));
+  s->units.target = spn_build_add(s, s->profile, target_root, target.toolchain);
+
+  spn_triple_t metaprogram_triple = { metaprogram.arch, metaprogram.os, metaprogram.abi };
+  spn_path_t metaprogram_root = spn_path_join(s->mem, s->paths.build, spn_triple_to_str(s->mem, metaprogram_triple));
+  s->units.metaprogram = spn_build_add(s, metaprogram, metaprogram_root, script.toolchain);
   sp_da_push(s->units.metaprogram->include, spn_path_join(s->mem, spn_path_from_root(SPN_PATH_ROOT_RUNTIME), sp_str_lit("include")));
 
   spn_path_t log_path = spn_path_join(s->mem, s->units.target->paths.root, sp_str_lit(".spn/build.jsonl"));

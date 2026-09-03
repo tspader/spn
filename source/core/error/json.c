@@ -30,6 +30,10 @@ void spn_codegen_write_triple(sp_io_writer_t* out, const spn_triple_t* triple) {
   sp_mem_end_scratch(scratch);
 }
 
+void spn_codegen_write_abi(sp_io_writer_t* out, const spn_abi_t* abi) {
+  spn_codegen_json_str(out, spn_abi_to_str(*abi));
+}
+
 void spn_codegen_write_sanitizer_set(sp_io_writer_t* out, const spn_sanitizer_set_t* set) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   spn_codegen_json_str(out, spn_sanitizer_set_to_str(scratch.mem, *set));

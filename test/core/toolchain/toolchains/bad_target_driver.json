@@ -1,0 +1,14 @@
+{
+  "toolchain": [
+    {
+      "name": "A",
+      "driver": "msvc",
+      "compiler": { "program": "cl" },
+      "linker":   { "program": "link" },
+      "archiver": { "program": "lib" },
+      "target": [
+        { "arch": "x86_64", "os": "freestanding" }
+      ]
+    }
+  ]
+}

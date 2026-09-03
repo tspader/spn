@@ -14,6 +14,16 @@ static void {{ .self }}_write(const {{ .type }}* in, sp_io_writer_t* out) {
 {{ if .k_extern }}
     spn_codegen_write_{{ .extern }}(out, &in->{{ .name }});
 {{ end }}
+{{ if .k_extern_array }}
+    sp_io_write_c8(out, '[');
+    sp_da_for(in->{{ .name }}, it) {
+      if (it) {
+        sp_io_write_c8(out, ',');
+      }
+      spn_codegen_write_{{ .extern }}(out, &in->{{ .name }}[it]);
+    }
+    sp_io_write_c8(out, ']');
+{{ end }}
 {{ if .k_object }}
     {{ .owrite }}_write(&in->{{ .name }}, out);
 {{ end }}

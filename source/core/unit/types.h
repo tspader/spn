@@ -14,12 +14,6 @@
 #include "target/types.h"
 #include "external/wasm/types.h"
 
-typedef struct {
-  spn_triple_t host;
-  spn_profile_info_t profile;
-  spn_toolchain_role_t role;
-} spn_build_config_t;
-
 struct spn_build_unit_t {
   spn_build_id_t id;
   spn_profile_info_t profile;
@@ -179,9 +173,6 @@ struct spn_pkg_unit_t {
 
 struct spn_toolchain_unit_t {
   spn_toolchain_info_t* info;
-  spn_triple_t host;
-  spn_opt_artifact_t artifact;
-  sp_str_t root;
   spn_cc_toolchain_t cc;
   sp_hash_t identity;
   sp_str_t version;

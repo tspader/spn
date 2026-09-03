@@ -15,17 +15,6 @@ typedef struct {
 
 static const launcher_test_t tests [] = {
   {
-    .name = "empty_root_is_identity",
-    .launcher = { .program = "A" },
-    .expect = { .program = "A" },
-  },
-  {
-    .name = "empty_program_stays_empty",
-    .launcher = { .program = "" },
-    .root = "/R",
-    .expect = { .program = "" },
-  },
-  {
     .name = "root_prefixes_program",
     .launcher = { .program = "B/A", .args = { "C" } },
     .root = "/R",
@@ -42,6 +31,30 @@ static const launcher_test_t tests [] = {
     .expect = { .str = "A B C" },
   },
 };
+
+typedef struct {
+  spn_toolchain_ref_kind_t kind;
+  const c8* name;
+} ref_expect_t;
+
+typedef struct {
+  const c8* name;
+  const c8* str;
+  ref_expect_t expect;
+} ref_test_t;
+
+static const ref_test_t ref_tests [] = {
+  { .name = "empty_is_unset", .str = "", .expect = { .name = "" } },
+  { .name = "auto_is_automatic", .str = "auto", .expect = { .kind = SPN_TOOLCHAIN_REF_AUTO, .name = "" } },
+  { .name = "anything_else_is_named", .str = "A", .expect = { .kind = SPN_TOOLCHAIN_REF_NAMED, .name = "A" } },
+};
+
+sp_test_each(launcher, ref, ref_test_t, ref_tests) {
+  spn_toolchain_ref_t ref = spn_toolchain_ref_from_str(sp_cstr_as_str(it->str));
+  sp_expect_eq(t, (u32)it->expect.kind, (u32)ref.kind);
+  sp_expect_str_eq_c(t, ref.name, it->expect.name);
+  return SP_OK;
+}
 
 sp_test_each(launcher, resolve, launcher_test_t, tests) {
   sp_mem_t mem = sp_test_arena(t);
@@ -63,7 +76,7 @@ sp_test_each(launcher, resolve, launcher_test_t, tests) {
       program = it->expect.program_win;
     }
 #endif
-    spn_path_t root = { .sub = sp_str_view(it->root ? it->root : "") };
+    spn_path_t root = { .sub = sp_cstr_as_str(it->root) };
     spn_toolchain_launcher_t rooted = spn_toolchain_launcher_with_root(mem, launcher, root);
     sp_expect_str_eq_c(t, spn_arg_str(&roots, mem, rooted.program), program);
   }

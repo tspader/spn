@@ -3,11 +3,6 @@
 #include "enum/enum.h"
 #include "triple/triple.h"
 
-// @spader I don't know if this should literally use the same logic as we do internally to check
-// stuff or if that means we will never actually catch a bug; my intent is just to say "when this
-// test runs on Linux with mingw-gcc targeting Windows, I expect it to $result" for various
-// combinations of facts etc.
-
 static const test_toolchain_t toolchains [] = {
   {
     .name = "zig",
@@ -19,12 +14,12 @@ static const test_toolchain_t toolchains [] = {
       "aarch64-linux-gnu",
       "x86_64-linux-musl",
       "aarch64-linux-musl",
-      "x86_64-macos",
-      "aarch64-macos",
+      "x86_64-macos-apple",
+      "aarch64-macos-apple",
       "x86_64-windows-gnu",
       "aarch64-windows-gnu",
-      "x86_64-freestanding",
-      "aarch64-freestanding",
+      "x86_64-freestanding-none",
+      "aarch64-freestanding-none",
     },
   },
   {
@@ -39,10 +34,12 @@ static const test_toolchain_t toolchains [] = {
   {
     .name = "clang",
     .driver = SPN_CC_DRIVER_CLANG,
+    .targets = { SPN_TEST_HOST_TARGETS },
   },
   {
     .name = "gcc",
     .driver = SPN_CC_DRIVER_GCC,
+    .targets = { SPN_TEST_HOST_TARGETS },
   },
 };
 
@@ -77,41 +74,56 @@ spn_triple_t test_host(void) {
   return host;
 }
 
+static spn_triple_t parse_triple(const c8* str) {
+  spn_triple_t triple = sp_zero;
+  sp_assert(spn_triple_parse(sp_cstr_as_str(str), &triple) == SPN_OK);
+  return triple;
+}
+
 static spn_triple_t when_target(const test_when_t* when) {
   spn_triple_t host = test_host();
   if (!when->target) {
     return host;
   }
-  return spn_triple_merge(host, spn_triple_from_str(sp_str_view(when->target)));
+  spn_triple_t partial = parse_triple(when->target);
+  return (spn_triple_t) {
+    .arch = partial.arch ? partial.arch : host.arch,
+    .os = partial.os ? partial.os : host.os,
+    .abi = partial.abi,
+  };
+}
+
+static bool triple_agrees(spn_triple_t a, spn_triple_t b) {
+  bool arch = !a.arch || !b.arch || a.arch == b.arch;
+  bool os = !a.os || !b.os || a.os == b.os;
+  bool abi = !a.abi || !b.abi || a.abi == b.abi;
+  return arch && os && abi;
 }
 
 static bool toolchain_targets(const test_toolchain_t* toolchain, spn_triple_t target) {
-  if (!toolchain->targets[0]) {
-    spn_triple_t host = spn_triple_host();
-    return target.os == host.os && target.arch == host.arch;
-  }
-
   sp_carr_for(toolchain->targets, it) {
     if (!toolchain->targets[it]) {
       break;
     }
-    if (spn_triple_match(spn_triple_from_str(sp_str_view(toolchain->targets[it])), target)) {
+    if (triple_agrees(parse_triple(toolchain->targets[it]), target)) {
       return true;
     }
   }
-
   return false;
 }
 
 const c8* test_target_alternate(void) {
   const test_toolchain_t* toolchain = test_toolchain();
-  spn_triple_t host = spn_triple_host();
+  spn_triple_t host = test_host();
 
   sp_carr_for(toolchain->targets, it) {
     if (!toolchain->targets[it]) {
       break;
     }
-    spn_triple_t target = spn_triple_from_str(sp_str_view(toolchain->targets[it]));
+    spn_triple_t target = parse_triple(toolchain->targets[it]);
+    if (target.os == SPN_OS_FREESTANDING) {
+      continue;
+    }
     if (target.os != host.os || target.arch != host.arch) {
       return toolchain->targets[it];
     }

@@ -148,6 +148,9 @@ sp_str_t spn_abi_to_str(spn_abi_t abi) {
     case SPN_ABI_NONE: {
       return sp_str_lit("");
     }
+    case SPN_ABI_COUNT: {
+      sp_unreachable_case();
+    }
   }
 
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
@@ -457,9 +460,6 @@ sp_str_t spn_option_setter_kind_to_str(spn_option_setter_kind_t kind) {
 
 sp_str_t spn_cc_feature_to_str(spn_cc_feature_t feature) {
   switch (feature) {
-    case SPN_CC_FEATURE_COMPILE: {
-      return sp_str_lit("compile");
-    }
     case SPN_CC_FEATURE_LINK_EXE: {
       return sp_str_lit("link_exe");
     }

@@ -5,6 +5,7 @@
 
 #define expect_path(t, fixture, path) expect_exists(t, fixture, path, true, __FILE__, __LINE__)
 #define expect_no_path(t, fixture, path) expect_exists(t, fixture, path, false, __FILE__, __LINE__)
+#define expect_static_elf(t, fixture, path) expect_no_interp(t, fixture, path, __FILE__, __LINE__)
 
 static SP_THREAD_LOCAL sp_mem_heap_t* harness_heap;
 
@@ -63,7 +64,9 @@ sp_str_t test_lib(const c8* name) {
 static sp_str_t exe_file_name(const c8* name, const c8* triple) {
   spn_triple_t target = test_host();
   if (triple) {
-    target = spn_triple_merge(target, spn_triple_from_str(sp_str_view(triple)));
+    spn_triple_t partial = sp_zero;
+    sp_assert(spn_triple_parse(sp_str_view(triple), &partial) == SPN_OK);
+    target = spn_triple_merge(target, partial);
   }
   if (sp_str_find_c8(sp_fs_get_name(sp_str_view(name)), '.') >= 0) {
     return sp_str_view(name);
@@ -116,23 +119,53 @@ sp_str_t target_store_file(const c8* rest, const c8* triple) {
   return layout_path(triple, "debug", layout_sub("store", store_rest(rest, triple)));
 }
 
+static sp_str_t display_path(fixture_t* fixture, sp_str_t path) {
+  if (!fixture) {
+    return path;
+  }
+  sp_str_t relative = sp_str_strip_left(path, fixture->root);
+  if (relative.len == path.len) {
+    return path;
+  }
+  return sp_str_concat(harness_mem(), sp_str_lit("$test"), relative);
+}
+
 sp_err_t expect_exists(sp_test_t* t, fixture_t* fixture, sp_str_t path, bool expected, const c8* file, u32 line) {
   bool exists = sp_fs_exists(path);
   if (exists == expected) return SP_OK;
 
   if (fixture) {
     sp_test_kv(t, "root", fixture->root);
-    sp_str_t relative = sp_str_strip_left(path, fixture->root);
-    if (relative.len != path.len) {
-      path = sp_str_concat(harness_mem(), sp_str_lit("$test"), relative);
-    }
   }
-  sp_test_kv(t, "path", path);
+  sp_test_kv(t, "path", display_path(fixture, path));
   sp_test_record(t, (sp_test_failure_t) {
     .file = sp_cstr_as_str(file),
     .line = line,
     .expected = sp_cstr_as_str(expected ? "path exists" : "path does not exist"),
     .actual = sp_cstr_as_str(exists ? "it exists" : "it does not"),
+  });
+  return SP_ERR;
+}
+
+static sp_err_t expect_no_interp(sp_test_t* t, fixture_t* fixture, sp_str_t path, const c8* file, u32 line) {
+  sp_io_file_reader_t reader = sp_zero;
+  sp_must_ok(t, sp_io_file_reader_from_path(&reader, path));
+  sp_io_seeking_reader_t elf = sp_zero;
+  sp_io_seeking_reader_from_file_reader(&elf, &reader);
+  sp_str_t interp = sp_zero;
+  spn_err_t err = spn_elf_interp(fixture->mem, &elf, &interp);
+  sp_io_file_reader_close(&reader);
+  if (!err && sp_str_empty(interp)) {
+    return SP_OK;
+  }
+
+  sp_test_kv(t, "root", fixture->root);
+  sp_test_kv(t, "path", display_path(fixture, path));
+  sp_test_record(t, (sp_test_failure_t) {
+    .file = sp_cstr_as_str(file),
+    .line = line,
+    .expected = sp_cstr_as_str("a static elf64 with no program interpreter"),
+    .actual = err ? sp_cstr_as_str("not an elf64 image") : interp,
   });
   return SP_ERR;
 }
@@ -696,6 +729,11 @@ sp_err_t run_actions(sp_test_t* t, fixture_t* fixture, const action_t* actions) 
       case ACTION_VERIFY_NOT_EXISTS: {
         sp_str_t path = fixture_path(fixture, action.exists);
         expect_no_path(t, fixture, path);
+        break;
+      }
+      case ACTION_VERIFY_NO_INTERP: {
+        sp_str_t path = fixture_path(fixture, action.verify_no_interp);
+        expect_static_elf(t, fixture, path);
         break;
       }
       case ACTION_VERIFY_DIR_COUNT: {

@@ -682,6 +682,36 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
           );
           break;
         }
+        case SPN_ERR_PROFILE_ARCH: {
+          sp_tty_fmt(
+            &w,
+            "target {.yellow} isn't valid; {} doesn't run on {.red}",
+            sp_fmt_str(spn_triple_to_str(mem, event->err.profile.target)),
+            sp_fmt_str(spn_os_to_str(event->err.profile.target.os)),
+            sp_fmt_str(spn_arch_to_str(event->err.profile.target.arch))
+          );
+          break;
+        }
+        case SPN_ERR_PROFILE_ABI: {
+          sp_tty_fmt(
+            &w,
+            "target {.yellow} isn't valid; {} has no {.red} abi",
+            sp_fmt_str(spn_triple_to_str(mem, event->err.profile.target)),
+            sp_fmt_str(spn_os_to_str(event->err.profile.target.os)),
+            sp_fmt_str(spn_abi_to_str(event->err.profile.target.abi))
+          );
+          break;
+        }
+        case SPN_ERR_PROFILE_LINKAGE: {
+          sp_tty_fmt(
+            &w,
+            "target {.yellow} can't link {.red}; {} has no dynamic loader",
+            sp_fmt_str(spn_triple_to_str(mem, event->err.profile.target)),
+            sp_fmt_str(sp_str_lit("shared")),
+            sp_fmt_str(spn_os_to_str(event->err.profile.target.os))
+          );
+          break;
+        }
         case SPN_ERR_SANITIZER_UNSUPPORTED: {
           if (event->err.sanitizer.supported) {
             sp_tty_fmt(
@@ -716,7 +746,6 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
         case SPN_ERR_COMPILER_FEATURE_UNSUPPORTED: {
           const c8* feature = "";
           switch (event->err.compiler.feature) {
-            case SPN_CC_FEATURE_COMPILE: feature = "direct compilation"; break;
             case SPN_CC_FEATURE_LINK_EXE: feature = "executable linking"; break;
             case SPN_CC_FEATURE_LINK_SHARED: feature = "shared library linking"; break;
             case SPN_CC_FEATURE_LINK_REACTOR: feature = "reactor module linking"; break;
@@ -970,15 +999,6 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
           );
           break;
         }
-        case SPN_ERR_TOOLCHAIN_NO_SHA: {
-          sp_tty_fmt(
-            &w,
-            "toolchain {} has no sha256 for {.gray}",
-            sp_fmt_str(colored_name(w.color, mem, event->err.artifact.name)),
-            sp_fmt_str(event->err.artifact.url)
-          );
-          break;
-        }
         case SPN_ERR_TOOLCHAIN_SHA: {
           sp_tty_fmt(
             &w,
@@ -1021,15 +1041,6 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
             &w,
             "cross target {.yellow} needs an abi; pass --abi or add it to --target",
             sp_fmt_str(spn_triple_to_str(mem, event->err.completion.target))
-          );
-          break;
-        }
-        case SPN_ERR_TOOLCHAIN_SCRIPT_TARGET: {
-          sp_tty_fmt(
-            &w,
-            "build scripts compile to {.yellow}, but toolchain {} can't target it",
-            sp_fmt_str(spn_triple_to_str(mem, event->err.toolchain.target)),
-            sp_fmt_str(colored_name(w.color, mem, event->err.toolchain.name))
           );
           break;
         }
@@ -1435,12 +1446,13 @@ static void render_event_extra(sp_tty_t* w, spn_event_t* event) {
           sp_io_write_str(w->io, event->err.publish.output, SP_NULLPTR);
           break;
         }
-        case SPN_ERR_TOOLCHAIN_TARGET:
-        case SPN_ERR_TOOLCHAIN_SCRIPT_TARGET: {
+        case SPN_ERR_TOOLCHAIN_TARGET: {
+          sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
           sp_da_for(event->err.toolchain.targets, it) {
             sp_io_write_str(w->io, it ? sp_str_lit(", ") : sp_str_lit("it can target: "), SP_NULLPTR);
-            sp_tty_fmt(w, "{.yellow}", sp_fmt_str(event->err.toolchain.targets[it]));
+            sp_tty_fmt(w, "{.yellow}", sp_fmt_str(spn_triple_to_str(scratch.mem, event->err.toolchain.targets[it])));
           }
+          sp_mem_end_scratch(scratch);
           if (!sp_da_empty(event->err.toolchain.targets)) {
             sp_io_write_c8(w->io, '\n');
           }
@@ -1468,7 +1480,7 @@ static void render_event_extra(sp_tty_t* w, spn_event_t* event) {
         case SPN_ERR_TARGET_ABI: {
           sp_da_for(event->err.completion.candidates, it) {
             sp_io_write_str(w->io, it ? sp_str_lit(", ") : sp_str_lit("one of: "), SP_NULLPTR);
-            sp_tty_fmt(w, "{.green}", sp_fmt_str(event->err.completion.candidates[it]));
+            sp_tty_fmt(w, "{.green}", sp_fmt_str(spn_abi_to_str(event->err.completion.candidates[it])));
           }
           if (!sp_da_empty(event->err.completion.candidates)) {
             sp_io_write_c8(w->io, '\n');

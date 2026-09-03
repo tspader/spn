@@ -13,10 +13,8 @@
     "toolchain_none": { "ref": "toolchain" },
     "toolchain_target": { "ref": "toolchain" },
     "target_abi": { "ref": "completion" },
-    "toolchain_script_target": { "ref": "toolchain" },
     "toolchain_host": { "ref": "toolchain" },
     "toolchain_fetch": { "ref": "artifact" },
-    "toolchain_no_sha": { "ref": "artifact" },
     "toolchain_sha": { "ref": "artifact" },
     "toolchain_extract": { "ref": "artifact" },
     "toolchain_no_cxx": { "ref": "toolchain" },
@@ -47,6 +45,9 @@
     "wasm_export_not_found": { "ref": "wasm" },
     "profile_invalid": { "ref": "profile" },
     "profile_undefined": { "ref": "profile" },
+    "profile_arch": { "ref": "profile" },
+    "profile_abi": { "ref": "profile" },
+    "profile_linkage": { "ref": "profile" },
     "sanitizer_unsupported": { "ref": "sanitizer" },
     "sanitizer_static": { "ref": "sanitizer" },
     "compiler_feature_unsupported": { "ref": "compiler" },
@@ -180,14 +181,14 @@
         "target": { "metadata": { "extern": "triple" } },
         "host": { "metadata": { "extern": "triple" } },
         "candidates": { "elements": { "type": "string" } },
-        "targets": { "elements": { "type": "string" } }
+        "targets": { "elements": { "metadata": { "extern": "triple" } } }
       }
     },
     "completion": {
       "properties": {
         "target": { "metadata": { "extern": "triple" } },
         "host": { "metadata": { "extern": "triple" } },
-        "candidates": { "elements": { "type": "string" } }
+        "candidates": { "elements": { "metadata": { "extern": "abi" } } }
       }
     },
     "program": {
@@ -196,7 +197,7 @@
         "program": { "type": "string" }
       }
     },
-    "cc_feature": { "enum": ["compile", "link_exe", "link_shared", "link_reactor", "archive", "frameworks"] },
+    "cc_feature": { "enum": ["link_exe", "link_shared", "link_reactor", "archive", "frameworks"] },
     "artifact": {
       "properties": {
         "name": { "type": "string" },
@@ -214,7 +215,8 @@
     },
     "profile": {
       "properties": {
-        "name": { "type": "string" }
+        "name": { "type": "string" },
+        "target": { "metadata": { "extern": "triple" } }
       }
     },
     "sanitizer": {

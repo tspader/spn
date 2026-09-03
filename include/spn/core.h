@@ -26,6 +26,7 @@ typedef enum {
   SPN_ABI_MSVC,
   SPN_ABI_APPLE,
   SPN_ABI_BARE,
+  SPN_ABI_COUNT,
 } spn_abi_t;
 
 typedef enum {

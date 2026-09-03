@@ -93,7 +93,7 @@ static const flags_test_t tests [] = {
       .sanitizers = SPN_SANITIZER_MEMORY,
     },
     .driver = SPN_CC_DRIVER_CLANG,
-    .expect = { .unsupported = SPN_SANITIZER_MEMORY },
+    .expect = { .kind = SPN_ERR_SANITIZER_UNSUPPORTED, .unsupported = SPN_SANITIZER_MEMORY },
   },
   {
     .name = "reject_asan_on_wasi",
@@ -103,7 +103,7 @@ static const flags_test_t tests [] = {
       .sanitizers = SPN_SANITIZER_ADDRESS,
     },
     .driver = SPN_CC_DRIVER_CLANG,
-    .expect = { .unsupported = SPN_SANITIZER_ADDRESS },
+    .expect = { .kind = SPN_ERR_SANITIZER_UNSUPPORTED, .unsupported = SPN_SANITIZER_ADDRESS },
   },
   {
     .name = "reject_ubsan_on_freestanding",
@@ -114,7 +114,7 @@ static const flags_test_t tests [] = {
       .sanitizers = SPN_SANITIZER_UNDEFINED,
     },
     .driver = SPN_CC_DRIVER_ZIG,
-    .expect = { .unsupported = SPN_SANITIZER_UNDEFINED },
+    .expect = { .kind = SPN_ERR_SANITIZER_UNSUPPORTED, .unsupported = SPN_SANITIZER_UNDEFINED },
   },
   {
     .name = "zig_driver_rejects_asan",
@@ -125,7 +125,7 @@ static const flags_test_t tests [] = {
       .sanitizers = SPN_SANITIZER_ADDRESS | SPN_SANITIZER_UNDEFINED,
     },
     .driver = SPN_CC_DRIVER_ZIG,
-    .expect = { .unsupported = SPN_SANITIZER_ADDRESS },
+    .expect = { .kind = SPN_ERR_SANITIZER_UNSUPPORTED, .unsupported = SPN_SANITIZER_ADDRESS },
   },
   {
     .name = "zig_driver_allows_ubsan_on_windows",
@@ -184,7 +184,7 @@ static const flags_test_t tests [] = {
       .sanitizers = SPN_SANITIZER_THREAD | SPN_SANITIZER_UNDEFINED,
     },
     .driver = SPN_CC_DRIVER_ZIG,
-    .expect = { .unsupported = SPN_SANITIZER_THREAD },
+    .expect = { .kind = SPN_ERR_SANITIZER_UNSUPPORTED, .unsupported = SPN_SANITIZER_THREAD },
   },
   {
     .name = "zig_driver_allows_ubsan",
@@ -256,8 +256,8 @@ sp_test_each(render_flags, resolve, flags_test_t, tests, .setup = spn_test_ctx_s
   spn_cc_flags_t flags = sp_zero;
   spn_err_t err = spn_cc_render_flags(mem, &toolchain, &it->profile, &flags);
 
-  if (it->expect.unsupported) {
-    sp_expect_eq(t, err, it->expect.kind ? it->expect.kind : SPN_ERR_SANITIZER_UNSUPPORTED);
+  if (it->expect.kind) {
+    sp_expect_eq(t, err, it->expect.kind);
     sp_da(spn_event_t) errs = spn_test_drain_errs(mem);
     sp_must_eq(t, 1, sp_da_size(errs));
     sp_expect_eq(t, errs[0].err.kind, err);

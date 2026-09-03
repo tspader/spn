@@ -91,11 +91,25 @@ spn build
 ./build/debug/demo
 ```
 
-Cross compiling works out of the box. The following commands produce `build/x86_64-windows-gnu/debug/main.exe`, `build/aarch64-macos/debug/main`, and a bare metal `build/aarch64-freestanding-none/debug/main.elf` with no libc or startup files:
+Cross compiling works out of the box. The following commands produce `build/x86_64-windows-gnu/debug/demo.exe` and `build/aarch64-macos-apple/debug/demo`:
 
 ```sh
 spn build --target x86_64-windows-gnu
 spn build --target aarch64-macos
+```
+
+Bare metal works the same way. A program with no libc and its own entry point:
+
+```c
+void _start(void) {
+  for (;;) {
+  }
+}
+```
+
+builds into a static `build/aarch64-freestanding-none/debug/demo.elf` with no startup files:
+
+```sh
 spn build --target aarch64-freestanding
 ```
 

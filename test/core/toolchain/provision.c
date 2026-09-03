@@ -12,8 +12,6 @@ typedef struct {
   spn_err_t kind;
   u32 calls;
   const c8* last_url;
-  bool root_empty;
-  bool root_in_store;
   bool extracted;
   bool store_clean;
   bool err_reports_sha;
@@ -22,10 +20,8 @@ typedef struct {
 typedef struct {
   const c8* name;
   const c8* toolchains [PROVISION_MAX_TOOLCHAINS];
-  bool local;
   provision_tarball_t tarball;
   const c8* sha;
-  bool no_sha;
   const c8* mirror;
   bool fetch_fail;
   const c8* fail_url_containing;
@@ -52,15 +48,9 @@ typedef struct {
 
 static const provision_test_t tests [] = {
   {
-    .name = "local_toolchain_is_noop",
-    .local = true,
-    .expect = { .root_empty = true },
-  },
-  {
     .name = "fresh_artifact_downloads_and_extracts",
     .expect = {
       .calls = 1,
-      .root_in_store = true,
       .extracted = true,
     },
   },
@@ -140,11 +130,6 @@ static const provision_test_t tests [] = {
       .kind = SPN_ERR_TOOLCHAIN_EXTRACT,
       .calls = 1,
     },
-  },
-  {
-    .name = "empty_sha_is_rejected",
-    .no_sha = true,
-    .expect = { .kind = SPN_ERR_TOOLCHAIN_NO_SHA },
   },
   {
     .name = "missing_store_dir_is_created",
@@ -264,15 +249,15 @@ sp_test_each(provision, store, provision_test_t, tests, .setup = spn_test_ctx_se
     sp_fs_create_dir(store.dir);
   }
 
-  sp_str_t artifact_sha = it->no_sha ? sp_str_lit("") : (it->sha ? sp_str_view(it->sha) : sha);
-  sp_str_t url = sp_fmt(mem, "https://tc.example.com/{}", sp_fmt_str(sp_fs_get_name(stub.tarball))).value;
+  spn_artifact_t artifact = {
+    .url = sp_fmt(mem, "https://tc.example.com/{}", sp_fmt_str(sp_fs_get_name(stub.tarball))).value,
+    .sha256 = it->sha ? sp_str_view(it->sha) : sha,
+  };
 
   if (it->dest_file) {
-    sp_fs_create_file_str(sp_fs_join_path(mem, store.dir, artifact_sha), sp_str_lit("A"));
+    sp_fs_create_file_str(sp_fs_join_path(mem, store.dir, artifact.sha256), sp_str_lit("A"));
   }
 
-  sp_str_t roots [PROVISION_MAX_TOOLCHAINS] = sp_zero;
-  u32 provisions = 0;
   spn_err_union_t payload = sp_zero;
 
   sp_carr_for(it->toolchains, at) {
@@ -284,18 +269,7 @@ sp_test_each(provision, store, provision_test_t, tests, .setup = spn_test_ctx_se
       break;
     }
 
-    spn_toolchain_info_t toolchain = fixture_local_toolchain(name, name);
-    spn_opt_artifact_t artifact = sp_zero;
-    if (!it->local) {
-      toolchain.source = SPN_TOOLCHAIN_SOURCE_DISTRIBUTION;
-      sp_opt_set(artifact, ((spn_artifact_t) {
-        .url = url,
-        .sha256 = artifact_sha,
-      }));
-    }
-
-    roots[at] = sp_str_lit("sentinel");
-    spn_err_t err = spn_toolchain_provision(&store, &toolchain, artifact, &roots[at]);
+    spn_err_t err = spn_toolchain_provision(&store, sp_cstr_as_str(name), artifact);
     sp_must_eq(t, (u32)it->expect.kind, (u32)err);
     if (err) {
       sp_da(spn_event_t) errs = spn_test_drain_errs(mem);
@@ -304,7 +278,6 @@ sp_test_each(provision, store, provision_test_t, tests, .setup = spn_test_ctx_se
       sp_expect_eq(t, payload.kind, err);
       sp_expect_str_eq_c(t, payload.artifact.name, name);
     }
-    provisions++;
   }
 
   sp_expect_eq(t, it->expect.calls, stub.calls);
@@ -312,30 +285,22 @@ sp_test_each(provision, store, provision_test_t, tests, .setup = spn_test_ctx_se
   if (it->expect.last_url) {
     sp_expect_str_eq_c(t, stub.last_url, it->expect.last_url);
   }
-  if (it->expect.root_empty) {
-    sp_expect(t, sp_str_empty(roots[0]));
-  }
-  if (it->expect.root_in_store) {
-    sp_expect_str_eq(t, roots[0], sp_fs_join_path(mem, store.dir, sha));
-  }
   if (it->expect.extracted) {
-    sp_expect(t, sp_fs_is_dir(roots[0]));
-    sp_expect(t, sp_fs_is_file(sp_fs_join_path(mem, roots[0], sp_str_lit("B"))));
-    sp_expect(t, sp_fs_is_file(sp_fs_join_path(mem, roots[0], sp_str_lit("lib/C"))));
+    sp_str_t root = spn_toolchain_store_path(&store, artifact);
+    sp_expect(t, sp_fs_is_dir(root));
+    sp_expect(t, sp_fs_is_file(sp_fs_join_path(mem, root, sp_str_lit("B"))));
+    sp_expect(t, sp_fs_is_file(sp_fs_join_path(mem, root, sp_str_lit("lib/C"))));
   }
   if (it->expect.store_clean) {
-    sp_str_t lock = sp_fmt(mem, "{}.lock", sp_fmt_str(artifact_sha)).value;
+    sp_str_t lock = sp_fmt(mem, "{}.lock", sp_fmt_str(artifact.sha256)).value;
     sp_da(sp_fs_entry_t) entries = sp_zero;
     sp_fs_collect(mem, store.dir, &entries);
     sp_must_eq(t, 1u, (u32)sp_da_size(entries));
     sp_expect_str_eq(t, entries[0].name, lock);
   }
   if (it->expect.err_reports_sha) {
-    sp_expect_str_eq(t, payload.artifact.expected, artifact_sha);
+    sp_expect_str_eq(t, payload.artifact.expected, artifact.sha256);
     sp_expect_str_eq(t, payload.artifact.actual, sha);
-  }
-  if (provisions > 1) {
-    sp_expect_str_eq(t, roots[0], roots[1]);
   }
 
   return SP_OK;

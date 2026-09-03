@@ -127,8 +127,8 @@ sp_hash_t spn_unit_fingerprint(spn_session_t* session, spn_build_unit_t* build, 
   fingerprint.toolchain.ar = spn_digest_hash_str(toolchain->archiver.program.prefix);
   fingerprint.toolchain.cxx = spn_digest_hash_str(toolchain->cxx.program.prefix);
   fingerprint.toolchain.identity = build->toolchain->identity;
-  if (!sp_opt_is_null(build->toolchain->artifact)) {
-    fingerprint.toolchain.url = spn_digest_hash_str(sp_opt_get(build->toolchain->artifact).sha256);
+  if (toolchain->support.kind == SPN_TOOLCHAIN_SUPPORT_ARTIFACT) {
+    fingerprint.toolchain.url = spn_digest_hash_str(toolchain->support.artifact.sha256);
   }
 
   sp_hash_t hash = spn_digest_hash(&fingerprint, sizeof(fingerprint));

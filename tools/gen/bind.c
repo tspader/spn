@@ -72,6 +72,9 @@ static sp_str_t decl_type(gen_t* g, gen_field_t* f) {
     case FIELD_EXTERN: {
       return enum_type(g, f->as.ext);
     }
+    case FIELD_EXTERN_ARRAY: {
+      return sp_fmt(g->mem, "sp_da({})", sp_fmt_str(enum_type(g, f->as.ext))).value;
+    }
     case FIELD_STR_ARRAY: {
       return sp_str_lit("sp_da(sp_str_t)");
     }
@@ -104,6 +107,7 @@ static bool value_is_str(gen_field_t* f) {
     case FIELD_ENUM:
     case FIELD_OBJECT:
     case FIELD_EXTERN:
+    case FIELD_EXTERN_ARRAY:
     case FIELD_ENUM_ARRAY:
     case FIELD_OBJECT_ARRAY:
     case FIELD_KEYED: {
@@ -121,6 +125,7 @@ static sp_str_t present(gen_t* g, gen_field_t* f, sp_str_t recv) {
     return sp_str_lit("true");
   }
   switch (f->kind) {
+    case FIELD_EXTERN_ARRAY:
     case FIELD_STR_ARRAY:
     case FIELD_ENUM_ARRAY:
     case FIELD_OBJECT_ARRAY:
@@ -190,6 +195,7 @@ static sp_str_t write_value(gen_t* g, gen_field_t* f) {
     }
     case FIELD_OBJECT:
     case FIELD_EXTERN:
+    case FIELD_EXTERN_ARRAY:
     case FIELD_STR_ARRAY:
     case FIELD_ENUM_ARRAY:
     case FIELD_OBJECT_ARRAY:
@@ -246,6 +252,11 @@ static void bind_field(gen_t* g, sp_template_scope_t* scope, gen_field_t* f) {
     }
     case FIELD_EXTERN: {
       sp_template_set(scope, sp_str_lit("k_extern"), sp_str_lit("1"));
+      sp_template_set(scope, sp_str_lit("extern"), f->as.ext);
+      break;
+    }
+    case FIELD_EXTERN_ARRAY: {
+      sp_template_set(scope, sp_str_lit("k_extern_array"), sp_str_lit("1"));
       sp_template_set(scope, sp_str_lit("extern"), f->as.ext);
       break;
     }

@@ -485,10 +485,10 @@ static spn_err_t build_target_plan(spn_target_unit_t* target) {
     case SPN_CC_OUTPUT_SHARED_LIB:
     case SPN_CC_OUTPUT_REACTOR: {
       spn_try(spn_cc_validate_archive(toolchain, profile));
-      return spn_cc_validate_link(toolchain, profile, target->kind, !sp_da_empty(target->link.cc.frameworks));
+      return spn_cc_validate_link(toolchain, profile, &target->link.cc);
     }
     case SPN_CC_OUTPUT_EXE: {
-      return spn_cc_validate_link(toolchain, profile, target->kind, !sp_da_empty(target->link.cc.frameworks));
+      return spn_cc_validate_link(toolchain, profile, &target->link.cc);
     }
     case SPN_CC_OUTPUT_OBJECT: {
       return SPN_OK;

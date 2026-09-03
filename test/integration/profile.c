@@ -119,13 +119,13 @@ sp_test(profile, static_config_is_not_a_shared_demand) {
   });
 }
 
-sp_test(profile, target_without_toolchain) {
+sp_test(profile, target_with_foreign_arch) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/profile/override",
     .when.msvc_todo = true,
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", "x86_64-wasi" }, .rc = 1 } },
-      { .kind = ACTION_VERIFY_RESULT, .verify_result = { .err = SPN_ERR_TOOLCHAIN_NONE } },
+      { .kind = ACTION_VERIFY_RESULT, .verify_result = { .err = SPN_ERR_PROFILE_ARCH } },
     },
   });
 }
@@ -145,18 +145,30 @@ sp_test(profile, cross_target_macos) {
   });
 }
 
-sp_test(profile, cross_target_freestanding) {
+sp_test(profile, freestanding_target) {
   return run_command_test(t, (command_test_t) {
     .project = "test/integration/fixtures/profile/freestanding",
     .copy = { "a.c" },
-    .when.target = "aarch64-freestanding",
-    .args = { "build", "--target", "aarch64-freestanding" },
+    .when.target = SPN_TEST_ARCH "-freestanding",
+    .args = { "build", "--target", SPN_TEST_ARCH "-freestanding" },
     .expect = {
-      .exists = { target_exe("main", "aarch64-freestanding-none") },
+      .exists = { target_exe("main", SPN_TEST_ARCH "-freestanding-none") },
       .events = {
-        { .event = SPN_EVENT_INIT_BUILD_GRAPH, .key = "target", .value = "aarch64-freestanding-none" },
-        { .event = SPN_EVENT_INIT_BUILD_GRAPH, .key = "toolchain", .value = "zig" },
+        { .event = SPN_EVENT_INIT_BUILD_GRAPH, .key = "target", .value = SPN_TEST_ARCH "-freestanding-none" },
+        { .event = SPN_EVENT_INIT_BUILD_GRAPH, .key = "toolchain", .value = test_toolchain()->name },
       },
+    },
+  });
+}
+
+sp_test(profile, freestanding_exe_has_no_interp) {
+  return run_test(t, (test_t) {
+    .project = "test/integration/fixtures/profile/freestanding",
+    .copy = { "a.c" },
+    .when.target = SPN_TEST_ARCH "-freestanding",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", SPN_TEST_ARCH "-freestanding" } } },
+      { .kind = ACTION_VERIFY_NO_INTERP, .verify_no_interp = target_exe("main", SPN_TEST_ARCH "-freestanding-none") },
     },
   });
 }
@@ -165,22 +177,10 @@ sp_test(profile, freestanding_libs_not_pic) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/profile/freestanding",
     .copy = { "a.c" },
-    .when.target = "aarch64-freestanding",
+    .when.target = SPN_TEST_ARCH "-freestanding",
     .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", "aarch64-freestanding" } } },
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", SPN_TEST_ARCH "-freestanding" } } },
       { .kind = ACTION_VERIFY_NO_CC_ARG, .verify_cc_arg = { "-fPIC" } },
-    },
-  });
-}
-
-sp_test(profile, freestanding_rejects_shared_lib) {
-  return run_test(t, (test_t) {
-    .project = "test/integration/fixtures/profile/freestanding_shared",
-    .copy = { "a.c" },
-    .when.target = "aarch64-freestanding",
-    .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", "aarch64-freestanding" }, .rc = 1 } },
-      { .kind = ACTION_VERIFY_RESULT, .verify_result = { .err = SPN_ERR_COMPILER_FEATURE_UNSUPPORTED } },
     },
   });
 }
