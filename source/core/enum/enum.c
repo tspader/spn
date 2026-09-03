@@ -460,9 +460,6 @@ sp_str_t spn_option_setter_kind_to_str(spn_option_setter_kind_t kind) {
 
 sp_str_t spn_cc_feature_to_str(spn_cc_feature_t feature) {
   switch (feature) {
-    case SPN_CC_FEATURE_COMPILE: {
-      return sp_str_lit("compile");
-    }
     case SPN_CC_FEATURE_LINK_EXE: {
       return sp_str_lit("link_exe");
     }

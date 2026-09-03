@@ -197,7 +197,7 @@
         "program": { "type": "string" }
       }
     },
-    "cc_feature": { "enum": ["compile", "link_exe", "link_shared", "link_reactor", "archive", "frameworks"] },
+    "cc_feature": { "enum": ["link_exe", "link_shared", "link_reactor", "archive", "frameworks"] },
     "artifact": {
       "properties": {
         "name": { "type": "string" },

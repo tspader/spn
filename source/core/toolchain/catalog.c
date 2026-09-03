@@ -62,6 +62,9 @@ spn_err_t spn_toolchain_decls_parse(sp_mem_t mem, sp_str_t json, sp_da(spn_toolc
       if (spn_triple_entry(partial, &full) != SPN_TRIPLE_ENTRY_OK) {
         return SPN_ERROR;
       }
+      if (!spn_toolchain_driver_reaches(decl.driver, full)) {
+        return SPN_ERROR;
+      }
       sp_da_push(decl.targets, full);
     }
 
@@ -78,8 +81,9 @@ static sp_da(spn_triple_t) bind_targets(spn_toolchain_catalog_t* catalog, const 
 
   sp_da(spn_triple_t) targets = sp_da_new(catalog->mem, spn_triple_t);
   sp_da_push(targets, catalog->host);
-  if (catalog->host.os == SPN_OS_LINUX && (spn_toolchain_driver_caps(decl->driver) & SPN_CC_CAP_FREESTANDING)) {
-    sp_da_push(targets, ((spn_triple_t) { catalog->host.arch, SPN_OS_FREESTANDING, SPN_ABI_BARE }));
+  spn_triple_t bare = { catalog->host.arch, SPN_OS_FREESTANDING, SPN_ABI_BARE };
+  if (catalog->host.os == SPN_OS_LINUX && spn_toolchain_driver_reaches(decl->driver, bare)) {
+    sp_da_push(targets, bare);
   }
   return targets;
 }

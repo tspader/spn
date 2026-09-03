@@ -746,7 +746,6 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
         case SPN_ERR_COMPILER_FEATURE_UNSUPPORTED: {
           const c8* feature = "";
           switch (event->err.compiler.feature) {
-            case SPN_CC_FEATURE_COMPILE: feature = "direct compilation"; break;
             case SPN_CC_FEATURE_LINK_EXE: feature = "executable linking"; break;
             case SPN_CC_FEATURE_LINK_SHARED: feature = "shared library linking"; break;
             case SPN_CC_FEATURE_LINK_REACTOR: feature = "reactor module linking"; break;

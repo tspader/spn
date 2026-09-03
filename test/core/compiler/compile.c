@@ -132,19 +132,6 @@ static const compile_test_t tests [] = {
     },
   },
   {
-    .name = "msvc_freestanding_unsupported",
-    .driver = SPN_CC_DRIVER_MSVC,
-    .profile = {
-      .arch = SPN_ARCH_X64,
-      .os = SPN_OS_FREESTANDING,
-      .abi = SPN_ABI_BARE,
-    },
-    .expect = {
-      .err = SPN_ERR_COMPILER_FEATURE_UNSUPPORTED,
-      .feature = SPN_CC_FEATURE_COMPILE,
-    },
-  },
-  {
     .name = "clang_windows_deterministic_codeview",
     .driver = SPN_CC_DRIVER_CLANG,
     .profile = {

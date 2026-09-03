@@ -139,6 +139,11 @@ static const parse_test_t tests [] = {
     .file = "mixed.json",
     .expect = { .err = SPN_ERROR },
   },
+  {
+    .name = "target_beyond_driver",
+    .file = "bad_target_driver.json",
+    .expect = { .err = SPN_ERROR },
+  },
 };
 
 sp_test_each(parse, decls, parse_test_t, tests) {

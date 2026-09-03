@@ -133,9 +133,6 @@ static spn_err_t feature_unsupported(const spn_cc_toolchain_t* toolchain, const 
 }
 
 spn_err_t spn_cc_validate_profile(const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile) {
-  if (profile->os == SPN_OS_FREESTANDING && !spn_cc_has(toolchain, SPN_CC_CAP_FREESTANDING)) {
-    return feature_unsupported(toolchain, profile, SPN_CC_FEATURE_COMPILE);
-  }
   spn_triple_t target = { profile->arch, profile->os, profile->abi };
   spn_sanitizer_set_t supported = get_supported_sanitizers(toolchain, target);
   spn_sanitizer_set_t unsupported = profile->sanitizers & ~supported;

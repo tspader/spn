@@ -1,0 +1,11 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[[toolchain]]
+name = "cross"
+compiler = "cl"
+linker = "link"
+archiver = "lib"
+driver = "msvc"
+target = [{ arch = "x86_64", os = "freestanding" }]

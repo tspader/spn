@@ -370,6 +370,12 @@ static void lower_toolchains(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg
         spn_toml_loader_pop(ctx);
         continue;
       }
+      if (toolchain.driver && !spn_toolchain_driver_reaches(toolchain.driver, full)) {
+        spn_toml_loader_push_index(ctx, it);
+        spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "os");
+        spn_toml_loader_pop(ctx);
+        continue;
+      }
       sp_da_push(toolchain.targets, full);
     }
     spn_toml_loader_pop(ctx);

@@ -56,6 +56,13 @@ spn_cc_cap_set_t spn_toolchain_driver_caps(spn_cc_driver_t driver) {
   SP_UNREACHABLE_RETURN(0);
 }
 
+bool spn_toolchain_driver_reaches(spn_cc_driver_t driver, spn_triple_t target) {
+  if (target.os == SPN_OS_FREESTANDING) {
+    return spn_toolchain_driver_caps(driver) & SPN_CC_CAP_FREESTANDING;
+  }
+  return true;
+}
+
 sp_str_t spn_toolchain_launcher_to_str(const spn_path_roots_t* roots, sp_mem_t mem, spn_toolchain_launcher_t launcher) {
   sp_str_t program = spn_arg_str(roots, mem, launcher.program);
   if (sp_da_empty(launcher.args)) {
