@@ -73,6 +73,8 @@ typedef struct {
   sp_da(sp_str_t) system_libs;
   sp_da(spn_path_t) lib_dirs;
   sp_da(sp_str_t) frameworks;
+  sp_da(sp_str_t) args;
+  sp_da(spn_path_t) scripts;
   spn_os_version_t min_os;
   spn_win_subsystem_t subsystem;
   bool rpath;
