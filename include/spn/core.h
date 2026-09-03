@@ -70,6 +70,7 @@ typedef enum {
   SPN_CC_FEATURE_LINK_REACTOR,
   SPN_CC_FEATURE_ARCHIVE,
   SPN_CC_FEATURE_FRAMEWORKS,
+  SPN_CC_FEATURE_LINKER_SCRIPT,
 } spn_cc_feature_t;
 
 typedef enum {

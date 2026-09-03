@@ -751,6 +751,7 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
             case SPN_CC_FEATURE_LINK_REACTOR: feature = "reactor module linking"; break;
             case SPN_CC_FEATURE_ARCHIVE: feature = "static archiving"; break;
             case SPN_CC_FEATURE_FRAMEWORKS: feature = "framework linking without a macOS SDK"; break;
+            case SPN_CC_FEATURE_LINKER_SCRIPT: feature = "linker scripts"; break;
           }
 
           sp_tty_fmt(

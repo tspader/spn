@@ -475,6 +475,9 @@ sp_str_t spn_cc_feature_to_str(spn_cc_feature_t feature) {
     case SPN_CC_FEATURE_FRAMEWORKS: {
       return sp_str_lit("frameworks");
     }
+    case SPN_CC_FEATURE_LINKER_SCRIPT: {
+      return sp_str_lit("linker_script");
+    }
   }
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
