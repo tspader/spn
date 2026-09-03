@@ -211,7 +211,7 @@ static const test_t tests [] = {
     .libs = {
       {
         .name = "t",
-        .linkages = { .static_lib = true },
+        .linkages = { .static_lib = true, .shared = true },
         .source = { { "main.c" } },
         .headers = { { "header.h" } },
         .include = { { "include/dir" } },
@@ -415,6 +415,14 @@ static const test_t tests [] = {
     }
   },
   {
+    .name = "validate_link_inputs_on_static_lib",
+    .manifest = "validate_link_inputs_on_static_lib",
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "lib[0].link_flags" },
+      { SPN_ERR_CODEGEN_INVALID, "lib[0].linker_script" },
+    }
+  },
+  {
     .name = "validate_link_on_bin",
     .manifest = "validate_link_on_bin",
     .issues = {
@@ -553,7 +561,7 @@ static const test_t tests [] = {
     .libs = {
       {
         .name = "t",
-        .linkages = { .static_lib = true },
+        .linkages = { .static_lib = true, .shared = true },
         .source = { { "a.c" }, { "b.c", .tree = SPN_TREE_MANIFEST }, { "c.c", .tree = SPN_TREE_SOURCE } },
         .headers = { { "a.h" }, { "b.h", .tree = SPN_TREE_MANIFEST } },
         .include = { { "inc", .tree = SPN_TREE_MANIFEST } },
@@ -819,7 +827,7 @@ static const test_t tests [] = {
     .libs = {
       {
         .name = "t",
-        .linkages = { .static_lib = true },
+        .linkages = { .static_lib = true, .shared = true },
         .source = { { "a.c" }, { "b.c", "os = \"linux\"" } },
         .define = { { "X" }, { "Y", "os = \"windows\"" } },
         .flags = { { "-g", "mode = \"debug\"" } },

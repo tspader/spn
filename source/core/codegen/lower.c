@@ -953,12 +953,19 @@ static void validate_profiles(spn_toml_loader_t* ctx, const spn_cg_manifest_t* c
 static void validate_lib_linkages(spn_toml_loader_t* ctx, spn_pkg_info_t* out) {
   spn_toml_loader_push_key(ctx, "lib");
   sp_om_for(out->libs, it) {
-    spn_linkage_set_t set = sp_str_om_at(out->libs, it)->linkages;
+    spn_target_info_t* lib = sp_str_om_at(out->libs, it);
+    spn_linkage_set_t set = lib->linkages;
+    spn_toml_loader_push_index(ctx, it);
     if (set.object && (set.source || set.shared || set.static_lib)) {
-      spn_toml_loader_push_index(ctx, it);
       spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "kinds");
-      spn_toml_loader_pop(ctx);
     }
+    if (!set.shared && !sp_da_empty(lib->gated.link_flags)) {
+      spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "link_flags");
+    }
+    if (!set.shared && !sp_da_empty(lib->gated.linker_script)) {
+      spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "linker_script");
+    }
+    spn_toml_loader_pop(ctx);
   }
   spn_toml_loader_pop(ctx);
 }

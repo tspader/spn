@@ -1,0 +1,10 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[[lib]]
+name = "t"
+kinds = ["static"]
+source = ["a.c"]
+link_flags = ["-A"]
+linker_script = ["a.ld"]
