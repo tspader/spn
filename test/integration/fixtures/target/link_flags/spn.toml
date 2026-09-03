@@ -6,6 +6,6 @@ version = "0.1.0"
 name = "main"
 source = ["main.c"]
 link_flags = [
-  { value = "-lZ", when = { abi = { not = "msvc" } } },
-  { value = "/DEFAULTLIB:Z", when = { abi = "msvc" } },
+  { value = "-lmissing", when = { abi = { not = "msvc" } } },
+  { value = "/DEFAULTLIB:missing", when = { abi = "msvc" } },
 ]
