@@ -5,7 +5,7 @@
 
 #include "error/error.h"
 #include "paths/paths.h"
-#include "toolchain/driver.h"
+#include "toolchain/toolchain.h"
 #include "triple/triple.h"
 
 void spn_cc_push(sp_mem_t mem, spn_invocation_t* invocation, spn_arg_t arg) {
