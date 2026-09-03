@@ -245,23 +245,21 @@ spn_invocation_t spn_cc_render_compile_command(sp_mem_t mem, const spn_cc_toolch
   return invocation;
 }
 
-spn_err_t spn_cc_validate_link(const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, spn_cc_output_kind_t kind, bool frameworks) {
+spn_err_t spn_cc_validate_link(const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_link_t* link) {
   spn_try(spn_cc_validate_profile(toolchain, profile));
-  spn_cc_feature_t feature = link_feature(kind);
+  spn_cc_feature_t feature = link_feature(link->kind);
 
-  if (kind == SPN_CC_OUTPUT_REACTOR && profile->os != SPN_OS_WASI) {
+  if (link->kind == SPN_CC_OUTPUT_REACTOR && profile->os != SPN_OS_WASI) {
     return feature_unsupported(toolchain, profile, feature);
   }
-  if (kind == SPN_CC_OUTPUT_SHARED_LIB && !spn_os_dynamic(profile->os)) {
+  if (link->kind == SPN_CC_OUTPUT_SHARED_LIB && !spn_os_dynamic(profile->os)) {
     return feature_unsupported(toolchain, profile, feature);
   }
-  if (profile->os == SPN_OS_MACOS && frameworks && spn_path_empty(profile->sysroot)) {
+  if (profile->os == SPN_OS_MACOS && !sp_da_empty(link->frameworks) && spn_path_empty(profile->sysroot)) {
     return feature_unsupported(toolchain, profile, SPN_CC_FEATURE_FRAMEWORKS);
   }
-  if (toolchain->driver == SPN_CC_DRIVER_MSVC) {
-    if (kind == SPN_CC_OUTPUT_REACTOR) {
-      return feature_unsupported(toolchain, profile, feature);
-    }
+  if (toolchain->driver == SPN_CC_DRIVER_MSVC && link->kind == SPN_CC_OUTPUT_REACTOR) {
+    return feature_unsupported(toolchain, profile, feature);
   }
   return SPN_OK;
 }
@@ -269,7 +267,7 @@ spn_err_t spn_cc_validate_link(const spn_cc_toolchain_t* toolchain, const spn_pr
 spn_err_t spn_cc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_link_t* link, const spn_cc_link_files_t* files, spn_invocation_t* invocation) {
   sp_assert(!spn_path_empty(files->output));
   if (!spn_path_empty(files->exports.path)) sp_assert(sp_da_empty(files->exports.symbols));
-  spn_try(spn_cc_validate_link(toolchain, profile, link->kind, !sp_da_empty(link->frameworks)));
+  spn_try(spn_cc_validate_link(toolchain, profile, link));
   *invocation = sp_zero_s(spn_invocation_t);
   switch (toolchain->driver) {
     case SPN_CC_DRIVER_GCC:
