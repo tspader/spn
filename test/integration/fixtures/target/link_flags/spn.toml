@@ -1,0 +1,11 @@
+[package]
+name = "link_flags"
+version = "0.1.0"
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+link_flags = [
+  { value = "-lZ", when = { abi = { not = "msvc" } } },
+  { value = "/DEFAULTLIB:Z", when = { abi = "msvc" } },
+]
