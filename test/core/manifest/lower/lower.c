@@ -753,6 +753,7 @@ static const test_t tests [] = {
     .deps = {
       { .name = "core/fast", .source = SPN_PKG_SOURCE_INDEX, .when = "opt = \"3\"" },
       { .name = "core/asan", .source = SPN_PKG_SOURCE_INDEX, .when = "sanitize_address = true" },
+      { .name = "core/tidy", .source = SPN_PKG_SOURCE_INDEX, .when = "driver = \"clang\"" },
     },
   },
   {
@@ -761,6 +762,7 @@ static const test_t tests [] = {
     .issues = {
       { SPN_ERR_CODEGEN_INVALID, "deps.package[0].when.opt" },
       { SPN_ERR_CODEGEN_INVALID, "deps.package[1].when.sanitize_address" },
+      { SPN_ERR_CODEGEN_INVALID, "deps.package[2].when.driver" },
     },
   },
   {

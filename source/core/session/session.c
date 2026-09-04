@@ -118,7 +118,7 @@ spn_err_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem, spn_p
   }
   spn_toolchain_selection_t target = sp_zero;
   spn_try(spn_toolchain_select(&ctx->catalog, query, &target));
-  spn_profile_finalize(&s->profile, target.triple.abi);
+  spn_profile_finalize(&s->profile, target.triple.abi, target.toolchain->driver);
 
   switch (s->profile.os) {
     case SPN_OS_MACOS: {
@@ -133,6 +133,7 @@ spn_err_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem, spn_p
   spn_profile_info_t metaprogram = spn_profile_metaprogram();
   spn_toolchain_selection_t script = sp_zero;
   spn_try(spn_toolchain_select(&ctx->catalog, spn_profile_query(&metaprogram, host), &script));
+  spn_profile_finalize(&metaprogram, script.triple.abi, script.toolchain->driver);
 
   spn_path_t target_root = spn_path_join(s->mem, s->paths.build, spn_profile_build_dir(s->mem, &s->profile));
   s->units.target = spn_build_add(s, s->profile, target_root, target.toolchain);

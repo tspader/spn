@@ -406,20 +406,23 @@ static const query_test_t query_tests [] = {
 
 typedef struct {
   spn_linkage_t linkage;
-} linkage_expect_t;
+  spn_cc_driver_t driver;
+} finalize_expect_t;
 
 typedef struct {
   const c8* name;
   spn_abi_t abi;
-  linkage_expect_t expect;
-} linkage_test_t;
+  spn_cc_driver_t driver;
+  finalize_expect_t expect;
+} finalize_test_t;
 
-static const linkage_test_t linkage_tests [] = {
+static const finalize_test_t finalize_tests [] = {
   { .name = "gnu_is_shared",   .abi = SPN_ABI_GNU,   .expect = { .linkage = SPN_LIB_KIND_SHARED } },
   { .name = "musl_is_static",  .abi = SPN_ABI_MUSL,  .expect = { .linkage = SPN_LIB_KIND_STATIC } },
   { .name = "msvc_is_shared",  .abi = SPN_ABI_MSVC,  .expect = { .linkage = SPN_LIB_KIND_SHARED } },
   { .name = "apple_is_shared", .abi = SPN_ABI_APPLE, .expect = { .linkage = SPN_LIB_KIND_SHARED } },
   { .name = "bare_is_static",  .abi = SPN_ABI_BARE,  .expect = { .linkage = SPN_LIB_KIND_STATIC } },
+  { .name = "records_driver",  .abi = SPN_ABI_GNU,   .driver = SPN_CC_DRIVER_ZIG, .expect = { .linkage = SPN_LIB_KIND_SHARED, .driver = SPN_CC_DRIVER_ZIG } },
 };
 
 static spn_profile_info_t desc_to_info(const profile_desc_t* d) {
@@ -481,7 +484,7 @@ sp_test_each(profile, resolve, test_t, tests, .setup = spn_test_ctx_setup) {
     sp_expect_str_eq(t, toolchain.name, result.toolchain.name);
   }
 
-  spn_profile_finalize(&result, it->abi ? it->abi : result.abi);
+  spn_profile_finalize(&result, it->abi ? it->abi : result.abi, SPN_CC_DRIVER_NONE);
   sp_expect_eq(t, (u32)it->expect.linkage, (u32)result.linkage);
   return SP_OK;
 }
@@ -509,9 +512,10 @@ sp_test_each(profile, query, query_test_t, query_tests) {
   return SP_OK;
 }
 
-sp_test_each(profile, linkage, linkage_test_t, linkage_tests) {
+sp_test_each(profile, finalize, finalize_test_t, finalize_tests) {
   spn_profile_info_t profile = sp_zero;
-  spn_profile_finalize(&profile, it->abi);
+  spn_profile_finalize(&profile, it->abi, it->driver);
   sp_expect_eq(t, (u32)it->expect.linkage, (u32)profile.linkage);
+  sp_expect_eq(t, (u32)it->expect.driver, (u32)profile.driver);
   return SP_OK;
 }

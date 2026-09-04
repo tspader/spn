@@ -4,7 +4,7 @@
     "os": { "enum": ["windows", "linux", "macos", "wasi", "freestanding"] },
     "abi": { "enum": ["gnu", "musl", "msvc", "apple", "none"] },
     "linkage": { "enum": ["shared", "static", "source", "object"] },
-    "cc_driver": { "enum": ["gcc", "clang", "msvc", "zig"], "metadata": { "include": "toolchain/types.h" } },
+    "cc_driver": { "enum": ["gcc", "clang", "msvc", "zig"] },
     "index_protocol": { "enum": ["git", "http", "dir"], "metadata": { "include": "index/types.h" } },
     "option_type": { "enum": ["bool", "enum"], "metadata": { "include": "when/types.h" } },
     "pkg_source": { "enum": ["root", "file", "index"], "metadata": { "include": "pkg/types.h" } },

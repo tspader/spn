@@ -47,6 +47,7 @@ void spn_when_env_set_facts(spn_when_env_t* env, spn_when_facts_t facts) {
   spn_when_env_set(env, sp_str_lit("os"), spn_option_value_str(spn_os_to_str(facts.os)));
   spn_when_env_set(env, sp_str_lit("arch"), spn_option_value_str(spn_arch_to_str(facts.arch)));
   spn_when_env_set(env, sp_str_lit("abi"), spn_option_value_str(spn_abi_to_str(facts.abi)));
+  spn_when_env_set(env, sp_str_lit("driver"), spn_option_value_str(spn_cc_driver_to_str(facts.driver)));
   spn_when_env_set(env, sp_str_lit("mode"), spn_option_value_str(spn_mode_to_str(facts.mode)));
   spn_when_env_set(env, sp_str_lit("opt"), spn_option_value_str(spn_opt_level_to_str(facts.opt)));
   spn_when_env_set(env, sp_str_lit("sanitize_address"), spn_option_value_bool(facts.sanitizers & SPN_SANITIZER_ADDRESS));
@@ -69,6 +70,7 @@ sp_da(sp_str_t) spn_when_facts_to_defines(sp_mem_t mem, spn_when_facts_t facts) 
   push_fact_define(mem, &defines, "OS", spn_os_to_str(facts.os));
   push_fact_define(mem, &defines, "ARCH", spn_arch_to_str(facts.arch));
   push_fact_define(mem, &defines, "ABI", spn_abi_to_str(facts.abi));
+  push_fact_define(mem, &defines, "DRIVER", spn_cc_driver_to_str(facts.driver));
   push_fact_define(mem, &defines, "MODE", spn_mode_to_str(facts.mode));
   push_fact_define(mem, &defines, "OPT", spn_opt_level_to_str(facts.opt));
   if (facts.sanitizers & SPN_SANITIZER_ADDRESS) {

@@ -621,6 +621,7 @@ static bool when_key_is_fact(sp_str_t key) {
   return sp_str_equal_cstr(key, "os")
     || sp_str_equal_cstr(key, "arch")
     || sp_str_equal_cstr(key, "abi")
+    || sp_str_equal_cstr(key, "driver")
     || sp_str_equal_cstr(key, "mode")
     || sp_str_equal_cstr(key, "opt")
     || when_key_is_sanitizer_fact(key);
@@ -631,10 +632,11 @@ static bool when_fact_value_valid(sp_str_t key, spn_option_value_t value) {
     return value.kind == SPN_OPTION_VALUE_BOOL;
   }
   if (value.kind != SPN_OPTION_VALUE_STR) return false;
-  if (sp_str_equal_cstr(key, "os"))   return spn_os_from_str(value.str) != SPN_OS_NONE;
-  if (sp_str_equal_cstr(key, "arch")) return spn_arch_from_str(value.str) != SPN_ARCH_NONE;
-  if (sp_str_equal_cstr(key, "abi"))  return spn_abi_from_str(value.str) != SPN_ABI_NONE;
-  if (sp_str_equal_cstr(key, "opt"))  return spn_opt_level_from_str(value.str) != SPN_OPT_LEVEL_NONE;
+  if (sp_str_equal_cstr(key, "os"))     return spn_os_from_str(value.str) != SPN_OS_NONE;
+  if (sp_str_equal_cstr(key, "arch"))   return spn_arch_from_str(value.str) != SPN_ARCH_NONE;
+  if (sp_str_equal_cstr(key, "abi"))    return spn_abi_from_str(value.str) != SPN_ABI_NONE;
+  if (sp_str_equal_cstr(key, "driver")) return spn_cc_driver_from_str(value.str) != SPN_CC_DRIVER_NONE;
+  if (sp_str_equal_cstr(key, "opt"))    return spn_opt_level_from_str(value.str) != SPN_OPT_LEVEL_NONE;
   return sp_str_equal(value.str, spn_mode_to_str(SPN_MODE_RELEASE))
       || sp_str_equal(value.str, spn_mode_to_str(SPN_MODE_DEBUG));
 }

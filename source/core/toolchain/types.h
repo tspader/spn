@@ -9,14 +9,6 @@
 #include "sp_om/sp_om.h"
 
 typedef enum {
-  SPN_CC_DRIVER_NONE,
-  SPN_CC_DRIVER_GCC,
-  SPN_CC_DRIVER_CLANG,
-  SPN_CC_DRIVER_MSVC,
-  SPN_CC_DRIVER_ZIG,
-} spn_cc_driver_t;
-
-typedef enum {
   SPN_CC_CAP_TARGET_TRIPLE  = 1 << 0,
   SPN_CC_CAP_CLANG_FRONTEND = 1 << 1,
   SPN_CC_CAP_EXCLUDE_LIBS   = 1 << 2,

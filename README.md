@@ -201,7 +201,7 @@ mode = "debug"
 
 ## conditional configuration
 
-Any field in your package can be keyed on any fact of the build (target OS, architecture, ABI, build mode, optimization level, sanitizer settings). Clauses are structured data, not a DSL, and an entry with multiple clauses gets them ANDed together. Here's some common examples:
+Any field in your package can be keyed on any fact of the build (target OS, architecture, ABI, compiler driver, build mode, optimization level, sanitizer settings). Clauses are structured data, not a DSL, and an entry with multiple clauses gets them ANDed together. Here's some common examples:
 
 ```toml
 source = [
@@ -210,6 +210,7 @@ source = [
 ]
 flags = [
   { value = "-mfpu=neon", when = { os = "linux", arch = "aarch64" } },
+  { value = "/W4", when = { driver = "msvc" } },
 ]
 define = [
   { value = "USE_DEBUG_ALLOC", when = { mode = "debug", sanitize_address = false } },

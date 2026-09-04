@@ -49,6 +49,7 @@ static spn_when_env_t make_env(sp_mem_t mem) {
     .os = SPN_OS_LINUX,
     .arch = SPN_ARCH_X64,
     .abi = SPN_ABI_GNU,
+    .driver = SPN_CC_DRIVER_GCC,
     .mode = SPN_MODE_DEBUG,
     .opt = SPN_OPT_LEVEL_2,
     .sanitizers = SPN_SANITIZER_ADDRESS | SPN_SANITIZER_UNDEFINED,
@@ -189,6 +190,11 @@ static const eval_t eval_tests [] = {
   {
     .name = "negated_opt_miss_passes",
     .clauses = { { .key = "opt", .str = "z", .negated = true } },
+    .expect = { true },
+  },
+  {
+    .name = "driver_match",
+    .clauses = { { "driver", "gcc" } },
     .expect = { true },
   },
   {
@@ -441,6 +447,19 @@ static const defines_t defines_tests [] = {
       "SPN_BUILD_ARCH_AARCH64",
       "SPN_BUILD_ABI_NONE",
       "SPN_BUILD_MODE_RELEASE",
+      "SPN_BUILD_OPT_2",
+    } },
+  },
+  {
+    .name = "zig_driver",
+    .facts = { .os = SPN_OS_LINUX, .arch = SPN_ARCH_X64, .abi = SPN_ABI_GNU, .driver = SPN_CC_DRIVER_ZIG, .mode = SPN_MODE_DEBUG, .opt = SPN_OPT_LEVEL_2 },
+    .expect = { .defines = {
+      "SPN_BUILD",
+      "SPN_BUILD_OS_LINUX",
+      "SPN_BUILD_ARCH_X86_64",
+      "SPN_BUILD_ABI_GNU",
+      "SPN_BUILD_DRIVER_ZIG",
+      "SPN_BUILD_MODE_DEBUG",
       "SPN_BUILD_OPT_2",
     } },
   },

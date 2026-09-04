@@ -4,6 +4,10 @@ version = "0.1.0"
 define = [
   { value = "GATE_DEBUG=1", when = { mode = "debug" } },
   { value = "GATE_RELEASE=1", when = { mode = "release" } },
+  { value = "GATE_GCC=1", when = { driver = "gcc" } },
+  { value = "GATE_CLANG=1", when = { driver = "clang" } },
+  { value = "GATE_MSVC=1", when = { driver = "msvc" } },
+  { value = "GATE_ZIG=1", when = { driver = "zig" } },
 ]
 
 [[bin]]
