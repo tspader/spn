@@ -1,0 +1,30 @@
+{
+  "name": "@spn/docs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "check": "astro check",
+    "build": "bun tools/build.ts",
+    "readme": "bun tools/readme.ts"
+  },
+  "dependencies": {
+    "@astrojs/markdown-remark": "^6",
+    "@astrojs/mdx": "^4",
+    "@fontsource-variable/inconsolata": "^5",
+    "astro": "^5",
+    "github-slugger": "^2",
+    "hastscript": "^9",
+    "mdast-util-to-string": "^4",
+    "remark-mdx": "^3.1.1",
+    "remark-parse": "^11",
+    "shiki": "^3",
+    "unified": "^11",
+    "unist-util-visit": "^5"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9",
+    "@types/bun": "^1",
+    "typescript": "^5"
+  }
+}

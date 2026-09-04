@@ -1,0 +1,162 @@
+[package]
+name = "sqlite"
+version = "3.53.4"
+author = "sqlite"
+maintainer = "tspader"
+system_deps = [
+  { lib = "m", when = { os = { not = "windows" } } },
+  { lib = "pthread", when = { os = { not = "windows" }, single_thread = false } },
+  { lib = "dl", when = { os = { not = "windows" }, omit_load_extension = false } },
+]
+
+[options.all]
+type = "bool"
+default = false
+
+[options.fts3]
+type = "bool"
+default = false
+define = "SQLITE_ENABLE_FTS3"
+
+[options.fts4]
+type = "bool"
+default = [{ value = true, when = { all = true } }, { value = false }]
+define = "SQLITE_ENABLE_FTS4"
+
+[options.fts5]
+type = "bool"
+default = [{ value = true, when = { all = true } }, { value = false }]
+define = "SQLITE_ENABLE_FTS5"
+
+[options.geopoly]
+type = "bool"
+default = [{ value = true, when = { all = true } }, { value = false }]
+define = "SQLITE_ENABLE_GEOPOLY"
+
+[options.rtree]
+type = "bool"
+default = [
+  { value = true, when = { all = true } },
+  { value = true, when = { geopoly = true } },
+  { value = false },
+]
+define = "SQLITE_ENABLE_RTREE"
+
+[options.session]
+type = "bool"
+default = [{ value = true, when = { all = true } }, { value = false }]
+public = true
+define = "SQLITE_ENABLE_SESSION"
+
+[options.preupdate_hook]
+type = "bool"
+default = [{ value = true, when = { session = true } }, { value = false }]
+public = true
+define = "SQLITE_ENABLE_PREUPDATE_HOOK"
+
+[options.dbpage]
+type = "bool"
+default = [{ value = true, when = { all = true } }, { value = false }]
+define = "SQLITE_ENABLE_DBPAGE_VTAB"
+
+[options.dbstat]
+type = "bool"
+default = [{ value = true, when = { all = true } }, { value = false }]
+define = "SQLITE_ENABLE_DBSTAT_VTAB"
+
+[options.carray]
+type = "bool"
+default = [{ value = true, when = { all = true } }, { value = false }]
+define = "SQLITE_ENABLE_CARRAY"
+
+[options.column_metadata]
+type = "bool"
+default = false
+define = "SQLITE_ENABLE_COLUMN_METADATA"
+
+[options.scanstatus]
+type = "bool"
+default = false
+define = "SQLITE_ENABLE_STMT_SCANSTATUS"
+
+[options.bytecode_vtab]
+type = "bool"
+default = [{ value = true, when = { scanstatus = true } }, { value = false }]
+define = "SQLITE_ENABLE_BYTECODE_VTAB"
+
+[options.debug]
+type = "bool"
+default = false
+define = "SQLITE_DEBUG"
+
+[options.memsys5]
+type = "bool"
+default = [{ value = true, when = { debug = true } }, { value = false }]
+define = "SQLITE_ENABLE_MEMSYS5"
+
+[options.memsys3]
+type = "bool"
+default = false
+define = "SQLITE_ENABLE_MEMSYS3"
+
+[options.math]
+type = "bool"
+default = true
+define = "SQLITE_ENABLE_MATH_FUNCTIONS"
+
+[options.percentile]
+type = "bool"
+default = true
+define = "SQLITE_ENABLE_PERCENTILE"
+
+[options.omit_json]
+type = "bool"
+default = false
+define = "SQLITE_OMIT_JSON"
+
+[options.omit_load_extension]
+type = "bool"
+default = false
+define = "SQLITE_OMIT_LOAD_EXTENSION"
+
+[options.single_thread]
+type = "bool"
+default = false
+define = "SQLITE_THREADSAFE=0"
+
+[options.tempstore]
+type = "enum"
+values = ["never", "no", "yes", "always"]
+default = "no"
+
+[[lib]]
+name = "sqlite3"
+kinds = ["static"]
+source = ["gen/sqlite3.c"]
+define = [
+  { value = "SQLITE_TEMP_STORE=0", when = { tempstore = "never" } },
+  { value = "SQLITE_TEMP_STORE=2", when = { tempstore = "yes" } },
+  { value = "SQLITE_TEMP_STORE=3", when = { tempstore = "always" } },
+  { value = "SQLITE_ENABLE_SELECTTRACE", when = { debug = true } },
+  { value = "SQLITE_ENABLE_WHERETRACE", when = { debug = true } },
+]
+
+[[bin]]
+name = "sqlite3"
+source = ["gen/shell.c"]
+define = [{ value = "_GNU_SOURCE", when = { os = "linux" } }]
+deps = ["sqlite3"]
+
+[[example]]
+name = "memory"
+source = [{ path = "example/memory.c", tree = "manifest" }]
+deps = ["sqlite3"]
+
+[publish]
+copy = [
+  { from = "source/gen/sqlite3.h", to = "include" },
+  { from = "source/gen/sqlite3ext.h", to = "include" },
+]
+
+[profile.default]
+options = { all = true }

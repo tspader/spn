@@ -1,0 +1,334 @@
+[package]
+name = "curl"
+version = "8.19.1"
+author = "curl"
+maintainer = "tspader"
+include = ["include"]
+system_deps = [
+  { lib = "pthread", when = { os = "linux", threaded_resolver = true } },
+  { lib = "ws2_32", when = { os = "windows" } },
+  { lib = "iphlpapi", when = { os = "windows" } },
+  { lib = "bcrypt", when = { os = "windows" } },
+  { lib = "advapi32", when = { os = "windows" } },
+  { lib = "crypt32", when = { os = "windows" } },
+  { lib = "secur32", when = { os = "windows", sspi = true } },
+  { lib = "wldap32", when = { os = "windows", ldap = true } },
+  { lib = "normaliz", when = { os = "windows", idn = true } },
+  { lib = "icucore", when = { os = "macos", idn = true } },
+  { lib = "iconv", when = { os = "macos", idn = true } },
+]
+
+[package.upstream]
+url = "https://github.com/curl/curl.git"
+commit = "8c908d2d0a6d32abdedda2c52e90bd56ec76c24d"
+
+[deps.package]
+mbedtls = { version = "3.6.6", when = { mbedtls = true } }
+
+[options.mbedtls]
+type = "bool"
+default = [{ value = false, when = { os = "windows" } }, { value = true }]
+define = "SPN_CURL_MBEDTLS"
+
+[options.schannel]
+type = "bool"
+default = [{ value = true, when = { os = "windows" } }, { value = false }]
+define = "SPN_CURL_SCHANNEL"
+
+[options.sspi]
+type = "bool"
+default = [{ value = true, when = { schannel = true } }, { value = false }]
+define = "SPN_CURL_SSPI"
+
+[options.staticlib]
+type = "bool"
+default = true
+public = true
+define = "CURL_STATICLIB"
+
+[options.ca_bundle]
+type = "bool"
+default = true
+define = "SPN_CURL_CA_BUNDLE"
+
+[options.threaded_resolver]
+type = "bool"
+default = true
+define = "SPN_CURL_THREADED_RESOLVER"
+
+[options.ipv6]
+type = "bool"
+default = true
+define = "SPN_CURL_IPV6"
+
+[options.unix_sockets]
+type = "bool"
+default = true
+define = "SPN_CURL_UNIX_SOCKETS"
+
+[options.idn]
+type = "bool"
+default = false
+define = "SPN_CURL_IDN"
+
+[options.http]
+type = "bool"
+default = true
+define = "SPN_CURL_HTTP"
+
+[options.ftp]
+type = "bool"
+default = true
+define = "SPN_CURL_FTP"
+
+[options.file]
+type = "bool"
+default = true
+define = "SPN_CURL_FILE"
+
+[options.dict]
+type = "bool"
+default = true
+define = "SPN_CURL_DICT"
+
+[options.gopher]
+type = "bool"
+default = true
+define = "SPN_CURL_GOPHER"
+
+[options.imap]
+type = "bool"
+default = true
+define = "SPN_CURL_IMAP"
+
+[options.pop3]
+type = "bool"
+default = true
+define = "SPN_CURL_POP3"
+
+[options.smtp]
+type = "bool"
+default = true
+define = "SPN_CURL_SMTP"
+
+[options.telnet]
+type = "bool"
+default = true
+define = "SPN_CURL_TELNET"
+
+[options.tftp]
+type = "bool"
+default = true
+define = "SPN_CURL_TFTP"
+
+[options.mqtt]
+type = "bool"
+default = true
+define = "SPN_CURL_MQTT"
+
+[options.rtsp]
+type = "bool"
+default = true
+define = "SPN_CURL_RTSP"
+
+[options.smb]
+type = "bool"
+default = true
+define = "SPN_CURL_SMB"
+
+[options.ldap]
+type = "bool"
+default = [{ value = true, when = { os = "windows" } }, { value = false }]
+define = "SPN_CURL_LDAP"
+
+[options.ipfs]
+type = "bool"
+default = true
+define = "SPN_CURL_IPFS"
+
+[options.websockets]
+type = "bool"
+default = true
+define = "SPN_CURL_WEBSOCKETS"
+
+[options.proxy]
+type = "bool"
+default = true
+define = "SPN_CURL_PROXY"
+
+[options.cookies]
+type = "bool"
+default = true
+define = "SPN_CURL_COOKIES"
+
+[options.doh]
+type = "bool"
+default = true
+define = "SPN_CURL_DOH"
+
+[options.hsts]
+type = "bool"
+default = true
+define = "SPN_CURL_HSTS"
+
+[options.altsvc]
+type = "bool"
+default = true
+define = "SPN_CURL_ALTSVC"
+
+[options.netrc]
+type = "bool"
+default = true
+define = "SPN_CURL_NETRC"
+
+[options.mime]
+type = "bool"
+default = true
+define = "SPN_CURL_MIME"
+
+[options.form_api]
+type = "bool"
+default = [{ value = false, when = { mime = false } }, { value = true }]
+define = "SPN_CURL_FORM_API"
+
+[options.ntlm]
+type = "bool"
+default = true
+define = "SPN_CURL_NTLM"
+
+[options.aws]
+type = "bool"
+default = true
+define = "SPN_CURL_AWS"
+
+[options.http_auth]
+type = "bool"
+default = true
+define = "SPN_CURL_HTTP_AUTH"
+
+[options.basic_auth]
+type = "bool"
+default = true
+define = "SPN_CURL_BASIC_AUTH"
+
+[options.bearer_auth]
+type = "bool"
+default = true
+define = "SPN_CURL_BEARER_AUTH"
+
+[options.digest_auth]
+type = "bool"
+default = true
+define = "SPN_CURL_DIGEST_AUTH"
+
+[options.kerberos_auth]
+type = "bool"
+default = true
+define = "SPN_CURL_KERBEROS_AUTH"
+
+[options.negotiate_auth]
+type = "bool"
+default = true
+define = "SPN_CURL_NEGOTIATE_AUTH"
+
+[options.verbose_strings]
+type = "bool"
+default = true
+define = "SPN_CURL_VERBOSE_STRINGS"
+
+[[lib]]
+name = "curl"
+kinds = ["static"]
+include = ["lib", { path = "config", tree = "manifest" }]
+define = [
+  "BUILDING_LIBCURL",
+  "HAVE_CONFIG_H",
+  { value = "_GNU_SOURCE", when = { os = "linux" } },
+]
+source = [
+  "lib/*.c",
+  "lib/curlx/*.c",
+  "lib/vauth/*.c",
+  "lib/vtls/*.c",
+  "lib/vquic/*.c",
+  "lib/vssh/*.c",
+]
+deps = [{ pkg = "mbedtls", when = { mbedtls = true } }]
+macos = { frameworks = ["SystemConfiguration", "CoreFoundation", "CoreServices"] }
+
+[[bin]]
+name = "curl"
+include = ["lib", "src", { path = "config", tree = "manifest" }]
+define = [
+  "HAVE_CONFIG_H",
+  { value = "_GNU_SOURCE", when = { os = "linux" } },
+]
+source = [
+  "src/tool_*.c",
+  "src/config2setopts.c",
+  "src/slist_wc.c",
+  "src/terminal.c",
+  "src/var.c",
+  "src/toolx/tool_time.c",
+]
+deps = ["curl"]
+
+[[example]]
+name = "get"
+source = [{ path = "example/get.c", tree = "manifest" }]
+deps = ["curl"]
+
+[[example]]
+name = "simple"
+source = ["docs/examples/simple.c"]
+deps = ["curl"]
+
+[[example]]
+name = "https"
+source = ["docs/examples/https.c"]
+deps = ["curl"]
+
+[[example]]
+name = "getinmemory"
+source = ["docs/examples/getinmemory.c"]
+deps = ["curl"]
+
+[[example]]
+name = "sepheaders"
+source = ["docs/examples/sepheaders.c"]
+deps = ["curl"]
+
+[[example]]
+name = "simplepost"
+source = ["docs/examples/simplepost.c"]
+deps = ["curl"]
+
+[[example]]
+name = "postinmemory"
+source = ["docs/examples/postinmemory.c"]
+deps = ["curl"]
+
+[[example]]
+name = "multi-single"
+source = ["docs/examples/multi-single.c"]
+deps = ["curl"]
+
+[[example]]
+name = "persistent"
+source = ["docs/examples/persistent.c"]
+deps = ["curl"]
+
+[[example]]
+name = "urlapi"
+source = ["docs/examples/urlapi.c"]
+deps = ["curl"]
+
+[[example]]
+name = "parseurl"
+source = ["docs/examples/parseurl.c"]
+deps = ["curl"]
+
+[publish]
+copy = [
+  { from = "source/include/curl/*.h", to = "include/curl" },
+]

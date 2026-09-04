@@ -1,0 +1,13 @@
+[package]
+name = "db"
+version = "0.1.0"
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+
+[deps.package]
+sqlite = "3.53.4"
+
+[config.sqlite]
+options = { fts5 = true, rtree = true }

@@ -1,0 +1,64 @@
+---
+interface Props {
+  group: string
+  tabs: { id: string; label: string }[]
+}
+
+const { group, tabs } = Astro.props
+---
+
+<div class="tabs" data-tabs={group}>
+  <div role="tablist">
+    {tabs.map((tab, i) => <button type="button" role="tab" data-tab={tab.id} aria-selected={i === 0}>{tab.label}</button>)}
+  </div>
+  <slot />
+</div>
+
+<script>
+  document.addEventListener('click', (event) => {
+    const tab = (event.target as Element).closest<HTMLElement>('[role=tab]')
+    if (!tab) return
+    const group = `[data-tabs="${tab.closest<HTMLElement>('[data-tabs]')!.dataset.tabs}"]`
+    for (const el of document.querySelectorAll<HTMLElement>(`${group} [role=tab]`)) el.ariaSelected = String(el.dataset.tab === tab.dataset.tab)
+    for (const el of document.querySelectorAll<HTMLElement>(`${group} [role=tabpanel]`)) el.hidden = el.dataset.tab !== tab.dataset.tab
+  })
+</script>
+
+<style>
+  .tabs {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  [role='tablist'] {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-1);
+    padding-left: var(--s-4);
+  }
+
+  [role='tab'] {
+    position: relative;
+    margin-bottom: -1px;
+    padding: var(--s-1) var(--s-3) calc(var(--s-1) + 1px);
+    background: none;
+    border: var(--border-strong);
+    border-bottom: none;
+    border-radius: var(--r-md) var(--r-md) 0 0;
+    color: var(--text-faint);
+    font-size: var(--text-md);
+    cursor: pointer;
+
+    &:hover {
+      color: var(--text);
+      border-color: var(--line-hover);
+    }
+
+    &[aria-selected='true'] {
+      z-index: 1;
+      background: var(--tab-bg, var(--bg-card));
+      color: var(--text);
+    }
+  }
+</style>

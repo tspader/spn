@@ -1,0 +1,58 @@
+---
+interface Props {
+  title: string
+  head: string
+}
+
+const { title, head } = Astro.props
+---
+
+<section class="pillar">
+  <div>
+    <h2>{title}</h2>
+    <div class="prose"><slot /></div>
+  </div>
+  <div class="code">
+    <div class="code-head">{head}</div>
+    <slot name="code" />
+  </div>
+</section>
+
+<style>
+  .pillar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--s-10);
+    align-items: center;
+
+    @media (max-width: 900px) {
+      grid-template-columns: minmax(0, 1fr);
+      gap: var(--s-8);
+    }
+  }
+
+  .prose {
+    font-size: var(--text-md);
+    color: var(--text-dim);
+  }
+
+  .prose :global(p) {
+    margin-block: var(--s-4) 0;
+  }
+
+  .code {
+    overflow: hidden;
+    background: var(--code-bg);
+    border: var(--border-strong);
+    border-radius: var(--r-lg);
+  }
+
+  .code :global(.code-block) {
+    border: none;
+    border-radius: 0;
+  }
+
+  .code :global(.code-block + .code-block pre) {
+    padding-top: 0;
+  }
+</style>

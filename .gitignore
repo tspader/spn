@@ -38,3 +38,6 @@ compile_commands.json
 /example/*/generated
 /example/*/imgui.ini
 /example/*/spn.lock
+/docs/node_modules
+/docs/.astro
+/docs/dist

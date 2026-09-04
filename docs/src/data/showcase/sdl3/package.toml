@@ -1,0 +1,252 @@
+[package]
+name = "sdl3"
+version = "3.4.16"
+upstream.url = "https://github.com/libsdl-org/SDL.git"
+upstream.commit = "147a8ee32dbf9ac02f3794964490687b6bbda1bc"
+system_deps = [
+  { lib = "m", when = { os = "linux" } },
+  { lib = "dl", when = { os = "linux" } },
+  { lib = "pthread", when = { os = "linux" } },
+  { lib = "user32", when = { os = "windows" } },
+  { lib = "gdi32", when = { os = "windows" } },
+  { lib = "winmm", when = { os = "windows" } },
+  { lib = "imm32", when = { os = "windows" } },
+  { lib = "ole32", when = { os = "windows" } },
+  { lib = "oleaut32", when = { os = "windows" } },
+  { lib = "version", when = { os = "windows" } },
+  { lib = "uuid", when = { os = "windows" } },
+  { lib = "advapi32", when = { os = "windows" } },
+  { lib = "setupapi", when = { os = "windows" } },
+  { lib = "shell32", when = { os = "windows" } },
+  { lib = "dinput8", when = { os = "windows" } },
+]
+
+[options.x11]
+type = "bool"
+default = false
+public = true
+define = "SPN_SDL3_X11"
+
+[options.alsa]
+type = "bool"
+default = false
+public = true
+define = "SPN_SDL3_ALSA"
+
+[options.pulseaudio]
+type = "bool"
+default = false
+public = true
+define = "SPN_SDL3_PULSEAUDIO"
+
+[options.pipewire]
+type = "bool"
+default = false
+public = true
+define = "SPN_SDL3_PIPEWIRE"
+
+[options.oss]
+type = "bool"
+default = false
+public = true
+define = "SPN_SDL3_OSS"
+
+[options.dbus]
+type = "bool"
+default = false
+public = true
+define = "SPN_SDL3_DBUS"
+
+[options.udev]
+type = "bool"
+default = false
+public = true
+define = "SPN_SDL3_UDEV"
+
+[[lib]]
+name = "SDL3"
+kinds = ["static"]
+source = [
+  "src/*.c",
+  "src/atomic/*.c",
+  "src/audio/*.c",
+  "src/audio/disk/*.c",
+  "src/audio/dummy/*.c",
+  "src/camera/*.c",
+  "src/camera/dummy/*.c",
+  "src/core/*.c",
+  "src/cpuinfo/*.c",
+  "src/dialog/*.c",
+  "src/dynapi/*.c",
+  "src/events/*.c",
+  "src/filesystem/*.c",
+  "src/gpu/*.c",
+  "src/haptic/*.c",
+  "src/haptic/hidapi/*.c",
+  "src/hidapi/*.c",
+  "src/io/*.c",
+  "src/io/generic/*.c",
+  "src/joystick/*.c",
+  "src/joystick/hidapi/*.c",
+  "src/joystick/virtual/*.c",
+  "src/libm/*.c",
+  "src/locale/*.c",
+  "src/main/*.c",
+  "src/main/generic/*.c",
+  "src/misc/*.c",
+  "src/power/*.c",
+  "src/process/*.c",
+  "src/render/*.c",
+  "src/render/gpu/*.c",
+  "src/render/opengl/*.c",
+  "src/render/opengles2/*.c",
+  "src/render/software/*.c",
+  "src/render/vulkan/*.c",
+  "src/sensor/*.c",
+  "src/sensor/dummy/*.c",
+  "src/stdlib/*.c",
+  "src/storage/*.c",
+  "src/storage/generic/*.c",
+  "src/storage/steam/*.c",
+  "src/thread/*.c",
+  "src/time/*.c",
+  "src/timer/*.c",
+  "src/tray/*.c",
+  "src/video/*.c",
+  "src/video/dummy/*.c",
+  "src/video/offscreen/*.c",
+  "src/video/yuv2rgb/*.c",
+
+  "src/gpu/vulkan/*.c",
+
+  { path = "src/camera/v4l2/*.c", when = { os = "linux" } },
+  { path = "src/core/unix/*.c", when = { os = "linux" } },
+  { path = "src/core/linux/SDL_evdev.c", when = { os = "linux" } },
+  { path = "src/core/linux/SDL_evdev_capabilities.c", when = { os = "linux" } },
+  { path = "src/core/linux/SDL_evdev_kbd.c", when = { os = "linux" } },
+  { path = "src/core/linux/SDL_threadprio.c", when = { os = "linux" } },
+  { path = "src/dialog/unix/*.c", when = { os = "linux" } },
+  { path = "src/filesystem/posix/*.c", when = { os = "linux" } },
+  { path = "src/filesystem/unix/*.c", when = { os = "linux" } },
+  { path = "src/haptic/linux/*.c", when = { os = "linux" } },
+  { path = "src/io/io_uring/*.c", when = { os = "linux" } },
+  { path = "src/joystick/linux/*.c", when = { os = "linux" } },
+  { path = "src/loadso/dlopen/*.c", when = { os = "linux" } },
+  { path = "src/locale/unix/*.c", when = { os = "linux" } },
+  { path = "src/misc/unix/*.c", when = { os = "linux" } },
+  { path = "src/power/linux/*.c", when = { os = "linux" } },
+  { path = "src/process/posix/*.c", when = { os = "linux" } },
+  { path = "src/thread/pthread/*.c", when = { os = "linux" } },
+  { path = "src/time/unix/*.c", when = { os = "linux" } },
+  { path = "src/timer/unix/*.c", when = { os = "linux" } },
+  { path = "src/tray/unix/*.c", when = { os = "linux" } },
+
+  { path = "src/video/x11/*.c", when = { os = "linux", x11 = true } },
+  { path = "src/audio/alsa/*.c", when = { os = "linux", alsa = true } },
+  { path = "src/audio/pulseaudio/*.c", when = { os = "linux", pulseaudio = true } },
+  { path = "src/audio/pipewire/*.c", when = { os = "linux", pipewire = true } },
+  { path = "src/audio/dsp/*.c", when = { os = "linux", oss = true } },
+  { path = "src/core/linux/SDL_dbus.c", when = { os = "linux", dbus = true } },
+  { path = "src/core/linux/SDL_fcitx.c", when = { os = "linux", dbus = true } },
+  { path = "src/core/linux/SDL_ime.c", when = { os = "linux", dbus = true } },
+  { path = "src/core/linux/SDL_progressbar.c", when = { os = "linux", dbus = true } },
+  { path = "src/core/linux/SDL_system_theme.c", when = { os = "linux", dbus = true } },
+  { path = "src/core/linux/SDL_udev.c", when = { os = "linux", udev = true } },
+
+  { path = "src/audio/directsound/*.c", when = { os = "windows" } },
+  { path = "src/audio/wasapi/*.c", when = { os = "windows" } },
+  { path = "src/camera/mediafoundation/*.c", when = { os = "windows" } },
+  { path = "src/core/windows/*.c", when = { os = "windows" } },
+  { path = "src/dialog/windows/*.c", when = { os = "windows" } },
+  { path = "src/filesystem/windows/*.c", when = { os = "windows" } },
+  { path = "src/gpu/d3d12/*.c", when = { os = "windows" } },
+  { path = "src/haptic/windows/*.c", when = { os = "windows" } },
+  { path = "src/io/windows/*.c", when = { os = "windows" } },
+  { path = "src/joystick/windows/*.c", when = { os = "windows" } },
+  { path = "src/loadso/windows/*.c", when = { os = "windows" } },
+  { path = "src/locale/windows/*.c", when = { os = "windows" } },
+  { path = "src/main/windows/*.c", when = { os = "windows" } },
+  { path = "src/misc/windows/*.c", when = { os = "windows" } },
+  { path = "src/power/windows/*.c", when = { os = "windows" } },
+  { path = "src/process/windows/*.c", when = { os = "windows" } },
+  { path = "src/render/direct3d/*.c", when = { os = "windows" } },
+  { path = "src/render/direct3d11/*.c", when = { os = "windows" } },
+  { path = "src/render/direct3d12/*.c", when = { os = "windows" } },
+  { path = "src/sensor/windows/*.c", when = { os = "windows" } },
+  { path = "src/thread/windows/*.c", when = { os = "windows" } },
+  { path = "src/thread/generic/SDL_syscond.c", when = { os = "windows" } },
+  { path = "src/thread/generic/SDL_sysrwlock.c", when = { os = "windows" } },
+  { path = "src/time/windows/*.c", when = { os = "windows" } },
+  { path = "src/timer/windows/*.c", when = { os = "windows" } },
+  { path = "src/tray/windows/*.c", when = { os = "windows" } },
+  { path = "src/video/windows/*.c", when = { os = "windows" } },
+  { path = "src/core/windows/*.cpp", when = { os = "windows" } },
+  { path = "src/video/windows/*.cpp", when = { os = "windows" } },
+  { path = "src/joystick/gdk/*.cpp", when = { os = "windows" } },
+
+  { path = "src/audio/coreaudio/*.m", when = { os = "macos" } },
+  { path = "src/camera/coremedia/*.m", when = { os = "macos" } },
+  { path = "src/core/unix/*.c", when = { os = "macos" } },
+  { path = "src/dialog/cocoa/*.m", when = { os = "macos" } },
+  { path = "src/filesystem/cocoa/*.m", when = { os = "macos" } },
+  { path = "src/filesystem/posix/*.c", when = { os = "macos" } },
+  { path = "src/gpu/metal/*.m", when = { os = "macos" } },
+  { path = "src/haptic/darwin/*.c", when = { os = "macos" } },
+  { path = "src/joystick/apple/*.m", when = { os = "macos" } },
+  { path = "src/joystick/darwin/*.c", when = { os = "macos" } },
+  { path = "src/loadso/dlopen/*.c", when = { os = "macos" } },
+  { path = "src/locale/macos/*.m", when = { os = "macos" } },
+  { path = "src/misc/macos/*.m", when = { os = "macos" } },
+  { path = "src/power/macos/*.c", when = { os = "macos" } },
+  { path = "src/process/posix/*.c", when = { os = "macos" } },
+  { path = "src/render/metal/*.m", when = { os = "macos" } },
+  { path = "src/thread/pthread/*.c", when = { os = "macos" } },
+  { path = "src/time/unix/*.c", when = { os = "macos" } },
+  { path = "src/timer/unix/*.c", when = { os = "macos" } },
+  { path = "src/tray/cocoa/*.m", when = { os = "macos" } },
+  { path = "src/video/cocoa/*.m", when = { os = "macos" } },
+]
+define = [
+  { value = "_REENTRANT", when = { os = "linux" } },
+  { value = "_THREAD_SAFE", when = { os = "macos" } },
+]
+flags = [
+  "-fno-strict-aliasing",
+  "-fvisibility=hidden",
+  { value = "-msse", when = { arch = "x86_64" } },
+  { value = "-msse2", when = { arch = "x86_64" } },
+  { value = "-msse3", when = { arch = "x86_64" } },
+  { value = "-fobjc-arc", when = { os = "macos" } },
+]
+
+[lib.macos]
+frameworks = [
+  "AVFoundation",
+  "AudioToolbox",
+  "Carbon",
+  "Cocoa",
+  "CoreAudio",
+  "CoreFoundation",
+  "CoreHaptics",
+  "CoreMedia",
+  "CoreVideo",
+  "ForceFeedback",
+  "GameController",
+  "IOKit",
+  "Metal",
+  "QuartzCore",
+  "UniformTypeIdentifiers",
+]
+
+[[example]]
+name = "window"
+source = [{ path = "example/window.c", tree = "manifest" }]
+deps = ["SDL3"]
+
+[[example]]
+name = "gpu"
+source = [{ path = "example/gpu.c", tree = "manifest" }]
+deps = ["SDL3"]
+
+[profile.default]
+options = { x11 = true }

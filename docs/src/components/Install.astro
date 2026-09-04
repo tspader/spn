@@ -1,0 +1,71 @@
+---
+import Tabs from '@spn/docs/components/Tabs.astro'
+import { targets } from '@spn/docs/data/install'
+---
+
+<Tabs group="install" tabs={targets}>
+  <figure class="code-block install">
+    {targets.map((target, i) => <pre role="tabpanel" data-tab={target.id} data-prompt={target.prompt} hidden={i !== 0}>{target.command}</pre>)}
+    <button class="code-copy" type="button">copy</button>
+  </figure>
+</Tabs>
+
+<style>
+  :global([data-tabs='install']) {
+    --tab-bg: var(--bg-inset);
+  }
+
+  .install {
+    --code-bg: var(--bg-inset);
+
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--s-5);
+    padding: var(--s-4) var(--s-5);
+    font-size: var(--text-md);
+
+    @media (max-width: 480px) {
+      padding: var(--s-4);
+      font-size: var(--text-sm);
+    }
+  }
+
+  .install pre {
+    grid-area: 1 / 1;
+    padding: 0;
+    font: inherit;
+    font-family: var(--font-mono);
+    white-space: nowrap;
+    scrollbar-width: none;
+
+    &[hidden] {
+      display: block;
+      visibility: hidden;
+    }
+
+    &::before {
+      content: attr(data-prompt) ' ';
+      color: var(--accent);
+    }
+  }
+
+  .install .code-copy {
+    width: auto;
+    height: auto;
+    /* the label has no ascenders; bias padding down so it sits optically centered */
+    padding: calc(var(--s-1) - 2px) var(--s-3) calc(var(--s-1) + 2px);
+    border: var(--border-strong);
+    color: var(--text-mute);
+    font-size: var(--text-xs);
+
+    &::before {
+      content: none;
+    }
+
+    &:hover {
+      color: var(--text);
+      border-color: var(--line-hover);
+    }
+  }
+</style>

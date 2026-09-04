@@ -1,0 +1,54 @@
+---
+const source = `spn${Astro.url.pathname.replace(/\/$/, '')}`
+---
+
+<form class="subscribe" action="https://buttondown.com/api/emails/embed-subscribe/spader" method="post">
+  <input type="hidden" name="tag" value="spn" />
+  <input type="hidden" name="metadata__source" value={source} />
+  <span class="label">mailing list</span>
+  <slot />
+  <input type="email" name="email" placeholder="your@email.com" required />
+  <button type="submit">subscribe</button>
+</form>
+
+<style>
+  .subscribe {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s-3) var(--s-4);
+    font-size: var(--text-sm);
+  }
+
+  .subscribe :global(p) {
+    flex-basis: 100%;
+    color: var(--text-dim);
+  }
+
+  input[type='email'] {
+    flex: 1;
+    min-width: 0;
+    padding: var(--s-2) var(--s-3);
+    background: var(--bg-card);
+    border: var(--border-strong);
+    border-radius: var(--r-md);
+
+    &::placeholder {
+      color: var(--text-faint);
+    }
+  }
+
+  button {
+    padding: var(--s-2) var(--s-4);
+    background: none;
+    border: var(--border-strong);
+    border-radius: var(--r-md);
+    color: var(--text-mute);
+    cursor: pointer;
+
+    &:hover {
+      color: var(--text);
+      border-color: var(--line-hover);
+    }
+  }
+</style>

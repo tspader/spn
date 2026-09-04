@@ -1,0 +1,64 @@
+[package]
+name = "imgui"
+version = "1.92.8"
+
+[package.upstream]
+url = "https://github.com/ocornut/imgui.git"
+commit = "b61e56346a92cfcaf1f43a545ca37b0b32239654"
+
+[options.sdl2]
+type = "bool"
+default = false
+
+[options.opengl3]
+type = "bool"
+default = false
+
+[options.sdl3]
+type = "bool"
+default = false
+
+[options.sdlgpu3]
+type = "bool"
+default = false
+
+[deps.package]
+sdl2 = { version = "^2.30.0", when = { sdl2 = true } }
+sdl3 = { version = "3.4.14", when = { sdl3 = true } }
+
+[[lib]]
+name = "imgui"
+kinds = ["static", "shared"]
+source = [
+  "imgui.cpp",
+  "imgui_demo.cpp",
+  "imgui_draw.cpp",
+  "imgui_tables.cpp",
+  "imgui_widgets.cpp",
+  { path = "backends/imgui_impl_sdl2.cpp", when = { sdl2 = true } },
+  { path = "backends/imgui_impl_opengl3.cpp", when = { opengl3 = true } },
+  { path = "backends/imgui_impl_sdl3.cpp", when = { sdl3 = true } },
+  { path = "backends/imgui_impl_sdlgpu3.cpp", when = { sdlgpu3 = true } },
+]
+system_deps = [
+  { value = "dl", when = { opengl3 = true, os = "linux" } },
+]
+cxx = { standard = "c++17" }
+
+[[example]]
+name = "headless"
+source = [{ path = "example/headless.cpp", tree = "manifest" }]
+deps = ["imgui"]
+cxx = { standard = "c++17" }
+
+[profile.default]
+options = { sdl3 = true, sdlgpu3 = true }
+
+[publish]
+copy = [
+  { from = "source/*.h", to = "include" },
+  { from = "source/backends/imgui_impl_sdl2.h", to = "include" },
+  { from = "source/backends/imgui_impl_opengl3.h", to = "include" },
+  { from = "source/backends/imgui_impl_sdl3.h", to = "include" },
+  { from = "source/backends/imgui_impl_sdlgpu3.h", to = "include" },
+]

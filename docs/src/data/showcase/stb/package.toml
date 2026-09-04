@@ -1,0 +1,18 @@
+[package]
+name = "stb"
+version = "2.15.0"
+author = "nothings"
+maintainer = "tspader"
+
+[package.upstream]
+url = "https://github.com/nothings/stb.git"
+commit = "2c980bb59875b0d32144a71867fbdebb2f77cd20"
+
+[[lib]]
+name = "stb"
+kinds = ["source"]
+
+[publish]
+copy = [
+  { from = "source/*.h", to = "include" },
+]
