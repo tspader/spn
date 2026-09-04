@@ -34,6 +34,7 @@ typedef struct {
   spn_os_t os;
   spn_arch_t arch;
   spn_abi_t abi;
+  spn_cc_driver_t driver;
   spn_mode_t mode;
   spn_opt_level_t opt;
   spn_sanitizer_set_t sanitizers;

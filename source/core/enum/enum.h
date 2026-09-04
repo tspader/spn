@@ -9,7 +9,6 @@
 #include "resolve/types.h"
 #include "pkg/types.h"
 #include "target/types.h"
-#include "toolchain/types.h"
 #include "when/types.h"
 
 spn_arch_t      spn_arch_from_str(sp_str_t str);

@@ -12,6 +12,15 @@ sp_test(defines, build_facts) {
   });
 }
 
+sp_test(defines, script_facts) {
+  return run_test(t, (test_t) {
+    .project = "test/integration/fixtures/defines/script",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+    },
+  });
+}
+
 sp_test(defines, windows_target) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/defines/simple",

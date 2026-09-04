@@ -51,6 +51,14 @@ typedef struct {
   spn_abi_t abi;
 } spn_triple_t;
 
+typedef enum {
+  SPN_CC_DRIVER_NONE,
+  SPN_CC_DRIVER_GCC,
+  SPN_CC_DRIVER_CLANG,
+  SPN_CC_DRIVER_MSVC,
+  SPN_CC_DRIVER_ZIG,
+} spn_cc_driver_t;
+
 typedef struct {
   u16 major;
   u16 minor;
