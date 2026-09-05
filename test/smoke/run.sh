@@ -64,8 +64,9 @@ docker_lanes() {
   done < "$DIR/docker.txt"
 }
 
-run_host() { # <name> <ssh> <root> <triple> <toolchains...>
-  name="$1"; sshv="$2"; hroot="$3"; triple="$4"; shift 4
+run_host() { # <name> <ssh> <root> <triple> <path> <toolchains...>
+  name="$1"; sshv="$2"; hroot="$3"; triple="$4"; hpath="$5"; shift 5
+  [ "$hpath" = - ] && hpath="" || hpath=":$hpath"
   case "$triple" in *windows*) echo "== $name: run by hand (Windows); see README.md" >&2; return ;; esac
   if ! ssh -o ConnectTimeout=10 -o BatchMode=yes "$sshv" true 2>/dev/null; then
     echo "== $name: offline (ssh $sshv)" >&2; return
@@ -77,14 +78,14 @@ run_host() { # <name> <ssh> <root> <triple> <toolchains...>
     "$bdir/spn" "$bdir/test/smoke"
   ssh "$sshv" "mkdir -p $hroot && tar -xzf - -C $hroot" < "$OUT/$name.tgz"
   for tc in "$@"; do
-    lane "$name:$tc" ssh "$sshv" "cd $hroot && SPN_TEST_TOOLCHAIN=$tc ./$bdir/test/smoke --filter '*'"
+    lane "$name:$tc" ssh "$sshv" "cd $hroot && PATH=\$PATH$hpath SPN_TEST_TOOLCHAIN=$tc ./$bdir/test/smoke --filter '*'"
   done
 }
 
 host_lanes() {
-  while read -r name sshv hroot triple rest; do
+  while read -r name sshv hroot triple hpath rest; do
     case "$name" in ''|'#'*) continue ;; esac
-    run_host "$name" "$sshv" "$hroot" "$triple" $rest
+    run_host "$name" "$sshv" "$hroot" "$triple" "$hpath" $rest
   done < "$DIR/hosts.txt"
 }
 
