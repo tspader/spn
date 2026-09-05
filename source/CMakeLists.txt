@@ -133,6 +133,7 @@ set(SPN_SOURCES
   core/toolchain/select.c
   core/toolchain/toolchain.c
   core/triple/triple.c
+  core/elf/elf.c
   cli/tui/tui.c
   core/unit/build.c
   core/unit/fingerprint.c

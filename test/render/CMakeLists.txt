@@ -23,6 +23,7 @@ add_executable(render
   ${UTIL}/str/str.c
   ${SRC}/toolchain/toolchain.c
   ${SRC}/triple/triple.c
+  ${SRC}/elf/elf.c
   main.c
   cases.c
   ${TEST_TOOLS}/caps.c

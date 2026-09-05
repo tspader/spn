@@ -1,7 +1,9 @@
 add_executable(core
   tools/ctx.c
+  tools/elf_emit.c
   tools/main/sim.c
   drain.c
+  elf.c
   fs.c
   filter.c
   wake.c
@@ -230,6 +232,7 @@ add_executable(core
   ${SRC}/toolchain/select.c
   ${SRC}/toolchain/toolchain.c
   ${SRC}/triple/triple.c
+  ${SRC}/elf/elf.c
   ${SRC}/unit/build.c
   ${SRC}/unit/fingerprint.c
   ${SRC}/unit/graph.c

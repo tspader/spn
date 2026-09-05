@@ -2,6 +2,7 @@
 
 #include "spn/core.h"
 #include "triple/triple.h"
+#include "elf_emit.h"
 
 
 typedef struct {
@@ -171,116 +172,6 @@ sp_test(triple, host) {
 
 
 typedef struct {
-  u8 e_ident [16];
-  u16 e_type;
-  u16 e_machine;
-  u32 e_version;
-  u64 e_entry;
-  u64 e_phoff;
-  u64 e_shoff;
-  u32 e_flags;
-  u16 e_ehsize;
-  u16 e_phentsize;
-  u16 e_phnum;
-  u16 e_shentsize;
-  u16 e_shnum;
-  u16 e_shstrndx;
-} elf_ehdr_t;
-
-typedef struct {
-  u32 p_type;
-  u32 p_flags;
-  u64 p_offset;
-  u64 p_vaddr;
-  u64 p_paddr;
-  u64 p_filesz;
-  u64 p_memsz;
-  u64 p_align;
-} elf_phdr_t;
-
-#define ELF_PT_LOAD 1
-#define ELF_PT_INTERP 3
-
-typedef struct {
-  const c8* value;
-  bool malformed;
-} interp_expect_t;
-
-typedef struct {
-  const c8* name;
-  const c8* interp;
-  bool bad_magic;
-  bool elf32;
-  bool load_first;
-  bool truncated;
-  interp_expect_t expect;
-} interp_t;
-
-static const interp_t interp_tests [] = {
-  { .name = "gnu_loader",      .interp = "/lib64/ld-linux-x86-64.so.2", .expect = { "/lib64/ld-linux-x86-64.so.2" } },
-  { .name = "musl_loader",     .interp = "/lib/ld-musl-x86_64.so.1",    .expect = { "/lib/ld-musl-x86_64.so.1" } },
-  { .name = "interp_after_load", .interp = "/lib/ld-musl-x86_64.so.1", .load_first = true, .expect = { "/lib/ld-musl-x86_64.so.1" } },
-  { .name = "static_binary" },
-  { .name = "bad_magic",       .interp = "/lib64/ld-linux-x86-64.so.2", .bad_magic = true, .expect = { .malformed = true } },
-  { .name = "elf32_rejected",  .interp = "/lib64/ld-linux-x86-64.so.2", .elf32 = true, .expect = { .malformed = true } },
-  { .name = "truncated_phdrs", .interp = "/lib64/ld-linux-x86-64.so.2", .truncated = true, .expect = { .malformed = true } },
-};
-
-static sp_str_t interp_build_elf(sp_mem_t mem, const interp_t* spec) {
-  u32 num_phdrs = (spec->load_first ? 1 : 0) + (spec->interp ? 1 : 0);
-  u64 phoff = sizeof(elf_ehdr_t);
-  u64 interp_off = phoff + num_phdrs * sizeof(elf_phdr_t);
-  sp_str_t interp = spec->interp ? sp_cstr_as_str(spec->interp) : (sp_str_t) sp_zero;
-  u64 size = interp_off + interp.len + 1;
-
-  c8* bytes = sp_alloc(mem, size);
-
-  elf_ehdr_t* ehdr = (elf_ehdr_t*)bytes;
-  ehdr->e_ident[0] = spec->bad_magic ? 0x7e : 0x7f;
-  ehdr->e_ident[1] = 'E';
-  ehdr->e_ident[2] = 'L';
-  ehdr->e_ident[3] = 'F';
-  ehdr->e_ident[4] = spec->elf32 ? 1 : 2;
-  ehdr->e_phoff = phoff;
-  ehdr->e_phentsize = sizeof(elf_phdr_t);
-  ehdr->e_phnum = (u16)(spec->truncated ? num_phdrs + 8 : num_phdrs);
-
-  elf_phdr_t* phdr = (elf_phdr_t*)(bytes + phoff);
-  if (spec->load_first) {
-    phdr->p_type = ELF_PT_LOAD;
-    phdr++;
-  }
-  if (spec->interp) {
-    phdr->p_type = ELF_PT_INTERP;
-    phdr->p_offset = interp_off;
-    phdr->p_filesz = interp.len + 1;
-    sp_mem_copy(bytes + interp_off, interp.data, interp.len);
-  }
-
-  return sp_str(bytes, (u32)size);
-}
-
-static sp_io_seeking_reader_t interp_reader(sp_io_reader_t* backing, sp_str_t elf) {
-  sp_io_seeking_reader_t reader = sp_zero;
-  sp_io_seeking_reader_from_mem(&reader, backing, elf.data, elf.len);
-  return reader;
-}
-
-sp_test_each(triple, elf_interp, interp_t, interp_tests) {
-  sp_str_t elf = interp_build_elf(sp_test_arena(t), it);
-  sp_io_reader_t backing = sp_zero;
-  sp_io_seeking_reader_t reader = interp_reader(&backing, elf);
-  sp_str_t interp = sp_zero;
-  spn_err_t err = spn_elf_interp(sp_test_arena(t), &reader, &interp);
-  sp_expect_eq(t, (u32)(it->expect.malformed ? SPN_ERROR : SPN_OK), (u32)err);
-  if (!err) {
-    sp_expect_str_eq_c(t, interp, it->expect.value ? it->expect.value : "");
-  }
-  return SP_OK;
-}
-
-
-typedef struct {
   const c8* name;
   const c8* interp;
   spn_abi_t expect;
@@ -314,10 +205,10 @@ static const host_libc_t host_libc_tests [] = {
 };
 
 sp_test_each(triple, host_libc, host_libc_t, host_libc_tests) {
-  interp_t spec = { .interp = it->interp };
-  sp_str_t elf = interp_build_elf(sp_test_arena(t), &spec);
+  elf_spec_t spec = { .interp = it->interp };
+  sp_str_t elf = elf_emit(sp_test_arena(t), &spec);
   sp_io_reader_t backing = sp_zero;
-  sp_io_seeking_reader_t reader = interp_reader(&backing, elf);
+  sp_io_seeking_reader_t reader = elf_reader(&backing, elf);
   sp_expect_eq(t, spn_host_libc(sp_test_arena(t), &reader), it->expect);
   return SP_OK;
 }

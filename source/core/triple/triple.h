@@ -17,7 +17,6 @@ spn_err_t spn_triple_parse(sp_str_t str, spn_triple_t* triple);
 spn_err_t spn_triple_parse_host(sp_str_t str, spn_triple_t* triple);
 sp_str_t spn_triple_to_str(sp_mem_t mem, spn_triple_t triple);
 spn_triple_t spn_triple_host();
-spn_err_t spn_elf_interp(sp_mem_t mem, sp_io_seeking_reader_t* elf, sp_str_t* interp);
 spn_abi_t spn_abi_from_interp(sp_str_t interp);
 spn_abi_t spn_host_libc(sp_mem_t mem, sp_io_seeking_reader_t* elf);
 u32 spn_os_abis(spn_os_t os, const spn_abi_t** abis);

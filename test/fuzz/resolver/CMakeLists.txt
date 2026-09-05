@@ -43,6 +43,7 @@ add_executable(fuzz_resolver
   ${SRC}/profile/profile.c
   ${SRC}/pkg/load.c
   ${SRC}/triple/triple.c
+  ${SRC}/elf/elf.c
   ${SRC}/resolve/resolve.c
   ${UTIL}/str/str.c
   ${SRC}/semver/compare.c

@@ -1,0 +1,38 @@
+#include "spn_test.h"
+
+#include "elf/elf.h"
+#include "elf_emit.h"
+
+typedef struct {
+  const c8* value;
+  bool malformed;
+} interp_expect_t;
+
+typedef struct {
+  const c8* name;
+  elf_spec_t elf;
+  interp_expect_t expect;
+} interp_t;
+
+static const interp_t interp_tests [] = {
+  { .name = "gnu_loader",        .elf = { .interp = "/lib64/ld-linux-x86-64.so.2" }, .expect = { "/lib64/ld-linux-x86-64.so.2" } },
+  { .name = "musl_loader",       .elf = { .interp = "/lib/ld-musl-x86_64.so.1" }, .expect = { "/lib/ld-musl-x86_64.so.1" } },
+  { .name = "interp_after_load", .elf = { .interp = "/lib/ld-musl-x86_64.so.1", .load_first = true }, .expect = { "/lib/ld-musl-x86_64.so.1" } },
+  { .name = "static_binary" },
+  { .name = "bad_magic",         .elf = { .interp = "/lib64/ld-linux-x86-64.so.2", .bad_magic = true }, .expect = { .malformed = true } },
+  { .name = "elf32_rejected",    .elf = { .interp = "/lib64/ld-linux-x86-64.so.2", .elf32 = true }, .expect = { .malformed = true } },
+  { .name = "truncated_phdrs",   .elf = { .interp = "/lib64/ld-linux-x86-64.so.2", .truncated = true }, .expect = { .malformed = true } },
+};
+
+sp_test_each(elf, interp, interp_t, interp_tests) {
+  sp_str_t elf = elf_emit(sp_test_arena(t), &it->elf);
+  sp_io_reader_t backing = sp_zero;
+  sp_io_seeking_reader_t reader = elf_reader(&backing, elf);
+  sp_str_t interp = sp_zero;
+  spn_err_t err = spn_elf_interp(sp_test_arena(t), &reader, &interp);
+  sp_expect_eq(t, (u32)(it->expect.malformed ? SPN_ERROR : SPN_OK), (u32)err);
+  if (!err) {
+    sp_expect_str_eq_c(t, interp, it->expect.value ? it->expect.value : "");
+  }
+  return SP_OK;
+}

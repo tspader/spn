@@ -23,6 +23,7 @@ add_executable(integration
   ${UTIL}/str/str.c
   ${SRC}/toolchain/toolchain.c
   ${SRC}/triple/triple.c
+  ${SRC}/elf/elf.c
   main.c
   cli.c
   compile_commands.c

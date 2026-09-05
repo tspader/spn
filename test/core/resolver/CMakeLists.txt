@@ -44,6 +44,7 @@ add_executable(resolver
   ${SRC}/profile/profile.c
   ${SRC}/pkg/load.c
   ${SRC}/triple/triple.c
+  ${SRC}/elf/elf.c
   ${SRC}/resolve/resolve.c
   ${SRC}/resolve/dump.c
   ${SRC}/codegen/gen/resolve.gen.c
