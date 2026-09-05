@@ -40,7 +40,7 @@ image_dir() {
 lane() { # <name> <cmd...>
   name="$1"; shift
   echo "== $name"
-  "$@" 2>&1 | grep -E '^(elf|mingw|msvc|macho|wasm)\.[a-z_]+ (ok|skipped|failed)' \
+  "$@" 2>&1 | grep -E '^(elf|mingw|msvc|macho|wasm)\.[a-z0-9_]+ (ok|skipped|failed)' \
     | tee "$OUT/$name" | sed 's/^/   /' || true
 }
 
