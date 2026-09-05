@@ -129,39 +129,57 @@ SP_PRIVATE spn_err_t probe_hash(spn_probe_cache_t* cache, sp_str_t path, sp_hash
   return SPN_OK;
 }
 
-spn_err_t spn_toolchain_probe(spn_cc_toolchain_t* cc, sp_da(sp_str_t) dirs, spn_probe_cache_t* cache, sp_mem_t mem, sp_hash_t* identity) {
+static bool probe_program(spn_probe_cache_t* cache, sp_str_t cwd, sp_da(sp_str_t) dirs, sp_mem_t mem, spn_arg_t* program, sp_hash_t* hash) {
+  sp_str_t resolved = spn_search_program(mem, cwd, program->prefix, dirs);
+  if (sp_str_empty(resolved) || probe_hash(cache, resolved, hash)) {
+    return false;
+  }
+  *program = spn_arg_lit(resolved);
+  return true;
+}
+
+static spn_err_t probe_missing(const spn_cc_toolchain_t* cc, spn_arg_t program) {
+  return spn_err_emit(&spn, (spn_err_union_t) {
+    .kind = SPN_ERR_TOOLCHAIN_MISSING,
+    .program = {
+      .name = cc->name,
+      .program = program.prefix,
+    },
+  });
+}
+
+spn_err_t spn_toolchain_probe(spn_cc_toolchain_t* cc, sp_da(sp_str_t) dirs, spn_probe_cache_t* cache, sp_mem_t mem, spn_ld_flavor_set_t flavors, sp_hash_t* identity) {
   *identity = 0;
 
   sp_str_t cwd = sp_fs_get_cwd(mem);
-  spn_toolchain_launcher_t* launchers [] = { &cc->compiler, &cc->linker, &cc->archiver, &cc->cxx };
-  sp_hash_t hashes [sp_carr_len(launchers)] = sp_zero;
+  sp_hash_t hashes [3 + SPN_LD_FLAVOR_COUNT] = sp_zero;
   u32 num_hashes = 0;
 
-  sp_carr_for(launchers, it) {
-    spn_toolchain_launcher_t* launcher = launchers[it];
-    if (spn_arg_empty(launcher->program)) {
+  if (!probe_program(cache, cwd, dirs, mem, &cc->compiler.program, &hashes[num_hashes])) {
+    return probe_missing(cc, cc->compiler.program);
+  }
+  num_hashes++;
+  if (!probe_program(cache, cwd, dirs, mem, &cc->archiver.program, &hashes[num_hashes])) {
+    return probe_missing(cc, cc->archiver.program);
+  }
+  num_hashes++;
+  if (!spn_arg_empty(cc->cxx.program)) {
+    if (probe_program(cache, cwd, dirs, mem, &cc->cxx.program, &hashes[num_hashes])) {
+      num_hashes++;
+    }
+    else {
+      cc->cxx = sp_zero_s(spn_toolchain_launcher_t);
+    }
+  }
+  sp_for(flavor, SPN_LD_FLAVOR_COUNT) {
+    spn_arg_t* program = &cc->linkers.slots[flavor].program;
+    if (!(flavors & spn_ld_flavor_bit(flavor)) || spn_arg_empty(*program)) {
       continue;
     }
-
-    sp_str_t program = launcher->program.prefix;
-    sp_str_t resolved = spn_search_program(mem, cwd, program, dirs);
-    sp_hash_t hash = 0;
-    if (sp_str_empty(resolved) || probe_hash(cache, resolved, &hash)) {
-      if (launcher == &cc->cxx) {
-        *launcher = sp_zero_s(spn_toolchain_launcher_t);
-        continue;
-      }
-      return spn_err_emit(&spn, (spn_err_union_t) {
-        .kind = SPN_ERR_TOOLCHAIN_MISSING,
-        .program = {
-          .name = cc->name,
-          .program = program,
-        },
-      });
+    if (!probe_program(cache, cwd, dirs, mem, program, &hashes[num_hashes])) {
+      return probe_missing(cc, *program);
     }
-
-    launcher->program = spn_arg_lit(resolved);
-    hashes[num_hashes++] = hash;
+    num_hashes++;
   }
 
   *identity = spn_digest_hash_combine(hashes, num_hashes);

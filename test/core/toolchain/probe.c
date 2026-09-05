@@ -37,6 +37,7 @@ typedef struct {
     struct {
       u32 slot;
       const c8* dirs [PROBE_MAX_DIRS];
+      spn_ld_flavor_set_t flavors;
       spn_err_t err;
       const c8* program;
       const c8* resolved [PROBE_MAX_PROGRAMS];
@@ -60,9 +61,9 @@ typedef struct {
   const c8* name;
   struct {
     const c8* compiler;
-    const c8* linker;
     const c8* archiver;
     const c8* cxx;
+    const c8* linker;
     bool no_cxx;
   } programs;
   file_t files [PROBE_MAX_FILES];
@@ -77,7 +78,7 @@ static const test_t tests [] = {
     .name = "resolves_all_programs",
     .files = STANDARD_FILES,
     .actions = {
-      { .kind = PROBE_ACTION_PROBE, .probe = { .slot = 1, .resolved = { "A/cc", "A/cc", "A/ar", "A/c++" } } },
+      { .kind = PROBE_ACTION_PROBE, .probe = { .slot = 1, .resolved = { "A/cc", "A/ar", "A/c++" } } },
     },
     .expect = { .entries = 3 },
   },
@@ -89,12 +90,41 @@ static const test_t tests [] = {
     },
   },
   {
+    .name = "resolves_linker_program",
+    .programs = { .linker = "ld" },
+    .files = { { "A/cc" }, { "A/ar" }, { "A/c++" }, { "A/ld" } },
+    .actions = {
+      { .kind = PROBE_ACTION_PROBE, .probe = { .slot = 1, .resolved = { "A/cc", "A/ar", "A/c++", "A/ld" } } },
+    },
+    .expect = { .entries = 4 },
+  },
+  {
     .name = "missing_linker",
     .programs = { .linker = "ld" },
     .files = STANDARD_FILES,
     .actions = {
       { .kind = PROBE_ACTION_PROBE, .probe = { .err = SPN_ERR_TOOLCHAIN_MISSING, .program = "ld" } },
     },
+  },
+  {
+    .name = "unlinked_flavor_is_not_probed",
+    .programs = { .linker = "ld" },
+    .files = STANDARD_FILES,
+    .actions = {
+      { .kind = PROBE_ACTION_PROBE, .probe = { .slot = 1, .flavors = spn_ld_flavor_bit(SPN_LD_FLAVOR_MACHO) } },
+    },
+    .expect = { .entries = 3 },
+  },
+  {
+    .name = "linker_bytes_change_identity",
+    .programs = { .linker = "ld" },
+    .files = { { "A/cc" }, { "A/ar" }, { "A/c++" }, { "A/ld" } },
+    .actions = {
+      { .kind = PROBE_ACTION_PROBE, .probe = { .slot = 1 } },
+      { .kind = PROBE_ACTION_FILE, .file = { "A/ld", "BB" } },
+      { .kind = PROBE_ACTION_PROBE, .probe = { .slot = 2 } },
+    },
+    .expect = { .differ = { { 1, 2 } } },
   },
   {
     .name = "missing_archiver",
@@ -132,12 +162,12 @@ static const test_t tests [] = {
   },
   {
     .name = "absolute_program_bypasses_search",
-    .programs = { .compiler = "B/cc", .linker = "B/cc", .archiver = "B/ar", .cxx = "B/c++" },
-    .files = { { "B/cc" }, { "B/ar" }, { "B/c++" } },
+    .programs = { .compiler = "B/cc", .archiver = "B/ar", .cxx = "B/c++", .linker = "B/ld" },
+    .files = { { "B/cc" }, { "B/ar" }, { "B/c++" }, { "B/ld" } },
     .actions = {
-      { .kind = PROBE_ACTION_PROBE, .probe = { .slot = 1, .resolved = { "B/cc", "B/cc", "B/ar", "B/c++" } } },
+      { .kind = PROBE_ACTION_PROBE, .probe = { .slot = 1, .resolved = { "B/cc", "B/ar", "B/c++", "B/ld" } } },
     },
-    .expect = { .entries = 3 },
+    .expect = { .entries = 4 },
   },
   {
     .name = "absolute_program_missing",
@@ -164,7 +194,7 @@ static const test_t tests [] = {
     .name = "later_dir_is_searched",
     .files = { { "A/cc" }, { "B/ar" }, { "B/c++" } },
     .actions = {
-      { .kind = PROBE_ACTION_PROBE, .probe = { .slot = 1, .dirs = { "A", "B" }, .resolved = { "A/cc", "A/cc", "B/ar", "B/c++" } } },
+      { .kind = PROBE_ACTION_PROBE, .probe = { .slot = 1, .dirs = { "A", "B" }, .resolved = { "A/cc", "B/ar", "B/c++" } } },
     },
     .expect = { .entries = 3 },
   },
@@ -273,16 +303,18 @@ static sp_da(sp_str_t) search_dirs(sp_mem_t mem, sp_str_t root, const c8* const*
 }
 
 static spn_cc_toolchain_t make_cc(sp_mem_t mem, sp_str_t root, const test_t* it) {
-  const c8* compiler = it->programs.compiler ? it->programs.compiler : "cc";
   spn_cc_toolchain_t cc = {
     .name = sp_str_lit("A"),
-    .driver = SPN_CC_DRIVER_GCC,
-    .compiler = launcher(mem, root, compiler),
-    .linker = launcher(mem, root, it->programs.linker ? it->programs.linker : compiler),
+    .driver = SPN_CC_DRIVER_CLANG,
+    .compiler = launcher(mem, root, it->programs.compiler ? it->programs.compiler : "cc"),
     .archiver = launcher(mem, root, it->programs.archiver ? it->programs.archiver : "ar"),
+    .linkers.slots = { [SPN_LD_FLAVOR_ELF] = { .family = SPN_LD_FAMILY_GNU } },
   };
   if (!it->programs.no_cxx) {
     cc.cxx = launcher(mem, root, it->programs.cxx ? it->programs.cxx : "c++");
+  }
+  if (it->programs.linker) {
+    cc.linkers.slots[SPN_LD_FLAVOR_ELF].program = spn_arg_lit(program_str(mem, root, it->programs.linker));
   }
   return cc;
 }
@@ -342,7 +374,8 @@ sp_test_each(probe, resolve, test_t, tests, .setup = spn_test_ctx_setup) {
       case PROBE_ACTION_PROBE: {
         spn_cc_toolchain_t cc = make_cc(mem, root, it);
         sp_hash_t identity = sp_zero;
-        spn_err_t err = spn_toolchain_probe(&cc, search_dirs(mem, root, action.probe.dirs), &cache, mem, &identity);
+        spn_ld_flavor_set_t flavors = action.probe.flavors ? action.probe.flavors : spn_ld_flavor_bit(SPN_LD_FLAVOR_ELF);
+        spn_err_t err = spn_toolchain_probe(&cc, search_dirs(mem, root, action.probe.dirs), &cache, mem, flavors, &identity);
         sp_must_eq(t, (u32)action.probe.err, (u32)err);
         if (err) {
           sp_da(spn_event_t) errs = spn_test_drain_errs(mem);
@@ -354,12 +387,12 @@ sp_test_each(probe, resolve, test_t, tests, .setup = spn_test_ctx_setup) {
         }
         sp_expect(t, identity != 0);
         sp_expect_eq(t, action.probe.cxx_dropped || it->programs.no_cxx, spn_arg_empty(cc.cxx.program));
-        const spn_toolchain_launcher_t* launchers [PROBE_MAX_PROGRAMS] = { &cc.compiler, &cc.linker, &cc.archiver, &cc.cxx };
+        const spn_arg_t* programs [PROBE_MAX_PROGRAMS] = { &cc.compiler.program, &cc.archiver.program, &cc.cxx.program, &cc.linkers.slots[SPN_LD_FLAVOR_ELF].program };
         sp_carr_for(action.probe.resolved, pt) {
           if (!action.probe.resolved[pt]) {
             continue;
           }
-          sp_expect_str_eq(t, launchers[pt]->program.prefix, file_path(mem, root, action.probe.resolved[pt]));
+          sp_expect_str_eq(t, programs[pt]->prefix, file_path(mem, root, action.probe.resolved[pt]));
         }
         if (action.probe.slot) {
           slots[action.probe.slot] = identity;

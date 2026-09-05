@@ -1,4 +1,5 @@
 #include "unit/unit.h"
+#include "toolchain/linker.h"
 
 #include "ctx/types.h"
 #include "hash/digest/digest.h"
@@ -54,6 +55,8 @@ spn_build_unit_t* spn_build_add(spn_session_t* s, spn_profile_info_t profile, sp
   build->id = id;
   build->profile = profile;
   build->toolchain = bind_toolchain(s, toolchain);
+  spn_triple_t target = { profile.arch, profile.os, profile.abi };
+  build->toolchain->flavors |= spn_ld_flavor_bit(spn_ld_flavor(target));
   build->paths.root = root;
   sp_da_init(s->mem, build->include);
   build->define = spn_when_facts_to_defines(s->mem, spn_profile_facts(&build->profile));
