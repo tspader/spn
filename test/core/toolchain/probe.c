@@ -6,14 +6,11 @@
 #define PROBE_MAX_DIRS 2
 #define PROBE_MAX_SLOTS 4
 #define PROBE_MAX_PAIRS 2
-#define PROBE_MAX_SPLIT 3
 #define PROBE_MAX_PROGRAMS 4
 
 #if defined(SP_WIN32)
-  #define PROBE_SEP ";"
   #define PROBE_EXE ".exe"
 #else
-  #define PROBE_SEP ":"
   #define PROBE_EXE ""
 #endif
 
@@ -393,22 +390,3 @@ sp_test_each(probe, resolve, test_t, tests, .setup = spn_test_ctx_setup) {
   return SP_OK;
 }
 
-
-typedef struct {
-  const c8* name;
-  const c8* path;
-  const c8* expect [PROBE_MAX_SPLIT];
-} split_t;
-
-static const split_t split_tests [] = {
-  { "single", "A", { "A" } },
-  { "two", "A" PROBE_SEP "B", { "A", "B" } },
-  { "empty_entries_dropped", PROBE_SEP "A" PROBE_SEP PROBE_SEP "B" PROBE_SEP, { "A", "B" } },
-  { "empty", "" },
-};
-
-sp_test_each(probe, split_path, split_t, split_tests) {
-  sp_da(sp_str_t) dirs = spn_probe_split_path(sp_test_arena(t), sp_cstr_as_str(it->path));
-  sp_must_strs_eq(t, dirs, sp_da_size(dirs), it->expect);
-  return SP_OK;
-}

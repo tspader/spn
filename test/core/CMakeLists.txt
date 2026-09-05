@@ -128,6 +128,7 @@ add_executable(core
   toolchain/parse.c
   toolchain/probe.c
   toolchain/provision.c
+  toolchain/search.c
   toolchain/select.c
   toolchain/sha256.c
   toolchain/toolchain.c
@@ -228,6 +229,7 @@ add_executable(core
   ${SRC}/pkg/load.c
   ${SRC}/toolchain/catalog.c
   ${SRC}/toolchain/probe.c
+  ${SRC}/toolchain/search.c
   ${SRC}/toolchain/provision.c
   ${SRC}/toolchain/select.c
   ${SRC}/toolchain/toolchain.c
@@ -274,6 +276,7 @@ set_source_files_properties(
   toolchain/catalog.c
   toolchain/parse.c
   toolchain/probe.c
+  toolchain/search.c
   toolchain/provision.c
   toolchain/select.c
   toolchain/sha256.c

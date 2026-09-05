@@ -1,34 +1,12 @@
 #include "toolchain/probe.h"
+#include "toolchain/search.h"
 
 #include "ctx/types.h"
 #include "error/error.h"
 #include "hash/digest/digest.h"
 #include "paths/paths.h"
 
-#if defined(SP_WIN32)
-  #define SPN_PROBE_PATH_SEP ';'
-#else
-  #define SPN_PROBE_PATH_SEP ':'
-#endif
-
 #define SPN_PROBE_CACHE_HEADER "spn-probe-cache 1"
-
-sp_da(sp_str_t) spn_probe_split_path(sp_mem_t mem, sp_str_t path) {
-  sp_da(sp_str_t) dirs = sp_da_new(mem, sp_str_t);
-  sp_str_t remaining = path;
-  while (remaining.len) {
-    s32 sep = sp_str_find_c8(remaining, SPN_PROBE_PATH_SEP);
-    sp_str_t entry = sep < 0 ? remaining : sp_str_prefix(remaining, sep);
-    if (!sp_str_empty(entry)) {
-      sp_da_push(dirs, entry);
-    }
-    if (sep < 0) {
-      break;
-    }
-    remaining = sp_str_suffix(remaining, remaining.len - sep - 1);
-  }
-  return dirs;
-}
 
 SP_PRIVATE sp_str_t next_field(sp_str_t* line) {
   s32 sep = sp_str_find_c8(*line, ' ');
@@ -110,41 +88,6 @@ spn_err_t spn_probe_cache_flush(spn_probe_cache_t* cache) {
   return result;
 }
 
-SP_PRIVATE sp_str_t probe_file(sp_mem_t mem, sp_str_t candidate) {
-  if (sp_fs_is_target_file(candidate)) {
-    return candidate;
-  }
-#if defined(SP_WIN32)
-  sp_str_t exe = sp_fmt(mem, "{}.exe", sp_fmt_str(candidate)).value;
-  if (sp_fs_is_target_file(exe)) {
-    return exe;
-  }
-#endif
-  return sp_str_lit("");
-}
-
-SP_PRIVATE bool is_pathless(sp_str_t program) {
-  sp_for(it, program.len) {
-    if (sp_fs_is_sep(program.data[it])) {
-      return false;
-    }
-  }
-  return true;
-}
-
-SP_PRIVATE sp_str_t probe_resolve(sp_mem_t mem, sp_str_t program, sp_da(sp_str_t) dirs) {
-  if (!is_pathless(program)) {
-    return probe_file(mem, program);
-  }
-  sp_da_for(dirs, it) {
-    sp_str_t resolved = probe_file(mem, sp_fs_join_path(mem, dirs[it], program));
-    if (!sp_str_empty(resolved)) {
-      return resolved;
-    }
-  }
-  return sp_str_lit("");
-}
-
 SP_PRIVATE spn_err_t probe_hash(spn_probe_cache_t* cache, sp_str_t path, sp_hash_t* hash) {
   sp_sys_file_meta_t meta = sp_zero;
   if (sp_sys_get_path_metadata_s(sp_sys_get_root(0), path, &meta)) {
@@ -189,6 +132,7 @@ SP_PRIVATE spn_err_t probe_hash(spn_probe_cache_t* cache, sp_str_t path, sp_hash
 spn_err_t spn_toolchain_probe(spn_cc_toolchain_t* cc, sp_da(sp_str_t) dirs, spn_probe_cache_t* cache, sp_mem_t mem, sp_hash_t* identity) {
   *identity = 0;
 
+  sp_str_t cwd = sp_fs_get_cwd(mem);
   spn_toolchain_launcher_t* launchers [] = { &cc->compiler, &cc->linker, &cc->archiver, &cc->cxx };
   sp_hash_t hashes [sp_carr_len(launchers)] = sp_zero;
   u32 num_hashes = 0;
@@ -200,7 +144,7 @@ spn_err_t spn_toolchain_probe(spn_cc_toolchain_t* cc, sp_da(sp_str_t) dirs, spn_
     }
 
     sp_str_t program = launcher->program.prefix;
-    sp_str_t resolved = probe_resolve(mem, program, dirs);
+    sp_str_t resolved = spn_search_program(mem, cwd, program, dirs);
     sp_hash_t hash = 0;
     if (sp_str_empty(resolved) || probe_hash(cache, resolved, &hash)) {
       if (launcher == &cc->cxx) {
