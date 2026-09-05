@@ -136,6 +136,7 @@ void spn_gnu_render_flags(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, con
   }
   if (profile->os == SPN_OS_FREESTANDING) {
     sp_da_push(flags->compile, sp_str_lit("-ffreestanding"));
+    sp_da_push(flags->compile, sp_str_lit("-fno-stack-protector"));
     if (spn_cc_has(toolchain, SPN_CC_CAP_NOLIBC)) {
       sp_da_push(flags->link, sp_str_lit("-nostartfiles"));
       sp_da_push(flags->link, sp_str_lit("-nolibc"));

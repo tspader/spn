@@ -210,7 +210,7 @@ static const flags_test_t tests [] = {
       .abi = SPN_ABI_BARE,
     },
     .driver = SPN_CC_DRIVER_ZIG,
-    .expect = { .compile = { "-ffreestanding" } },
+    .expect = { .compile = { "-ffreestanding", "-fno-stack-protector" } },
   },
   {
     .name = "freestanding_gcc_strips_runtime",
@@ -220,7 +220,7 @@ static const flags_test_t tests [] = {
       .abi = SPN_ABI_BARE,
     },
     .driver = SPN_CC_DRIVER_GCC,
-    .expect = { .compile = { "-ffreestanding" }, .link = { "-nostartfiles", "-nolibc" } },
+    .expect = { .compile = { "-ffreestanding", "-fno-stack-protector" }, .link = { "-nostartfiles", "-nolibc" } },
   },
   {
     .name = "freestanding_clang_strips_runtime",
@@ -230,7 +230,7 @@ static const flags_test_t tests [] = {
       .abi = SPN_ABI_BARE,
     },
     .driver = SPN_CC_DRIVER_CLANG,
-    .expect = { .compile = { "-ffreestanding" }, .link = { "-nostartfiles", "-nolibc" } },
+    .expect = { .compile = { "-ffreestanding", "-fno-stack-protector" }, .link = { "-nostartfiles", "-nolibc" } },
   },
   {
     .name = "reject_sanitizers_with_static_linkage",
