@@ -74,7 +74,7 @@ sp_test(profile, override_rebuild) {
 sp_test(profile, default_is_musl_static) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/profile/override",
-    .when.os = SPN_OS_LINUX,
+    .when = { .os = SPN_OS_LINUX, .driver = SPN_CC_DRIVER_ZIG },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build" } },
       { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_INIT_BUILD_GRAPH, .key = "target", .value = SPN_TEST_ARCH "-linux-musl" } },
@@ -111,7 +111,7 @@ sp_test(profile, static_config_is_not_a_shared_demand) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/consume/multi_kind/static",
     .copy = { "packages/*" },
-    .when.os = SPN_OS_LINUX,
+    .when = { .os = SPN_OS_LINUX, .driver = SPN_CC_DRIVER_ZIG },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build" } },
       { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_INIT_BUILD_GRAPH, .key = "target", .value = SPN_TEST_ARCH "-linux-musl" } },
@@ -133,7 +133,7 @@ sp_test(profile, target_with_foreign_arch) {
 sp_test(profile, cross_target_macos) {
   return run_command_test(t, (command_test_t) {
     .project = "test/integration/fixtures/profile/override",
-    .when.msvc_todo = true,
+    .when.driver = SPN_CC_DRIVER_ZIG,
     .args = { "build", "--target", "aarch64-macos" },
     .expect = {
       .exists = { target_exe("main", "aarch64-macos-apple") },
