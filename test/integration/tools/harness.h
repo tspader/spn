@@ -34,6 +34,7 @@ typedef enum {
   ACTION_VERIFY_EXISTS,
   ACTION_VERIFY_NOT_EXISTS,
   ACTION_VERIFY_NO_INTERP,
+  ACTION_VERIFY_ELF_ENTRY,
   ACTION_VERIFY_INCLUDE,
   ACTION_VERIFY_FILE_CONTAINS,
   ACTION_VERIFY_FILE_NOT_CONTAINS,
@@ -58,6 +59,7 @@ typedef struct {
     struct { const c8* name; s32 rc; } bin;
     sp_str_t exists;
     sp_str_t verify_no_interp;
+    struct { sp_str_t file; u64 entry; } verify_elf_entry;
     struct { sp_str_t file; } verify_include;
     struct { sp_str_t file; sp_str_t needle; } verify_file_contains;
     struct { sp_str_t file; sp_str_t needle; } verify_file_not_contains;

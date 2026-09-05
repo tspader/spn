@@ -1,4 +1,5 @@
 #include "harness.h"
+#include "elf/elf.h"
 #include "error/error.h"
 #include "triple/triple.h"
 #include "yyjson.h"
@@ -166,6 +167,30 @@ static sp_err_t expect_no_interp(sp_test_t* t, fixture_t* fixture, sp_str_t path
     .line = line,
     .expected = sp_cstr_as_str("a static elf64 with no program interpreter"),
     .actual = err ? sp_cstr_as_str("not an elf64 image") : interp,
+  });
+  return SP_ERR;
+}
+
+static sp_err_t expect_elf_entry(sp_test_t* t, fixture_t* fixture, sp_str_t path, u64 expected, const c8* file, u32 line) {
+  sp_io_file_reader_t reader = sp_zero;
+  sp_must_ok(t, sp_io_file_reader_from_path(&reader, path));
+  sp_io_seeking_reader_t elf = sp_zero;
+  sp_io_seeking_reader_from_file_reader(&elf, &reader);
+  u64 entry = 0;
+  spn_err_t err = spn_elf_entry(&elf, &entry);
+  sp_io_file_reader_close(&reader);
+  if (!err && entry == expected) {
+    return SP_OK;
+  }
+
+  sp_mem_t mem = harness_mem();
+  sp_test_kv(t, "root", fixture->root);
+  sp_test_kv(t, "path", display_path(fixture, path));
+  sp_test_record(t, (sp_test_failure_t) {
+    .file = sp_cstr_as_str(file),
+    .line = line,
+    .expected = sp_fmt(mem, "an elf64 image with entry {:x}", sp_fmt_uint(expected)).value,
+    .actual = err ? sp_cstr_as_str("not an elf64 image") : sp_fmt(mem, "entry {:x}", sp_fmt_uint(entry)).value,
   });
   return SP_ERR;
 }
@@ -734,6 +759,11 @@ sp_err_t run_actions(sp_test_t* t, fixture_t* fixture, const action_t* actions) 
       case ACTION_VERIFY_NO_INTERP: {
         sp_str_t path = fixture_path(fixture, action.verify_no_interp);
         expect_static_elf(t, fixture, path);
+        break;
+      }
+      case ACTION_VERIFY_ELF_ENTRY: {
+        sp_str_t path = fixture_path(fixture, action.verify_elf_entry.file);
+        expect_elf_entry(t, fixture, path, action.verify_elf_entry.entry, __FILE__, __LINE__);
         break;
       }
       case ACTION_VERIFY_DIR_COUNT: {
