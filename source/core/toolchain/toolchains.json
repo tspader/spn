@@ -156,6 +156,56 @@
       },
       "host": {
         "x86_64-linux": {},
+        "aarch64-linux": {}
+      }
+    },
+    {
+      "name": "apple-clang",
+      "driver": "clang",
+      "compiler": {
+        "program": "clang"
+      },
+      "archiver": {
+        "program": "ar"
+      },
+      "cxx": {
+        "program": "clang++"
+      },
+      "linker": {
+        "macho": {
+          "family": "ld64",
+          "program": "ld"
+        }
+      },
+      "host": {
+        "x86_64-macos": {},
+        "aarch64-macos": {}
+      }
+    },
+    {
+      "name": "llvm",
+      "driver": "clang",
+      "compiler": {
+        "program": "clang"
+      },
+      "archiver": {
+        "program": "llvm-ar"
+      },
+      "cxx": {
+        "program": "clang++"
+      },
+      "linker": {
+        "elf": {
+          "family": "lld",
+          "program": "ld.lld"
+        },
+        "macho": {
+          "family": "lld",
+          "program": "ld64.lld"
+        }
+      },
+      "host": {
+        "x86_64-linux": {},
         "aarch64-linux": {},
         "x86_64-macos": {},
         "aarch64-macos": {}

@@ -76,6 +76,39 @@ static const test_t tests [] = {
       .hosts = {
         { .triple = { SPN_ARCH_X64, SPN_OS_LINUX } },
         { .triple = { SPN_ARCH_ARM64, SPN_OS_LINUX } },
+      },
+    },
+  },
+  {
+    .name = "apple-clang",
+    .expect = {
+      .driver = SPN_CC_DRIVER_CLANG,
+      .compiler = { .program = "clang" },
+      .cxx = { .program = "clang++" },
+      .archiver = { .program = "ar" },
+      .linkers = {
+        [SPN_LD_FLAVOR_MACHO] = { SPN_LD_FAMILY_LD64, "ld" },
+      },
+      .hosts = {
+        { .triple = { SPN_ARCH_X64, SPN_OS_MACOS } },
+        { .triple = { SPN_ARCH_ARM64, SPN_OS_MACOS } },
+      },
+    },
+  },
+  {
+    .name = "llvm",
+    .expect = {
+      .driver = SPN_CC_DRIVER_CLANG,
+      .compiler = { .program = "clang" },
+      .cxx = { .program = "clang++" },
+      .archiver = { .program = "llvm-ar" },
+      .linkers = {
+        [SPN_LD_FLAVOR_ELF] = { SPN_LD_FAMILY_LLD, "ld.lld" },
+        [SPN_LD_FLAVOR_MACHO] = { SPN_LD_FAMILY_LLD, "ld64.lld" },
+      },
+      .hosts = {
+        { .triple = { SPN_ARCH_X64, SPN_OS_LINUX } },
+        { .triple = { SPN_ARCH_ARM64, SPN_OS_LINUX } },
         { .triple = { SPN_ARCH_X64, SPN_OS_MACOS } },
         { .triple = { SPN_ARCH_ARM64, SPN_OS_MACOS } },
       },
@@ -124,6 +157,36 @@ static const bind_test_t bind_tests [] = {
   {
     .name = "clang_on_windows",
     .toolchain = "clang",
+    .host = HOST_X64_WIN_GNU,
+    .expect = { .targets = {} },
+  },
+  {
+    .name = "apple_clang_on_macos",
+    .toolchain = "apple-clang",
+    .host = HOST_X64_MACOS,
+    .expect = { .targets = { HOST_X64_MACOS } },
+  },
+  {
+    .name = "apple_clang_on_linux",
+    .toolchain = "apple-clang",
+    .host = HOST_X64_LINUX,
+    .expect = { .targets = {} },
+  },
+  {
+    .name = "llvm_on_linux",
+    .toolchain = "llvm",
+    .host = HOST_X64_LINUX,
+    .expect = { .targets = { HOST_X64_LINUX, TARGET_X64_BARE } },
+  },
+  {
+    .name = "llvm_on_macos",
+    .toolchain = "llvm",
+    .host = HOST_X64_MACOS,
+    .expect = { .targets = { HOST_X64_MACOS } },
+  },
+  {
+    .name = "llvm_on_windows",
+    .toolchain = "llvm",
     .host = HOST_X64_WIN_GNU,
     .expect = { .targets = {} },
   },
@@ -230,7 +293,7 @@ sp_test(builtins, declared_order) {
     return SP_ERR;
   }
 
-  const c8* order [] = { "zig", "msvc", "clang", "gcc" };
+  const c8* order [] = { "zig", "msvc", "clang", "apple-clang", "llvm", "gcc" };
   sp_must_eq(t, (u32)sp_carr_len(order), fixture_catalog_size(&catalog));
   sp_carr_for(order, it) {
     sp_expect_str_eq_c(t, fixture_catalog_at(&catalog, it)->name, order[it]);
