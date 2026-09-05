@@ -13,6 +13,7 @@ typedef struct {
   sp_str_t root;
   sp_str_t events;
   const c8* toolchain;
+  const c8* path;
   struct {
     sp_str_t root;
     sp_str_t spn;

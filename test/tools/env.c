@@ -1,5 +1,6 @@
 #include "env.h"
 #include "caps.h"
+#include "toolchain/search.h"
 #include "triple/triple.h"
 
 void write_file(sp_str_t path, sp_str_t content) {
@@ -466,6 +467,14 @@ static sp_ps_output_t run_spn_ex(sp_test_t* t, fixture_t* fixture, const c8* for
   u32 env_slot = 0;
   while (env_slot < sp_carr_len(config.env.extra) && !sp_str_empty(config.env.extra[env_slot].key)) {
     env_slot++;
+  }
+  if (fixture->path) {
+    c8 sep = SPN_SEARCH_PATH_SEP;
+    sp_str_t prefixed = sp_fmt(mem, "{}{}{}",
+      sp_fmt_str(fixture_path(fixture, sp_cstr_as_str(fixture->path))),
+      sp_fmt_char(sep),
+      sp_fmt_str(sp_os_env_get(sp_str_lit("PATH")))).value;
+    config.env.extra[env_slot++] = (sp_env_var_t) { .key = sp_str_lit("PATH"), .value = prefixed };
   }
   if (env) {
     sp_for(it, SPN_TEST_COMMAND_MAX_ENV) {

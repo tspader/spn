@@ -824,7 +824,9 @@ sp_err_t run_actions(sp_test_t* t, fixture_t* fixture, const action_t* actions) 
           }
           args[it + 1] = action.cli.args[it];
         }
+        fixture->path = action.cli.path;
         sp_ps_output_t output = run_spn_json(t, fixture, args, action.cli.env);
+        fixture->path = SP_NULLPTR;
         sp_expect_eq(t, action.cli.rc, output.status.exit_code);
         break;
       }
