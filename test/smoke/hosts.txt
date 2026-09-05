@@ -1,0 +1,8 @@
+# Native hosts for the cells no container can reach: mach-o (ld64, ld64.lld)
+# and the msvc ABI (link.exe, lld-link). See machines.md. run.sh drives POSIX
+# hosts; Windows is run by hand (see README). Toolchains is a space list; each
+# is passed as SPN_TEST_TOOLCHAIN for one pass of the smoke binary.
+#
+# name   ssh            root                          triple               toolchains
+miles    spader@miles   ~/source/spn                  aarch64-macos-apple   apple-clang llvm zig
+piotr    spader@piotr   C:/Users/spader/source/spn    x86_64-windows-gnu    msvc zig
