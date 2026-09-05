@@ -46,6 +46,7 @@ sp_str_t elf_emit(sp_mem_t mem, const elf_spec_t* spec) {
   ehdr->e_ident[2] = 'L';
   ehdr->e_ident[3] = 'F';
   ehdr->e_ident[4] = spec->elf32 ? 1 : 2;
+  ehdr->e_entry = spec->entry;
   ehdr->e_phoff = phoff;
   ehdr->e_phentsize = sizeof(elf_phdr_t);
   ehdr->e_phnum = (u16)(spec->truncated ? num_phdrs + 8 : num_phdrs);

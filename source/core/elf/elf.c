@@ -49,6 +49,13 @@ static spn_err_t read_header(sp_io_seeking_reader_t* elf, elf_ehdr_t* ehdr) {
   return SPN_OK;
 }
 
+spn_err_t spn_elf_entry(sp_io_seeking_reader_t* elf, u64* entry) {
+  elf_ehdr_t ehdr = sp_zero;
+  spn_try(read_header(elf, &ehdr));
+  *entry = ehdr.e_entry;
+  return SPN_OK;
+}
+
 spn_err_t spn_elf_interp(sp_mem_t mem, sp_io_seeking_reader_t* elf, sp_str_t* interp) {
   *interp = sp_str_lit("");
   s64 position = 0;

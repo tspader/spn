@@ -36,3 +36,34 @@ sp_test_each(elf, interp, interp_t, interp_tests) {
   }
   return SP_OK;
 }
+
+typedef struct {
+  u64 value;
+  bool malformed;
+} entry_expect_t;
+
+typedef struct {
+  const c8* name;
+  elf_spec_t elf;
+  entry_expect_t expect;
+} entry_t;
+
+static const entry_t entry_tests [] = {
+  { .name = "reads_entry",    .elf = { .entry = 0x400000 }, .expect = { .value = 0x400000 } },
+  { .name = "zero_entry" },
+  { .name = "bad_magic",      .elf = { .entry = 0x400000, .bad_magic = true }, .expect = { .malformed = true } },
+  { .name = "elf32_rejected", .elf = { .entry = 0x400000, .elf32 = true }, .expect = { .malformed = true } },
+};
+
+sp_test_each(elf, entry, entry_t, entry_tests) {
+  sp_str_t elf = elf_emit(sp_test_arena(t), &it->elf);
+  sp_io_reader_t backing = sp_zero;
+  sp_io_seeking_reader_t reader = elf_reader(&backing, elf);
+  u64 entry = 0;
+  spn_err_t err = spn_elf_entry(&reader, &entry);
+  sp_expect_eq(t, (u32)(it->expect.malformed ? SPN_ERROR : SPN_OK), (u32)err);
+  if (!err) {
+    sp_expect_eq(t, it->expect.value, entry);
+  }
+  return SP_OK;
+}

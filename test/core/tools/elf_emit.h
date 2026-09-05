@@ -5,6 +5,7 @@
 
 typedef struct {
   const c8* interp;
+  u64 entry;
   bool bad_magic;
   bool elf32;
   bool load_first;
