@@ -3,9 +3,17 @@
     {
       "name": "A",
       "driver": "gcc",
-      "compiler": { "program": "A" },
-      "linker":   { "program": "A" },
-      "archiver": { "program": "ar" },
+      "compiler": {
+        "program": "A"
+      },
+      "archiver": {
+        "program": "ar"
+      },
+      "linker": {
+        "elf": {
+          "family": "gnu"
+        }
+      },
       "host": {
         "x86-linux": {}
       }

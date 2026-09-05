@@ -3,16 +3,33 @@
     {
       "name": "A",
       "driver": "gcc",
-      "compiler": { "program": "A" },
-      "linker":   { "program": "A" },
-      "archiver": { "program": "ar" }
+      "compiler": {
+        "program": "A"
+      },
+      "archiver": {
+        "program": "ar"
+      },
+      "linker": {
+        "elf": {
+          "family": "gnu"
+        }
+      }
     },
     {
       "name": "B",
       "driver": "clang",
-      "compiler": { "program": "B" },
-      "linker":   { "program": "B" },
-      "archiver": { "program": "ar" }
+      "compiler": {
+        "program": "B"
+      },
+      "archiver": {
+        "program": "ar"
+      },
+      "linker": {
+        "elf": {
+          "family": "gnu",
+          "program": "ld"
+        }
+      }
     }
   ]
 }

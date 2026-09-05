@@ -3,11 +3,17 @@
     {
       "name": "A",
       "driver": "msvc",
-      "compiler": { "program": "cl" },
-      "linker":   { "program": "link" },
-      "archiver": { "program": "lib" },
+      "compiler": {
+        "program": "cl"
+      },
+      "archiver": {
+        "program": "lib"
+      },
       "target": [
-        { "arch": "x86_64", "os": "freestanding" }
+        {
+          "arch": "x86_64",
+          "os": "freestanding"
+        }
       ]
     }
   ]

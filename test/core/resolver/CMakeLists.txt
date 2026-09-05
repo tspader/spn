@@ -23,6 +23,7 @@ add_executable(resolver
   ${SRC}/hash/sha256/sha256.c
   ${SRC}/when/when.c
   ${SRC}/toolchain/catalog.c
+  ${SRC}/toolchain/linker.c
   ${SRC}/codegen/gen/toolchains.gen.c
   ${SRC}/codegen/gen/config.gen.c
   ${SRC}/codegen/gen/errors.gen.c

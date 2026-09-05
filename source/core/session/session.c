@@ -178,7 +178,7 @@ void spn_session_export_toolchain_env(spn_session_t* s) {
   spn_toolchain_unit_t* toolchain = s->units.target->toolchain;
   sp_env_insert(&s->env, sp_str_lit("CC"), spn_toolchain_launcher_to_str(&spn.roots, s->mem, toolchain->cc.compiler));
   sp_env_insert(&s->env, sp_str_lit("AR"), spn_toolchain_launcher_to_str(&spn.roots, s->mem, toolchain->cc.archiver));
-  sp_env_insert(&s->env, sp_str_lit("LD"), spn_toolchain_launcher_to_str(&spn.roots, s->mem, toolchain->cc.linker));
+  sp_env_insert(&s->env, sp_str_lit("LD"), spn_toolchain_launcher_to_str(&spn.roots, s->mem, toolchain->cc.compiler));
   if (!spn_arg_empty(toolchain->cc.cxx.program)) {
     sp_env_insert(&s->env, sp_str_lit("CXX"), spn_toolchain_launcher_to_str(&spn.roots, s->mem, toolchain->cc.cxx));
   }

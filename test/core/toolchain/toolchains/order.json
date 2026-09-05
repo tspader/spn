@@ -3,22 +3,50 @@
     {
       "name": "A",
       "driver": "gcc",
-      "compiler": { "program": "A" },
-      "linker":   { "program": "A" },
-      "archiver": { "program": "ar" },
+      "compiler": {
+        "program": "A"
+      },
+      "archiver": {
+        "program": "ar"
+      },
+      "linker": {
+        "elf": {
+          "family": "gnu"
+        }
+      },
       "target": [
-        { "arch": "x86_64", "os": "linux", "abi": "gnu" }
+        {
+          "arch": "x86_64",
+          "os": "linux",
+          "abi": "gnu"
+        }
       ]
     },
     {
       "name": "B",
       "driver": "gcc",
-      "compiler": { "program": "B" },
-      "linker":   { "program": "B" },
-      "archiver": { "program": "ar" },
+      "compiler": {
+        "program": "B"
+      },
+      "archiver": {
+        "program": "ar"
+      },
+      "linker": {
+        "elf": {
+          "family": "gnu"
+        }
+      },
       "target": [
-        { "arch": "x86_64", "os": "linux", "abi": "musl" },
-        { "arch": "x86_64", "os": "linux", "abi": "gnu" }
+        {
+          "arch": "x86_64",
+          "os": "linux",
+          "abi": "musl"
+        },
+        {
+          "arch": "x86_64",
+          "os": "linux",
+          "abi": "gnu"
+        }
       ]
     }
   ]

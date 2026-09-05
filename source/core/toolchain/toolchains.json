@@ -10,12 +10,6 @@
           "cc"
         ]
       },
-      "linker": {
-        "program": "zig",
-        "args": [
-          "cc"
-        ]
-      },
       "archiver": {
         "program": "zig",
         "args": [
@@ -119,9 +113,6 @@
       "compiler": {
         "program": "cl"
       },
-      "linker": {
-        "program": "cl"
-      },
       "archiver": {
         "program": "lib"
       },
@@ -151,14 +142,17 @@
       "compiler": {
         "program": "clang"
       },
-      "linker": {
-        "program": "clang"
-      },
       "archiver": {
         "program": "ar"
       },
       "cxx": {
         "program": "clang++"
+      },
+      "linker": {
+        "elf": {
+          "family": "gnu",
+          "program": "ld"
+        }
       },
       "host": {
         "x86_64-linux": {},
@@ -173,14 +167,22 @@
       "compiler": {
         "program": "gcc"
       },
-      "linker": {
-        "program": "gcc"
-      },
       "archiver": {
         "program": "ar"
       },
       "cxx": {
         "program": "g++"
+      },
+      "linker": {
+        "elf": {
+          "family": "gnu"
+        },
+        "mingw": {
+          "family": "gnu"
+        },
+        "macho": {
+          "family": "ld64"
+        }
       }
     }
   ]

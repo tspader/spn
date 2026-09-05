@@ -2,9 +2,9 @@
   "toolchain": [
     {
       "name": "A",
-      "driver": "gcc",
+      "driver": "clang",
       "compiler": {
-        "program": "cc"
+        "program": "A"
       },
       "archiver": {
         "program": "ar"

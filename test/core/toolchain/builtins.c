@@ -13,8 +13,13 @@ static const test_t tests [] = {
       .driver = SPN_CC_DRIVER_ZIG,
       .compiler = { .program = "zig", .args = { "cc" } },
       .cxx = { .program = "zig", .args = { "c++" } },
-      .linker = { .program = "zig", .args = { "cc" } },
       .archiver = { .program = "zig", .args = { "ar" } },
+      .linkers = {
+        [SPN_LD_FLAVOR_ELF] = { SPN_LD_FAMILY_LLD },
+        [SPN_LD_FLAVOR_MINGW] = { SPN_LD_FAMILY_LLD },
+        [SPN_LD_FLAVOR_MACHO] = { SPN_LD_FAMILY_LLD },
+        [SPN_LD_FLAVOR_WASM] = { SPN_LD_FAMILY_LLD },
+      },
       .hosts = {
         { .triple = { SPN_ARCH_X64, SPN_OS_LINUX }, .url = "https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz" },
         { .triple = { SPN_ARCH_ARM64, SPN_OS_LINUX }, .url = "https://ziglang.org/download/0.16.0/zig-aarch64-linux-0.16.0.tar.xz" },
@@ -44,8 +49,10 @@ static const test_t tests [] = {
       .driver = SPN_CC_DRIVER_MSVC,
       .compiler = { .program = "cl" },
       .cxx = { .program = "cl" },
-      .linker = { .program = "cl" },
       .archiver = { .program = "lib" },
+      .linkers = {
+        [SPN_LD_FLAVOR_MSVC] = { SPN_LD_FAMILY_MSVC },
+      },
       .hosts = {
         { .triple = { SPN_ARCH_X64, SPN_OS_WINDOWS } },
         { .triple = { SPN_ARCH_ARM64, SPN_OS_WINDOWS } },
@@ -62,8 +69,10 @@ static const test_t tests [] = {
       .driver = SPN_CC_DRIVER_CLANG,
       .compiler = { .program = "clang" },
       .cxx = { .program = "clang++" },
-      .linker = { .program = "clang" },
       .archiver = { .program = "ar" },
+      .linkers = {
+        [SPN_LD_FLAVOR_ELF] = { SPN_LD_FAMILY_GNU, "ld" },
+      },
       .hosts = {
         { .triple = { SPN_ARCH_X64, SPN_OS_LINUX } },
         { .triple = { SPN_ARCH_ARM64, SPN_OS_LINUX } },
@@ -78,11 +87,121 @@ static const test_t tests [] = {
       .driver = SPN_CC_DRIVER_GCC,
       .compiler = { .program = "gcc" },
       .cxx = { .program = "g++" },
-      .linker = { .program = "gcc" },
       .archiver = { .program = "ar" },
+      .linkers = {
+        [SPN_LD_FLAVOR_ELF] = { SPN_LD_FAMILY_GNU },
+        [SPN_LD_FLAVOR_MINGW] = { SPN_LD_FAMILY_GNU },
+        [SPN_LD_FLAVOR_MACHO] = { SPN_LD_FAMILY_LD64 },
+      },
     },
   },
 };
+
+typedef struct {
+  spn_triple_t targets [FIXTURE_MAX_TARGETS];
+} bind_expect_t;
+
+typedef struct {
+  const c8* name;
+  const c8* toolchain;
+  spn_triple_t host;
+  bind_expect_t expect;
+} bind_test_t;
+
+static const bind_test_t bind_tests [] = {
+  {
+    .name = "clang_on_linux",
+    .toolchain = "clang",
+    .host = HOST_X64_LINUX,
+    .expect = { .targets = { HOST_X64_LINUX, TARGET_X64_BARE } },
+  },
+  {
+    .name = "clang_on_macos",
+    .toolchain = "clang",
+    .host = HOST_X64_MACOS,
+    .expect = { .targets = {} },
+  },
+  {
+    .name = "clang_on_windows",
+    .toolchain = "clang",
+    .host = HOST_X64_WIN_GNU,
+    .expect = { .targets = {} },
+  },
+  {
+    .name = "gcc_on_linux",
+    .toolchain = "gcc",
+    .host = HOST_X64_LINUX,
+    .expect = { .targets = { HOST_X64_LINUX, TARGET_X64_BARE } },
+  },
+  {
+    .name = "gcc_on_macos",
+    .toolchain = "gcc",
+    .host = HOST_X64_MACOS,
+    .expect = { .targets = { HOST_X64_MACOS } },
+  },
+  {
+    .name = "gcc_on_windows",
+    .toolchain = "gcc",
+    .host = HOST_X64_WIN_GNU,
+    .expect = { .targets = { HOST_X64_WIN_GNU } },
+  },
+  {
+    .name = "zig_keeps_declared_targets_on_macos",
+    .toolchain = "zig",
+    .host = HOST_X64_MACOS,
+    .expect = {
+      .targets = {
+        TARGET_WASM,
+        HOST_X64_LINUX,
+        HOST_X64_LINUX_MUSL,
+        HOST_ARM_LINUX,
+        { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_MUSL },
+        HOST_X64_MACOS,
+        HOST_ARM_MACOS,
+        HOST_X64_WIN_GNU,
+        { SPN_ARCH_ARM64, SPN_OS_WINDOWS, SPN_ABI_GNU },
+        TARGET_X64_BARE,
+        TARGET_ARM_BARE,
+      },
+    },
+  },
+  {
+    .name = "msvc_keeps_declared_targets_on_windows",
+    .toolchain = "msvc",
+    .host = HOST_X64_WIN_MSVC,
+    .expect = {
+      .targets = {
+        HOST_X64_WIN_MSVC,
+        { SPN_ARCH_ARM64, SPN_OS_WINDOWS, SPN_ABI_MSVC },
+      },
+    },
+  },
+  {
+    .name = "msvc_keeps_declared_targets_on_linux",
+    .toolchain = "msvc",
+    .host = HOST_X64_LINUX,
+    .expect = {
+      .targets = {
+        HOST_X64_WIN_MSVC,
+        { SPN_ARCH_ARM64, SPN_OS_WINDOWS, SPN_ABI_MSVC },
+      },
+    },
+  },
+};
+
+sp_test_each(builtins, bind, bind_test_t, bind_tests) {
+  spn_toolchain_catalog_t catalog = sp_zero;
+  if (spn_test_builtin_catalog(t, &catalog, it->host)) {
+    return SP_ERR;
+  }
+
+  spn_toolchain_info_t* info = spn_toolchain_catalog_get(&catalog, sp_cstr_as_str(it->toolchain));
+  sp_must(t, info);
+
+  u32 targets = 0;
+  sp_carr_detect_len(it->expect.targets, targets, !fixture_triple_empty(it->expect.targets[targets]));
+  return fixture_check_targets(t, info->targets, it->expect.targets, targets);
+}
 
 static bool builtins_is_sha256(sp_str_t str) {
   return str.len == 64 && test_str_is_hex(str);

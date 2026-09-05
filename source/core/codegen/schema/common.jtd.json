@@ -5,6 +5,7 @@
     "abi": { "enum": ["gnu", "musl", "msvc", "apple", "none"] },
     "linkage": { "enum": ["shared", "static", "source", "object"] },
     "cc_driver": { "enum": ["gcc", "clang", "msvc", "zig"] },
+    "ld_family": { "enum": ["gnu", "lld", "ld64", "msvc"], "metadata": { "include": "toolchain/types.h" } },
     "index_protocol": { "enum": ["git", "http", "dir"], "metadata": { "include": "index/types.h" } },
     "option_type": { "enum": ["bool", "enum"], "metadata": { "include": "when/types.h" } },
     "pkg_source": { "enum": ["root", "file", "index"], "metadata": { "include": "pkg/types.h" } },
@@ -22,6 +23,23 @@
       "optionalProperties": {
         "url": { "type": "string" },
         "sha256": { "type": "string" }
+      }
+    },
+
+    "linker": {
+      "optionalProperties": {
+        "family": { "ref": "ld_family" },
+        "program": { "type": "string" }
+      }
+    },
+
+    "linkers": {
+      "optionalProperties": {
+        "elf": { "ref": "linker" },
+        "mingw": { "ref": "linker" },
+        "msvc": { "ref": "linker" },
+        "macho": { "ref": "linker" },
+        "wasm": { "ref": "linker" }
       }
     },
 

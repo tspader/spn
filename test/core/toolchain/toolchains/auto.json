@@ -3,49 +3,120 @@
     {
       "name": "A",
       "driver": "gcc",
-      "compiler": { "program": "A" },
-      "linker":   { "program": "A" },
-      "archiver": { "program": "ar" },
+      "compiler": {
+        "program": "A"
+      },
+      "archiver": {
+        "program": "ar"
+      },
+      "linker": {
+        "mingw": {
+          "family": "gnu"
+        }
+      },
       "target": [
-        { "arch": "x86_64", "os": "windows", "abi": "gnu" }
+        {
+          "arch": "x86_64",
+          "os": "windows",
+          "abi": "gnu"
+        }
       ]
     },
     {
       "name": "B",
-      "version": "1.0.0",
       "driver": "clang",
-      "compiler": { "program": "B" },
-      "linker":   { "program": "B" },
-      "archiver": { "program": "B" },
+      "compiler": {
+        "program": "B"
+      },
+      "archiver": {
+        "program": "B"
+      },
+      "version": "1.0.0",
+      "linker": {
+        "elf": {
+          "family": "gnu",
+          "program": "ld"
+        }
+      },
       "mirrors": "https://example.com/mirrors.txt",
       "host": {
-        "x86_64-linux": { "url": "https://example.com/linux.tar.xz", "sha256": "aa" }
+        "x86_64-linux": {
+          "url": "https://example.com/linux.tar.xz",
+          "sha256": "aa"
+        }
       },
       "target": [
-        { "arch": "x86_64", "os": "linux", "abi": "gnu" },
-        { "arch": "x86_64", "os": "linux", "abi": "musl" },
-        { "arch": "aarch64", "os": "linux", "abi": "gnu" },
-        { "arch": "aarch64", "os": "linux", "abi": "musl" }
+        {
+          "arch": "x86_64",
+          "os": "linux",
+          "abi": "gnu"
+        },
+        {
+          "arch": "x86_64",
+          "os": "linux",
+          "abi": "musl"
+        },
+        {
+          "arch": "aarch64",
+          "os": "linux",
+          "abi": "gnu"
+        },
+        {
+          "arch": "aarch64",
+          "os": "linux",
+          "abi": "musl"
+        }
       ]
     },
     {
       "name": "C",
       "driver": "gcc",
-      "compiler": { "program": "C" },
-      "linker":   { "program": "C" },
-      "archiver": { "program": "ar" },
+      "compiler": {
+        "program": "C"
+      },
+      "archiver": {
+        "program": "ar"
+      },
+      "linker": {
+        "elf": {
+          "family": "gnu"
+        },
+        "mingw": {
+          "family": "gnu"
+        }
+      },
       "target": [
-        { "arch": "aarch64", "os": "linux", "abi": "gnu" },
-        { "arch": "aarch64", "os": "linux", "abi": "musl" },
-        { "arch": "x86_64", "os": "windows", "abi": "gnu" }
+        {
+          "arch": "aarch64",
+          "os": "linux",
+          "abi": "gnu"
+        },
+        {
+          "arch": "aarch64",
+          "os": "linux",
+          "abi": "musl"
+        },
+        {
+          "arch": "x86_64",
+          "os": "windows",
+          "abi": "gnu"
+        }
       ]
     },
     {
       "name": "D",
       "driver": "gcc",
-      "compiler": { "program": "D" },
-      "linker":   { "program": "D" },
-      "archiver": { "program": "ar" }
+      "compiler": {
+        "program": "D"
+      },
+      "archiver": {
+        "program": "ar"
+      },
+      "linker": {
+        "elf": {
+          "family": "gnu"
+        }
+      }
     }
   ]
 }

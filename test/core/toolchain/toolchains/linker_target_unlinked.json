@@ -4,7 +4,7 @@
       "name": "A",
       "driver": "gcc",
       "compiler": {
-        "program": "cc"
+        "program": "A"
       },
       "archiver": {
         "program": "ar"
@@ -13,7 +13,14 @@
         "elf": {
           "family": "gnu"
         }
-      }
+      },
+      "target": [
+        {
+          "arch": "aarch64",
+          "os": "macos",
+          "abi": "apple"
+        }
+      ]
     }
   ]
 }

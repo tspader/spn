@@ -3,14 +3,17 @@
 #include "paths/paths.h"
 #include "toolchain/toolchain.h"
 
-spn_toolchain_launcher_t spn_toolchain_launcher_with_root(sp_mem_t mem, spn_toolchain_launcher_t launcher, spn_path_t root) {
-  sp_str_t name = launcher.program.prefix;
+spn_arg_t spn_toolchain_program_with_root(sp_mem_t mem, spn_arg_t program, spn_path_t root) {
+  sp_str_t name = program.prefix;
 #if defined(SP_WIN32)
   name = sp_fmt(mem, "{}.exe", sp_fmt_str(name)).value;
 #endif
+  return spn_arg_path(spn_path_join(mem, root, name));
+}
 
+spn_toolchain_launcher_t spn_toolchain_launcher_with_root(sp_mem_t mem, spn_toolchain_launcher_t launcher, spn_path_t root) {
   spn_toolchain_launcher_t result = launcher;
-  result.program = spn_arg_path(spn_path_join(mem, root, name));
+  result.program = spn_toolchain_program_with_root(mem, launcher.program, root);
   return result;
 }
 
@@ -54,13 +57,6 @@ spn_cc_cap_set_t spn_toolchain_driver_caps(spn_cc_driver_t driver) {
     case SPN_CC_DRIVER_NONE: sp_unreachable_case();
   }
   SP_UNREACHABLE_RETURN(0);
-}
-
-bool spn_toolchain_driver_reaches(spn_cc_driver_t driver, spn_triple_t target) {
-  if (target.os == SPN_OS_FREESTANDING) {
-    return spn_toolchain_driver_caps(driver) & SPN_CC_CAP_FREESTANDING;
-  }
-  return true;
 }
 
 sp_str_t spn_toolchain_launcher_to_str(const spn_path_roots_t* roots, sp_mem_t mem, spn_toolchain_launcher_t launcher) {

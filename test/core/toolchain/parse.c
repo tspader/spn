@@ -27,8 +27,11 @@ static const parse_test_t tests [] = {
           .driver = SPN_CC_DRIVER_CLANG,
           .compiler = { .program = "A", .args = { "cc" } },
           .cxx = { .program = "A", .args = { "c++" } },
-          .linker = { .program = "A", .args = { "cc" } },
           .archiver = { .program = "A", .args = { "ar" } },
+          .linkers = {
+            [SPN_LD_FLAVOR_ELF] = { SPN_LD_FAMILY_LLD, "ld.lld" },
+            [SPN_LD_FLAVOR_WASM] = { SPN_LD_FAMILY_LLD },
+          },
           .hosts = {
             {
               .triple = { SPN_ARCH_X64, SPN_OS_LINUX },
@@ -63,8 +66,10 @@ static const parse_test_t tests [] = {
           .driver = SPN_CC_DRIVER_GCC,
           .compiler = { .program = "cc" },
           .cxx = { .program = "" },
-          .linker = { .program = "cc" },
           .archiver = { .program = "ar" },
+          .linkers = {
+            [SPN_LD_FLAVOR_ELF] = { SPN_LD_FAMILY_GNU },
+          },
         },
       },
     },
@@ -142,6 +147,98 @@ static const parse_test_t tests [] = {
   {
     .name = "target_beyond_driver",
     .file = "bad_target_driver.json",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "linker_per_flavor",
+    .file = "linkers.json",
+    .expect = {
+      .entries = 1,
+      .toolchains = {
+        {
+          .name = "A",
+          .driver = SPN_CC_DRIVER_CLANG,
+          .compiler = { .program = "A" },
+          .archiver = { .program = "llvm-ar" },
+          .linkers = {
+            [SPN_LD_FLAVOR_ELF] = { SPN_LD_FAMILY_LLD, "ld.lld" },
+            [SPN_LD_FLAVOR_MINGW] = { SPN_LD_FAMILY_LLD, "ld.lld" },
+            [SPN_LD_FLAVOR_MSVC] = { SPN_LD_FAMILY_MSVC },
+            [SPN_LD_FLAVOR_MACHO] = { SPN_LD_FAMILY_LLD, "ld64.lld" },
+            [SPN_LD_FLAVOR_WASM] = { SPN_LD_FAMILY_LLD },
+          },
+          .targets = {
+            { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU },
+            TARGET_WIN_GNU,
+            { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MSVC },
+            HOST_ARM_MACOS,
+            TARGET_WASM,
+          },
+        },
+      },
+    },
+  },
+  {
+    .name = "fixed_driver_fills_linkers",
+    .file = "drivers.json",
+    .expect = {
+      .entries = 5,
+      .toolchains = {
+        {
+          .name = "C",
+          .driver = SPN_CC_DRIVER_MSVC,
+          .compiler = { .program = "cl" },
+          .linkers = {
+            [SPN_LD_FLAVOR_MSVC] = { SPN_LD_FAMILY_MSVC },
+          },
+        },
+        {
+          .name = "D",
+          .driver = SPN_CC_DRIVER_ZIG,
+          .compiler = { .program = "D", .args = { "cc" } },
+          .linkers = {
+            [SPN_LD_FLAVOR_ELF] = { SPN_LD_FAMILY_LLD },
+            [SPN_LD_FLAVOR_MINGW] = { SPN_LD_FAMILY_LLD },
+            [SPN_LD_FLAVOR_MACHO] = { SPN_LD_FAMILY_LLD },
+            [SPN_LD_FLAVOR_WASM] = { SPN_LD_FAMILY_LLD },
+          },
+        },
+      },
+    },
+  },
+  {
+    .name = "linker_on_fixed_driver",
+    .file = "linker_fixed.json",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "linker_required",
+    .file = "linker_none.json",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "linker_family_missing",
+    .file = "linker_family_missing.json",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "linker_family_forbidden",
+    .file = "linker_family_forbidden.json",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "linker_program_forbidden",
+    .file = "linker_program_forbidden.json",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "linker_program_missing",
+    .file = "linker_program_missing.json",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "target_without_linker",
+    .file = "linker_target_unlinked.json",
     .expect = { .err = SPN_ERROR },
   },
 };

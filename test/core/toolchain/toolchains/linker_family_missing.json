@@ -2,16 +2,16 @@
   "toolchain": [
     {
       "name": "A",
-      "driver": "gcc",
+      "driver": "clang",
       "compiler": {
-        "program": "cc"
+        "program": "A"
       },
       "archiver": {
         "program": "ar"
       },
       "linker": {
         "elf": {
-          "family": "gnu"
+          "program": "ld"
         }
       }
     }

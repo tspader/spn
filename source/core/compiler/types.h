@@ -39,8 +39,8 @@ typedef struct {
   spn_cc_driver_t driver;
   spn_toolchain_launcher_t compiler;
   spn_toolchain_launcher_t cxx;
-  spn_toolchain_launcher_t linker;
   spn_toolchain_launcher_t archiver;
+  spn_toolchain_linkers_t linkers;
   spn_ar_driver_t archiver_driver;
 } spn_cc_toolchain_t;
 

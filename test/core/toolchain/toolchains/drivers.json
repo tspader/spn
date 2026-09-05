@@ -3,30 +3,81 @@
     {
       "name": "A",
       "driver": "gcc",
-      "compiler": { "program": "A" },
-      "linker":   { "program": "A" },
-      "archiver": { "program": "ar" }
+      "compiler": {
+        "program": "A"
+      },
+      "archiver": {
+        "program": "ar"
+      },
+      "linker": {
+        "elf": {
+          "family": "gnu"
+        },
+        "mingw": {
+          "family": "gnu"
+        },
+        "macho": {
+          "family": "ld64"
+        }
+      }
     },
     {
       "name": "B",
       "driver": "clang",
-      "compiler": { "program": "B" },
-      "linker":   { "program": "B" },
-      "archiver": { "program": "ar" }
+      "compiler": {
+        "program": "B"
+      },
+      "archiver": {
+        "program": "ar"
+      },
+      "linker": {
+        "elf": {
+          "family": "gnu",
+          "program": "ld"
+        }
+      }
     },
     {
       "name": "C",
       "driver": "msvc",
-      "compiler": { "program": "cl" },
-      "linker":   { "program": "cl" },
-      "archiver": { "program": "lib" }
+      "compiler": {
+        "program": "cl"
+      },
+      "archiver": {
+        "program": "lib"
+      }
     },
     {
       "name": "D",
       "driver": "zig",
-      "compiler": { "program": "D", "args": ["cc"] },
-      "linker":   { "program": "D", "args": ["cc"] },
-      "archiver": { "program": "D", "args": ["ar"] }
+      "compiler": {
+        "program": "D",
+        "args": [
+          "cc"
+        ]
+      },
+      "archiver": {
+        "program": "D",
+        "args": [
+          "ar"
+        ]
+      }
+    },
+    {
+      "name": "E",
+      "driver": "clang",
+      "compiler": {
+        "program": "E"
+      },
+      "archiver": {
+        "program": "ar"
+      },
+      "linker": {
+        "macho": {
+          "family": "ld64",
+          "program": "ld"
+        }
+      }
     }
   ]
 }

@@ -73,8 +73,8 @@ static spn_build_unit_t* add_build(spn_session_t* s, spn_build_id_t id, const c8
   info->driver = SPN_CC_DRIVER_GCC;
   info->compiler.program = spn_arg_lit(sp_str_lit("cc"));
   info->cxx.program = spn_arg_lit(sp_str_lit("c++"));
-  info->linker.program = spn_arg_lit(sp_str_lit("cc"));
   info->archiver.program = spn_arg_lit(sp_str_lit("ar"));
+  info->linkers.slots[SPN_LD_FLAVOR_ELF].family = SPN_LD_FAMILY_GNU;
 
   spn_toolchain_unit_t* toolchain = sp_alloc_type(s->mem, spn_toolchain_unit_t);
   toolchain->info = info;
@@ -83,8 +83,8 @@ static spn_build_unit_t* add_build(spn_session_t* s, spn_build_id_t id, const c8
     .driver = SPN_CC_DRIVER_GCC,
     .compiler = info->compiler,
     .cxx = info->cxx,
-    .linker = info->linker,
     .archiver = info->archiver,
+    .linkers = info->linkers,
     .archiver_driver = SPN_AR_DRIVER_GNU,
   };
   build->toolchain = toolchain;

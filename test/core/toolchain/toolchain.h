@@ -4,6 +4,7 @@
 #include "spn_test.h"
 #include "hash/digest/digest.h"
 #include "paths/paths.h"
+#include "enum/enum.h"
 #include "toolchain/toolchain.h"
 #include "triple/triple.h"
 
@@ -14,6 +15,7 @@
 #define HOST_X64_LINUX      { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU }
 #define HOST_X64_LINUX_MUSL { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL }
 #define HOST_ARM_LINUX      { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_GNU }
+#define HOST_X64_MACOS      { SPN_ARCH_X64, SPN_OS_MACOS, SPN_ABI_APPLE }
 #define HOST_ARM_MACOS      { SPN_ARCH_ARM64, SPN_OS_MACOS, SPN_ABI_APPLE }
 #define HOST_X64_WIN_MSVC   { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MSVC }
 #define HOST_X64_WIN_GNU    { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU }
@@ -46,8 +48,8 @@ typedef struct {
   spn_cc_driver_t driver;
   fixture_launcher_t compiler;
   fixture_launcher_t cxx;
-  fixture_launcher_t linker;
   fixture_launcher_t archiver;
+  fixture_linker_t linkers [SPN_LD_FLAVOR_COUNT];
   fixture_host_t hosts [FIXTURE_MAX_HOSTS];
   spn_triple_t targets [FIXTURE_MAX_TARGETS];
 } fixture_toolchain_t;
@@ -90,14 +92,33 @@ static sp_err_t fixture_check_targets(sp_test_t* t, sp_da(spn_triple_t) targets,
   return SP_OK;
 }
 
-static sp_err_t fixture_check_launchers(sp_test_t* t, spn_toolchain_launcher_t compiler, spn_toolchain_launcher_t cxx, spn_toolchain_launcher_t linker, spn_toolchain_launcher_t archiver, fixture_toolchain_t expect) {
+static bool fixture_linkers_expected(const fixture_linker_t* linkers) {
+  sp_for(flavor, SPN_LD_FLAVOR_COUNT) {
+    if (linkers[flavor].family || linkers[flavor].program) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static sp_err_t fixture_check_linkers(sp_test_t* t, const spn_toolchain_linkers_t* linkers, const fixture_linker_t* expect) {
+  if (!fixture_linkers_expected(expect)) {
+    return SP_OK;
+  }
+  sp_for(flavor, SPN_LD_FLAVOR_COUNT) {
+    sp_test_kv(t, "flavor", spn_ld_flavor_to_str((spn_ld_flavor_t)flavor));
+    sp_expect_eq(t, (u32)expect[flavor].family, (u32)linkers->slots[flavor].family);
+    sp_expect_str_eq_c(t, linkers->slots[flavor].program.prefix, expect[flavor].program ? expect[flavor].program : "");
+  }
+  sp_test_kv_clear(t, SP_NULLPTR);
+  return SP_OK;
+}
+
+static sp_err_t fixture_check_launchers(sp_test_t* t, spn_toolchain_launcher_t compiler, spn_toolchain_launcher_t cxx, spn_toolchain_launcher_t archiver, fixture_toolchain_t expect) {
   if (fixture_check_launcher(t, compiler, expect.compiler)) {
     return SP_ERR;
   }
   if (fixture_check_launcher(t, cxx, expect.cxx)) {
-    return SP_ERR;
-  }
-  if (fixture_check_launcher(t, linker, expect.linker)) {
     return SP_ERR;
   }
   if (fixture_check_launcher(t, archiver, expect.archiver)) {
@@ -126,7 +147,10 @@ static sp_err_t fixture_check_decl(sp_test_t* t, const spn_toolchain_decl_t* dec
     sp_expect_str_eq_c(t, decl->version, expect.version);
   }
   sp_expect_eq(t, (u32)expect.driver, (u32)decl->driver);
-  if (fixture_check_launchers(t, decl->compiler, decl->cxx, decl->linker, decl->archiver, expect)) {
+  if (fixture_check_launchers(t, decl->compiler, decl->cxx, decl->archiver, expect)) {
+    return SP_ERR;
+  }
+  if (fixture_check_linkers(t, &decl->linkers, expect.linkers)) {
     return SP_ERR;
   }
 
@@ -153,7 +177,10 @@ static sp_err_t fixture_check_entry(sp_test_t* t, spn_toolchain_info_t* info, fi
     sp_expect_str_eq_c(t, info->version, expect.version);
   }
   sp_expect_eq(t, (u32)expect.driver, (u32)info->driver);
-  if (fixture_check_launchers(t, info->compiler, info->cxx, info->linker, info->archiver, expect)) {
+  if (fixture_check_launchers(t, info->compiler, info->cxx, info->archiver, expect)) {
+    return SP_ERR;
+  }
+  if (fixture_check_linkers(t, &info->linkers, expect.linkers)) {
     return SP_ERR;
   }
 
@@ -199,8 +226,12 @@ static spn_toolchain_decl_t fixture_local_toolchain(const c8* name, const c8* co
     .name = sp_cstr_as_str(name),
     .driver = SPN_CC_DRIVER_GCC,
     .compiler = { .program = spn_arg_lit(sp_cstr_as_str(compiler)) },
-    .linker = { .program = spn_arg_lit(sp_cstr_as_str(compiler)) },
     .archiver = { .program = spn_arg_lit(sp_cstr_as_str("ar")) },
+    .linkers.slots = {
+      [SPN_LD_FLAVOR_ELF] = { .family = SPN_LD_FAMILY_GNU },
+      [SPN_LD_FLAVOR_MINGW] = { .family = SPN_LD_FAMILY_GNU },
+      [SPN_LD_FLAVOR_MACHO] = { .family = SPN_LD_FAMILY_LD64 },
+    },
   };
 }
 

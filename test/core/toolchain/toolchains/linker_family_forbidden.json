@@ -4,13 +4,13 @@
       "name": "A",
       "driver": "gcc",
       "compiler": {
-        "program": "cc"
+        "program": "A"
       },
       "archiver": {
         "program": "ar"
       },
       "linker": {
-        "elf": {
+        "macho": {
           "family": "gnu"
         }
       }

@@ -14,12 +14,12 @@
         "name":     { "type": "string" },
         "driver":   { "ref": "cc_driver" },
         "compiler": { "ref": "launcher" },
-        "linker":   { "ref": "launcher" },
         "archiver": { "ref": "launcher" }
       },
       "optionalProperties": {
         "version":  { "type": "string" },
         "cxx":      { "ref": "launcher" },
+        "linker":   { "ref": "linkers" },
         "host":     { "values": { "ref": "artifact" } },
         "target":   { "elements": { "ref": "triple" } },
         "mirrors":  { "type": "string" }

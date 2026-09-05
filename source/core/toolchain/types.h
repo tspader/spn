@@ -131,8 +131,8 @@ typedef struct {
   spn_cc_driver_t driver;
   spn_toolchain_launcher_t compiler;
   spn_toolchain_launcher_t cxx;
-  spn_toolchain_launcher_t linker;
   spn_toolchain_launcher_t archiver;
+  spn_toolchain_linkers_t linkers;
   spn_toolchain_source_t source;
   sp_da(spn_toolchain_host_t) hosts;
   sp_da(spn_triple_t) targets;
@@ -144,8 +144,8 @@ typedef struct {
   spn_cc_driver_t driver;
   spn_toolchain_launcher_t compiler;
   spn_toolchain_launcher_t cxx;
-  spn_toolchain_launcher_t linker;
   spn_toolchain_launcher_t archiver;
+  spn_toolchain_linkers_t linkers;
   sp_da(spn_triple_t) targets;
   spn_toolchain_support_t support;
 } spn_toolchain_info_t;

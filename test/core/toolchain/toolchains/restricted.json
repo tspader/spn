@@ -3,9 +3,20 @@
     {
       "name": "A",
       "driver": "gcc",
-      "compiler": { "program": "A" },
-      "linker":   { "program": "A" },
-      "archiver": { "program": "ar" },
+      "compiler": {
+        "program": "A"
+      },
+      "archiver": {
+        "program": "ar"
+      },
+      "linker": {
+        "elf": {
+          "family": "gnu"
+        },
+        "macho": {
+          "family": "ld64"
+        }
+      },
       "host": {
         "x86_64-linux": {}
       }
@@ -13,9 +24,20 @@
     {
       "name": "B",
       "driver": "gcc",
-      "compiler": { "program": "B" },
-      "linker":   { "program": "B" },
-      "archiver": { "program": "ar" }
+      "compiler": {
+        "program": "B"
+      },
+      "archiver": {
+        "program": "ar"
+      },
+      "linker": {
+        "elf": {
+          "family": "gnu"
+        },
+        "macho": {
+          "family": "ld64"
+        }
+      }
     }
   ]
 }
