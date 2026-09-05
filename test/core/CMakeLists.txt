@@ -125,6 +125,7 @@ add_executable(core
   toml/set.c
   toolchain/builtins.c
   toolchain/catalog.c
+  toolchain/linker.c
   toolchain/parse.c
   toolchain/probe.c
   toolchain/provision.c
@@ -233,6 +234,7 @@ add_executable(core
   ${SRC}/toolchain/provision.c
   ${SRC}/toolchain/select.c
   ${SRC}/toolchain/toolchain.c
+  ${SRC}/toolchain/linker.c
   ${SRC}/triple/triple.c
   ${SRC}/elf/elf.c
   ${SRC}/unit/build.c
@@ -274,6 +276,7 @@ set_source_files_properties(manifest/lower/lower.c PROPERTIES COMPILE_DEFINITION
 set_source_files_properties(
   toolchain/builtins.c
   toolchain/catalog.c
+  toolchain/linker.c
   toolchain/parse.c
   toolchain/probe.c
   toolchain/search.c

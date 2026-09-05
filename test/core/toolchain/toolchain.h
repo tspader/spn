@@ -28,6 +28,11 @@ typedef struct {
 } fixture_launcher_t;
 
 typedef struct {
+  spn_ld_family_t family;
+  const c8* program;
+} fixture_linker_t;
+
+typedef struct {
   spn_triple_t triple;
   const c8* url;
   const c8* sha256;

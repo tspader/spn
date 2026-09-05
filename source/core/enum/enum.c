@@ -108,6 +108,48 @@ sp_str_t spn_cc_driver_to_str(spn_cc_driver_t driver) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
+spn_ld_family_t spn_ld_family_from_str(sp_str_t str) {
+  if (sp_str_equal_cstr(str, "gnu")) {
+    return SPN_LD_FAMILY_GNU;
+  }
+  if (sp_str_equal_cstr(str, "lld")) {
+    return SPN_LD_FAMILY_LLD;
+  }
+  if (sp_str_equal_cstr(str, "ld64")) {
+    return SPN_LD_FAMILY_LD64;
+  }
+  if (sp_str_equal_cstr(str, "msvc")) {
+    return SPN_LD_FAMILY_MSVC;
+  }
+
+  return SPN_LD_FAMILY_NONE;
+}
+
+sp_str_t spn_ld_family_to_str(spn_ld_family_t family) {
+  switch (family) {
+    case SPN_LD_FAMILY_NONE: return sp_str_lit("");
+    case SPN_LD_FAMILY_GNU:  return sp_str_lit("gnu");
+    case SPN_LD_FAMILY_LLD:  return sp_str_lit("lld");
+    case SPN_LD_FAMILY_LD64: return sp_str_lit("ld64");
+    case SPN_LD_FAMILY_MSVC: return sp_str_lit("msvc");
+  }
+
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
+sp_str_t spn_ld_flavor_to_str(spn_ld_flavor_t flavor) {
+  switch (flavor) {
+    case SPN_LD_FLAVOR_ELF:   return sp_str_lit("elf");
+    case SPN_LD_FLAVOR_MINGW: return sp_str_lit("mingw");
+    case SPN_LD_FLAVOR_MSVC:  return sp_str_lit("msvc");
+    case SPN_LD_FLAVOR_MACHO: return sp_str_lit("macho");
+    case SPN_LD_FLAVOR_WASM:  return sp_str_lit("wasm");
+    case SPN_LD_FLAVOR_COUNT: sp_unreachable_case();
+  }
+
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
 spn_abi_t spn_abi_from_str(sp_str_t str) {
   if (sp_str_equal_cstr(str, "gnu")) {
     return SPN_ABI_GNU;

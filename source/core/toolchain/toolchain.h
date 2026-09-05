@@ -6,6 +6,7 @@
 #include "toolchain/catalog.h"
 #include "toolchain/select.h"
 #include "toolchain/provision.h"
+#include "toolchain/linker.h"
 
 spn_cc_cap_set_t         spn_toolchain_driver_caps(spn_cc_driver_t driver);
 bool                     spn_toolchain_driver_reaches(spn_cc_driver_t driver, spn_triple_t target);

@@ -128,6 +128,7 @@ set(SPN_SOURCES
   core/toml/edit.c
   core/pkg/load.c
   core/toolchain/catalog.c
+  core/toolchain/linker.c
   core/toolchain/probe.c
   core/toolchain/search.c
   core/toolchain/provision.c

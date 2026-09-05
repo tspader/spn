@@ -20,6 +20,78 @@ typedef enum {
 
 typedef u32 spn_cc_cap_set_t;
 
+typedef enum {
+  SPN_LD_FLAVOR_ELF,
+  SPN_LD_FLAVOR_MINGW,
+  SPN_LD_FLAVOR_MSVC,
+  SPN_LD_FLAVOR_MACHO,
+  SPN_LD_FLAVOR_WASM,
+  SPN_LD_FLAVOR_COUNT,
+} spn_ld_flavor_t;
+
+#define spn_ld_flavor_bit(flavor) (1u << (flavor))
+
+typedef u32 spn_ld_flavor_set_t;
+
+typedef enum {
+  SPN_LD_FAMILY_NONE,
+  SPN_LD_FAMILY_GNU,
+  SPN_LD_FAMILY_LLD,
+  SPN_LD_FAMILY_LD64,
+  SPN_LD_FAMILY_MSVC,
+} spn_ld_family_t;
+
+#define spn_ld_family_bit(family) (1u << (family))
+
+typedef u32 spn_ld_family_set_t;
+
+typedef enum {
+  SPN_LD_CAP_SCRIPT       = 1 << 0,
+  SPN_LD_CAP_EXCLUDE_LIBS = 1 << 1,
+} spn_ld_cap_t;
+
+typedef u32 spn_ld_cap_set_t;
+
+typedef enum {
+  SPN_LD_ARG_NONE,
+  SPN_LD_ARG_LD_PATH,
+  SPN_LD_ARG_FUSE_LLD,
+} spn_ld_arg_t;
+
+typedef enum {
+  SPN_LD_CHECK_OK,
+  SPN_LD_CHECK_FAMILY_MISSING,
+  SPN_LD_CHECK_FAMILY_FORBIDDEN,
+  SPN_LD_CHECK_PROGRAM_MISSING,
+  SPN_LD_CHECK_PROGRAM_FORBIDDEN,
+} spn_ld_check_t;
+
+typedef struct {
+  spn_ld_family_t family;
+  spn_arg_t program;
+} spn_toolchain_linker_t;
+
+typedef struct {
+  spn_toolchain_linker_t slots [SPN_LD_FLAVOR_COUNT];
+} spn_toolchain_linkers_t;
+
+typedef enum {
+  SPN_LD_ISSUE_DECLARED,
+  SPN_LD_ISSUE_UNDECLARED,
+  SPN_LD_ISSUE_SLOT,
+} spn_ld_issue_kind_t;
+
+typedef struct {
+  spn_ld_issue_kind_t kind;
+  spn_ld_flavor_t flavor;
+  spn_ld_check_t check;
+} spn_ld_issue_t;
+
+typedef struct {
+  spn_ld_issue_t items [SPN_LD_FLAVOR_COUNT];
+  u32 count;
+} spn_ld_issues_t;
+
 typedef struct {
   spn_arg_t program;
   sp_da(sp_str_t) args;

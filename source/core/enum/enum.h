@@ -18,6 +18,9 @@ spn_os_t        spn_os_from_str(sp_str_t str);
 sp_str_t        spn_os_to_str(spn_os_t os);
 spn_cc_driver_t spn_cc_driver_from_str(sp_str_t str);
 sp_str_t        spn_cc_driver_to_str(spn_cc_driver_t driver);
+spn_ld_family_t spn_ld_family_from_str(sp_str_t str);
+sp_str_t        spn_ld_family_to_str(spn_ld_family_t family);
+sp_str_t        spn_ld_flavor_to_str(spn_ld_flavor_t flavor);
 spn_abi_t       spn_abi_from_str(sp_str_t str);
 sp_str_t        spn_abi_to_str(spn_abi_t abi);
 
