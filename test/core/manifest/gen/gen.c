@@ -51,6 +51,7 @@ static const test_t tests [] = {
   { "target_link_false" },
   { "target_multiple" },
   { "toolchain_launcher_args" },
+  { "toolchain_linkers" },
   { "toolchain_scalars" },
   { "toolchain_triples" },
   { "tree_entries" },

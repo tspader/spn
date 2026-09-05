@@ -1,0 +1,17 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[[toolchain]]
+name = "llvm"
+compiler = "clang"
+archiver = "llvm-ar"
+driver = "clang"
+linker = { elf = { family = "lld", program = "ld.lld" }, mingw = { family = "gnu", program = "x86_64-w64-mingw32-ld" }, msvc = { family = "msvc" }, macho = { family = "lld", program = "ld64.lld" }, wasm = { family = "lld" } }
+target = [
+  { arch = "x86_64", os = "linux", abi = "gnu" },
+  { arch = "x86_64", os = "windows", abi = "gnu" },
+  { arch = "x86_64", os = "windows", abi = "msvc" },
+  { arch = "aarch64", os = "macos", abi = "apple" },
+  { arch = "wasm32", os = "wasi", abi = "musl" },
+]

@@ -23,7 +23,11 @@
     {
       "name": "custom",
       "compiler": "cc",
-      "linker": "cc",
+      "linker": {
+        "elf": {
+          "family": "gnu"
+        }
+      },
       "archiver": "ar",
       "driver": "gcc",
       "cxx": "c++"

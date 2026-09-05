@@ -82,7 +82,11 @@
     {
       "name": "host-gcc",
       "compiler": "gcc",
-      "linker": "ld",
+      "linker": {
+        "elf": {
+          "family": "gnu"
+        }
+      },
       "archiver": "ar",
       "driver": "gcc",
       "target": [

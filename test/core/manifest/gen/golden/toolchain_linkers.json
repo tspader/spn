@@ -1,0 +1,33 @@
+{
+  "package": {
+    "name": "tclinkers",
+    "version": "1.0.0"
+  },
+  "toolchain": [
+    {
+      "name": "llvm",
+      "compiler": "clang",
+      "linker": {
+        "elf": {
+          "family": "lld",
+          "program": "ld.lld"
+        },
+        "mingw": {
+          "family": "gnu",
+          "program": "x86_64-w64-mingw32-ld"
+        },
+        "msvc": {
+          "family": "msvc"
+        },
+        "macho": {
+          "family": "ld64"
+        },
+        "wasm": {
+          "family": "lld"
+        }
+      },
+      "archiver": "llvm-ar",
+      "driver": "clang"
+    }
+  ]
+}

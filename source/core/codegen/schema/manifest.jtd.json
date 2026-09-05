@@ -176,7 +176,7 @@
       "optionalProperties": {
         "name": { "type": "string" },
         "compiler": { "type": "string" },
-        "linker": { "type": "string" },
+        "linker": { "ref": "linkers" },
         "archiver": { "type": "string" },
         "driver": { "ref": "cc_driver" },
         "cxx": { "type": "string" },

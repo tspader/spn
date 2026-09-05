@@ -7,7 +7,12 @@
     {
       "name": "zig",
       "compiler": "zig cc -target x86_64-linux-gnu",
-      "linker": "zig cc",
+      "linker": {
+        "elf": {
+          "family": "gnu",
+          "program": "ld"
+        }
+      },
       "archiver": "ar",
       "driver": "clang",
       "target": [

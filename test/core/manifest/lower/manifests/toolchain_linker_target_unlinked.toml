@@ -1,0 +1,11 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[[toolchain]]
+name = "custom"
+compiler = "gcc"
+archiver = "ar"
+driver = "gcc"
+linker = { elf = { family = "gnu" } }
+target = [{ arch = "aarch64", os = "macos", abi = "apple" }]

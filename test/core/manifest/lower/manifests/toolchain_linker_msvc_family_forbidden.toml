@@ -3,8 +3,8 @@ name = "p"
 version = "1.0.0"
 
 [[toolchain]]
-name = "auto"
-compiler = "cc"
-linker = { elf = { family = "gnu" } }
+name = "custom"
+compiler = "gcc"
 archiver = "ar"
 driver = "gcc"
+linker = { msvc = { family = "msvc" } }

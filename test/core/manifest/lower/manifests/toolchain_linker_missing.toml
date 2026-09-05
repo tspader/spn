@@ -3,10 +3,7 @@ name = "p"
 version = "1.0.0"
 
 [[toolchain]]
-name = "pin"
+name = "custom"
 compiler = "cc"
-linker = { elf = { family = "gnu" } }
 archiver = "ar"
 driver = "gcc"
-
-[toolchain.host.x86-linux]

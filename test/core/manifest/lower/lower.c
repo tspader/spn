@@ -78,13 +78,16 @@ typedef struct {
   const c8* mirrors;
   const c8* compiler;
   const c8* args [8];
-  const c8* linker;
   const c8* archiver;
   const c8* cxx;
   const c8* cxx_args [8];
   spn_cc_driver_t driver;
+  struct {
+    spn_ld_family_t family;
+    const c8* program;
+  } linkers [SPN_LD_FLAVOR_COUNT];
   spn_triple_t hosts [2];
-  spn_triple_t targets [4];
+  spn_triple_t targets [5];
 } toolchain_t;
 
 typedef struct {
@@ -399,11 +402,11 @@ static const test_t tests [] = {
       {
         .name = "custom",
         .compiler = "cc",
-        .linker = "cc",
         .archiver = "ar",
         .cxx = "g++",
         .cxx_args = { "-pthread" },
         .driver = SPN_CC_DRIVER_GCC,
+        .linkers = { [SPN_LD_FLAVOR_ELF] = { SPN_LD_FAMILY_GNU } },
       },
     },
   },
@@ -482,8 +485,122 @@ static const test_t tests [] = {
     .name = "validate_toolchain_target_beyond_driver",
     .manifest = "toolchain_target_driver",
     .issues = {
-      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].target[0].os" }
+      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].target[0]" }
     }
+  },
+  {
+    .name = "validate_toolchain_linker_on_fixed_driver",
+    .manifest = "toolchain_linker_fixed",
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].linker" }
+    }
+  },
+  {
+    .name = "validate_toolchain_linker_missing",
+    .manifest = "toolchain_linker_missing",
+    .issues = {
+      { SPN_ERR_CODEGEN_MISSING_KEY, "toolchain[0].linker" }
+    }
+  },
+  {
+    .name = "validate_toolchain_linker_family_missing",
+    .manifest = "toolchain_linker_family_missing",
+    .issues = {
+      { SPN_ERR_CODEGEN_MISSING_KEY, "toolchain[0].linker.elf.family" }
+    }
+  },
+  {
+    .name = "validate_toolchain_linker_family_forbidden",
+    .manifest = "toolchain_linker_family_forbidden",
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].linker.macho.family" }
+    }
+  },
+  {
+    .name = "validate_toolchain_linker_program_forbidden",
+    .manifest = "toolchain_linker_program_forbidden",
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].linker.elf.program" }
+    }
+  },
+  {
+    .name = "validate_toolchain_linker_program_missing",
+    .manifest = "toolchain_linker_program_missing",
+    .issues = {
+      { SPN_ERR_CODEGEN_MISSING_KEY, "toolchain[0].linker.elf.program" }
+    }
+  },
+  {
+    .name = "validate_toolchain_linker_mingw_program_forbidden",
+    .manifest = "toolchain_linker_mingw_program_forbidden",
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].linker.mingw.program" }
+    }
+  },
+  {
+    .name = "validate_toolchain_linker_msvc_family_forbidden",
+    .manifest = "toolchain_linker_msvc_family_forbidden",
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].linker.msvc.family" }
+    }
+  },
+  {
+    .name = "validate_toolchain_linker_wasm_family_forbidden",
+    .manifest = "toolchain_linker_wasm_family_forbidden",
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].linker.wasm.family" }
+    }
+  },
+  {
+    .name = "validate_toolchain_target_without_linker",
+    .manifest = "toolchain_linker_target_unlinked",
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].target[0]" }
+    }
+  },
+  {
+    .name = "toolchain_linker_per_flavor",
+    .manifest = "toolchain_linkers",
+    .toolchains = {
+      {
+        .name = "llvm",
+        .compiler = "clang",
+        .archiver = "llvm-ar",
+        .driver = SPN_CC_DRIVER_CLANG,
+        .linkers = {
+          [SPN_LD_FLAVOR_ELF] = { SPN_LD_FAMILY_LLD, "ld.lld" },
+          [SPN_LD_FLAVOR_MINGW] = { SPN_LD_FAMILY_GNU, "x86_64-w64-mingw32-ld" },
+          [SPN_LD_FLAVOR_MSVC] = { SPN_LD_FAMILY_MSVC },
+          [SPN_LD_FLAVOR_MACHO] = { SPN_LD_FAMILY_LLD, "ld64.lld" },
+          [SPN_LD_FLAVOR_WASM] = { SPN_LD_FAMILY_LLD },
+        },
+        .targets = {
+          { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU },
+          { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU },
+          { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MSVC },
+          { SPN_ARCH_ARM64, SPN_OS_MACOS, SPN_ABI_APPLE },
+          { SPN_ARCH_WASM32, SPN_OS_WASI, SPN_ABI_MUSL },
+        },
+      },
+    },
+  },
+  {
+    .name = "toolchain_fixed_driver_fills_linkers",
+    .manifest = "toolchain_linker_fixed_fills",
+    .toolchains = {
+      {
+        .name = "zig",
+        .compiler = "zig",
+        .args = { "cc" },
+        .driver = SPN_CC_DRIVER_ZIG,
+        .linkers = {
+          [SPN_LD_FLAVOR_ELF] = { SPN_LD_FAMILY_LLD },
+          [SPN_LD_FLAVOR_MINGW] = { SPN_LD_FAMILY_LLD },
+          [SPN_LD_FLAVOR_MACHO] = { SPN_LD_FAMILY_LLD },
+          [SPN_LD_FLAVOR_WASM] = { SPN_LD_FAMILY_LLD },
+        },
+      },
+    },
   },
   {
     .name = "validate_toolchain_url_without_sha",
@@ -527,9 +644,9 @@ static const test_t tests [] = {
       {
         .name = "pin",
         .compiler = "cc",
-        .linker = "cc",
         .archiver = "ar",
         .driver = SPN_CC_DRIVER_GCC,
+        .linkers = { [SPN_LD_FLAVOR_ELF] = { SPN_LD_FAMILY_GNU } },
         .hosts = { { SPN_ARCH_X64, SPN_OS_LINUX } },
       },
     },
@@ -673,9 +790,9 @@ static const test_t tests [] = {
         .mirrors = "https://mirrors",
         .compiler = "zig",
         .args = { "cc", "-target", "x86_64-linux-gnu" },
-        .linker = "zig",
         .archiver = "ar",
         .driver = SPN_CC_DRIVER_CLANG,
+        .linkers = { [SPN_LD_FLAVOR_MACHO] = { SPN_LD_FAMILY_LD64, "ld" } },
         .targets = { { SPN_ARCH_ARM64, SPN_OS_MACOS, SPN_ABI_APPLE } },
       },
     },
@@ -1335,8 +1452,11 @@ sp_test_each(lower, cases, test_t, tests) {
     if (expected.sha256)   sp_expect_str_eq_c(t, tc->hosts[0].artifact.sha256, expected.sha256);
     if (expected.mirrors)  sp_expect_str_eq_c(t, tc->hosts[0].artifact.mirror_list, expected.mirrors);
     if (expected.compiler) sp_expect_str_eq_c(t, tc->compiler.program.prefix, expected.compiler);
-    if (expected.linker)   sp_expect_str_eq_c(t, tc->linker.program.prefix, expected.linker);
     if (expected.archiver) sp_expect_str_eq_c(t, tc->archiver.program.prefix, expected.archiver);
+    sp_for(flavor, SPN_LD_FLAVOR_COUNT) {
+      sp_expect_eq(t, (u32)expected.linkers[flavor].family, (u32)tc->linkers.slots[flavor].family);
+      sp_expect_str_eq_c(t, tc->linkers.slots[flavor].program.prefix, expected.linkers[flavor].program ? expected.linkers[flavor].program : "");
+    }
     if (expected.cxx)      sp_expect_str_eq_c(t, tc->cxx.program.prefix, expected.cxx);
     if (expected.driver)   sp_expect_eq(t, (u32)expected.driver, (u32)tc->driver);
 

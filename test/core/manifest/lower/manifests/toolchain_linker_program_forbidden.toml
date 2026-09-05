@@ -4,8 +4,7 @@ version = "1.0.0"
 
 [[toolchain]]
 name = "custom"
-compiler = "cc"
-linker = { elf = { family = "gnu" } }
+compiler = "gcc"
 archiver = "ar"
 driver = "gcc"
-cxx = "g++ -pthread"
+linker = { elf = { family = "gnu", program = "ld" } }

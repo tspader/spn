@@ -1,0 +1,10 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[[toolchain]]
+name = "custom"
+compiler = "clang"
+archiver = "ar"
+driver = "clang"
+linker = { elf = { program = "ld" } }
