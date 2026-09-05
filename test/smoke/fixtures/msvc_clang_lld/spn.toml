@@ -1,0 +1,15 @@
+[package]
+name = "msvc_clang_lld"
+version = "0.1.0"
+
+[[toolchain]]
+name = "CM"
+driver = "clang"
+compiler = "clang"
+archiver = "llvm-ar"
+linker = { msvc = { family = "lld" } }
+target = [{ arch = "x86_64", os = "windows", abi = "msvc" }]
+
+[[bin]]
+name = "main"
+source = ["main.c"]

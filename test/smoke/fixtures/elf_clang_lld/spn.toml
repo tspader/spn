@@ -1,0 +1,14 @@
+[package]
+name = "elf_clang_lld"
+version = "0.1.0"
+
+[[toolchain]]
+name = "LV"
+driver = "clang"
+compiler = "clang"
+archiver = "llvm-ar"
+linker = { elf = { family = "lld", program = "ld.lld" } }
+
+[[bin]]
+name = "main"
+source = ["main.c"]

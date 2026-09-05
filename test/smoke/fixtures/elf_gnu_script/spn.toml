@@ -1,0 +1,15 @@
+[package]
+name = "elf_gnu_script"
+version = "0.1.0"
+
+[[toolchain]]
+name = "G"
+driver = "gcc"
+compiler = "gcc"
+archiver = "ar"
+linker = { elf = { family = "gnu" } }
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+linker_script = ["main.ld"]

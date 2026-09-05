@@ -1,0 +1,14 @@
+[package]
+name = "elf_gcc_lld_hosted"
+version = "0.1.0"
+
+[[toolchain]]
+name = "GLH"
+driver = "gcc"
+compiler = "gcc"
+archiver = "ar"
+linker = { elf = { family = "lld" } }
+
+[[bin]]
+name = "main"
+source = ["main.c"]

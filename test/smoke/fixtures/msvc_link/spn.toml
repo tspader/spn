@@ -1,0 +1,14 @@
+[package]
+name = "msvc_link"
+version = "0.1.0"
+
+[[toolchain]]
+name = "MV"
+driver = "msvc"
+compiler = "cl"
+archiver = "lib"
+target = [{ arch = "x86_64", os = "windows", abi = "msvc" }]
+
+[[bin]]
+name = "main"
+source = ["main.c"]

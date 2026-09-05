@@ -1,0 +1,14 @@
+[package]
+name = "macho_ld64_lld"
+version = "0.1.0"
+
+[[toolchain]]
+name = "LM"
+driver = "clang"
+compiler = "clang"
+archiver = "llvm-ar"
+linker = { macho = { family = "lld", program = "ld64.lld" } }
+
+[[bin]]
+name = "main"
+source = ["main.c"]

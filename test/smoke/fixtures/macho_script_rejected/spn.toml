@@ -1,0 +1,8 @@
+[package]
+name = "macho_script_rejected"
+version = "0.1.0"
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+linker_script = ["main.ld"]

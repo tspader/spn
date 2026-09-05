@@ -1,0 +1,15 @@
+[package]
+name = "mingw_clang_gnu"
+version = "0.1.0"
+
+[[toolchain]]
+name = "W"
+driver = "clang"
+compiler = "clang"
+archiver = "x86_64-w64-mingw32-ar"
+linker = { mingw = { family = "gnu", program = "x86_64-w64-mingw32-ld" } }
+target = [{ arch = "x86_64", os = "windows", abi = "gnu" }]
+
+[[bin]]
+name = "main"
+source = ["main.c"]

@@ -1,0 +1,14 @@
+[package]
+name = "elf_clang_gnu"
+version = "0.1.0"
+
+[[toolchain]]
+name = "C"
+driver = "clang"
+compiler = "clang"
+archiver = "ar"
+linker = { elf = { family = "gnu", program = "ld" } }
+
+[[bin]]
+name = "main"
+source = ["main.c"]

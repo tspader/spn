@@ -1,0 +1,15 @@
+[package]
+name = "elf_lld_script"
+version = "0.1.0"
+
+[[toolchain]]
+name = "GL"
+driver = "gcc"
+compiler = "gcc"
+archiver = "ar"
+linker = { elf = { family = "lld" } }
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+linker_script = ["main.ld"]
