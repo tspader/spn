@@ -75,9 +75,9 @@ run_host() { # <name> <ssh> <root> <triple> <toolchains...>
   tar -czf "$OUT/$name.tgz" -C "$ROOT" \
     $(git -C "$ROOT" ls-files) $(git -C "$ROOT" ls-files --others --exclude-standard -- test/smoke) \
     "$bdir/spn" "$bdir/test/smoke"
-  ssh "$sshv" "mkdir -p '$hroot' && tar -xzf - -C '$hroot'" < "$OUT/$name.tgz"
+  ssh "$sshv" "mkdir -p $hroot && tar -xzf - -C $hroot" < "$OUT/$name.tgz"
   for tc in "$@"; do
-    lane "$name:$tc" ssh "$sshv" "cd '$hroot' && SPN_TEST_TOOLCHAIN=$tc ./$bdir/test/smoke --filter '*'"
+    lane "$name:$tc" ssh "$sshv" "cd $hroot && SPN_TEST_TOOLCHAIN=$tc ./$bdir/test/smoke --filter '*'"
   done
 }
 
