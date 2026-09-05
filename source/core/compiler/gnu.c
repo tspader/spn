@@ -3,6 +3,7 @@
 #include "compiler/push.h"
 
 #include "enum/enum.h"
+#include "toolchain/linker.h"
 #include "macro/macro.h"
 #include "paths/paths.h"
 #include "triple/triple.h"
@@ -234,8 +235,125 @@ spn_err_t spn_gnu_parse_depfile(sp_mem_t mem, sp_str_t content, sp_da(sp_str_t)*
   return parser.err ? SPN_ERROR : SPN_OK;
 }
 
+static void add_linker(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, spn_triple_t target, spn_invocation_t* invocation) {
+  spn_toolchain_linker_t linker = toolchain->linkers.slots[spn_ld_flavor(target)];
+  switch (spn_ld_arg(toolchain->driver, target, linker.family)) {
+    case SPN_LD_ARG_NONE: {
+      break;
+    }
+    case SPN_LD_ARG_LD_PATH: {
+      spn_cc_push(mem, invocation, spn_arg_prepend(mem, sp_str_lit("--ld-path="), linker.program));
+      break;
+    }
+    case SPN_LD_ARG_FUSE_LLD: {
+      spn_cc_push_c(mem, invocation, "-fuse-ld=lld");
+      break;
+    }
+  }
+}
+
+static void add_exports(sp_mem_t mem, spn_ld_flavor_t flavor, spn_path_t exports, spn_invocation_t* invocation) {
+  switch (flavor) {
+    case SPN_LD_FLAVOR_ELF: {
+      spn_cc_push_glued(mem, invocation, "-Wl,--version-script,", exports);
+      break;
+    }
+    case SPN_LD_FLAVOR_MINGW: {
+      spn_cc_push_path(mem, invocation, exports);
+      break;
+    }
+    case SPN_LD_FLAVOR_MSVC: {
+      spn_cc_push_glued(mem, invocation, "-Wl,/DEF:", exports);
+      break;
+    }
+    case SPN_LD_FLAVOR_MACHO: {
+      spn_cc_push_glued(mem, invocation, "-Wl,-exported_symbols_list,", exports);
+      break;
+    }
+    case SPN_LD_FLAVOR_WASM:
+    case SPN_LD_FLAVOR_COUNT: {
+      sp_unreachable_case();
+    }
+  }
+}
+
+static void add_whole_archives(sp_mem_t mem, spn_ld_flavor_t flavor, sp_da(spn_path_t) archives, spn_invocation_t* invocation) {
+  switch (flavor) {
+    case SPN_LD_FLAVOR_ELF:
+    case SPN_LD_FLAVOR_MINGW:
+    case SPN_LD_FLAVOR_WASM: {
+      spn_cc_push_c(mem, invocation, "-Wl,--whole-archive");
+      spn_cc_push_paths(mem, invocation, archives);
+      spn_cc_push_c(mem, invocation, "-Wl,--no-whole-archive");
+      break;
+    }
+    case SPN_LD_FLAVOR_MSVC: {
+      sp_da_for(archives, it) {
+        spn_cc_push_glued(mem, invocation, "-Wl,/WHOLEARCHIVE:", archives[it]);
+      }
+      break;
+    }
+    case SPN_LD_FLAVOR_MACHO: {
+      sp_da_for(archives, it) {
+        spn_cc_push_glued(mem, invocation, "-Wl,-force_load,", archives[it]);
+      }
+      break;
+    }
+    case SPN_LD_FLAVOR_COUNT: {
+      sp_unreachable_case();
+    }
+  }
+}
+
+static void add_subsystem(sp_mem_t mem, spn_ld_flavor_t flavor, spn_invocation_t* invocation) {
+  switch (flavor) {
+    case SPN_LD_FLAVOR_MINGW: {
+      spn_cc_push_c(mem, invocation, "-Wl,--subsystem,windows");
+      break;
+    }
+    case SPN_LD_FLAVOR_MSVC: {
+      spn_cc_push_c(mem, invocation, "-Wl,/SUBSYSTEM:WINDOWS");
+      break;
+    }
+    case SPN_LD_FLAVOR_ELF:
+    case SPN_LD_FLAVOR_MACHO:
+    case SPN_LD_FLAVOR_WASM: {
+      break;
+    }
+    case SPN_LD_FLAVOR_COUNT: {
+      sp_unreachable_case();
+    }
+  }
+}
+
+static void add_rpath(sp_mem_t mem, spn_ld_flavor_t flavor, spn_invocation_t* invocation) {
+  switch (flavor) {
+    case SPN_LD_FLAVOR_ELF: {
+      spn_cc_push_c(mem, invocation, "-Wl,-rpath,$ORIGIN");
+      break;
+    }
+    case SPN_LD_FLAVOR_MACHO: {
+      spn_cc_push_c(mem, invocation, "-Wl,-rpath,@loader_path");
+      break;
+    }
+    case SPN_LD_FLAVOR_MINGW:
+    case SPN_LD_FLAVOR_MSVC:
+    case SPN_LD_FLAVOR_WASM: {
+      break;
+    }
+    case SPN_LD_FLAVOR_COUNT: {
+      sp_unreachable_case();
+    }
+  }
+}
+
 void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_link_t* link, const spn_cc_link_files_t* files, spn_invocation_t* invocation) {
+  spn_triple_t triple = { profile->arch, profile->os, profile->abi };
+  spn_ld_flavor_t flavor = spn_ld_flavor(triple);
+  spn_ld_cap_set_t caps = spn_ld_caps(toolchain->linkers.slots[flavor].family, flavor);
+
   add_launcher(mem, toolchain, profile, link->lang, invocation);
+  add_linker(mem, toolchain, triple, invocation);
   spn_cc_flags_t flags = sp_zero;
   sp_da_init(mem, flags.compile);
   sp_da_init(mem, flags.link);
@@ -253,36 +371,20 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
     }
     case SPN_CC_OUTPUT_SHARED_LIB: {
       spn_cc_push_c(mem, invocation, "-shared");
-      if (profile->os == SPN_OS_MACOS) {
+      if (flavor == SPN_LD_FLAVOR_MACHO) {
         spn_cc_push_fmt(mem, invocation, "-Wl,-install_name,@rpath/{}", sp_fmt_str(sp_fs_get_name(files->output.sub)));
       }
       if (!spn_path_empty(files->exports.path)) {
-        switch (spn_cc_exports_format(link->kind, profile->os)) {
-          case SPN_CC_EXPORTS_SYMBOL_LIST: {
-            spn_cc_push_glued(mem, invocation, "-Wl,-exported_symbols_list,", files->exports.path);
-            break;
-          }
-          case SPN_CC_EXPORTS_DEF: {
-            spn_cc_push_path(mem, invocation, files->exports.path);
-            break;
-          }
-          case SPN_CC_EXPORTS_VERSION_SCRIPT: {
-            spn_cc_push_glued(mem, invocation, "-Wl,--version-script,", files->exports.path);
-            break;
-          }
-          case SPN_CC_EXPORTS_WASM: {
-            sp_unreachable_case();
-          }
-        }
+        add_exports(mem, flavor, files->exports.path, invocation);
       }
       break;
     }
     case SPN_CC_OUTPUT_EXE: {
-      if (profile->linkage == SPN_LIB_KIND_STATIC && profile->os != SPN_OS_MACOS) {
+      if (profile->linkage == SPN_LIB_KIND_STATIC && flavor != SPN_LD_FLAVOR_MACHO && flavor != SPN_LD_FLAVOR_MSVC) {
         spn_cc_push_c(mem, invocation, "-static");
       }
-      if (profile->os == SPN_OS_WINDOWS && link->subsystem == SPN_WIN_SUBSYSTEM_WINDOWS) {
-        spn_cc_push_c(mem, invocation, "-Wl,--subsystem,windows");
+      if (link->subsystem == SPN_WIN_SUBSYSTEM_WINDOWS) {
+        add_subsystem(mem, flavor, invocation);
       }
       break;
     }
@@ -297,23 +399,14 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
   spn_cc_push_strs(mem, invocation, link->args);
   spn_cc_push_paths(mem, invocation, files->objects);
   if (!sp_da_empty(files->whole_archives)) {
-    if (profile->os == SPN_OS_MACOS) {
-      sp_da_for(files->whole_archives, it) {
-        spn_cc_push_glued(mem, invocation, "-Wl,-force_load,", files->whole_archives[it]);
-      }
-    } else {
-      spn_cc_push_c(mem, invocation, "-Wl,--whole-archive");
-      spn_cc_push_paths(mem, invocation, files->whole_archives);
-      spn_cc_push_c(mem, invocation, "-Wl,--no-whole-archive");
-    }
+    add_whole_archives(mem, flavor, files->whole_archives, invocation);
   }
   sp_da_for(link->lib_dirs, it) {
     spn_cc_push_glued(mem, invocation, "-L", link->lib_dirs[it]);
   }
   sp_da_for(link->private_libs, it) {
     spn_cc_push_fmt(mem, invocation, "-l{}", sp_fmt_str(link->private_libs[it]));
-    if (profile->os == SPN_OS_WINDOWS && spn_cc_has(toolchain, SPN_CC_CAP_EXCLUDE_LIBS)) {
-      spn_triple_t triple = { profile->arch, profile->os, profile->abi };
+    if (caps & SPN_LD_CAP_EXCLUDE_LIBS) {
       sp_str_t archive = spn_triple_lib_file_name(mem, triple, link->private_libs[it], SP_OS_LIB_STATIC);
       spn_cc_push_fmt(mem, invocation, "-Wl,--exclude-libs,{}", sp_fmt_str(archive));
     }
@@ -339,23 +432,8 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
       spn_cc_push_str(mem, invocation, link->frameworks[it]);
     }
   }
-  if (link->rpath) {
-    switch (profile->os) {
-      case SPN_OS_LINUX: {
-        spn_cc_push_c(mem, invocation, "-Wl,-rpath,$ORIGIN");
-        break;
-      }
-      case SPN_OS_MACOS: {
-        spn_cc_push_c(mem, invocation, "-Wl,-rpath,@loader_path");
-        break;
-      }
-      case SPN_OS_WINDOWS:
-      case SPN_OS_WASI:
-      case SPN_OS_FREESTANDING:
-      case SPN_OS_NONE: {
-        break;
-      }
-    }
+  if (link->rpath && spn_os_dynamic(profile->os)) {
+    add_rpath(mem, flavor, invocation);
   }
   spn_cc_push_c(mem, invocation, "-o");
   spn_cc_push_path(mem, invocation, files->output);
