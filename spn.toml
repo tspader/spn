@@ -383,6 +383,7 @@ source = [
   "test/integration/freshness.c",
   "test/integration/harness_test.c",
   "test/integration/layout.c",
+  "test/integration/linker.c",
   "test/integration/log.c",
   "test/integration/offline.c",
   "test/integration/options.c",

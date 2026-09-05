@@ -40,6 +40,7 @@ add_executable(integration
   freshness.c
   harness_test.c
   layout.c
+  linker.c
   log.c
   offline.c
   options.c

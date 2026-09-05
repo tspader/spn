@@ -1,0 +1,16 @@
+[package]
+name = "linker_mingw"
+version = "0.1.0"
+
+[[toolchain]]
+name = "M"
+driver = "gcc"
+compiler = "x86_64-w64-mingw32-gcc"
+archiver = "x86_64-w64-mingw32-ar"
+linker = { mingw = { family = "gnu" } }
+target = [{ arch = "x86_64", os = "windows", abi = "gnu" }]
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+linker_script = ["main.ld"]
