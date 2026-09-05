@@ -290,6 +290,10 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
       sp_unreachable_case();
     }
   }
+  sp_da_for(link->scripts, it) {
+    spn_cc_push_glued(mem, invocation, "-Wl,-T,", link->scripts[it]);
+  }
+  spn_cc_push_strs(mem, invocation, link->args);
   spn_cc_push_paths(mem, invocation, files->objects);
   if (!sp_da_empty(files->whole_archives)) {
     if (profile->os == SPN_OS_MACOS) {

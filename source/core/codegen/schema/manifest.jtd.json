@@ -153,6 +153,8 @@
         "include": { "elements": { "ref": "source_entry" }, "metadata": { "shorthand": "path" } },
         "define": { "elements": { "ref": "value_entry" }, "metadata": { "shorthand": "value" } },
         "flags": { "elements": { "ref": "value_entry" }, "metadata": { "shorthand": "value" } },
+        "link_flags": { "elements": { "ref": "value_entry" }, "metadata": { "shorthand": "value" } },
+        "linker_script": { "elements": { "ref": "source_entry" }, "metadata": { "shorthand": "path" } },
         "system_deps": { "elements": { "ref": "value_entry" }, "metadata": { "shorthand": "value" } },
         "deps": { "elements": { "ref": "target_dep_entry" }, "metadata": { "shorthand": "pkg" } },
         "link": { "type": "boolean" },

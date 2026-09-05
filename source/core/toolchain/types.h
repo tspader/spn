@@ -15,6 +15,7 @@ typedef enum {
   SPN_CC_CAP_NOLIBC         = 1 << 3,
   SPN_CC_CAP_FREESTANDING   = 1 << 4,
   SPN_CC_CAP_LLVM_TRIPLE    = 1 << 5,
+  SPN_CC_CAP_LINKER_SCRIPT  = 1 << 6,
 } spn_cc_cap_t;
 
 typedef u32 spn_cc_cap_set_t;

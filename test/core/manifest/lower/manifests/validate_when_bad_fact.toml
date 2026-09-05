@@ -4,8 +4,11 @@ version = "1.0.0"
 
 [[lib]]
 name = "t"
+kinds = ["shared"]
 source = [
   { path = "a.c", when = { os = "banana" } },
   { path = "b.c", when = { mode = "banana" } },
   { path = "c.c", when = { abi = "banana" } },
 ]
+link_flags = [{ value = "-A", when = { os = "banana" } }]
+linker_script = [{ path = "a.ld", when = { os = "banana" } }]

@@ -34,6 +34,8 @@ typedef struct {
   const c8* deps [UNIT_TEST_MAX_STRS];
   const c8* system_deps [UNIT_TEST_MAX_STRS];
   const c8* frameworks [UNIT_TEST_MAX_STRS];
+  const c8* link_flags [UNIT_TEST_MAX_STRS];
+  const c8* linker_script [UNIT_TEST_MAX_STRS];
   spn_os_version_t min_os;
 } unit_lib_t;
 

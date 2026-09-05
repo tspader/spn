@@ -53,6 +53,8 @@ static spn_target_info_t lib_info(sp_mem_t mem, spn_tree_roots_t trees, const un
   info.system_deps = test_str_list(mem, spec->system_deps, UNIT_TEST_MAX_STRS);
   info.macos.frameworks = test_str_list(mem, spec->frameworks, UNIT_TEST_MAX_STRS);
   info.macos.min_os = spec->min_os;
+  info.link_flags = test_str_list(mem, spec->link_flags, UNIT_TEST_MAX_STRS);
+  info.linker_script = test_path_list(mem, trees, spec->linker_script, UNIT_TEST_MAX_STRS);
   return info;
 }
 

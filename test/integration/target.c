@@ -231,3 +231,26 @@ sp_test(target, lib_system_deps) {
     },
   });
 }
+
+sp_test(target, link_flags) {
+  return run_test(t, (test_t) {
+    .project = "test/integration/fixtures/target/link_flags",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_LINK_FAILED } },
+      { .kind = ACTION_VERIFY_NO_CC_ARG, .verify_cc_arg = { "-lmissing", "/DEFAULTLIB:missing" } },
+    },
+  });
+}
+
+sp_test(target, linker_script_msvc_unsupported) {
+  return run_test(t, (test_t) {
+    .project = "test/integration/fixtures/target/linker_script",
+    .copy = { "main.ld" },
+    .when.target = SPN_TEST_ARCH "-windows-msvc",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },
+      { .kind = ACTION_VERIFY_RESULT, .verify_result.err = SPN_ERR_COMPILER_FEATURE_UNSUPPORTED },
+    },
+  });
+}

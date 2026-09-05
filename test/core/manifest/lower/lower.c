@@ -37,6 +37,8 @@ typedef struct {
   gated_t include [4];
   gated_t define [4];
   gated_t flags [4];
+  gated_t link_flags [4];
+  gated_t linker_script [4];
   gated_t system_deps [4];
   gated_t deps [4];
   gated_t frameworks [4];
@@ -209,12 +211,14 @@ static const test_t tests [] = {
     .libs = {
       {
         .name = "t",
-        .linkages = { .static_lib = true },
+        .linkages = { .static_lib = true, .shared = true },
         .source = { { "main.c" } },
         .headers = { { "header.h" } },
         .include = { { "include/dir" } },
         .define = { { "SPUM" } },
         .flags = { { "-flag" } },
+        .link_flags = { { "-A" } },
+        .linker_script = { { "a.ld" } },
         .deps = { { "spum" } },
       }
     }
@@ -411,6 +415,14 @@ static const test_t tests [] = {
     }
   },
   {
+    .name = "validate_link_inputs_on_static_lib",
+    .manifest = "validate_link_inputs_on_static_lib",
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "lib[0].link_flags" },
+      { SPN_ERR_CODEGEN_INVALID, "lib[0].linker_script" },
+    }
+  },
+  {
     .name = "validate_link_on_bin",
     .manifest = "validate_link_on_bin",
     .issues = {
@@ -549,10 +561,11 @@ static const test_t tests [] = {
     .libs = {
       {
         .name = "t",
-        .linkages = { .static_lib = true },
+        .linkages = { .static_lib = true, .shared = true },
         .source = { { "a.c" }, { "b.c", .tree = SPN_TREE_MANIFEST }, { "c.c", .tree = SPN_TREE_SOURCE } },
         .headers = { { "a.h" }, { "b.h", .tree = SPN_TREE_MANIFEST } },
         .include = { { "inc", .tree = SPN_TREE_MANIFEST } },
+        .linker_script = { { "a.ld", .tree = SPN_TREE_MANIFEST } },
       }
     }
   },
@@ -564,6 +577,7 @@ static const test_t tests [] = {
     .issues = {
       { SPN_ERR_CODEGEN_INVALID, "lib[0].source[0].tree" },
       { SPN_ERR_CODEGEN_INVALID, "lib[0].headers[0].tree" },
+      { SPN_ERR_CODEGEN_INVALID, "lib[0].linker_script[0].tree" },
       { SPN_ERR_CODEGEN_INVALID, "package.include[0].tree" },
       { SPN_ERR_CODEGEN_INVALID, "package.build.source[0].tree" },
       { SPN_ERR_CODEGEN_INVALID, "package.configure.include[0].tree" },
@@ -815,10 +829,12 @@ static const test_t tests [] = {
     .libs = {
       {
         .name = "t",
-        .linkages = { .static_lib = true },
+        .linkages = { .static_lib = true, .shared = true },
         .source = { { "a.c" }, { "b.c", "os = \"linux\"" } },
         .define = { { "X" }, { "Y", "os = \"windows\"" } },
         .flags = { { "-g", "mode = \"debug\"" } },
+        .link_flags = { { "-A", "os = \"linux\"" } },
+        .linker_script = { { "a.ld", "arch = \"x86_64\"" } },
         .system_deps = { { "ws2_32", "os = \"windows\"" } },
       },
     },
@@ -942,7 +958,9 @@ static const test_t tests [] = {
     .issues = {
       { SPN_ERR_CODEGEN_INVALID, "lib[0].source[0].when.os" },
       { SPN_ERR_CODEGEN_INVALID, "lib[0].source[1].when.mode" },
-      { SPN_ERR_CODEGEN_INVALID, "lib[0].source[2].when.abi" }
+      { SPN_ERR_CODEGEN_INVALID, "lib[0].source[2].when.abi" },
+      { SPN_ERR_CODEGEN_INVALID, "lib[0].link_flags[0].when.os" },
+      { SPN_ERR_CODEGEN_INVALID, "lib[0].linker_script[0].when.os" },
     },
   },
   {
@@ -1156,6 +1174,8 @@ static sp_err_t check_targets(sp_test_t* t, spn_target_map_t om, const target_t*
     sp_expect_eq(t, (u32)0, (u32)sp_da_size(info->include));
     sp_expect_eq(t, (u32)0, (u32)sp_da_size(info->define));
     sp_expect_eq(t, (u32)0, (u32)sp_da_size(info->flags));
+    sp_expect_eq(t, (u32)0, (u32)sp_da_size(info->link_flags));
+    sp_expect_eq(t, (u32)0, (u32)sp_da_size(info->linker_script));
     sp_expect_eq(t, (u32)0, (u32)sp_da_size(info->system_deps));
     sp_expect_eq(t, (u32)0, (u32)sp_da_size(info->deps));
     check_gated_paths(t, info->gated.source, arr[i].source);
@@ -1164,6 +1184,8 @@ static sp_err_t check_targets(sp_test_t* t, spn_target_map_t om, const target_t*
     check_gated_paths(t, info->gated.include, arr[i].include);
     check_gated(t, info->gated.define, arr[i].define);
     check_gated(t, info->gated.flags, arr[i].flags);
+    check_gated(t, info->gated.link_flags, arr[i].link_flags);
+    check_gated_paths(t, info->gated.linker_script, arr[i].linker_script);
     check_gated(t, info->gated.system_deps, arr[i].system_deps);
     check_gated(t, info->gated.deps, arr[i].deps);
     sp_expect_eq(t, (u32)0, (u32)sp_da_size(info->macos.frameworks));

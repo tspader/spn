@@ -13,6 +13,8 @@ typedef struct {
   const c8* system_lib;
   const c8* framework;
   const c8* lib_dir;
+  const c8* arg;
+  const c8* script;
   bool rpath;
   spn_os_version_t min_os;
   spn_win_subsystem_t subsystem;
@@ -203,6 +205,124 @@ static const link_test_t tests [] = {
     .expect = {
       .err = SPN_ERR_COMPILER_FEATURE_UNSUPPORTED,
       .feature = SPN_CC_FEATURE_FRAMEWORKS,
+    },
+  },
+  {
+    .name = "gcc_link_flag",
+    .driver = SPN_CC_DRIVER_GCC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_GNU,
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .arg = "-A",
+    .expect = {
+      .command = "cc",
+      .args = { "-A", "main.o", "-o", "main" },
+    },
+  },
+  {
+    .name = "gcc_linker_script",
+    .driver = SPN_CC_DRIVER_GCC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_GNU,
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .script = "A.ld",
+    .expect = {
+      .command = "cc",
+      .args = { "-Wl,-T,A.ld", "main.o", "-o", "main" },
+    },
+  },
+  {
+    .name = "zig_linker_script",
+    .driver = SPN_CC_DRIVER_ZIG,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_GNU,
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .script = "A.ld",
+    .expect = {
+      .command = "cc",
+      .args = { "--target=x86_64-linux-gnu", "-Wl,-T,A.ld", "main.o", "-o", "main" },
+    },
+  },
+  {
+    .name = "clang_linker_script",
+    .driver = SPN_CC_DRIVER_CLANG,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_GNU,
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .script = "A.ld",
+    .expect = {
+      .command = "cc",
+      .args = { "--target=x86_64-linux-gnu", "-Wl,-T,A.ld", "main.o", "-o", "main" },
+    },
+  },
+  {
+    .name = "msvc_link_flag",
+    .driver = SPN_CC_DRIVER_MSVC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_MSVC,
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .arg = "/A",
+    .expect = {
+      .command = "cc",
+      .args = { "/nologo", "main.o", "/Femain", "/link", "/A" },
+    },
+  },
+  {
+    .name = "macos_linker_script_unsupported",
+    .driver = SPN_CC_DRIVER_CLANG,
+    .profile = {
+      .arch = SPN_ARCH_ARM64,
+      .os = SPN_OS_MACOS,
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .script = "A.ld",
+    .expect = {
+      .err = SPN_ERR_COMPILER_FEATURE_UNSUPPORTED,
+      .feature = SPN_CC_FEATURE_LINKER_SCRIPT,
+    },
+  },
+  {
+    .name = "wasi_linker_script_unsupported",
+    .driver = SPN_CC_DRIVER_CLANG,
+    .profile = {
+      .arch = SPN_ARCH_WASM32,
+      .os = SPN_OS_WASI,
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .script = "A.ld",
+    .expect = {
+      .err = SPN_ERR_COMPILER_FEATURE_UNSUPPORTED,
+      .feature = SPN_CC_FEATURE_LINKER_SCRIPT,
+    },
+  },
+  {
+    .name = "msvc_linker_script_unsupported",
+    .driver = SPN_CC_DRIVER_MSVC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_MSVC,
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .script = "A.ld",
+    .expect = {
+      .err = SPN_ERR_COMPILER_FEATURE_UNSUPPORTED,
+      .feature = SPN_CC_FEATURE_LINKER_SCRIPT,
     },
   },
   {
@@ -535,6 +655,8 @@ sp_test_each(render_link, render, link_test_t, tests, .setup = spn_test_ctx_setu
   sp_da_init(mem, link.system_libs);
   sp_da_init(mem, link.lib_dirs);
   sp_da_init(mem, link.frameworks);
+  sp_da_init(mem, link.args);
+  sp_da_init(mem, link.scripts);
 
   spn_cc_link_files_t files = {
     .output = test_arg_path("main"),
@@ -567,6 +689,12 @@ sp_test_each(render_link, render, link_test_t, tests, .setup = spn_test_ctx_setu
   }
   if (it->lib_dir) {
     sp_da_push(link.lib_dirs, test_arg_path(it->lib_dir));
+  }
+  if (it->arg) {
+    sp_da_push(link.args, sp_str_from_cstr(mem, it->arg));
+  }
+  if (it->script) {
+    sp_da_push(link.scripts, test_arg_path(it->script));
   }
 
   spn_profile_info_t profile = test_profile(it->profile);
