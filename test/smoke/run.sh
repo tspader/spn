@@ -38,10 +38,10 @@ image_dir() {
 
 # run one lane, tee its per-cell results into $OUT/<lane> for the matrix
 lane() { # <name> <cmd...>
-  name="$1"; shift
-  echo "== $name"
+  l="$1"; shift
+  echo "== $l"
   "$@" 2>&1 | grep -E '^(elf|mingw|msvc|macho|wasm)\.[a-z0-9_]+ (ok|skipped|failed)' \
-    | tee "$OUT/$name" | sed 's/^/   /' || true
+    | tee "$OUT/$l" | sed 's/^/   /' || true
 }
 
 run_local() {
