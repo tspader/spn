@@ -7,6 +7,7 @@ add_executable(render
   ${SRC}/codegen/gen/errors.gen.c
   ${SRC}/codegen/gen/events.gen.c
   ${SRC}/codegen/gen/source_deps.gen.c
+  ${SRC}/codegen/gen/toolchains.gen.c
   ${SRC}/codegen/json.c
   ${SRC}/codegen/loader.c
   ${SRC}/core/core.c
@@ -21,7 +22,10 @@ add_executable(render
   ${SRC}/intern/intern.c
   ${SRC}/paths/paths.c
   ${UTIL}/str/str.c
+  ${SRC}/toolchain/catalog.c
   ${SRC}/toolchain/toolchain.c
+  ${SRC}/toolchain/linker.c
+  ${SRC}/toolchain/search.c
   ${SRC}/triple/triple.c
   ${SRC}/elf/elf.c
   main.c

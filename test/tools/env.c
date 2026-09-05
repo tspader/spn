@@ -436,6 +436,14 @@ sp_err_t prepare_test(sp_test_t* t, fixture_t* fixture, const c8* project, const
   return SP_OK;
 }
 
+static const c8* toolchain_arg(fixture_t* fixture) {
+  if (fixture->toolchain) {
+    return fixture->toolchain;
+  }
+  const test_toolchain_t* toolchain = test_toolchain();
+  return sp_cstr_equal(toolchain->name, "zig") ? SP_NULLPTR : toolchain->name;
+}
+
 static sp_ps_output_t run_spn_ex(sp_test_t* t, fixture_t* fixture, const c8* format, const c8* const* args, const c8* const* env) {
   sp_mem_t mem = fixture->mem;
   sp_ps_config_t config = {
@@ -475,17 +483,15 @@ static sp_ps_output_t run_spn_ex(sp_test_t* t, fixture_t* fixture, const c8* for
   }
 
   if (args) {
-    sp_for(it, SPN_TEST_COMMAND_MAX_ARGS) {
-      if (!args[it]) {
-        break;
-      }
-      sp_ps_config_add_arg(mem, &config, sp_str_view(args[it]));
-    }
-    const test_toolchain_t* toolchain = test_toolchain();
+    sp_ps_config_add_arg(mem, &config, sp_str_view(args[0]));
+    const c8* toolchain = toolchain_arg(fixture);
     bool takes_toolchain = sp_cstr_equal(args[0], "build") || sp_cstr_equal(args[0], "test");
-    if (takes_toolchain && !sp_cstr_equal(toolchain->name, "zig")) {
+    if (takes_toolchain && toolchain) {
       sp_ps_config_add_arg(mem, &config, sp_str_lit("--toolchain"));
-      sp_ps_config_add_arg(mem, &config, sp_cstr_as_str(toolchain->name));
+      sp_ps_config_add_arg(mem, &config, sp_cstr_as_str(toolchain));
+    }
+    for (u32 it = 1; it < SPN_TEST_COMMAND_MAX_ARGS && args[it]; it++) {
+      sp_ps_config_add_arg(mem, &config, sp_str_view(args[it]));
     }
   }
 

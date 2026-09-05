@@ -3,6 +3,7 @@
 
 #include "sp.h"
 #include "compiler/driver.h"
+#include "toolchain/types.h"
 
 #if defined(SP_ARM64)
   #define SPN_TEST_ARCH "aarch64"
@@ -12,29 +13,31 @@
 
 #if defined(SP_MACOS)
   #define SPN_TEST_TRIPLE SPN_TEST_ARCH "-macos-apple"
-  #define SPN_TEST_HOST_TARGETS SPN_TEST_ARCH "-macos"
 #elif defined(SP_WIN32)
   #define SPN_TEST_TRIPLE SPN_TEST_ARCH "-windows-gnu"
-  #define SPN_TEST_HOST_TARGETS SPN_TEST_ARCH "-windows"
 #else
   #define SPN_TEST_TRIPLE SPN_TEST_ARCH "-linux-gnu"
-  #define SPN_TEST_HOST_TARGETS SPN_TEST_ARCH "-linux", SPN_TEST_ARCH "-freestanding-none"
 #endif
+
+#define SPN_TEST_MAX_PROGRAMS 4
 
 typedef struct {
   spn_sanitizer_set_t sanitize;
   spn_os_t os;
+  spn_os_t host;
+  spn_cc_driver_t driver;
   const c8* target;
+  const c8* toolchain;
+  const c8* programs [SPN_TEST_MAX_PROGRAMS];
   bool exports;
   bool deterministic;
   bool msvc_todo;
+  bool shell;
 } test_when_t;
 
 typedef struct {
   const c8* name;
-  spn_cc_driver_t driver;
-  spn_abi_t abi;
-  const c8* targets [12];
+  spn_toolchain_info_t* info;
 } test_toolchain_t;
 
 const test_toolchain_t* test_toolchain(void);
