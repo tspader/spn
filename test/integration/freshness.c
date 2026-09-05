@@ -217,3 +217,31 @@ sp_test(freshness, linker_script_change) {
     },
   });
 }
+
+sp_test(freshness, linker_family_change) {
+  return run_rebuild_test(t, (rebuild_test_t) {
+    .project = "test/integration/fixtures/freshness/linker_family",
+    .copy = { "gnu.toml", "lld.toml" },
+    .when = { .toolchain = "L", .host = SPN_OS_LINUX, .programs = { "gcc", "ar", "ld.lld" } },
+    .first = {
+      .args = { "build" },
+      .expect.exists = { exe("main") },
+    },
+    .rebuilds = {
+      {
+        .change.moves = {
+          { .from = sp_str_lit("lld.toml"), .to = sp_str_lit("spn.toml") },
+        },
+        .command = {
+          .args = { "build" },
+          .expect.events = {
+            { .event = SPN_EVENT_LINK_PASSED },
+          },
+        },
+      },
+    },
+    .watches = {
+      { .file = exe("main"), .mtime = REBUILD_MTIME_CHANGED },
+    },
+  });
+}
