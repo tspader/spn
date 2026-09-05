@@ -80,18 +80,20 @@ run green.
 | `msvc.link`             | msvc → msvc (link.exe) | B | piotr |
 | `msvc.clang_lld`        | clang → lld (`-fuse-ld=lld`) | B | piotr |
 | `msvc.script_rejected`  | msvc → msvc         | R | piotr |
-| `macho.ld64_apple`      | clang → ld64 (`--ld-path=ld`) | B | *pending (miles)* |
-| `macho.ld64_lld`        | clang → lld (`--ld-path=ld64.lld`) | B | *pending (miles)* |
-| `macho.zig_build`       | zig → lld           | B | *pending (miles)* |
-| `macho.script_rejected` | zig → lld           | R | *pending (miles)* |
+| `macho.ld64_apple`      | clang → ld64 (`--ld-path=ld`) | B | miles |
+| `macho.ld64_lld`        | clang → lld (`--ld-path=ld64.lld`) | B | miles |
+| `macho.zig_build`       | zig → lld           | B | miles |
+| `macho.script_rejected` | zig → lld           | R | miles |
 | `wasm.zig_build`        | zig → lld           | B | debian-zig, aral, piotr |
 | `wasm.zig_script_rejected` | zig → lld        | R | debian-zig, aral, piotr |
 
 ### Notes on the host-only cells
 
 - **macOS (`macho.*`)**: no container can produce a real ld64 link, so these need
-  a Mac (`miles` in machines.md). They were pending at last run because miles was
-  offline. Bring it up and `sh test/smoke/run.sh hosts` fills them in.
+  a Mac (`miles` in machines.md): `sh test/smoke/run.sh hosts`. Apple clang, ld64
+  and ar come from the Command Line Tools; `ld64.lld` and `llvm-ar` come from
+  Homebrew's `lld` and keg-only `llvm`, which is why hosts.txt appends their
+  dirs to the host PATH (after the system dirs, so `clang` stays Apple's).
 - **Windows (`msvc.*`)**: `cl`/`link.exe` need a Visual Studio environment, so
   run these by hand in a dev shell:
   ```
