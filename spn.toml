@@ -129,6 +129,7 @@ source = [
   "test/core/compiler/*.c",
   "test/core/compiler/exports/*.c",
   "test/core/compiler/rsp/*.c",
+  "test/core/config/*.c",
   "test/core/dag/*.c",
   "test/core/external/*.c",
   "test/core/gen/*.c",
@@ -269,6 +270,7 @@ flags = [
   '-DSCHEMA_DIR="source/core/codegen/schema"',
   '-DJTD_TEST_JSON_DIR="test/core/jtd/json"',
   '-DMANIFEST_DIR="test/core/manifest/lower/manifests"',
+  '-DCONFIG_DIR="test/core/config/configs"',
   '-DTOOLCHAINS_DIR="test/core/toolchain/toolchains"',
 ]
 
@@ -374,6 +376,7 @@ source = [
   "test/integration/main.c",
   "test/integration/cli.c",
   "test/integration/compile_commands.c",
+  "test/integration/config.c",
   "test/integration/consume.c",
   "test/integration/corrupt.c",
   "test/integration/cxx.c",

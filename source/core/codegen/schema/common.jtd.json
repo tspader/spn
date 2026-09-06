@@ -43,6 +43,20 @@
       }
     },
 
+    "toolchain_decl": {
+      "optionalProperties": {
+        "name": { "type": "string" },
+        "compiler": { "type": "string" },
+        "linker": { "ref": "linkers" },
+        "archiver": { "type": "string" },
+        "driver": { "ref": "cc_driver" },
+        "cxx": { "type": "string" },
+        "host": { "values": { "ref": "artifact" } },
+        "mirrors": { "type": "string" },
+        "target": { "elements": { "ref": "triple" } }
+      }
+    },
+
     "index": {
       "properties": {
         "name": { "type": "string" }

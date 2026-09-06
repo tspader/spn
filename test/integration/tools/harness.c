@@ -894,6 +894,9 @@ sp_err_t run_test(sp_test_t* t, test_t test) {
   }
 
   sp_try(prepare_test(t, &fixture, test.project, test.copy));
+  if (test.config) {
+    sp_try(fixture_config_append(t, &fixture, test.project, test.config));
+  }
   return run_actions(t, &fixture, test.actions);
 }
 

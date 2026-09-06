@@ -1,0 +1,13 @@
+[package]
+name = "A"
+version = "0.1.0"
+
+[[toolchain]]
+name = "T"
+driver = "zig"
+compiler = "/R"
+archiver = "/R"
+
+[[bin]]
+name = "A"
+source = ["main.c"]

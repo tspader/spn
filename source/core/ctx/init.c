@@ -187,20 +187,26 @@ static spn_err_t open_ctx(spn_ctx_t* ctx, spn_open_request_t request) {
     spn_cg_config_t config = sp_zero;
     spn_toml_loader_t loader = sp_zero;
     spn_toml_loader_init(&loader, ctx->mem, ctx->intern);
-    spn_err_t loaded = spn_codegen_load_config(&loader, ctx->paths.config.toml, &config);
     sp_da(spn_index_info_t) indexes = sp_da_new(ctx->heap, spn_index_info_t);
-    if (!loaded) {
+    sp_da(spn_toolchain_decl_t) toolchains = sp_da_new(ctx->mem, spn_toolchain_decl_t);
+    if (spn_codegen_load_config(&loader, ctx->paths.config.toml, &config) == SPN_OK) {
       sp_da_for(config.index, it) {
         sp_da_push(indexes, spn_index_lower(&loader, it, SPN_INDEX_KIND_USER, &config.index[it]));
       }
+      sp_da_for(config.toolchain, it) {
+        sp_da_push(toolchains, spn_toolchain_lower(&loader, it, &config.toolchain[it]));
+      }
     }
-    if (loaded || !sp_da_empty(loader.issues)) {
+    if (!sp_da_empty(loader.issues)) {
       return spn_err_emit(ctx, (spn_err_union_t) {
         .kind = SPN_ERR_MANIFEST_ISSUES,
         .manifest = { .path = ctx->paths.config.toml, .issues = spn_codegen_issues_to_err(ctx->mem, loader.issues) },
       });
     }
     ctx->config.indexes = indexes;
+    sp_da_for(toolchains, it) {
+      spn_toolchain_catalog_add(&ctx->catalog, toolchains[it]);
+    }
   }
 
   spn_try(spn_project_load(ctx, ctx->paths.project, &ctx->project));

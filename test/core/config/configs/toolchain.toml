@@ -1,0 +1,6 @@
+[[toolchain]]
+name = "T"
+driver = "gcc"
+compiler = "C"
+archiver = "A"
+linker = { elf = { family = "gnu" } }

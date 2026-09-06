@@ -31,6 +31,7 @@ add_executable(integration
   main.c
   cli.c
   compile_commands.c
+  config.c
   consume.c
   corrupt.c
   cxx.c

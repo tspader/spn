@@ -9,7 +9,7 @@
     "script": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
     "test": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
     "example": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
-    "toolchain": { "elements": { "ref": "manifest_toolchain" } },
+    "toolchain": { "elements": { "ref": "toolchain_decl" } },
     "index": { "elements": { "ref": "index" } },
     "profile": { "values": { "ref": "profile" } },
     "options": { "values": { "ref": "option" } },
@@ -169,20 +169,6 @@
         "standard": { "ref": "cxx_standard" },
         "exceptions": { "type": "boolean" },
         "rtti": { "type": "boolean" }
-      }
-    },
-
-    "manifest_toolchain": {
-      "optionalProperties": {
-        "name": { "type": "string" },
-        "compiler": { "type": "string" },
-        "linker": { "ref": "linkers" },
-        "archiver": { "type": "string" },
-        "driver": { "ref": "cc_driver" },
-        "cxx": { "type": "string" },
-        "host": { "values": { "ref": "artifact" } },
-        "mirrors": { "type": "string" },
-        "target": { "elements": { "ref": "triple" } }
       }
     },
 

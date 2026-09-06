@@ -76,6 +76,7 @@ typedef struct {
 typedef struct {
   const c8* project;
   const c8* copy [16];
+  const c8* config;
   test_when_t when;
   action_t actions [SPN_TEST_MAX_ACTIONS];
 } test_t;

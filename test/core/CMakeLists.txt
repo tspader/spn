@@ -36,6 +36,7 @@ add_executable(core
   compiler/rsp/style.c
   compiler/rsp/windows.c
   compiler/toc.c
+  config/config.c
   dag/harness.c
   dag/action_cache.c
   dag/canonicalize.c
@@ -273,6 +274,8 @@ set_source_files_properties(jtd/harness.c jtd/conformance.c PROPERTIES COMPILE_D
   "JTD_TEST_JSON_DIR=\"test/core/jtd/json\"")
 set_source_files_properties(manifest/lower/lower.c PROPERTIES COMPILE_DEFINITIONS
   "MANIFEST_DIR=\"test/core/manifest/lower/manifests\"")
+set_source_files_properties(config/config.c PROPERTIES COMPILE_DEFINITIONS
+  "CONFIG_DIR=\"test/core/config/configs\"")
 set_source_files_properties(
   toolchain/builtins.c
   toolchain/catalog.c
