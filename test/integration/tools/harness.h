@@ -77,6 +77,7 @@ typedef struct {
   const c8* project;
   const c8* copy [16];
   const c8* config;
+  const c8* toolchain;
   test_when_t when;
   action_t actions [SPN_TEST_MAX_ACTIONS];
 } test_t;
@@ -182,6 +183,7 @@ typedef struct {
 typedef struct {
   const c8* project;
   const c8* copy [16];
+  const c8* toolchain;
   test_when_t when;
   command_test_t first;
   rebuild_step_t rebuilds [SPN_TEST_REBUILD_MAX_STEPS];

@@ -222,7 +222,8 @@ sp_test(freshness, linker_family_change) {
   return run_rebuild_test(t, (rebuild_test_t) {
     .project = "test/integration/fixtures/freshness/linker_family",
     .copy = { "gnu.toml", "lld.toml" },
-    .when = { .toolchain = "L", .host = SPN_OS_LINUX, .programs = { "gcc", "ar", "ld.lld" } },
+    .toolchain = "L",
+    .when.lanes = { "gcc-lld" },
     .first = {
       .args = { "build" },
       .expect.exists = { exe("main") },

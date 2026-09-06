@@ -2,14 +2,6 @@
 name = "linker_cross"
 version = "0.1.0"
 
-[[toolchain]]
-name = "X"
-driver = "gcc"
-compiler = "aarch64-linux-gnu-gcc"
-archiver = "aarch64-linux-gnu-ar"
-linker = { elf = { family = "gnu" } }
-target = [{ arch = "aarch64", os = "freestanding", abi = "none" }]
-
 [[bin]]
 name = "main"
 source = ["main.c"]

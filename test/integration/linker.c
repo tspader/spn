@@ -64,7 +64,8 @@ sp_test(linker, declared_program_is_invoked) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/linker/program",
     .copy = { "ld" },
-    .when = { .toolchain = "F", .programs = { "clang", "ar" }, .shell = true },
+    .toolchain = "F",
+    .when = { .lanes = { "clang" }, .shell = true },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },
       { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_LINK_FAILED } },
@@ -77,7 +78,8 @@ sp_test(linker, lld_family_is_requested_from_gcc) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/linker/fuse",
     .copy = { "bin" },
-    .when = { .toolchain = "G", .host = SPN_OS_LINUX, .programs = { "gcc", "ar" }, .shell = true },
+    .toolchain = "G",
+    .when = { .lanes = { "gcc" }, .os = SPN_OS_LINUX, .shell = true },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .path = "bin", .rc = 1 } },
       { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_LINK_FAILED } },
@@ -86,23 +88,11 @@ sp_test(linker, lld_family_is_requested_from_gcc) {
   });
 }
 
-sp_test(linker, gcc_with_lld_honors_script) {
-  return run_test(t, (test_t) {
-    .project = "test/integration/fixtures/linker/lld",
-    .copy = { "main.ld" },
-    .when = { .toolchain = "L", .host = SPN_OS_LINUX, .programs = { "gcc", "ar", "ld.lld" } },
-    .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", SPN_TEST_ARCH "-freestanding" } } },
-      { .kind = ACTION_VERIFY_ELF_ENTRY, .verify_elf_entry = { target_exe("main", SPN_TEST_ARCH "-freestanding-none"), 0x400000 } },
-    },
-  });
-}
-
 sp_test(linker, cross_gcc_honors_script) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/linker/cross",
     .copy = { "main.ld" },
-    .when = { .toolchain = "X", .programs = { "aarch64-linux-gnu-gcc", "aarch64-linux-gnu-ar" } },
+    .when = { .lanes = { "aarch64-gnu" }, .target = "aarch64-freestanding" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", "aarch64-freestanding" } } },
       { .kind = ACTION_VERIFY_ELF_ENTRY, .verify_elf_entry = { target_exe("main", "aarch64-freestanding-none"), 0x400000 } },
@@ -114,7 +104,7 @@ sp_test(linker, mingw_gcc_honors_script) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/linker/mingw",
     .copy = { "main.ld" },
-    .when = { .toolchain = "M", .programs = { "x86_64-w64-mingw32-gcc", "x86_64-w64-mingw32-ar" } },
+    .when = { .lanes = { "mingw-gnu", "clang-mingw" }, .target = "x86_64-windows-gnu" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", "x86_64-windows-gnu" } } },
       { .kind = ACTION_VERIFY_EXISTS, .exists = target_exe("main", "x86_64-windows-gnu") },

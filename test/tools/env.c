@@ -360,7 +360,7 @@ static void setup_fixture_config(fixture_t* fixture, sp_str_t index_dir, sp_str_
     sp_fmt_str(sp_str_replace_c8(mem, spn_dir, '\\', '/')),
     sp_fmt_str(sp_str_replace_c8(mem, index_dir, '\\', '/'))
   ).value;
-  write_file(config_path, content);
+  write_file(config_path, sp_str_concat(mem, content, test_lanes_toml()));
 }
 
 static sp_str_t pick_shared_toolchain_dir(sp_mem_t mem, sp_str_t root) {

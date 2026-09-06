@@ -4,7 +4,7 @@ sp_test(config, toolchain_is_selectable) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/config/toolchain",
     .config = "config.toml",
-    .when = { .toolchain = "T" },
+    .toolchain = "T",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },
       { .kind = ACTION_VERIFY_RESULT, .verify_result.err = SPN_ERR_TOOLCHAIN_MISSING },
@@ -17,7 +17,7 @@ sp_test(config, toolchain_overrides_builtin) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/config/builtin",
     .config = "config.toml",
-    .when = { .toolchain = "gcc" },
+    .toolchain = "gcc",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },
       { .kind = ACTION_VERIFY_RESULT, .verify_result.err = SPN_ERR_TOOLCHAIN_MISSING },
@@ -30,7 +30,7 @@ sp_test(config, project_toolchain_wins) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/config/override",
     .config = "config.toml",
-    .when = { .toolchain = "T" },
+    .toolchain = "T",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },
       { .kind = ACTION_VERIFY_RESULT, .verify_result.err = SPN_ERR_TOOLCHAIN_MISSING },

@@ -1,7 +1,0 @@
-[package]
-name = "macho_zig"
-version = "0.1.0"
-
-[[bin]]
-name = "main"
-source = ["main.c"]

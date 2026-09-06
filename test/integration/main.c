@@ -10,6 +10,7 @@ s32 main(s32 argc, const c8** argv) {
       jobs = true;
     }
   }
+  test_toolchain();
   if (jobs) {
     return sp_test_main(argc, argv, SP_NULLPTR);
   }

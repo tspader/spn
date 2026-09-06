@@ -3,6 +3,7 @@
 #include "sp/sp_test.h"
 
 #include "render.h"
+#include "caps.h"
 
 static s32 sort_cells_by_name(const void* a, const void* b) {
   const sp_fs_entry_t* lhs = (const sp_fs_entry_t*)a;
@@ -102,6 +103,7 @@ s32 main(s32 argc, const c8** argv) {
       jobs = true;
     }
   }
+  test_toolchain();
   if (jobs) {
     return sp_test_main(argc, argv, SP_NULLPTR);
   }

@@ -96,7 +96,8 @@ sp_test(cxx, transitive) {
 sp_test(cxx, toolchain) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cxx/toolchain",
-    .when = { .toolchain = "custom", .programs = { "cc", "c++", "ar" } },
+    .toolchain = "custom",
+    .when.programs = { "cc", "c++", "ar" },
     .copy = { "packages/*" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
@@ -131,7 +132,8 @@ sp_test(cxx, script_rejected) {
 sp_test(cxx, toolchain_missing) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cxx/toolchain_missing",
-    .when = { .toolchain = "conly", .programs = { "cc", "ar" }, .msvc_todo = true },
+    .toolchain = "conly",
+    .when = { .programs = { "cc", "ar" }, .msvc_todo = true },
     .copy = { "packages/*" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },

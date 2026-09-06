@@ -1,0 +1,52 @@
+{
+  "toolchain": [
+    {
+      "name": "gcc-lld",
+      "driver": "gcc",
+      "compiler": { "program": "gcc" },
+      "archiver": { "program": "ar" },
+      "cxx": { "program": "g++" },
+      "linker": { "elf": { "family": "lld" } },
+      "host": { "x86_64-linux": {}, "aarch64-linux": {} }
+    },
+    {
+      "name": "aarch64-gnu",
+      "driver": "gcc",
+      "compiler": { "program": "aarch64-linux-gnu-gcc" },
+      "archiver": { "program": "aarch64-linux-gnu-ar" },
+      "linker": { "elf": { "family": "gnu" } },
+      "host": { "x86_64-linux": {} },
+      "target": [{ "arch": "aarch64", "os": "freestanding", "abi": "none" }]
+    },
+    {
+      "name": "mingw-gnu",
+      "driver": "gcc",
+      "compiler": { "program": "x86_64-w64-mingw32-gcc" },
+      "archiver": { "program": "x86_64-w64-mingw32-ar" },
+      "cxx": { "program": "x86_64-w64-mingw32-g++" },
+      "linker": { "mingw": { "family": "gnu" } },
+      "host": { "x86_64-linux": {}, "aarch64-linux": {} },
+      "target": [{ "arch": "x86_64", "os": "windows", "abi": "gnu" }]
+    },
+    {
+      "name": "clang-mingw",
+      "driver": "clang",
+      "compiler": { "program": "clang" },
+      "archiver": { "program": "x86_64-w64-mingw32-ar" },
+      "cxx": { "program": "clang++" },
+      "linker": { "mingw": { "family": "gnu", "program": "x86_64-w64-mingw32-ld" } },
+      "host": { "x86_64-linux": {}, "aarch64-linux": {} },
+      "target": [{ "arch": "x86_64", "os": "windows", "abi": "gnu" }]
+    },
+    {
+      "name": "clang-msvc",
+      "driver": "clang",
+      "compiler": { "program": "clang" },
+      "archiver": { "program": "llvm-ar" },
+      "cxx": { "program": "clang++" },
+      "linker": { "msvc": { "family": "lld" } },
+      "host": { "x86_64-windows": {}, "aarch64-windows": {} },
+      "target": [{ "arch": "x86_64", "os": "windows", "abi": "msvc" }, { "arch": "aarch64", "os": "windows", "abi": "msvc" }]
+    }
+  ]
+}

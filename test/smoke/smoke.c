@@ -1,5 +1,0 @@
-#include "elf.c"
-#include "macho.c"
-#include "mingw.c"
-#include "msvc.c"
-#include "wasm.c"

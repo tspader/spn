@@ -20,6 +20,7 @@
 #endif
 
 #define SPN_TEST_MAX_PROGRAMS 4
+#define SPN_TEST_MAX_LANES 4
 
 typedef struct {
   spn_sanitizer_set_t sanitize;
@@ -27,7 +28,7 @@ typedef struct {
   spn_os_t host;
   spn_cc_driver_t driver;
   const c8* target;
-  const c8* toolchain;
+  const c8* lanes [SPN_TEST_MAX_LANES];
   const c8* programs [SPN_TEST_MAX_PROGRAMS];
   bool exports;
   bool deterministic;
@@ -41,6 +42,7 @@ typedef struct {
 } test_toolchain_t;
 
 const test_toolchain_t* test_toolchain(void);
+sp_str_t  test_lanes_toml(void);
 spn_triple_t test_host(void);
 const c8* test_target_alternate(void);
 sp_str_t  test_when_blocked(test_when_t when);

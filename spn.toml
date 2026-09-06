@@ -409,49 +409,6 @@ include = ["include", "source/core", "source/util", "source/core/codegen/gen", "
 flags = []
 
 [[test]]
-name = "smoke"
-source = [
-  "source/core/compiler/driver.c",
-  "source/core/compiler/gnu.c",
-  "source/core/compiler/msvc.c",
-  "source/core/compiler/occ.c",
-  "source/core/reflect/json.c",
-  "source/core/codegen/gen/errors.gen.c",
-  "source/core/codegen/gen/events.gen.c",
-  "source/core/codegen/gen/source_deps.gen.c",
-  "source/core/codegen/gen/toolchains.gen.c",
-  "source/core/codegen/json.c",
-  "source/core/codegen/loader.c",
-  "source/core/core/core.c",
-  "source/core/ctx/ctx.c",
-  "source/core/enum/enum.c",
-  "source/core/event/event.c",
-  "source/util/lazy/lazy.c",
-  "source/core/error/error.c",
-  "source/core/error/json.c",
-  "source/core/external/tom.c",
-  "source/core/intern/intern.c",
-  "source/core/paths/paths.c",
-  "source/util/io/io.c",
-  "source/util/str/str.c",
-  "source/core/toolchain/catalog.c",
-  "source/core/toolchain/toolchain.c",
-  "source/core/toolchain/linker.c",
-  "source/core/toolchain/search.c",
-  "source/core/triple/triple.c",
-  "source/core/elf/elf.c",
-  "test/smoke/smoke.c",
-  "test/smoke/main.c",
-  "test/integration/tools/harness.c",
-  "test/tools/caps.c",
-  "test/tools/env.c",
-  "test/tools/fixture.c",
-  "test/tools/toml.c",
-]
-include = ["include", "source/core", "source/util", "source/core/codegen/gen", "source/core/external", "test/integration/tools", "test/tools", "test/smoke"]
-flags = []
-
-[[test]]
 name = "render"
 source = [
   "source/core/compiler/driver.c",

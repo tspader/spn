@@ -176,14 +176,8 @@ sp_test(cli, workspace_dir_index) {
 sp_test(cli, user_dir_index) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cli/user_dir_index",
+    .config = "config.toml",
     .actions = {
-      {
-        .kind = ACTION_CREATE_FILE,
-        .create = {
-          .file = sp_str_lit(".home/config/spn/spn.toml"),
-          .content = sp_str_lit("[[index]]\nname = \"local\"\npath = \"index\"\n"),
-        },
-      },
       {
         .kind = ACTION_CREATE_FILE,
         .create = {

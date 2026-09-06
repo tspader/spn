@@ -1,9 +1,0 @@
-# variant       toolchain   filter
-debian-zig      zig         *
-debian-gcc      gcc         *
-debian-clang    clang       *
-debian-llvm     llvm        *
-alpine-gcc      gcc         linker.*
-debian-gcc-lld  gcc         linker.*
-debian-cross    gcc         linker.cross_*
-debian-mingw    gcc         linker.mingw_*

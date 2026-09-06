@@ -1,4 +1,5 @@
 #include "caps.h"
+#include "sp/sp_test.h"
 #include "fixture.h"
 
 #include "enum/enum.h"
@@ -6,30 +7,20 @@
 #include "toolchain/linker.h"
 #include "toolchain/search.h"
 #include "triple/triple.h"
+#include "yyjson.h"
 
+#define SPN_TEST_BUILTINS "source/core/toolchain/toolchains.json"
+#define SPN_TEST_LANES "test/tools/toolchains.json"
+
+static sp_test_once_t once;
 static test_toolchain_t cached;
+static spn_toolchain_catalog_t catalog;
+static sp_str_t lanes_toml;
 
-const test_toolchain_t* test_toolchain(void) {
-  if (cached.info) {
-    return &cached;
-  }
-
-  sp_mem_t mem = sp_mem_os_new();
-  sp_str_t name = sp_os_env_get(sp_str_lit("SPN_TEST_TOOLCHAIN"));
-  if (sp_str_empty(name)) {
-    name = sp_str_lit("zig");
-  }
-
-  sp_str_t json = sp_zero;
-  SP_ASSERT(!sp_io_read_file(mem, test_repo_path(mem, sp_str_lit("source/core/toolchain/toolchains.json")), &json));
-  spn_toolchain_catalog_t* catalog = sp_alloc_type(mem, spn_toolchain_catalog_t);
-  spn_toolchain_catalog_init(catalog, spn_triple_host(), mem);
-  SP_ASSERT(spn_toolchain_catalog_load(catalog, json) == SPN_OK);
-
-  spn_toolchain_info_t* info = spn_toolchain_catalog_get(catalog, name);
-  SP_ASSERT(info);
-  cached = (test_toolchain_t) { .name = sp_str_to_cstr(mem, info->name), .info = info };
-  return &cached;
+static sp_str_t read_repo_file(sp_mem_t mem, const c8* rel) {
+  sp_str_t content = sp_zero;
+  sp_assert(!sp_io_read_file(mem, test_repo_path(mem, sp_cstr_as_str(rel)), &content));
+  return content;
 }
 
 static bool targets(const spn_toolchain_info_t* info, spn_triple_t triple) {
@@ -41,9 +32,8 @@ static bool targets(const spn_toolchain_info_t* info, spn_triple_t triple) {
   return false;
 }
 
-spn_triple_t test_host(void) {
+static spn_triple_t host_for(const spn_toolchain_info_t* info) {
   spn_triple_t host = spn_triple_host();
-  const spn_toolchain_info_t* info = test_toolchain()->info;
   if (targets(info, host)) {
     return host;
   }
@@ -53,6 +43,10 @@ spn_triple_t test_host(void) {
     }
   }
   return host;
+}
+
+spn_triple_t test_host(void) {
+  return host_for(test_toolchain()->info);
 }
 
 static spn_triple_t parse_triple(const c8* str) {
@@ -140,10 +134,172 @@ static sp_str_t missing_toolchain_program(sp_mem_t mem, const spn_toolchain_info
   return sp_str_lit("");
 }
 
+static sp_str_t lane_broken(sp_mem_t mem, const spn_toolchain_info_t* info) {
+  switch (info->support.kind) {
+    case SPN_TOOLCHAIN_SUPPORT_NONE: {
+      return sp_fmt(mem, "doesn't support {}", sp_fmt_str(spn_triple_to_str(mem, spn_triple_host()))).value;
+    }
+    case SPN_TOOLCHAIN_SUPPORT_ARTIFACT: {
+      return sp_str_lit("");
+    }
+    case SPN_TOOLCHAIN_SUPPORT_LOCAL: {
+      sp_da_for(info->targets, it) {
+        sp_str_t missing = missing_toolchain_program(mem, info, info->targets[it]);
+        if (!sp_str_empty(missing)) {
+          return sp_fmt(mem, "{} isn't installed", sp_fmt_str(missing)).value;
+        }
+      }
+      return sp_str_lit("");
+    }
+  }
+  sp_unreachable_return(sp_str_lit(""));
+}
+
+static void write_str(sp_io_writer_t* io, const c8* key, yyjson_val* value) {
+  sp_fmt_io(io, "{} = \"{}\"\n", sp_fmt_cstr(key), sp_fmt_cstr(yyjson_get_str(value)));
+}
+
+static void write_launcher(sp_io_writer_t* io, const c8* key, yyjson_val* launcher) {
+  sp_fmt_io(io, "{} = \"{}", sp_fmt_cstr(key), sp_fmt_cstr(yyjson_get_str(yyjson_obj_get(launcher, "program"))));
+  size_t idx, max;
+  yyjson_val* arg;
+  yyjson_arr_foreach(yyjson_obj_get(launcher, "args"), idx, max, arg) {
+    sp_fmt_io(io, " {}", sp_fmt_cstr(yyjson_get_str(arg)));
+  }
+  sp_io_write_cstr(io, "\"\n", SP_NULLPTR);
+}
+
+static void write_table(sp_io_writer_t* io, yyjson_val* obj) {
+  sp_io_write_cstr(io, "{", SP_NULLPTR);
+  size_t idx, max;
+  yyjson_val* key;
+  yyjson_val* value;
+  yyjson_obj_foreach(obj, idx, max, key, value) {
+    sp_fmt_io(io, "{} {} = \"{}\"", sp_fmt_cstr(idx ? "," : ""), sp_fmt_cstr(yyjson_get_str(key)), sp_fmt_cstr(yyjson_get_str(value)));
+  }
+  sp_io_write_cstr(io, " }", SP_NULLPTR);
+}
+
+static void write_tables(sp_io_writer_t* io, const c8* name, yyjson_val* obj) {
+  sp_fmt_io(io, "{} = ", sp_fmt_cstr(name));
+  sp_io_write_cstr(io, "{", SP_NULLPTR);
+  size_t idx, max;
+  yyjson_val* key;
+  yyjson_val* value;
+  yyjson_obj_foreach(obj, idx, max, key, value) {
+    sp_fmt_io(io, "{} {} = ", sp_fmt_cstr(idx ? "," : ""), sp_fmt_cstr(yyjson_get_str(key)));
+    write_table(io, value);
+  }
+  sp_io_write_cstr(io, " }\n", SP_NULLPTR);
+}
+
+static void write_table_array(sp_io_writer_t* io, const c8* name, yyjson_val* arr) {
+  sp_fmt_io(io, "{} = [", sp_fmt_cstr(name));
+  size_t idx, max;
+  yyjson_val* value;
+  yyjson_arr_foreach(arr, idx, max, value) {
+    sp_io_write_cstr(io, idx ? ", " : " ", SP_NULLPTR);
+    write_table(io, value);
+  }
+  sp_io_write_cstr(io, " ]\n", SP_NULLPTR);
+}
+
+static void write_lane(sp_io_writer_t* io, yyjson_val* toolchain) {
+  sp_io_write_cstr(io, "\n[[toolchain]]\n", SP_NULLPTR);
+  write_str(io, "name", yyjson_obj_get(toolchain, "name"));
+  write_str(io, "driver", yyjson_obj_get(toolchain, "driver"));
+  write_launcher(io, "compiler", yyjson_obj_get(toolchain, "compiler"));
+  write_launcher(io, "archiver", yyjson_obj_get(toolchain, "archiver"));
+  if (yyjson_obj_get(toolchain, "cxx")) {
+    write_launcher(io, "cxx", yyjson_obj_get(toolchain, "cxx"));
+  }
+  if (yyjson_obj_get(toolchain, "linker")) {
+    write_tables(io, "linker", yyjson_obj_get(toolchain, "linker"));
+  }
+  if (yyjson_obj_get(toolchain, "host")) {
+    write_tables(io, "host", yyjson_obj_get(toolchain, "host"));
+  }
+  if (yyjson_obj_get(toolchain, "target")) {
+    write_table_array(io, "target", yyjson_obj_get(toolchain, "target"));
+  }
+  if (yyjson_obj_get(toolchain, "mirrors")) {
+    write_str(io, "mirrors", yyjson_obj_get(toolchain, "mirrors"));
+  }
+}
+
+static sp_str_t render_lanes(sp_mem_t mem, sp_str_t json) {
+  yyjson_doc* doc = yyjson_read(json.data, json.len, 0);
+  sp_assert(doc);
+
+  sp_io_dyn_mem_writer_t writer = sp_zero;
+  sp_io_dyn_mem_writer_init(mem, &writer);
+  size_t idx, max;
+  yyjson_val* toolchain;
+  yyjson_arr_foreach(yyjson_obj_get(yyjson_doc_get_root(doc), "toolchain"), idx, max, toolchain) {
+    write_lane(&writer.base, toolchain);
+  }
+  yyjson_doc_free(doc);
+  return sp_io_dyn_mem_writer_as_str(&writer);
+}
+
+static sp_err_t load_lanes(void* user) {
+  sp_mem_t mem = sp_mem_os_new();
+  sp_str_t name = sp_os_env_get(sp_str_lit("SPN_TEST_TOOLCHAIN"));
+  if (sp_str_empty(name)) {
+    name = sp_str_lit("zig");
+  }
+
+  sp_str_t lanes = read_repo_file(mem, SPN_TEST_LANES);
+  spn_toolchain_catalog_init(&catalog, spn_triple_host(), mem);
+  sp_assert(spn_toolchain_catalog_load(&catalog, read_repo_file(mem, SPN_TEST_BUILTINS)) == SPN_OK);
+  sp_assert(spn_toolchain_catalog_load(&catalog, lanes) == SPN_OK);
+  lanes_toml = render_lanes(mem, lanes);
+
+  spn_toolchain_info_t* info = spn_toolchain_catalog_get(&catalog, name);
+  if (!info) {
+    sp_log("unknown lane {.red}", sp_fmt_str(name));
+    sp_sys_exit(1);
+  }
+  sp_str_t broken = lane_broken(mem, info);
+  if (!sp_str_empty(broken)) {
+    sp_log("lane {.red} is broken: {}", sp_fmt_str(name), sp_fmt_str(broken));
+    sp_sys_exit(1);
+  }
+  cached = (test_toolchain_t) { .name = sp_str_to_cstr(mem, info->name), .info = info };
+  return SP_OK;
+}
+
+const test_toolchain_t* test_toolchain(void) {
+  sp_test_once(&once, load_lanes, SP_NULLPTR);
+  return &cached;
+}
+
+static sp_str_t not_in_lanes(sp_mem_t mem, const test_toolchain_t* toolchain, const c8* const* lanes, u32 count) {
+  sp_for(it, count) {
+    if (!spn_toolchain_catalog_get(&catalog, sp_cstr_as_str(lanes[it]))) {
+      sp_log("unknown lane {.red}", sp_fmt_cstr(lanes[it]));
+      sp_sys_exit(1);
+    }
+    if (sp_cstr_equal(lanes[it], toolchain->name)) {
+      return sp_str_lit("");
+    }
+  }
+  return sp_fmt(mem, "not in lane {}", sp_fmt_str(sp_str_join_cstr_n(mem, lanes, count, sp_str_lit(", ")))).value;
+}
+
 sp_str_t test_when_blocked(test_when_t when) {
   sp_mem_t mem = sp_mem_os_new();
   const test_toolchain_t* toolchain = test_toolchain();
   spn_triple_t target = when_target(&when);
+
+  u32 num_lanes = 0;
+  sp_carr_detect_len(when.lanes, num_lanes, when.lanes[num_lanes]);
+  if (num_lanes) {
+    sp_str_t blocked = not_in_lanes(mem, toolchain, when.lanes, num_lanes);
+    if (!sp_str_empty(blocked)) {
+      return blocked;
+    }
+  }
 
   if (when.os && when.os != target.os) {
     return sp_fmt(mem, "target os is {}, test needs {}",
@@ -175,10 +331,6 @@ sp_str_t test_when_blocked(test_when_t when) {
     return sp_fmt(mem, "{} isn't a {} driver",
       sp_fmt_cstr(toolchain->name),
       sp_fmt_str(spn_cc_driver_to_str(when.driver))).value;
-  }
-
-  if (when.toolchain) {
-    return sp_str_lit("");
   }
 
   if (!toolchain_targets(toolchain->info, target)) {
@@ -227,4 +379,9 @@ bool test_when_runs(const test_when_t* when) {
   spn_triple_t host = spn_triple_host();
   spn_triple_t target = when_target(when);
   return target.os == host.os && target.arch == host.arch;
+}
+
+sp_str_t test_lanes_toml(void) {
+  sp_test_once(&once, load_lanes, SP_NULLPTR);
+  return lanes_toml;
 }

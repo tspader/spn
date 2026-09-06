@@ -545,9 +545,7 @@ sp_err_t test_when(sp_test_t* t, test_when_t when) {
 
 static sp_err_t begin_test(sp_test_t* t, fixture_t* fixture, test_when_t when) {
   sp_try(fixture_init(t, fixture));
-  sp_try(test_when(t, when));
-  fixture->toolchain = when.toolchain;
-  return SP_OK;
+  return test_when(t, when);
 }
 
 sp_err_t run_command(sp_test_t* t, fixture_t* fixture, command_test_t test) {
@@ -678,6 +676,7 @@ static sp_err_t apply_rebuild_change(sp_test_t* t, fixture_t* fixture, rebuild_c
 sp_err_t run_rebuild_test(sp_test_t* t, rebuild_test_t test) {
   fixture_t fixture = sp_zero;
   sp_try(begin_test(t, &fixture, test.when));
+  fixture.toolchain = test.toolchain;
 
   sp_try(prepare_test(t, &fixture, test.project, test.copy));
   sp_try(run_command(t, &fixture, test.first));
@@ -878,6 +877,7 @@ sp_err_t run_actions(sp_test_t* t, fixture_t* fixture, const action_t* actions) 
 sp_err_t run_test(sp_test_t* t, test_t test) {
   fixture_t fixture = sp_zero;
   sp_try(begin_test(t, &fixture, test.when));
+  fixture.toolchain = test.toolchain;
 
   if (!test_when_runs(&test.when)) {
     u32 kept = 0;
