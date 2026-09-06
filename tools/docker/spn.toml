@@ -1,0 +1,33 @@
+[package]
+name = "smoke"
+version = "0.1.0"
+
+[deps.package]
+"spader/sp" = { path = "../../vendor/sp" }
+
+[profile.default]
+toolchain = "zig"
+linkage = "static"
+standard = "c11"
+mode = "debug"
+
+[[bin]]
+name = "smoke"
+source = [
+  "source/main.c",
+  "source/docker/docker.c",
+  "source/tail/tail.c",
+  "source/variant/variant.c",
+]
+include = ["source"]
+flags = ["-DSP_PS_MAX_ARGS=32"]
+
+[[bin]]
+name = "shell"
+source = ["source/container/shell.c"]
+include = ["source"]
+
+[[bin]]
+name = "check"
+source = ["source/container/check.c"]
+include = ["source"]
