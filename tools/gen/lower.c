@@ -288,6 +288,7 @@ static bool lower_field(gen_t* g, gen_type_t* type, jtd_property_t property) {
       }
       gen_entry_t entry = {
         .name = sp_fmt(g->mem, "{}_{}_entry", sp_fmt_str(type->name), sp_fmt_str(property.key)).value,
+        .owner = type,
         .object = val.kind == VAL_STRUCT ? val.object : SP_NULLPTR,
         .shorthand = jtd_metadata(property.schema, "shorthand"),
       };
