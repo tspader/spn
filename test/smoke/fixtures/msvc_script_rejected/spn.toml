@@ -3,7 +3,7 @@ name = "msvc_script_rejected"
 version = "0.1.0"
 
 [[toolchain]]
-name = "MV"
+name = "msvc-link"
 driver = "msvc"
 compiler = "cl"
 archiver = "lib"

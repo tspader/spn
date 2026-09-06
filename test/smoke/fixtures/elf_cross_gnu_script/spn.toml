@@ -3,7 +3,7 @@ name = "elf_cross_gnu_script"
 version = "0.1.0"
 
 [[toolchain]]
-name = "X"
+name = "aarch64-gnu"
 driver = "gcc"
 compiler = "aarch64-linux-gnu-gcc"
 archiver = "aarch64-linux-gnu-ar"

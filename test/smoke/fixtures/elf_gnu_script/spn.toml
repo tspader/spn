@@ -3,7 +3,7 @@ name = "elf_gnu_script"
 version = "0.1.0"
 
 [[toolchain]]
-name = "G"
+name = "gnu"
 driver = "gcc"
 compiler = "gcc"
 archiver = "ar"

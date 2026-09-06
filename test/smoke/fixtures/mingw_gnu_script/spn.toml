@@ -3,7 +3,7 @@ name = "mingw_gnu_script"
 version = "0.1.0"
 
 [[toolchain]]
-name = "M"
+name = "mingw-gnu"
 driver = "gcc"
 compiler = "x86_64-w64-mingw32-gcc"
 archiver = "x86_64-w64-mingw32-ar"

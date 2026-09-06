@@ -3,7 +3,7 @@ name = "mingw_clang_gnu"
 version = "0.1.0"
 
 [[toolchain]]
-name = "W"
+name = "clang-mingw"
 driver = "clang"
 compiler = "clang"
 archiver = "x86_64-w64-mingw32-ar"

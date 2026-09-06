@@ -3,7 +3,7 @@ name = "elf_lld_script"
 version = "0.1.0"
 
 [[toolchain]]
-name = "GL"
+name = "gcc-lld"
 driver = "gcc"
 compiler = "gcc"
 archiver = "ar"

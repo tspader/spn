@@ -3,7 +3,7 @@ name = "elf_gcc_lld_hosted"
 version = "0.1.0"
 
 [[toolchain]]
-name = "GLH"
+name = "gcc-lld"
 driver = "gcc"
 compiler = "gcc"
 archiver = "ar"

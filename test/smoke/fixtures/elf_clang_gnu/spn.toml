@@ -3,7 +3,7 @@ name = "elf_clang_gnu"
 version = "0.1.0"
 
 [[toolchain]]
-name = "C"
+name = "clang-gnu"
 driver = "clang"
 compiler = "clang"
 archiver = "ar"

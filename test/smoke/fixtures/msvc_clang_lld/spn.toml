@@ -3,7 +3,7 @@ name = "msvc_clang_lld"
 version = "0.1.0"
 
 [[toolchain]]
-name = "CM"
+name = "clang-lld"
 driver = "clang"
 compiler = "clang"
 archiver = "llvm-ar"

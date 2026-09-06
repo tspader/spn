@@ -3,7 +3,7 @@ name = "macho_ld64_apple"
 version = "0.1.0"
 
 [[toolchain]]
-name = "AC"
+name = "ld64"
 driver = "clang"
 compiler = "clang"
 archiver = "ar"
