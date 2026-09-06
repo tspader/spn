@@ -1,0 +1,36 @@
+<nav>
+  <a class="brand" href="/">spn</a>
+  <a href="/docs/quickstart">docs</a>
+  <a href="https://github.com/tspader/spam">packages</a>
+  <a href="https://github.com/tspader/spn">github</a>
+</nav>
+
+<style>
+  nav {
+    display: flex;
+    align-items: center;
+    gap: var(--s-7);
+  }
+
+  .brand {
+    margin-right: auto;
+    font-family: var(--font-mono);
+    font-size: var(--text-2xl);
+    font-weight: var(--weight-heavy);
+    letter-spacing: var(--tracking-tight);
+
+    &::before {
+      content: '$ ';
+      color: var(--accent);
+    }
+  }
+
+  .brand ~ a {
+    color: var(--accent-bright);
+
+    &:hover {
+      color: var(--accent-hover);
+      text-decoration: underline;
+    }
+  }
+</style>

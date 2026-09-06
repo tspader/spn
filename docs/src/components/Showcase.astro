@@ -1,0 +1,104 @@
+---
+import { Code } from 'astro:components'
+import type { ShikiTransformer } from 'shiki'
+import Tabs from '@spn/docs/components/Tabs.astro'
+import { theme } from '@spn/docs/lib/theme'
+
+const files = import.meta.glob<string>('@spn/docs/data/showcase/*/*.toml', { query: '?raw', import: 'default', eager: true })
+const read = (id: string, name: string) => files[`/src/data/showcase/${id}/${name}.toml`].trimEnd()
+const version = (manifest: string) => manifest.match(/^version = "(.+)"$/m)![1]
+const depLine = (project: string, id: string) => project.split('\n').findIndex((line) => line.startsWith(`${id} = `)) + 1
+const highlight = (line: number): ShikiTransformer => ({
+  name: 'dep',
+  line(node, n) {
+    if (n === line) this.addClassToHast(node, 'dep')
+  },
+})
+
+const packages = [
+  { id: 'sdl3', label: 'SDL3' },
+  { id: 'raylib', label: 'raylib' },
+  { id: 'imgui', label: 'ImGui' },
+  { id: 'lua', label: 'Lua' },
+  { id: 'stb', label: 'stb' },
+  { id: 'sqlite', label: 'SQLite' },
+  { id: 'curl', label: 'curl' },
+].map(({ id, label }) => {
+  const project = read(id, 'project')
+  const manifest = read(id, 'package')
+  return { id, label, project, manifest, version: version(manifest), dep: depLine(project, id) }
+})
+---
+
+<section class="showcase">
+  <h2>Try out the libraries you already use</h2>
+  <p>Unsure what all of this looks like? Click a library to see how simple it is to use (or even write your own package for) real, complex libraries.</p>
+  <Tabs group="showcase" tabs={packages}>
+    {packages.map((pkg, i) => (
+      <div class="pane" role="tabpanel" data-tab={pkg.id} hidden={i !== 0}>
+        <figure class="code-block project">
+          <figcaption class="code-head">spn.toml</figcaption>
+          <Code code={pkg.project} lang="toml" theme={theme} transformers={[highlight(pkg.dep)]} />
+        </figure>
+        <figure class="code-block package">
+          <figcaption class="code-head">
+            <b>{pkg.label}</b>
+            {pkg.version}
+            <a class="link" href={`https://github.com/tspader/spam/blob/main/${pkg.id}/spn.toml`}>view on github</a>
+          </figcaption>
+          <Code code={pkg.manifest} lang="toml" theme={theme} />
+        </figure>
+      </div>
+    ))}
+  </Tabs>
+</section>
+
+<style>
+  p {
+    max-width: 64ch;
+    margin-block: var(--s-4) var(--s-7);
+    font-size: var(--text-md);
+    line-height: var(--leading-loose);
+    color: var(--text-dim);
+  }
+
+  .pane:not([hidden]) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: var(--s-6);
+
+    @media (max-width: 900px) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  .code-head b {
+    font-weight: inherit;
+    color: var(--text-dim);
+  }
+
+  .code-head a {
+    margin-left: auto;
+  }
+
+  .project :global(.line.dep) {
+    display: inline-block;
+    width: calc(100% + 2 * var(--s-6));
+    margin-inline: calc(-1 * var(--s-6));
+    padding-inline: var(--s-6);
+    background: var(--accent-tint);
+    box-shadow: inset 2px 0 0 var(--accent);
+  }
+
+  .package {
+    --code-bg: var(--bg-inset);
+  }
+
+  .package :global(pre) {
+    max-height: 500px;
+    overflow-y: auto;
+    opacity: 0.8;
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-strong) transparent;
+  }
+</style>

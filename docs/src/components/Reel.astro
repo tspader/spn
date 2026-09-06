@@ -1,0 +1,101 @@
+---
+const items = ['make', 'cmake', 'conan', 'vcpkg', 'git submodules', 'pkg-config', 'ctest', 'dockerized builds', 'bash + python glue', 'ccache', 'vcvarsall', 'ninja']
+---
+
+<div class="reel">
+  <span>One binary replaces</span>
+  <div class="window">
+    <ul>{items.map((item) => <li>{item}</li>)}</ul>
+  </div>
+</div>
+
+<script>
+  const DURATION = 2600
+  const PAUSE = 1800
+
+  const reel = document.querySelector<HTMLElement>('.reel ul')!
+  const count = reel.childElementCount
+  reel.append(...[...reel.children, ...reel.children].map((item) => item.cloneNode(true)))
+
+  const show = (pos: number) => reel.style.setProperty('--pos', String((pos % count) + count - 1))
+  const ease = (t: number) => 1 - (1 - t) ** 5
+
+  const animate = (from: number, to: number, done: () => void) => {
+    const start = performance.now()
+    const step = (now: number) => {
+      const t = Math.min(1, (now - start) / DURATION)
+      show(from + (to - from) * ease(t))
+      if (t < 1) requestAnimationFrame(step)
+      else done()
+    }
+    requestAnimationFrame(step)
+  }
+
+  const jump = (_from: number, to: number, done: () => void) => {
+    show(to)
+    setTimeout(done, DURATION)
+  }
+
+  const move = matchMedia('(prefers-reduced-motion: reduce)').matches ? jump : animate
+
+  let current = 0
+  const spin = () => {
+    const next = (current + 1) % count
+    move(current, current + 2 * count + 1, () => {
+      current = next
+      show(current)
+      setTimeout(spin, PAUSE)
+    })
+  }
+
+  show(current)
+  setTimeout(spin, PAUSE)
+</script>
+
+<style>
+  .reel {
+    --size: var(--text-3xl);
+    --row: 56px;
+    --fade: 62px;
+
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-1);
+    min-width: 0;
+    font-family: var(--font-mono);
+    font-size: var(--size);
+    font-weight: var(--weight-heavy);
+    letter-spacing: var(--tracking-tight);
+
+    @media (max-width: 1024px) {
+      text-align: center;
+    }
+
+    @media (max-width: 900px) {
+      --size: var(--text-2xl);
+    }
+  }
+
+  .window {
+    height: calc(var(--row) * 3);
+    overflow: hidden;
+    mask-image: linear-gradient(transparent, black var(--fade), black calc(100% - var(--fade)), transparent);
+  }
+
+  ul {
+    will-change: transform;
+    transform: translateY(calc(var(--pos) * var(--row) * -1));
+  }
+
+  li {
+    display: flex;
+    align-items: center;
+    height: var(--row);
+    color: var(--accent);
+    white-space: nowrap;
+
+    @media (max-width: 1024px) {
+      justify-content: center;
+    }
+  }
+</style>

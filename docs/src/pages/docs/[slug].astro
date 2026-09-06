@@ -1,0 +1,164 @@
+---
+import { getCollection, render } from 'astro:content'
+import Nav from '@spn/docs/components/Nav.astro'
+import Shell from '@spn/docs/layouts/Shell.astro'
+
+export async function getStaticPaths() {
+  const docs = (await getCollection('docs', (doc) => doc.data.site)).sort((a, b) => a.data.order - b.data.order)
+  return docs.map((doc) => ({ params: { slug: doc.id }, props: { doc, docs } }))
+}
+
+const { doc, docs } = Astro.props
+const { Content, headings } = await render(doc)
+
+const groups = Map.groupBy(docs, (doc) => doc.data.group)
+const toc = headings.filter((heading) => heading.depth === 2 || heading.depth === 3)
+---
+
+<Shell title={`${doc.data.title} · spn`}>
+  <div class="page">
+    <header class="topbar"><Nav /></header>
+    <div class="layout">
+      <nav class="sidebar">
+        {[...groups].map(([group, docs]) => (
+          <section>
+            <div class="label">{group}</div>
+            <ul>
+              {docs.map((entry) => (
+                <li><a href={`/docs/${entry.id}`} aria-current={entry.id === doc.id ? 'page' : undefined}>{entry.data.title}</a></li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </nav>
+      <main class="doc">
+        <h1>{doc.data.title}</h1>
+        <article class="prose"><Content /></article>
+      </main>
+      <aside class="toc">
+        <div class="label">on this page</div>
+        <ul>
+          {toc.map((heading) => (
+            <li class={`depth-${heading.depth}`}><a href={`#${heading.slug}`}>{heading.text}</a></li>
+          ))}
+        </ul>
+      </aside>
+    </div>
+  </div>
+</Shell>
+
+<style>
+  .page {
+    --topbar-h: 3.25rem;
+  }
+
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: grid;
+    align-items: center;
+    height: var(--topbar-h);
+    padding-inline: var(--s-7);
+    border-bottom: var(--border);
+    background: var(--bg);
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 15rem minmax(0, 44rem) 14rem;
+    gap: var(--s-9);
+    max-width: 84rem;
+    margin-inline: auto;
+    padding-inline: var(--s-7);
+
+    @media (max-width: 72rem) {
+      grid-template-columns: 15rem minmax(0, 1fr);
+    }
+
+    @media (max-width: 48rem) {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  .sidebar,
+  .toc {
+    position: sticky;
+    top: var(--topbar-h);
+    align-self: start;
+    max-height: calc(100vh - var(--topbar-h));
+    overflow-y: auto;
+    padding-block: var(--s-7);
+  }
+
+  .sidebar {
+    height: calc(100vh - var(--topbar-h));
+    border-right: var(--border);
+    font-size: var(--text-md);
+
+    @media (max-width: 48rem) {
+      display: none;
+    }
+
+    section + section {
+      margin-top: var(--s-6);
+    }
+
+    a {
+      display: block;
+      padding-block: var(--s-1);
+      color: var(--text-dim);
+
+      &:hover {
+        color: var(--text);
+      }
+
+      &[aria-current='page'] {
+        color: var(--accent-bright);
+        font-weight: var(--weight-medium);
+      }
+    }
+  }
+
+  .toc {
+    @media (max-width: 72rem) {
+      display: none;
+    }
+
+    a {
+      display: block;
+      padding-block: var(--s-0);
+      color: var(--text-mute);
+
+      &:hover {
+        color: var(--text);
+      }
+    }
+
+    .depth-3 {
+      padding-left: var(--s-4);
+    }
+  }
+
+  .label {
+    margin-bottom: var(--s-3);
+    font-size: var(--text-xl);
+  }
+
+  .doc {
+    min-width: 0;
+    padding-block: var(--s-9) var(--s-12);
+
+    h1 {
+      margin-bottom: var(--s-8);
+      font-size: var(--text-3xl);
+      font-weight: var(--weight-semibold);
+      line-height: var(--leading-tight);
+      letter-spacing: var(--tracking-tight);
+    }
+
+    :global(:is(h2, h3)) {
+      scroll-margin-top: calc(var(--topbar-h) + var(--s-5));
+    }
+  }
+</style>

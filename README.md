@@ -28,19 +28,23 @@ If any part of your build pipeline would benefit from fast, cached, reproducible
 
 **spn is in alpha**. Join [our Discord](https://discord.gg/7v4C5Kwsp7) if you'd like to chat, need help, or want to scream into the void that I'm wasting my life.
 
-# installation
+# Quickstart
+
+## Install
+
+### macOS & Linux
 
 ```sh
 curl -fsSL https://spn.spader.zone/install | sh
 ```
 
-On Windows:
+### Windows
 
 ```powershell
 irm https://spn.spader.zone/install.ps1 | iex
 ```
 
-# quickstart
+## Create a project
 
 Let's use the following program, which needs to link to Lua, as an example:
 
@@ -60,6 +64,8 @@ int main(void) {
   return 0;
 }
 ```
+
+## Add a dependency
 
 First, initialize your project. We'll pull Lua from [the default package index](https://github.com/tspader/spam) for now; later, we'll talk about making your own packages.
 
@@ -84,6 +90,8 @@ lua = "5.4.6"
 
 ```
 
+## Build and run
+
 Then, after copying the source code into `main.c`:
 
 ```sh
@@ -91,67 +99,25 @@ spn build
 ./build/debug/demo
 ```
 
-Cross compiling works out of the box. The following commands produce `build/x86_64-windows-gnu/debug/demo.exe` and `build/aarch64-macos-apple/debug/demo`:
+## Cross compile
+
+Cross compiling works out of the box. The following commands produce `build/x86_64-windows-gnu/debug/main.exe`, `build/aarch64-macos/debug/main`, and a bare metal `build/aarch64-freestanding-none/debug/main.elf` with no libc or startup files:
 
 ```sh
 spn build --target x86_64-windows-gnu
 spn build --target aarch64-macos
-```
-
-Bare metal works the same way. A program with no libc and its own entry point:
-
-```c
-void _start(void) {
-  for (;;) {
-  }
-}
-```
-
-builds into a static `build/aarch64-freestanding-none/debug/demo.elf` with no startup files:
-
-```sh
 spn build --target aarch64-freestanding
 ```
 
 Congratulations! You now have a C program which:
 - Can be compiled to any OS, architecture, and ABI
 - Builds extremely quickly and incrementally
--
 
-# table of contents
-- [Overview](#overview)
-- [Packages](#packages)
-  - [Targets](#targets)
-  - [Profiles](#profiles)
-  - [Platform configuration](#configure-stuff-per-platform)
-  - [Embedding stuff in your binary](#embed-bytes-in-a-binary)
-- [Builds](#builds)
-  - [As fast as possible](#this-is-not-a-wrapper)
-  - [Toolchains](#toolchains)
-- [CI and build caches](#ci)
-- [Dependencies](#dependencies)
-  - [Package Indexes](#package-indexes-are-git-repos)
-  - [Publishing](#git-is-all-you-need-for-rich-private-packages)
-- [Build Scripts](#build-scripts)
-  - [Build Dependencies](#build-scripts-can-have-dependencies)
-  - [API](#build-scripts-have-access-to-the-api)
-  - [Hermetic, sandboxed](#build-scripts-are-hermetic-and-sandboxed)
-- [Embedding `spn`](#embedding-spn)
-  - [There's a stable C ABI](#theres-a-stable-c-abi)
-  - [Integration](#it-works-with-any-event-loop)
-  - [Hotloading](#its-so-much-better-at-hotloading-than-your-crappy-script)
-- [Workspaces](#workspaces)
-  - [Task runner](#spn-is-a-task-runner)
-  - [Test runner](#spn-is-a-test-runner)
-- [Why do I care?](#why-do-i-care)
-  - ["My CI isn't absurdly fast with zero configuration"](#my-ci-isnt-absurdly-fast-with-zero-configuration)
-  - ["My company doesn't approve tools with dependencies (e.g. Python or JS)"](#my-company-doesnt-approve-tools-with-dependencies-eg-python-or-js)
-- [Development](#development)
-  - [Building](#building)
-  - [Testing](#testing)
-  - [PRs](#prs)
+## Editor setup
 
-# overview
+`spn` generates `compile_commands.json` out of the box, with no instrumentation needed.
+
+# Overview
 
 Building C code should be this easy, always. This demo is just a fraction of the functionality `spn` offers. It can replace nearly every tool in what is today a patchwork ecosystem of developer tooling:
 - Build tools like CMake, Make, and Ninja
@@ -163,10 +129,11 @@ Building C code should be this easy, always. This demo is just a fraction of the
 
 Let's take a look at everything it can do in more detail!
 
-# packages
+# Packages
+
 Packages are defined by TOML manifests.
 
-## targets
+## Targets
 
 A package can define as many executables, libraries, tests, and examples as it would like. These are called *targets*. They have fields like `source`, or `include`, or `system_deps`, and most fields can be configured at the package level for all targets or for an individual target.
 
@@ -187,21 +154,31 @@ define = ['SOMETHING']
 system_deps = ['m']
 ```
 
-## profiles
+A `[[bin]]` and a `[[script]]`, for instance, are both executables, but their difference isn't strictly cosmetic. `[[bin]]` entries are taken to be *exports* of your package, able to be pulled in by consumers. `[[script]]` entries aren't. `[[test]]` entries are executed in `spn test`, and compiled to `test/` instead of `bin/`.
 
-Packages are compiled against a profile, which contains the target triple, toolchain, build mode, optimization level, sanitizers, etc.
+## Target fields
 
-```toml
-[profile.default]
-toolchain = "zig"
-linkage = "static"
-standard = "c11"
-mode = "debug"
-```
+### source
 
-## conditional configuration
+### include and headers
 
-Any field in your package can be keyed on any fact of the build (target OS, architecture, ABI, compiler driver, build mode, optimization level, sanitizer settings). Clauses are structured data, not a DSL, and an entry with multiple clauses gets them ANDed together. Here's some common examples:
+### define and flags
+
+### system_deps
+
+### deps
+
+### kinds
+
+### cxx
+
+## System dependencies
+
+
+
+## Conditional configuration
+
+Any field in your package can be keyed on any fact of the build (target OS, architecture, ABI, build mode, optimization level, sanitizer settings). Clauses are structured data, not a DSL, and an entry with multiple clauses gets them ANDed together. Here's some common examples:
 
 ```toml
 source = [
@@ -210,7 +187,6 @@ source = [
 ]
 flags = [
   { value = "-mfpu=neon", when = { os = "linux", arch = "aarch64" } },
-  { value = "/W4", when = { driver = "msvc" } },
 ]
 define = [
   { value = "USE_DEBUG_ALLOC", when = { mode = "debug", sanitize_address = false } },
@@ -222,6 +198,12 @@ deps = [
   { pkg = "tracy", when = { mode = "debug" } },
 ]
 ```
+
+### when clauses
+
+### Fact keys
+
+### Options as keys
 
 Options declared in the manifest work as keys, too, so a feature flag can gate sources and dependencies together:
 
@@ -241,9 +223,30 @@ deps = [
 ]
 ```
 
-## platform specific configuration
+## Options
 
-### macOS configuration
+Packages provide options. Options can be enumerations or booleans; enums are mutually exclusive, and an unresolvable conflict is a build error. Booleans are additive. For example:
+
+```toml
+[options.tls]
+type = "enum"
+values = ["schannel", "openssl", "off"]
+default = [
+  { when = { os = "windows" }, value = "schannel" },
+  { when = { os = { not = "wasi" } }, value = "openssl" },
+  { value = "off" },
+]
+
+[options.zstd]
+type = "bool"
+default = false
+```
+
+Consumers can then [set these options](#options-1)
+
+## Platforms
+
+### macOS
 
 ```toml
 [package.macos]
@@ -255,7 +258,7 @@ frameworks = ["Cocoa", "IOKit", "CoreVideo", "OpenGL"]
 
 When linking, your binary's `min_os` is the max across everything in it. If a dependency needs macOS 12, your binary targets macOS 12.
 
-### windows configuration
+### Windows
 
 ```toml
 [[bin]]
@@ -263,8 +266,7 @@ When linking, your binary's `min_os` is the max across everything in it. If a de
 windows = { subsystem = "windows" }
 ```
 
-
-## embed bytes in a binary
+## Embedding files
 
 `spn` can embed arbitrary files and bytes (from build scripts) in your binary by creating an object file and header that anything can link to trivially. For example, this configuration:
 
@@ -308,16 +310,146 @@ static const spn_embed_entry_t spn_embed_manifest[] = {
 };
 ```
 
-# builds
+# Dependencies
 
-## this is not a wrapper
+`spn` is a real package manager, built specifically for C and C++.
 
-## toolchains
-### bring your own toolchain
+## Local dependencies
 
-### (or feel the warm embrace of `zig cc`)
+The simplest dependency is a path to a directory with an `spn.toml`:
 
-# CI
+```toml
+[deps.package]
+foo = { path = "packages/foo" }
+```
+
+And this is what the package might look like:
+
+```toml
+[package]
+name = "foo"
+version = "6.9.0"
+
+[[lib]]
+name = "foo"
+source = ["foo.c"] # Relative to foo's manifest
+```
+
+This is just an old fashioned vendored dependency. You could download LLVM, check in the entire source tree, and have an `spn.toml` that builds this local copy. If you then regained your sanity, you can point the exact same manifest at Git and `spn` will manage the checkout for you *exactly* as if it were an "official" package:
+
+```toml
+[package.upstream]
+url = "https://github.com/tspader/foo.git"
+commit = "6937fa02243da7b693c5692cea84a696950d4669"
+```
+
+## Conditional and private dependencies
+
+## Configuration
+
+### Options
+
+Packages can [provide options](#options), either as an enumeration or a boolean. Options for `foo` are set in `[config.foo]`, like this:
+
+```toml
+[config.foo]
+tls = "openssl"
+zstd = true
+```
+
+### Linkage
+
+Libraries declare the linkages they support:
+- `shared`
+- `static`
+- `source`, which compiles the package's sources directly into your target as if they were your own files.
+
+```toml
+[config.foo]
+kind = "shared"
+```
+
+## Patching
+
+What if you need to patch `foo`? You don't want to go back to the technology of the ancients, like submodules or vendoring. You want a specific commit with just a few changes. Do this in your `spn.toml`:
+
+```toml
+[deps.package]
+foo = "6.9.0"
+
+[patch.foo]
+files = ["patches/foo.patch"]
+```
+
+That's it! Patches fold into the build system like everything else. If you change the contents of a patch, add or remove patches, you'll still get a correct, incremental build.
+
+Your dependencies can't patch. If you ask for a given commit, you get exactly that commit.
+
+## The lockfile
+
+# Building
+
+`spn build` compiles your project and all dependencies. Compilation targets a *triple* (e.g. `x86_64-windows-gnu`) and uses a *profile* (e.g. release, O2, statically linked).
+
+## Build output
+
+By default, spn outputs to `build/`. If you explicitly pass a triple, it uses `build/triple/profile`. Otherwise, it uses `build/profile`. If you were to run this:
+
+```bash
+spn build
+spn build --target x86_64-windows-gnu
+```
+
+It would produce this:
+
+```
+build/
+├── debug/
+└── x86_64-windows-gnu/
+    └── debug/
+```
+
+Inside a given build, executables are placed at the top level for easy running. All other artifacts (headers, libraries, your dependencies' artifacts) are placed in `store/` in the usual way. Finally, a JSONL file with a detailed trace of the build is in `.spn/build.jsonl`
+
+```
+build/debug/
+├── store/
+│   ├── bin/
+│   │   ├── main.exe
+│   ├── lib/
+│   │   ├── libwhatever.a
+│   ├── include/
+│   │   ├── whatever.h
+│   │   └── ...
+└── .spn/
+    └── build.jsonl
+```
+
+## Selecting targets
+
+### Profiles
+
+Packages are compiled against a profile, which contains the target triple, toolchain, build mode, optimization level, sanitizers, etc.
+
+```toml
+[profile.default]
+toolchain = "zig"
+linkage = "static"
+standard = "c11"
+mode = "debug"
+```
+
+### Modes and optimization
+
+### Sanitizers
+
+## Cross compilation
+
+### Target triples
+
+### --os, --arch, --abi
+
+## CI
 
 `spn` was built for CI from day one:
 - The build cache is designed to scale to your entire team
@@ -327,17 +459,17 @@ static const spn_embed_entry_t spn_embed_manifest[] = {
 - If it doesn't work how you want, write your own CLI that links to `libspn` instead
 - @spader Are these weak? People care about fast builds mostly but we got that elsewhere...
 
-## everything is cached
+## Caching
 
 spn has a built in build cache which caches any intermediate artifact that your build creates, like `ccache` or `sccache`. Builds are incremental by default. That doesn't mean "incremental on my machine". That means *incremental*. Build `foo.exe` on one machine, and the cache is designed such that *any* subsequent machine building `foo.exe` can see a fully cached build.
 
 That's because, at its core, `spn` is a *content addressed DAG*. If you've never seen the terms, let's take a ride!
 
-### spn is a dag
+### Incremental builds
 
 This means that everything in your build is turned into nodes in a graph. If something in the middle of the graph changes, we know exactly what needs to be rebuilt and in what order. This is like every other incremental build system that has ever existed.
 
-### spn is content addressed
+### Content addressing
 
 If you use CMake, you've probably encountered this:
 
@@ -374,99 +506,73 @@ This is beautiful. Identity is content; content is identity. A file doesn't have
 
 This is the exact principle behind Bazel, BuildXL, and Nix, and it's the fundamental reason why `spn` is so good at caching your builds across machines.
 
-# dependencies
+### --force
 
-`spn` is a real package manager, built specifically for C and C++.
+## Running tests
 
-## local dependencies
+## Output
 
-The simplest dependency is a path to a directory with an `spn.toml`:
+### compile_commands.json
 
-```toml
-[deps.package]
-foo = { path = "packages/foo" }
-```
+### JSON event stream
 
-And this is what the package might look like:
+# Build scripts
 
-```toml
-[package]
-name = "foo"
-version = "6.9.0"
+You need to run code in your build. Most people solve this by writing brittle scripts in Bash or Powershell, or, at best, a language like Python. `spn` solves this with WebAssembly[^wasm]. It embeds a WASM runtime, and will automatically compile arbitrary C programs to WASM modules that run in the build graph. You do not write code against a subset of C, or against a DSL. You write regular code, in the language you were using anyway.
 
-[[lib]]
-name = "foo"
-source = ["foo.c"] # Relative to foo's manifest
-```
+## Phases
 
-This is just an old fashioned vendored dependency. You could download LLVM, check in the entire source tree, and have an `spn.toml` that builds this local copy. If you then regained your sanity, you can point the exact same manifest at Git and `spn` will manage the checkout for you *exactly* as if it were an "official" package:
+### configure
 
-```toml
-[package.upstream]
-url = "https://github.com/tspader/foo.git"
-commit = "6937fa02243da7b693c5692cea84a696950d4669"
-```
+### build
 
-## patching dependencies
+## Writing a script
 
-What if you need to patch `foo`? You don't want to go back to the technology of the ancients, like submodules or vendoring. You want a specific commit with just a few changes. Do this in your `spn.toml`:
+## The sandbox
 
-```toml
-[deps.package]
-foo = "6.9.0"
+## Script dependencies
 
-[patch.foo]
-files = ["patches/foo.patch"]
-```
+## API
 
-That's it! Patches fold into the build system like everything else. If you change the contents of a patch, add or remove patches, you'll still get a correct, incremental build.
+If you're porting over an existing build, you can continue to use what you have.
 
-Your dependencies can't patch. If you ask for a given commit, you get exactly that commit.
+### Targets
 
-## configuration
+### Files and directories
 
-Packages provide options. Options can be enumerations or booleans; enums are mutually exclusive, and an unresolvable conflict is a build error. Booleans are additive. A package `foo` might declare them like this:
+### Custom nodes
 
-```toml
-[options.tls]
-type = "enum"
-values = ["schannel", "openssl", "off"]
-default = [
-  { when = { os = "windows" }, value = "schannel" },
-  { when = { os = { not = "wasi" } }, value = "openssl" },
-  { value = "off" },
-]
+### Embedding files
 
-[options.zstd]
-type = "bool"
-default = false
-```
+### Logging
 
-Then, consumers of `foo` set them like this:
+## Example: code generation
 
-```toml
-[config.foo]
-tls = "openssl"
-zstd = true
-```
+[^wasm]: WebAssembly is a platform agnostic binary target; instead of compiling code for x86_64 or ARM64 machine code and running it with your CPU, you compile it to WASM bytecode and run it inside a regular program.
 
-## linkage
+# Toolchains
 
-Libraries declare the linkages they support:
-- `shared`
-- `static`
-- `source`, which compiles the package's sources directly into your target as if they were your own files.
+## Defaults
 
-```toml
-[config.foo]
-kind = "shared"
-```
+## Zig
 
-## hosting an index is really easy
+## Probing
+
+## Bring your own
+
+### [[toolchain]]
+
+### Hosted artifacts
+
+### Target support
+
+## MSVC
+
+# Package indexes
 
 When you run `spn add lua`, a version appears from the mist. Where does it come from? And what happens when I want to maintain my own versions of Lua, or some private package?
 
-### directory indexes
+## Directory indexes
 
 A *package index* is just metadata about what packages exist, and what versions are available. The simplest possible index is just a directory of packages:
 
@@ -497,7 +603,7 @@ path = "./packages"
 
 If you only care about one version existing at a time, this is all you need. If you just want to build your personal libraries, or use some common packages in different projects, you're done.
 
-### git indexes
+## Git indexes
 
 Let's say you have a project that uses `sqlite==3.51.0`. You like it. But then, Richard Hipp returns from an ayahuasca retreat having had a vision: `4.0`. You can prompt an LLM from *inside* a query, to say the least.
 
@@ -541,8 +647,6 @@ name = "randy"
 url = "git@github.com:you/index.git"
 ```
 
-### git is all you need for rich, private packages
-
 Let's dig into that a little more, because it's important: **Package indexes are just Git repositories**. You're going to *really* like this:
   - Commits are transactional, reversible, and everything else Git does for your source code
   - It comes with provenance and auth that you already have set up
@@ -552,7 +656,15 @@ If you've ever used Homebrew and waited multiple tens of seconds for kegs to be 
 - `spn` isn't tied to Git. Index backends are just interfaces; there's a stubbed out HTTP backend in there already if you want to host it on Cloudflare or whatever
 - C is not JS. It's not a distro, it's not Rust. Nobody uses packages in C because there are no good package managers for all its special little quirks. We're talking orders (plural) of magnitude less scale.
 
-## the ecosystem
+## Global configuration
+
+## Publishing
+
+### spn publish
+
+### Namespaces
+
+## The ecosystem
 
 Here's some of the packages which have native, high quality `spn` manifests. The full list is in [the package manifest repository](https://github.com/tspader/spam). If a package is on this list, it has full support. That means you can cross compile it, pull in its optional dependencies, build its examples, and so on. Everything.
 - [Clay](https://github.com/nicbarker/clay)
@@ -576,49 +688,21 @@ Here's some of the packages which have native, high quality `spn` manifests. The
 - [Tracy](https://github.com/wolfpld/tracy)
 - [yyjson](https://github.com/ibireme/yyjson)
 
-# build scripts
+# Embedding `spn`
 
-You need to run code in your build. Most people solve this by writing brittle scripts in Bash or Powershell, or, at best, a language like Python. `spn` solves this with WebAssembly[^1]. It embeds a WASM runtime, and will automatically compile arbitrary C programs to WASM modules that run in the build graph. You do not write code against a subset of C, or against a DSL. You write regular code, in the language you were using anyway:
+## There's a stable C ABI
 
-```c
+## It works with any event loop
 
-```
+## It's so much better at hotloading than your crappy script
 
-## build scripts can have dependencies
-
-```toml
-[deps.build]
-```
-
-```c
-
-```
-
-
-## build scripts have access to the API
-
-```c
-
-```
-
-If you're porting over an existing build, you can continue to use what you have.
-
-## build scripts are hermetic and sandboxed
-
-# embedding `spn`
-
-## there's a stable C ABI
-
-## it works with any event loop
-
-## it's so much better at hotloading than your crappy script
-
-# workspaces
+# Workspaces
 
 ## `spn` is a task runner
+
 ## `spn` is a test runner
 
-# why do i care?
+# Why do I care?
 
 ## "My CI isn't absurdly fast with zero configuration"
 
@@ -626,7 +710,7 @@ Look. I get it. Setting up the mess of tooling and integrations needed to cache 
 
 Twenty minutes is not normal! An hour is not normal! 90% of your builds in CI should be so fast that you have to double check that it actually happened.
 
-If this isn't the case for whatever you work on, [send me an email right god damn now](mailto:admin@spader.zone)! Building native code is an *extremely well understood* problem. The problem's not that we don't know how, it's that we know how, and, well, it's pretty fucking hard unless you spend a *lot* of time on it. You, person who are presumably making and/or selling something other than an obscure meta-tool, don't have that much spare time[^2].
+If this isn't the case for whatever you work on, [send me an email right god damn now](mailto:admin@spader.zone)! Building native code is an *extremely well understood* problem. The problem's not that we don't know how, it's that we know how, and, well, it's pretty fucking hard unless you spend a *lot* of time on it. You, person who are presumably making and/or selling something other than an obscure meta-tool, don't have that much spare time[^grass].
 
 takes quite a bit of rigor and care that most folks who are actually making and selling things can't spare.
 
@@ -634,18 +718,18 @@ takes quite a bit of rigor and care that most folks who are actually making and 
 
 `spn` has *zero* dependencies. It is exactly one binary. Builds are hermetic and sandboxed by default, and it's as easy to pin the exact commits of your dependencies as it is to use packages from the index.
 
-# can this replace...
+[^grass]: And if you did, you'd probably spend it running your hands through the soft day-warmed grass of some shaded grove, those whom you love most by your side, feeling the beams of the sun against your face and basking in the simple pleasure of being alive.
+
+# Can this replace...
 
 ## ...bear, compiledb?
 
 Yes. `spn` generates `compile_commands.json` out of the box, with no instrumentation needed.
 
-# development
-## building
-## testing
+# Development
+
+## Building
+
+## Testing
+
 ## PRs
-
-[^1]: WebAssembly is a platform agnostic binary target; instead of compiling code for x86_64 or ARM64 machine code and running it with your CPU, you compile it to WASM bytecode and run it inside a regular program.
-
-[^2]: And if you did, you'd probably spend it running your hands through the soft day-warmed grass of some shaded grove, those whom you love most by your side, feeling the beams of the sun against your face and basking in the simple pleasure of being alive.
-

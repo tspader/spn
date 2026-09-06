@@ -1,0 +1,119 @@
+import Install from '@spn/docs/components/Install.astro'
+import Nav from '@spn/docs/components/Nav.astro'
+import Pillar from '@spn/docs/components/Pillar.astro'
+import Reel from '@spn/docs/components/Reel.astro'
+import Showcase from '@spn/docs/components/Showcase.astro'
+import Subscribe from '@spn/docs/components/Subscribe.astro'
+import Shell from '@spn/docs/layouts/Shell.astro'
+import '@spn/docs/styles/landing.css'
+
+<Shell title="spn — a package manager and build tool for C">
+  <meta slot="head" name="description" content="TOML manifests, build scripts written in C, dependencies pinned to exact commits. One static binary replaces make, cmake, conan, and the glue between them." />
+
+  <header class="container"><Nav /></header>
+
+  <section class="hero container">
+    <div class="hero-copy">
+      <h1>The missing everything tool for <b>C</b> and <b>C++</b></h1>
+      <div class="prose">
+A modern package manager, build system, and build cache in one static binary. Write packages in TOML, not an arcane language, and get reproducible, sandboxed builds that are as fast in CI as on your machine.
+
+Install the latest alpha, then [build an example](https://github.com/tspader/spn/tree/main/example) to get started. Sign up for the mailing list for updates, [send me an email](mailto:newsletter@spader.zone), or [join the Discord server](https://discord.gg/7v4C5Kwsp7).
+      </div>
+      <div class="actions">
+        <Install />
+        <Subscribe />
+      </div>
+    </div>
+    <Reel />
+  </section>
+
+  <main class="container">
+    <Pillar title="An extremely fast build system" head="spn.toml">
+Write project manifests in TOML, and `spn` turns them into a build graph and executes it in parallel. You don't have to envy Rust programmers any more.
+
+`spn`'s build executor is as fast as Ninja, but since it owns your entire build, it can aggressively parallelize and cache in ways that other tools simply aren't able to.
+
+It's really, *really* fast.
+
+<Fragment slot="code">
+```toml
+[package]
+name = "hello"
+
+[[bin]]
+name   = "hello"
+source = ["main.c"]
+```
+
+```console
+$ spn build
+Compiled profile debug in 22.5 ms (0 executed, 807 cached)
+```
+</Fragment>
+    </Pillar>
+
+    <Pillar title="Reproducible, sandboxed builds" head="build.c">
+Build scripts are written in the same language as your project. `spn` sandboxes them by compiling them to WASM modules. Or, if you prefer, write your build scripts in any language that compiles to WASM.
+
+Build scripts are first class programs. They can have their own dependencies, and are only rerun when the files they read change.
+
+<Fragment slot="code">
+```c
+spn_err_t build(spn_t* spn) {
+  read_json("endpoints.json");
+  generate_code();
+  add_to_build("/source/gen/endpoint.c");
+}
+```
+</Fragment>
+    </Pillar>
+
+    <Pillar title="Zero dependency, single file deployment" head="sh">
+`spn` ships as a single file static executable, or an embeddable library with a C ABI. It runs natively on Linux, macOS, and Windows, supports most common toolchains, and supports your toolchain's cross compilation matrix.
+
+<Fragment slot="code">
+```bash
+spn build --target x86_64-windows-gnu
+spn build --target aarch64-macos
+spn build --target x86_64-windows-msvc --toolchain msvc
+```
+</Fragment>
+    </Pillar>
+
+    <Pillar title="A package manager built for C and C++" head="spn.toml">
+`spn` includes a sophisticated package manager with first class Git integration. Pick from [existing package versions](https://github.com/tspader/spam), write your own, or just pin to a commit.
+
+C/C++ are not JS. There isn't a package culture. `spn` takes great care to provide a package manager that can handle anything from complex dependency structures to hardcoded versions to hobby projects with an excellent developer experience.
+
+<Fragment slot="code">
+```toml
+[deps.package.imgui]
+version = "1.92.8"
+options = { sdl3 = true, sdlgpu3 = true, freetype = false }
+
+[patch.imgui]
+files = ["patches/oopsie-daisy.patch"]
+
+[deps.build]
+yyjson = "0.14.0"
+```
+</Fragment>
+    </Pillar>
+
+    <Showcase />
+  </main>
+
+  <section class="cta container">
+    <div class="actions">
+      <Install />
+      <div class="card"><Subscribe><p>sign up for updates. good stuff only!</p></Subscribe></div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container">
+      <span><a href="/docs/quickstart">docs</a> · <a href="https://github.com/tspader/spam">packages</a> · <a href="https://github.com/tspader/spn">github</a></span>
+    </div>
+  </footer>
+</Shell>

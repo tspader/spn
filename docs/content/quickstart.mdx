@@ -1,0 +1,83 @@
+---
+title: Quickstart
+order: 1
+---
+
+import Install from '@spn/docs/components/Install.astro'
+
+## Install
+
+<Install />
+
+## Create a project
+
+Let's use the following program, which needs to link to Lua, as an example:
+
+```c
+#include <stdio.h>
+#include "lauxlib.h"
+#include "lualib.h"
+
+int main(void) {
+  lua_State *L = luaL_newstate();
+  luaL_openlibs(L);
+  if (luaL_dofile(L, NULL) != LUA_OK) {
+    fprintf(stderr, "%s\n", lua_tostring(L, -1));
+    return 1;
+  }
+  lua_close(L);
+  return 0;
+}
+```
+
+## Add a dependency
+
+First, initialize your project. We'll pull Lua from [the default package index](https://github.com/tspader/spam) for now; later, we'll talk about making your own packages.
+
+```sh
+spn init
+spn add lua
+```
+
+Those commands create a project manifest, `spn.toml`, which defines a single `[[bin]]` executable.
+
+```toml
+[package]
+name = "demo"
+version = "0.1.0"
+
+[[bin]]
+name = "demo"
+source = ["main.c"]
+
+[deps.package]
+lua = "5.4.6"
+
+```
+
+## Build and run
+
+Then, after copying the source code into `main.c`:
+
+```sh
+spn build
+./build/debug/demo
+```
+
+## Cross compile
+
+Cross compiling works out of the box. The following commands produce `build/x86_64-windows-gnu/debug/main.exe`, `build/aarch64-macos/debug/main`, and a bare metal `build/aarch64-freestanding-none/debug/main.elf` with no libc or startup files:
+
+```sh
+spn build --target x86_64-windows-gnu
+spn build --target aarch64-macos
+spn build --target aarch64-freestanding
+```
+
+Congratulations! You now have a C program which:
+- Can be compiled to any OS, architecture, and ABI
+- Builds extremely quickly and incrementally
+
+## Editor setup
+
+`spn` generates `compile_commands.json` out of the box, with no instrumentation needed.
