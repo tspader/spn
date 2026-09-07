@@ -12,6 +12,7 @@ typedef enum {
   DOCKER_INIT_ERR_REPO,
   DOCKER_INIT_ERR_BINARY,
   DOCKER_INIT_ERR_TEMPLATES,
+  DOCKER_INIT_ERR_LANES,
 } docker_init_err_t;
 
 typedef enum {
@@ -40,6 +41,8 @@ typedef struct {
     sp_str_t home;
     sp_str_t dockerfiles;
     sp_str_t templates;
+    sp_str_t lanes;
+    sp_str_t config;
   } paths;
   const c8* user;
   struct {

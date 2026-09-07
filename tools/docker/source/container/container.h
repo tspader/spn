@@ -3,12 +3,14 @@
 
 #define CONTAINER_SPN_DIR "/mnt/spn"
 #define CONTAINER_TOOL_DIR "/mnt/smoke"
+#define CONTAINER_CONFIG_DIR "/mnt/config"
 #define CONTAINER_CACHE "/root/.local/share/spn"
 #define CONTAINER_WORK "/work"
 
 #define CONTAINER_SPN CONTAINER_SPN_DIR "/spn"
 #define CONTAINER_SHELL CONTAINER_TOOL_DIR "/shell"
 #define CONTAINER_CHECK CONTAINER_TOOL_DIR "/check"
+#define CONTAINER_CONFIG CONTAINER_CONFIG_DIR "/spn/spn.toml"
 
 #define CONTAINER_PROJECT "hello"
 #define CONTAINER_PROJECT_DIR CONTAINER_WORK "/" CONTAINER_PROJECT

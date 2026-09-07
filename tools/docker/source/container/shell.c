@@ -26,7 +26,7 @@ s32 main() {
     .io = SP_PS_NO_STDIO,
   });
 
-  sp_log("spn smoke: fresh {.cyan} on PATH, {.cyan} project seeded", sp_fmt_cstr("spn"), sp_fmt_cstr(CONTAINER_PROJECT));
+  sp_log("spn smoke: fresh {.cyan} on PATH, {.cyan} project seeded, lanes declared in {.cyan}", sp_fmt_cstr("spn"), sp_fmt_cstr(CONTAINER_PROJECT), sp_fmt_cstr(CONTAINER_CONFIG));
 
   const c8* cwd = sp_fs_is_dir(sp_str_lit(CONTAINER_PROJECT_DIR)) ? CONTAINER_PROJECT_DIR : CONTAINER_WORK;
 

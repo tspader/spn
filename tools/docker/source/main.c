@@ -43,6 +43,9 @@ static sp_cli_result_t init(sp_cli_t* cli, smoke_t* smoke) {
     case DOCKER_INIT_ERR_TEMPLATES: {
       return sp_cli_set_error(cli, sp_fmt(mem, "failed to load templates from {.cyan}", sp_fmt_str(smoke->docker.paths.templates)).value);
     }
+    case DOCKER_INIT_ERR_LANES: {
+      return sp_cli_set_error(cli, sp_fmt(mem, "failed to render lanes from {.cyan}", sp_fmt_str(smoke->docker.paths.lanes)).value);
+    }
   }
   SP_UNREACHABLE_RETURN(SP_CLI_ERR);
 }

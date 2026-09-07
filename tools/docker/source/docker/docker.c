@@ -1,6 +1,7 @@
 #include "docker.h"
 
 #include "container/container.h"
+#include "yyjson.h"
 
 #define SP_TEMPLATE_IMPLEMENTATION
 #include "../../../gen/sp_template.h"
@@ -74,6 +75,119 @@ static const c8* cache(docker_t* docker, const variant_t* variant) {
   return cfmt(docker->mem, "{}:{}", sp_fmt_cstr(docker_image(docker, variant)), sp_fmt_cstr(CONTAINER_CACHE));
 }
 
+static void write_str(sp_io_writer_t* io, const c8* key, yyjson_val* value) {
+  sp_fmt_io(io, "{} = \"{}\"\n", sp_fmt_cstr(key), sp_fmt_cstr(yyjson_get_str(value)));
+}
+
+static void write_launcher(sp_io_writer_t* io, const c8* key, yyjson_val* launcher) {
+  sp_fmt_io(io, "{} = \"{}", sp_fmt_cstr(key), sp_fmt_cstr(yyjson_get_str(yyjson_obj_get(launcher, "program"))));
+  size_t idx, max;
+  yyjson_val* arg;
+  yyjson_arr_foreach(yyjson_obj_get(launcher, "args"), idx, max, arg) {
+    sp_fmt_io(io, " {}", sp_fmt_cstr(yyjson_get_str(arg)));
+  }
+  sp_io_write_cstr(io, "\"\n", SP_NULLPTR);
+}
+
+static void write_table(sp_io_writer_t* io, yyjson_val* obj) {
+  sp_io_write_cstr(io, "{", SP_NULLPTR);
+  size_t idx, max;
+  yyjson_val* key;
+  yyjson_val* value;
+  yyjson_obj_foreach(obj, idx, max, key, value) {
+    sp_fmt_io(io, "{} {} = \"{}\"", sp_fmt_cstr(idx ? "," : ""), sp_fmt_cstr(yyjson_get_str(key)), sp_fmt_cstr(yyjson_get_str(value)));
+  }
+  sp_io_write_cstr(io, " }", SP_NULLPTR);
+}
+
+static void write_tables(sp_io_writer_t* io, const c8* name, yyjson_val* obj) {
+  sp_fmt_io(io, "{} = ", sp_fmt_cstr(name));
+  sp_io_write_cstr(io, "{", SP_NULLPTR);
+  size_t idx, max;
+  yyjson_val* key;
+  yyjson_val* value;
+  yyjson_obj_foreach(obj, idx, max, key, value) {
+    sp_fmt_io(io, "{} {} = ", sp_fmt_cstr(idx ? "," : ""), sp_fmt_cstr(yyjson_get_str(key)));
+    write_table(io, value);
+  }
+  sp_io_write_cstr(io, " }\n", SP_NULLPTR);
+}
+
+static void write_str_array(sp_io_writer_t* io, const c8* name, yyjson_val* arr) {
+  sp_fmt_io(io, "{} = [", sp_fmt_cstr(name));
+  size_t idx, max;
+  yyjson_val* value;
+  yyjson_arr_foreach(arr, idx, max, value) {
+    sp_fmt_io(io, "{} \"{}\"", sp_fmt_cstr(idx ? "," : ""), sp_fmt_cstr(yyjson_get_str(value)));
+  }
+  sp_io_write_cstr(io, " ]\n", SP_NULLPTR);
+}
+
+static void write_table_array(sp_io_writer_t* io, const c8* name, yyjson_val* arr) {
+  sp_fmt_io(io, "{} = [", sp_fmt_cstr(name));
+  size_t idx, max;
+  yyjson_val* value;
+  yyjson_arr_foreach(arr, idx, max, value) {
+    sp_io_write_cstr(io, idx ? ", " : " ", SP_NULLPTR);
+    write_table(io, value);
+  }
+  sp_io_write_cstr(io, " ]\n", SP_NULLPTR);
+}
+
+static void write_lane(sp_io_writer_t* io, yyjson_val* toolchain) {
+  sp_io_write_cstr(io, "\n[[toolchain]]\n", SP_NULLPTR);
+  write_str(io, "name", yyjson_obj_get(toolchain, "name"));
+  write_str(io, "driver", yyjson_obj_get(toolchain, "driver"));
+  write_launcher(io, "compiler", yyjson_obj_get(toolchain, "compiler"));
+  write_launcher(io, "archiver", yyjson_obj_get(toolchain, "archiver"));
+  if (yyjson_obj_get(toolchain, "cxx")) {
+    write_launcher(io, "cxx", yyjson_obj_get(toolchain, "cxx"));
+  }
+  if (yyjson_obj_get(toolchain, "linker")) {
+    sp_io_write_cstr(io, "linker = ", SP_NULLPTR);
+    write_table(io, yyjson_obj_get(toolchain, "linker"));
+    sp_io_write_cstr(io, "\n", SP_NULLPTR);
+  }
+  if (yyjson_obj_get(toolchain, "link_args")) {
+    write_str_array(io, "link_args", yyjson_obj_get(toolchain, "link_args"));
+  }
+  if (yyjson_obj_get(toolchain, "host")) {
+    write_tables(io, "host", yyjson_obj_get(toolchain, "host"));
+  }
+  if (yyjson_obj_get(toolchain, "target")) {
+    write_table_array(io, "target", yyjson_obj_get(toolchain, "target"));
+  }
+  if (yyjson_obj_get(toolchain, "mirrors")) {
+    write_str(io, "mirrors", yyjson_obj_get(toolchain, "mirrors"));
+  }
+}
+
+static bool render_lanes(docker_t* docker) {
+  sp_mem_t mem = docker->mem;
+
+  sp_str_t json = sp_zero;
+  if (sp_io_read_file(mem, docker->paths.lanes, &json)) {
+    return false;
+  }
+  yyjson_doc* doc = yyjson_read(json.data, json.len, 0);
+  if (!doc) {
+    return false;
+  }
+
+  sp_io_dyn_mem_writer_t writer = sp_zero;
+  sp_io_dyn_mem_writer_init(mem, &writer);
+  size_t idx, max;
+  yyjson_val* toolchain;
+  yyjson_arr_foreach(yyjson_obj_get(yyjson_doc_get_root(doc), "toolchain"), idx, max, toolchain) {
+    write_lane(&writer.base, toolchain);
+  }
+  yyjson_doc_free(doc);
+
+  sp_str_t config = sp_fs_join_path(mem, docker->paths.config, sp_str_lit("spn/spn.toml"));
+  sp_fs_create_dir(sp_fs_parent_path(config));
+  return !sp_fs_create_file_str(config, sp_io_dyn_mem_writer_as_str(&writer));
+}
+
 static sp_ps_config_cstr_t launch(docker_t* docker, const variant_t* variant, const c8* option, const c8* command, const c8* argument) {
   return (sp_ps_config_cstr_t) {
     .command = "docker",
@@ -81,8 +195,10 @@ static sp_ps_config_cstr_t launch(docker_t* docker, const variant_t* variant, co
       "run",
       "--rm",
       option,
+      "-e", "SPN_CONFIG_DIR=" CONTAINER_CONFIG_DIR,
       "-v", bind(docker, spn_dir(docker, variant->spn), CONTAINER_SPN_DIR),
       "-v", bind(docker, docker->paths.tools, CONTAINER_TOOL_DIR),
+      "-v", bind(docker, docker->paths.config, CONTAINER_CONFIG_DIR),
       "-v", cache(docker, variant),
       "-w", CONTAINER_WORK,
       docker_image(docker, variant),
@@ -104,6 +220,8 @@ docker_init_err_t docker_init(docker_t* docker, sp_mem_t mem) {
   docker->paths.tools = sp_fs_join_path(mem, repo, sp_str_lit("tools/docker/build/debug"));
   docker->paths.dockerfiles = sp_fs_join_path(mem, repo, sp_str_lit("build/smoke"));
   docker->paths.templates = sp_fs_join_path(mem, repo, sp_str_lit("tools/docker/templates"));
+  docker->paths.lanes = sp_fs_join_path(mem, repo, sp_str_lit("test/tools/toolchains.json"));
+  docker->paths.config = sp_fs_join_path(mem, docker->paths.dockerfiles, sp_str_lit("config"));
 
   const c8* tools [] = { "shell", "check" };
   sp_carr_for(tools, it) {
@@ -121,6 +239,9 @@ docker_init_err_t docker_init(docker_t* docker, sp_mem_t mem) {
   }
 
   sp_fs_create_dir(docker->paths.dockerfiles);
+  if (!render_lanes(docker)) {
+    return DOCKER_INIT_ERR_LANES;
+  }
   return DOCKER_INIT_OK;
 }
 

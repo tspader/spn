@@ -4,6 +4,7 @@ version = "0.1.0"
 
 [deps.package]
 "spader/sp" = { path = "../../vendor/sp" }
+yyjson = "0.14.0"
 
 [profile.default]
 toolchain = "zig"
