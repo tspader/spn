@@ -27,6 +27,13 @@ typedef enum {
   SPN_LD_FLAVOR_COUNT,
 } spn_ld_flavor_t;
 
+typedef enum {
+  SPN_SDK_NONE,
+  SPN_SDK_SYSROOT,
+  SPN_SDK_MACOS,
+  SPN_SDK_MSVC,
+} spn_sdk_kind_t;
+
 typedef struct {
   spn_ld_family_t families [SPN_LD_FLAVOR_COUNT];
 } spn_toolchain_linkers_t;

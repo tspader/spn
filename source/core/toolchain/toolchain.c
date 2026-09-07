@@ -103,6 +103,10 @@ bool spn_toolchain_driver_retargets(spn_cc_driver_t driver) {
   return spn_toolchain_driver_caps(driver) & SPN_CC_CAP_TARGET_TRIPLE;
 }
 
+spn_abi_t spn_default_abi(spn_cc_driver_t driver, spn_os_t os) {
+  return SPN_ABI_NONE;
+}
+
 bool spn_toolchain_driver_produces(spn_cc_driver_t driver, spn_ld_flavor_t flavor) {
   switch (driver) {
     case SPN_CC_DRIVER_GCC: return flavor == SPN_LD_FLAVOR_ELF || flavor == SPN_LD_FLAVOR_MINGW || flavor == SPN_LD_FLAVOR_MACHO;
@@ -112,6 +116,10 @@ bool spn_toolchain_driver_produces(spn_cc_driver_t driver, spn_ld_flavor_t flavo
     case SPN_CC_DRIVER_NONE: sp_unreachable_case();
   }
   SP_UNREACHABLE_RETURN(false);
+}
+
+spn_sdk_kind_t spn_sdk_kind(spn_triple_t target) {
+  return SPN_SDK_NONE;
 }
 
 sp_str_t spn_toolchain_launcher_to_str(const spn_path_roots_t* roots, sp_mem_t mem, spn_toolchain_launcher_t launcher) {
