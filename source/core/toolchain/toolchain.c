@@ -114,7 +114,7 @@ spn_cc_cap_set_t spn_toolchain_driver_caps(spn_cc_driver_t driver) {
   switch (driver) {
     case SPN_CC_DRIVER_GCC: return SPN_CC_CAP_NOLIBC | SPN_CC_CAP_FUSE_LD;
     case SPN_CC_DRIVER_CLANG: return SPN_CC_CAP_TARGET_TRIPLE | SPN_CC_CAP_LLVM_TRIPLE | SPN_CC_CAP_CLANG_FRONTEND | SPN_CC_CAP_NOLIBC | SPN_CC_CAP_FUSE_LD;
-    case SPN_CC_DRIVER_ZIG: return SPN_CC_CAP_TARGET_TRIPLE | SPN_CC_CAP_CLANG_FRONTEND;
+    case SPN_CC_DRIVER_ZIG: return SPN_CC_CAP_TARGET_TRIPLE | SPN_CC_CAP_CLANG_FRONTEND | SPN_CC_CAP_CODEVIEW;
     case SPN_CC_DRIVER_MSVC: return 0;
     case SPN_CC_DRIVER_NONE: sp_unreachable_case();
   }

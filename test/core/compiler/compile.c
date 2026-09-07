@@ -148,8 +148,8 @@ static const compile_test_t tests [] = {
     },
   },
   {
-    .name = "clang_windows_deterministic_codeview",
-    .driver = SPN_CC_DRIVER_CLANG,
+    .name = "zig_windows_deterministic_codeview",
+    .driver = SPN_CC_DRIVER_ZIG,
     .profile = {
       .arch = SPN_ARCH_X64,
       .os = SPN_OS_WINDOWS,
@@ -159,6 +159,20 @@ static const compile_test_t tests [] = {
     .expect = {
       .command = "cc",
       .args = { "--target=x86_64-windows-gnu", "-std=c11", "-c", "-gno-codeview-command-line", "-Werror=return-type", "main.c", "-Xclang", "-object-file-name=main.o", "-o", "main.o" },
+    },
+  },
+  {
+    .name = "clang_windows_gnu_writes_dwarf",
+    .driver = SPN_CC_DRIVER_CLANG,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_GNU,
+      .standard = SPN_C11,
+    },
+    .expect = {
+      .command = "cc",
+      .args = { "--target=x86_64-windows-gnu", "-std=c11", "-c", "-Werror=return-type", "main.c", "-o", "main.o" },
     },
   },
   {

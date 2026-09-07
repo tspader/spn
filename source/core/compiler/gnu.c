@@ -70,6 +70,16 @@ static spn_triple_t profile_triple(const spn_profile_info_t* profile) {
   return (spn_triple_t) { profile->arch, profile->os, profile->abi };
 }
 
+// clang writes CodeView for the msvc abi and DWARF for mingw; zig writes
+// CodeView for every Windows target. Only CodeView records the command line
+// and object name, and only clang 15 and later knows the flag that drops them
+static bool codeview(const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile) {
+  if (profile->os != SPN_OS_WINDOWS || !spn_cc_has(toolchain, SPN_CC_CAP_CLANG_FRONTEND)) {
+    return false;
+  }
+  return profile->abi == SPN_ABI_MSVC || spn_cc_has(toolchain, SPN_CC_CAP_CODEVIEW);
+}
+
 static sp_str_t render_target(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, spn_triple_t triple) {
   switch (triple.os) {
     case SPN_OS_MACOS:
@@ -217,7 +227,7 @@ void spn_gnu_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, c
   if (profile->os == SPN_OS_MACOS && is_os_version_present(compile->min_os)) {
     spn_cc_push_fmt(mem, invocation, "-mmacosx-version-min={}.{}", sp_fmt_uint(compile->min_os.major), sp_fmt_uint(compile->min_os.minor));
   }
-  if (profile->os == SPN_OS_WINDOWS && spn_cc_has(toolchain, SPN_CC_CAP_CLANG_FRONTEND)) {
+  if (codeview(toolchain, profile)) {
     spn_cc_push_c(mem, invocation, "-gno-codeview-command-line");
   }
   spn_cc_push_strs(mem, invocation, compile->args);
@@ -231,7 +241,7 @@ void spn_gnu_render_compile_files(sp_mem_t mem, const spn_cc_toolchain_t* toolch
     spn_cc_push_c(mem, invocation, "-MF");
     spn_cc_push_path(mem, invocation, files->depfile);
   }
-  if (profile->os == SPN_OS_WINDOWS && spn_cc_has(toolchain, SPN_CC_CAP_CLANG_FRONTEND)) {
+  if (codeview(toolchain, profile)) {
     spn_cc_push_c(mem, invocation, "-Xclang");
     spn_cc_push_fmt(mem, invocation, "-object-file-name={}", sp_fmt_str(sp_fs_get_name(files->output.sub)));
   }
