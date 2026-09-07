@@ -159,6 +159,9 @@ static const lane_program_t lane_programs [] = {
   { "gcc-lld",         SPN_LD_FLAVOR_ELF,   "ld.lld" },
   { "clang-msvc",      SPN_LD_FLAVOR_MSVC,  "lld-link" },
   { "clang-mingw",     SPN_LD_FLAVOR_MINGW, "x86_64-w64-mingw32-ld" },
+  { "clang-mingw-lld", SPN_LD_FLAVOR_MINGW, "ld.lld" },
+  { "clang-sysroot",   SPN_LD_FLAVOR_ELF,   "ld.lld" },
+  { "clang-wasi",      SPN_LD_FLAVOR_WASM,  "wasm-ld" },
 };
 
 static bool links_flavor(const spn_toolchain_info_t* info, spn_ld_flavor_t flavor) {

@@ -176,6 +176,7 @@ docker_render_err_t docker_render(docker_t* docker, const variant_t* variant) {
 
   sp_template_scope_t* scope = sp_template_scope_create(mem);
   sp_template_set(scope, sp_str_lit("packages"), get_variant_packages(mem, variant));
+  sp_template_set(scope, sp_str_lit("setup"), get_variant_setup(mem, variant));
 
   sp_io_dyn_mem_writer_t writer = sp_zero;
   sp_io_dyn_mem_writer_init(mem, &writer);

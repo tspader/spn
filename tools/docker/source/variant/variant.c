@@ -34,6 +34,29 @@ static const distro_t distros [] = {
   },
 };
 
+static const sysroot_t sysroots [] = {
+  [SYSROOT_MUSL] = {
+    .name = "musl",
+    .path = "/sysroot/musl",
+    .packages = "musl musl-dev musl-tools",
+    .links = {
+      { "include", "/usr/include/x86_64-linux-musl" },
+      { "lib", "/usr/lib/x86_64-linux-musl" },
+    },
+  },
+  [SYSROOT_WASI] = {
+    .name = "wasi",
+    .path = "/usr",
+    .packages = "wasi-libc libclang-rt-dev-wasm32",
+  },
+  [SYSROOT_ARM64] = {
+    .name = "arm64",
+    .path = "/sysroot/arm64",
+    .arch = "arm64",
+    .debs = { "libc6", "libc6-dev", "linux-libc-dev", "libgcc-s1", "libgcc-12-dev" },
+  },
+};
+
 static const compiler_t compilers [] = { COMPILER_GCC, COMPILER_GXX, COMPILER_CLANG };
 
 const variant_t variants [] = {
@@ -58,13 +81,15 @@ const variant_t variants [] = {
     .installed = COMPILER_GCC | COMPILER_CLANG,
     .toolchain = TOOLCHAIN_CLANG,
     .extra = "lld llvm",
-    .lanes = { "llvm", "clang", "gcc", "gcc-lld" },
+    .lanes = { "llvm", "clang", "gcc", "gcc-lld", "clang-bare" },
   },
   {
     .name = "debian-cross",
     .distro = DISTRO_DEBIAN,
-    .extra = "gcc-aarch64-linux-gnu",
-    .lanes = { "aarch64-gnu" },
+    .installed = COMPILER_CLANG,
+    .toolchain = TOOLCHAIN_CLANG,
+    .extra = "gcc-aarch64-linux-gnu libc6-dev-arm64-cross",
+    .lanes = { "aarch64-gnu", "clang-cross" },
   },
   {
     .name = "debian-mingw",
@@ -77,8 +102,34 @@ const variant_t variants [] = {
     .distro = DISTRO_DEBIAN,
     .installed = COMPILER_CLANG,
     .toolchain = TOOLCHAIN_CLANG,
-    .extra = "gcc-mingw-w64-x86-64",
-    .lanes = { "clang-mingw" },
+    .extra = "gcc-mingw-w64-x86-64 lld",
+    .lanes = { "clang-mingw", "clang-mingw-lld" },
+  },
+  {
+    .name = "debian-musl",
+    .distro = DISTRO_DEBIAN,
+    .installed = COMPILER_GCC | COMPILER_CLANG,
+    .toolchain = TOOLCHAIN_GCC,
+    .sysroots = { SYSROOT_MUSL },
+    .lanes = { "musl-gcc", "clang-musl" },
+  },
+  {
+    .name = "debian-wasi",
+    .distro = DISTRO_DEBIAN,
+    .installed = COMPILER_CLANG,
+    .toolchain = TOOLCHAIN_CLANG,
+    .extra = "lld llvm",
+    .sysroots = { SYSROOT_WASI },
+    .lanes = { "clang-wasi" },
+  },
+  {
+    .name = "debian-sysroot",
+    .distro = DISTRO_DEBIAN,
+    .installed = COMPILER_CLANG,
+    .toolchain = TOOLCHAIN_CLANG,
+    .extra = "lld llvm",
+    .sysroots = { SYSROOT_ARM64 },
+    .lanes = { "clang-sysroot" },
   },
   {
     .name = "debian-cc-only",
@@ -254,7 +305,7 @@ const c8* toolchain_name(toolchain_t toolchain) {
 }
 
 sp_str_t get_variant_packages(sp_mem_t mem, const variant_t* variant) {
-  const c8* pieces [2 + sp_carr_len(compilers)];
+  const c8* pieces [2 + sp_carr_len(compilers) + SMOKE_MAX_SYSROOTS];
   u32 count = 0;
   pieces[count++] = distros[variant->distro].packages;
   sp_carr_for(compilers, it) {
@@ -265,11 +316,50 @@ sp_str_t get_variant_packages(sp_mem_t mem, const variant_t* variant) {
   if (variant->extra) {
     pieces[count++] = variant->extra;
   }
+  sp_carr_for_until(variant->sysroots, it, variant->sysroots[it]) {
+    sp_assert(variant->distro == DISTRO_DEBIAN);
+    const sysroot_t* sysroot = &sysroots[variant->sysroots[it]];
+    if (sysroot->packages) {
+      pieces[count++] = sysroot->packages;
+    }
+  }
   return sp_str_join_cstr_n(mem, pieces, count, sp_str_lit(" "));
 }
 
+static void push_sysroot_setup(sp_mem_t mem, sp_da(sp_str_t)* steps, const sysroot_t* sysroot) {
+  if (sysroot->links[0].dir) {
+    sp_da_push(*steps, sp_fmt(mem, "mkdir -p {}", sp_fmt_cstr(sysroot->path)).value);
+    sp_carr_for_until(sysroot->links, it, sysroot->links[it].dir) {
+      sp_da_push(*steps, sp_fmt(mem, "ln -s {} {}/{}", sp_fmt_cstr(sysroot->links[it].from), sp_fmt_cstr(sysroot->path), sp_fmt_cstr(sysroot->links[it].dir)).value);
+    }
+  }
+  if (sysroot->arch) {
+    const c8* debs [SMOKE_MAX_DEBS];
+    u32 count = 0;
+    sp_carr_for_until(sysroot->debs, it, sysroot->debs[it]) {
+      debs[count++] = sp_str_to_cstr(mem, sp_fmt(mem, "{}:{}", sp_fmt_cstr(sysroot->debs[it]), sp_fmt_cstr(sysroot->arch)).value);
+    }
+    sp_da_push(*steps, sp_fmt(mem, "dpkg --add-architecture {}", sp_fmt_cstr(sysroot->arch)).value);
+    sp_da_push(*steps, sp_str_lit("apt-get update"));
+    sp_da_push(*steps, sp_str_lit("cd /tmp"));
+    sp_da_push(*steps, sp_fmt(mem, "apt-get download {}", sp_fmt_str(sp_str_join_cstr_n(mem, debs, count, sp_str_lit(" ")))).value);
+    sp_da_push(*steps, sp_fmt(mem, "mkdir -p {}", sp_fmt_cstr(sysroot->path)).value);
+    sp_da_push(*steps, sp_fmt(mem, "for d in *.deb; do dpkg -x \"$d\" {}; done", sp_fmt_cstr(sysroot->path)).value);
+    sp_da_push(*steps, sp_str_lit("rm -f *.deb"));
+    sp_da_push(*steps, sp_str_lit("rm -rf /var/lib/apt/lists/*"));
+  }
+}
+
+sp_str_t get_variant_setup(sp_mem_t mem, const variant_t* variant) {
+  sp_da(sp_str_t) steps = sp_da_new(mem, sp_str_t);
+  sp_carr_for_until(variant->sysroots, it, variant->sysroots[it]) {
+    push_sysroot_setup(mem, &steps, &sysroots[variant->sysroots[it]]);
+  }
+  return sp_str_join_n(mem, steps, (u32)sp_da_size(steps), sp_str_lit(" && "));
+}
+
 sp_str_t variant_summary(sp_mem_t mem, const variant_t* variant) {
-  const c8* pieces [4 + sp_carr_len(compilers)];
+  const c8* pieces [5 + sp_carr_len(compilers)];
   u32 count = 0;
   pieces[count++] = distros[variant->distro].label;
 
@@ -289,6 +379,14 @@ sp_str_t variant_summary(sp_mem_t mem, const variant_t* variant) {
   }
   if (variant->spn == SPN_GNU) {
     pieces[count++] = "dynamic spn";
+  }
+  if (variant->sysroots[0]) {
+    const c8* names [SMOKE_MAX_SYSROOTS];
+    u32 num_sysroots = 0;
+    sp_carr_for_until(variant->sysroots, it, variant->sysroots[it]) {
+      names[num_sysroots++] = sysroots[variant->sysroots[it]].name;
+    }
+    pieces[count++] = sp_str_to_cstr(mem, sp_fmt(mem, "sysroots {}", sp_fmt_str(sp_str_join_cstr_n(mem, names, num_sysroots, sp_str_lit(" ")))).value);
   }
   if (variant->lanes[0]) {
     u32 num_lanes = 0;

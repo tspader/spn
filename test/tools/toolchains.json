@@ -80,7 +80,177 @@
         "program": "clang++"
       },
       "link_args": [
-        "--ld-path=x86_64-w64-mingw32-ld"
+        "--ld-path=x86_64-w64-mingw32-ld",
+        "-L/usr/lib/gcc/x86_64-w64-mingw32/12-win32"
+      ],
+      "host": {
+        "x86_64-linux": {},
+        "aarch64-linux": {}
+      },
+      "target": [
+        {
+          "arch": "x86_64",
+          "os": "windows",
+          "abi": "gnu"
+        }
+      ]
+    },
+    {
+      "name": "clang-bare",
+      "driver": "clang",
+      "compiler": {
+        "program": "clang"
+      },
+      "archiver": {
+        "program": "ar"
+      },
+      "host": {
+        "x86_64-linux": {}
+      },
+      "target": [
+        {
+          "arch": "x86_64",
+          "os": "freestanding",
+          "abi": "none"
+        }
+      ]
+    },
+    {
+      "name": "musl-gcc",
+      "driver": "gcc",
+      "compiler": {
+        "program": "musl-gcc"
+      },
+      "archiver": {
+        "program": "ar"
+      },
+      "host": {
+        "x86_64-linux": {}
+      },
+      "target": [
+        {
+          "arch": "x86_64",
+          "os": "linux",
+          "abi": "musl"
+        }
+      ]
+    },
+    {
+      "name": "clang-musl",
+      "driver": "clang",
+      "compiler": {
+        "program": "clang"
+      },
+      "archiver": {
+        "program": "ar"
+      },
+      "link_args": [
+        "-rtlib=compiler-rt",
+        "-unwindlib=none"
+      ],
+      "host": {
+        "x86_64-linux": {}
+      },
+      "target": [
+        {
+          "arch": "x86_64",
+          "os": "linux",
+          "abi": "gnu"
+        },
+        {
+          "arch": "x86_64",
+          "os": "linux",
+          "abi": "musl",
+          "sysroot": "/sysroot/musl"
+        }
+      ]
+    },
+    {
+      "name": "clang-wasi",
+      "driver": "clang",
+      "compiler": {
+        "program": "clang"
+      },
+      "archiver": {
+        "program": "llvm-ar"
+      },
+      "host": {
+        "x86_64-linux": {}
+      },
+      "target": [
+        {
+          "arch": "wasm32",
+          "os": "wasi",
+          "abi": "musl",
+          "sysroot": "/usr"
+        }
+      ]
+    },
+    {
+      "name": "clang-sysroot",
+      "driver": "clang",
+      "compiler": {
+        "program": "clang"
+      },
+      "archiver": {
+        "program": "llvm-ar"
+      },
+      "linker": {
+        "elf": "lld"
+      },
+      "link_args": [
+        "-fuse-ld=lld"
+      ],
+      "host": {
+        "x86_64-linux": {}
+      },
+      "target": [
+        {
+          "arch": "aarch64",
+          "os": "linux",
+          "abi": "gnu",
+          "sysroot": "/sysroot/arm64"
+        }
+      ]
+    },
+    {
+      "name": "clang-cross",
+      "driver": "clang",
+      "compiler": {
+        "program": "clang"
+      },
+      "archiver": {
+        "program": "aarch64-linux-gnu-ar"
+      },
+      "host": {
+        "x86_64-linux": {}
+      },
+      "target": [
+        {
+          "arch": "aarch64",
+          "os": "linux",
+          "abi": "gnu"
+        }
+      ]
+    },
+    {
+      "name": "clang-mingw-lld",
+      "driver": "clang",
+      "compiler": {
+        "program": "clang"
+      },
+      "archiver": {
+        "program": "x86_64-w64-mingw32-ar"
+      },
+      "cxx": {
+        "program": "clang++"
+      },
+      "linker": {
+        "mingw": "lld"
+      },
+      "link_args": [
+        "-fuse-ld=lld",
+        "-L/usr/lib/gcc/x86_64-w64-mingw32/12-win32"
       ],
       "host": {
         "x86_64-linux": {},

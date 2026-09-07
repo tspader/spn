@@ -42,6 +42,11 @@ and skips with a reason otherwise.
 - `.linker = SPN_LD_FAMILY_LLD`: only where the lane's declared family for the
   target's output format is that one. Cases about what a family accepts gate on
   this, never on a lane or driver name.
+- `.cxx`: only where the lane declares a C++ compiler. `musl-gcc`, `clang-musl`
+  and `clang-bare` have none, since Debian ships no C++ runtime for those
+  targets.
+- `.sanitize` also skips where a system gcc or clang targets a libc other than
+  the host's, since its sanitizer runtimes are built for the host libc.
 - `.driver`, `.os`, `.host`, `.shell`, and the rest are unchanged. `.programs`
   is for cases that need a program by name that the lane doesn't provide, like
   a fixture-local toolchain's `compiler = "gcc"`, never as a stand-in for a
@@ -56,6 +61,19 @@ family belongs to a lane.
 A case that needs user config of its own puts it in a file in its fixture dir
 and names it with `.config = "config.toml"`. It is appended to the generated
 config, so the lane catalog survives.
+
+## sysroots
+
+A lane target that names a `sysroot` points at a tree its container assembles,
+declared as data in `tools/docker/source/variant/variant.c`: `debian-musl`
+links Debian's musl headers and libs under `/sysroot/musl`, `debian-sysroot`
+unpacks the arm64 libc and libgcc debs under `/sysroot/arm64`, and
+`debian-wasi` names `/usr` because Debian's wasi-libc is already laid out as
+one. `musl-gcc` and `clang-cross` list a target with no sysroot and lean on
+the wrapper or on clang's gcc-cross discovery instead.
+clang hands an `x86_64-none-elf` link to `gcc`, so `clang-bare` lives where
+both are installed. Debian names its mingw libgcc directory `12-win32`, which clang 14 does not
+parse as a version, so both clang mingw lanes name it with `-L`.
 
 ## what a lane proves
 
@@ -81,10 +99,19 @@ proves the `linker` fact matches the family the lane declares.
 | `clang-msvc`  | clang   | lld on msvc                | `-fuse-ld=lld`                     | Windows with LLVM                             |
 | `aarch64-gnu` | gcc     | gnu                        |                                    | `debian-cross`                                |
 | `mingw-gnu`   | gcc     | gnu                        |                                    | `debian-mingw`                                |
-| `clang-mingw` | clang   | gnu on mingw               | `--ld-path=x86_64-w64-mingw32-ld`  | `debian-mingw-clang`                          |
+| `clang-mingw` | clang   | gnu on mingw               | `--ld-path=x86_64-w64-mingw32-ld -L<libgcc>` | `debian-mingw-clang`                |
+| `clang-mingw-lld` | clang | lld on mingw            | `-fuse-ld=lld -L<libgcc>`          | `debian-mingw-clang`                          |
+| `clang-bare`  | clang   | gnu on elf, via gcc        |                                    | `debian-llvm`                                 |
+| `musl-gcc`    | gcc     | gnu                        |                                    | `debian-musl`                                 |
+| `clang-musl`  | clang   | gnu                        | `-rtlib=compiler-rt -unwindlib=none` | `debian-musl`, host gnu and sysroot musl    |
+| `clang-wasi`  | clang   | lld (wasm)                 |                                    | `debian-wasi`                                 |
+| `clang-sysroot` | clang | lld on elf                 | `-fuse-ld=lld`                     | `debian-sysroot`                              |
+| `clang-cross` | clang   | gnu                        |                                    | `debian-cross`                                |
 
-The cross lanes (`aarch64-gnu`, `mingw-gnu`, `clang-mingw`) can't target the
-host, so only cases with a matching `.target` run there. The `clang` and `llvm`
+The cross lanes (`aarch64-gnu`, `mingw-gnu`, `clang-mingw`, `clang-mingw-lld`,
+`clang-wasi`, `clang-sysroot`, `clang-cross`) can't target the host, so only
+cases with a matching `.target` run there; `target.cross_exe` builds for a
+lane's first cross target so every one of them links something. The `clang` and `llvm`
 lanes claim only the host: a bare-name clang reaches bare metal only through
 whatever runtime and linker happen to be installed, so nothing is proven about
 it there. On a Mac, put Homebrew's `lld` and keg-only `llvm` on PATH after the
