@@ -34,8 +34,9 @@ static const c8* spn_hint(spn_kind_t kind) {
   SP_UNREACHABLE_RETURN("");
 }
 
-static sp_str_t dockerfile_path(docker_t* docker, const variant_t* variant) {
-  return sp_fs_join_path(docker->mem, docker->paths.dockerfiles, sp_fmt(docker->mem, "{}.dockerfile", sp_fmt_cstr(variant->name)).value);
+static sp_str_t get_manifest_path(docker_t* docker, const variant_t* variant) {
+  sp_str_t file = sp_fmt(docker->mem, "{}.dockerfile", sp_fmt_cstr(variant->name)).value;
+  return sp_fs_join_path(docker->mem, docker->paths.dockerfiles, file);
 }
 
 static const c8* bind(docker_t* docker, sp_str_t host, const c8* guest) {
@@ -169,22 +170,22 @@ docker_render_err_t docker_render(docker_t* docker, const variant_t* variant) {
   sp_mem_t mem = docker->mem;
 
   sp_str_t source = sp_zero;
-  if (!sp_template_get(docker->templates, sp_cstr_as_str(variant_template(variant)), &source)) {
+  if (!sp_template_get(docker->templates, get_template_name(variant), &source)) {
     return DOCKER_RENDER_ERR_MISSING;
   }
 
   sp_template_scope_t* scope = sp_template_scope_create(mem);
-  sp_template_set(scope, sp_str_lit("packages"), variant_packages(mem, variant));
+  sp_template_set(scope, sp_str_lit("packages"), get_variant_packages(mem, variant));
 
   sp_io_dyn_mem_writer_t writer = sp_zero;
   sp_io_dyn_mem_writer_init(mem, &writer);
-  sp_template_err_t err = sp_template_render(&writer.base, source, scope, docker->templates);
-  if (err) {
-    docker->err.render = err;
+  docker->err.render = sp_template_render(&writer.base, source, scope, docker->templates);
+  if (docker->err.render) {
     return DOCKER_RENDER_ERR_FAILED;
   }
 
-  sp_fs_create_file_str(dockerfile_path(docker, variant), sp_io_dyn_mem_writer_as_str(&writer));
+  sp_str_t manifest = get_manifest_path(docker, variant);
+  sp_fs_create_file_str(manifest, sp_io_dyn_mem_writer_as_str(&writer));
   return DOCKER_RENDER_OK;
 }
 
@@ -199,7 +200,7 @@ sp_ps_config_cstr_t docker_build(docker_t* docker, const variant_t* variant) {
     .args = {
       "build",
       "-t", docker_image(docker, variant),
-      "-f", sp_str_to_cstr(mem, dockerfile_path(docker, variant)),
+      "-f", sp_str_to_cstr(mem, get_manifest_path(docker, variant)),
       sp_str_to_cstr(mem, docker->paths.dockerfiles),
     },
   };

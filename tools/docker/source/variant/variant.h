@@ -47,9 +47,9 @@ extern const u32 num_variants;
 const variant_t* variant_find(const c8* name);
 const variant_t* variant_hosting(const c8* lane);
 bool             variant_hosts(const variant_t* variant, const c8* lane);
-const c8* variant_template(const variant_t* variant);
+sp_str_t get_template_name(const variant_t* variant);
 const c8* toolchain_name(toolchain_t toolchain);
-sp_str_t variant_packages(sp_mem_t mem, const variant_t* variant);
+sp_str_t get_variant_packages(sp_mem_t mem, const variant_t* variant);
 sp_str_t variant_summary(sp_mem_t mem, const variant_t* variant);
 
 #endif

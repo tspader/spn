@@ -76,10 +76,10 @@ static sp_cli_result_t build_image(sp_cli_t* cli, smoke_t* smoke, const variant_
       break;
     }
     case DOCKER_RENDER_ERR_MISSING: {
-      return fail(cli, smoke, sp_fmt(mem, "missing template {}", sp_fmt_cstr(variant_template(variant))).value);
+      return fail(cli, smoke, sp_fmt(mem, "missing template {}", sp_fmt_str(get_template_name(variant))).value);
     }
     case DOCKER_RENDER_ERR_FAILED: {
-      return fail(cli, smoke, sp_fmt(mem, "failed to render template {} with code {}", sp_fmt_cstr(variant_template(variant)), sp_fmt_int(smoke->docker.err.render)).value);
+      return fail(cli, smoke, sp_fmt(mem, "failed to render template {} with code {}", sp_fmt_str(get_template_name(variant)), sp_fmt_int(smoke->docker.err.render)).value);
     }
   }
 

@@ -239,8 +239,8 @@ const variant_t* variant_hosting(const c8* lane) {
   return SP_NULLPTR;
 }
 
-const c8* variant_template(const variant_t* variant) {
-  return distros[variant->distro].template;
+sp_str_t get_template_name(const variant_t* variant) {
+  return sp_cstr_as_str(distros[variant->distro].template);
 }
 
 const c8* toolchain_name(toolchain_t toolchain) {
@@ -253,7 +253,7 @@ const c8* toolchain_name(toolchain_t toolchain) {
   SP_UNREACHABLE_RETURN("");
 }
 
-sp_str_t variant_packages(sp_mem_t mem, const variant_t* variant) {
+sp_str_t get_variant_packages(sp_mem_t mem, const variant_t* variant) {
   const c8* pieces [2 + sp_carr_len(compilers)];
   u32 count = 0;
   pieces[count++] = distros[variant->distro].packages;
