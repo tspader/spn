@@ -1065,6 +1065,29 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
           );
           break;
         }
+        case SPN_ERR_TOOLCHAIN_MSVC_LINKER_HOST: {
+          sp_tty_fmt(
+            &w,
+            "toolchain {} can't link {.yellow} from {.yellow} with {.red}; declare {.cyan} and add {.cyan} to its {.cyan} to link with lld instead",
+            sp_fmt_str(colored_name(w.color, mem, event->err.toolchain.name)),
+            sp_fmt_str(spn_triple_to_str(mem, event->err.toolchain.target)),
+            sp_fmt_str(spn_triple_to_str(mem, event->err.toolchain.host)),
+            sp_fmt_str(sp_str_lit("link.exe")),
+            sp_fmt_str(sp_str_lit("linker = { msvc = \"lld\" }")),
+            sp_fmt_str(sp_str_lit("-fuse-ld=lld")),
+            sp_fmt_str(sp_str_lit("link_args"))
+          );
+          break;
+        }
+        case SPN_ERR_TOOLCHAIN_ZIG_MSVC_SDK: {
+          sp_tty_fmt(
+            &w,
+            "toolchain {} can't target {.yellow} yet; spn can't supply zig an external MSVC SDK",
+            sp_fmt_str(colored_name(w.color, mem, event->err.toolchain.name)),
+            sp_fmt_str(spn_triple_to_str(mem, event->err.toolchain.target))
+          );
+          break;
+        }
         case SPN_ERR_TARGET_ABI: {
           sp_tty_fmt(
             &w,

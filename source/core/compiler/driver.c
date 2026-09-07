@@ -132,6 +132,17 @@ static spn_err_t feature_unsupported(const spn_cc_toolchain_t* toolchain, const 
   });
 }
 
+static spn_err_t link_refused(spn_err_t kind, const spn_cc_toolchain_t* toolchain, spn_triple_t host, const spn_profile_info_t* profile) {
+  return spn_err_emit(&spn, (spn_err_union_t) {
+    .kind = kind,
+    .toolchain = {
+      .name = toolchain->name,
+      .target = { profile->arch, profile->os, profile->abi },
+      .host = host,
+    },
+  });
+}
+
 spn_err_t spn_cc_validate_profile(const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile) {
   spn_triple_t target = { profile->arch, profile->os, profile->abi };
   spn_sanitizer_set_t supported = get_supported_sanitizers(toolchain, target);
@@ -242,7 +253,7 @@ spn_invocation_t spn_cc_render_compile_command(sp_mem_t mem, const spn_cc_toolch
   return invocation;
 }
 
-spn_err_t spn_cc_validate_link(const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_link_t* link) {
+spn_err_t spn_cc_validate_link(const spn_cc_toolchain_t* toolchain, spn_triple_t host, const spn_profile_info_t* profile, const spn_cc_link_t* link) {
   spn_try(spn_cc_validate_profile(toolchain, profile));
   spn_cc_feature_t feature = link_feature(link->kind);
 
@@ -256,16 +267,24 @@ spn_err_t spn_cc_validate_link(const spn_cc_toolchain_t* toolchain, const spn_pr
     return feature_unsupported(toolchain, profile, SPN_CC_FEATURE_FRAMEWORKS);
   }
   spn_triple_t target = { profile->arch, profile->os, profile->abi };
-  if (!sp_da_empty(link->scripts) && !spn_ld_scripts(spn_ld_family(&toolchain->linkers, target), spn_ld_flavor(target))) {
+  spn_ld_flavor_t flavor = spn_ld_flavor(target);
+  spn_ld_family_t family = spn_ld_family(&toolchain->linkers, target);
+  if (!sp_da_empty(link->scripts) && !spn_ld_scripts(family, flavor)) {
     return feature_unsupported(toolchain, profile, SPN_CC_FEATURE_LINKER_SCRIPT);
+  }
+  if (family == SPN_LD_FAMILY_MSVC && host.os != SPN_OS_WINDOWS) {
+    return link_refused(SPN_ERR_TOOLCHAIN_MSVC_LINKER_HOST, toolchain, host, profile);
+  }
+  if (flavor == SPN_LD_FLAVOR_MSVC && toolchain->driver == SPN_CC_DRIVER_ZIG) {
+    return link_refused(SPN_ERR_TOOLCHAIN_ZIG_MSVC_SDK, toolchain, host, profile);
   }
   return SPN_OK;
 }
 
-spn_err_t spn_cc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_link_t* link, const spn_cc_link_files_t* files, spn_invocation_t* invocation) {
+spn_err_t spn_cc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, spn_triple_t host, const spn_profile_info_t* profile, const spn_cc_link_t* link, const spn_cc_link_files_t* files, spn_invocation_t* invocation) {
   sp_assert(!spn_path_empty(files->output));
   if (!spn_path_empty(files->exports.path)) sp_assert(sp_da_empty(files->exports.symbols));
-  spn_try(spn_cc_validate_link(toolchain, profile, link));
+  spn_try(spn_cc_validate_link(toolchain, host, profile, link));
   *invocation = sp_zero_s(spn_invocation_t);
   switch (toolchain->driver) {
     case SPN_CC_DRIVER_GCC:

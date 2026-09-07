@@ -4,6 +4,7 @@
 #include "spn_test.h"
 #include "arg.h"
 #include "linkers.h"
+#include "triples.h"
 #include "hash/digest/digest.h"
 #include "paths/paths.h"
 #include "enum/enum.h"
@@ -13,18 +14,6 @@
 #define FIXTURE_MAX_ARGS 2
 #define FIXTURE_MAX_HOSTS 6
 #define FIXTURE_MAX_TARGETS 12
-
-#define HOST_X64_LINUX      { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU }
-#define HOST_X64_LINUX_MUSL { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL }
-#define HOST_ARM_LINUX      { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_GNU }
-#define HOST_X64_MACOS      { SPN_ARCH_X64, SPN_OS_MACOS, SPN_ABI_APPLE }
-#define HOST_ARM_MACOS      { SPN_ARCH_ARM64, SPN_OS_MACOS, SPN_ABI_APPLE }
-#define HOST_X64_WINDOWS    { SPN_ARCH_X64, SPN_OS_WINDOWS }
-#define TARGET_WIN_GNU      { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU }
-#define TARGET_WIN_MSVC     { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MSVC }
-#define TARGET_WASM         { SPN_ARCH_WASM32, SPN_OS_WASI, SPN_ABI_MUSL }
-#define TARGET_X64_BARE     { SPN_ARCH_X64, SPN_OS_FREESTANDING, SPN_ABI_BARE }
-#define TARGET_ARM_BARE     { SPN_ARCH_ARM64, SPN_OS_FREESTANDING, SPN_ABI_BARE }
 
 typedef struct {
   const c8* name;

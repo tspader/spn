@@ -473,7 +473,7 @@ spn_err_t spn_target_link_invocation(sp_mem_t mem, spn_target_unit_t* target, co
     case SPN_CC_OUTPUT_REACTOR: {
       spn_cc_link_files_t linked = *files;
       linked.whole_archives = target->link.archives;
-      spn_try(spn_cc_render_link(mem, toolchain, profile, &target->link.cc, &linked, invocation));
+      spn_try(spn_cc_render_link(mem, toolchain, spn.host, profile, &target->link.cc, &linked, invocation));
       break;
     }
     case SPN_CC_OUTPUT_OBJECT: {
@@ -500,10 +500,10 @@ static spn_err_t build_target_plan(spn_target_unit_t* target) {
     case SPN_CC_OUTPUT_SHARED_LIB:
     case SPN_CC_OUTPUT_REACTOR: {
       spn_try(spn_cc_validate_archive(toolchain, profile));
-      return spn_cc_validate_link(toolchain, profile, &target->link.cc);
+      return spn_cc_validate_link(toolchain, spn.host, profile, &target->link.cc);
     }
     case SPN_CC_OUTPUT_EXE: {
-      return spn_cc_validate_link(toolchain, profile, &target->link.cc);
+      return spn_cc_validate_link(toolchain, spn.host, profile, &target->link.cc);
     }
     case SPN_CC_OUTPUT_OBJECT: {
       return SPN_OK;

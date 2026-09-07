@@ -1,6 +1,7 @@
 #pragma once
 
 #include "spn_test.h"
+#include "triples.h"
 
 #include "compiler/driver.h"
 #include "compiler/exports.h"
@@ -9,6 +10,7 @@
 #include "ctx/types.h"
 #include "paths/paths.h"
 #include "session/invocation.h"
+#include "triple/triple.h"
 
 #define render_args_max 20
 #define rsp_args_max 8

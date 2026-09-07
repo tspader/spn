@@ -6,6 +6,7 @@ typedef struct {
   spn_cc_driver_t driver;
   spn_ld_family_t family;
   const c8* link_args [2];
+  spn_triple_t host;
   test_profile_t profile;
   spn_cc_output_kind_t kind;
   const c8* exports;
@@ -97,6 +98,7 @@ static const link_test_t tests [] = {
     .name = "msvc_exe_libs",
     .driver = SPN_CC_DRIVER_MSVC,
     .family = SPN_LD_FAMILY_MSVC,
+    .host = HOST_X64_WINDOWS,
     .profile = {
       .arch = SPN_ARCH_X64,
       .os = SPN_OS_WINDOWS,
@@ -122,6 +124,7 @@ static const link_test_t tests [] = {
     .name = "msvc_shared_lib",
     .driver = SPN_CC_DRIVER_MSVC,
     .family = SPN_LD_FAMILY_MSVC,
+    .host = HOST_X64_WINDOWS,
     .profile = {
       .arch = SPN_ARCH_X64,
       .os = SPN_OS_WINDOWS,
@@ -137,6 +140,7 @@ static const link_test_t tests [] = {
     .name = "msvc_debug_pdb",
     .driver = SPN_CC_DRIVER_MSVC,
     .family = SPN_LD_FAMILY_MSVC,
+    .host = HOST_X64_WINDOWS,
     .profile = {
       .arch = SPN_ARCH_X64,
       .os = SPN_OS_WINDOWS,
@@ -153,6 +157,7 @@ static const link_test_t tests [] = {
     .name = "msvc_subsystem",
     .driver = SPN_CC_DRIVER_MSVC,
     .family = SPN_LD_FAMILY_MSVC,
+    .host = HOST_X64_WINDOWS,
     .profile = {
       .arch = SPN_ARCH_X64,
       .os = SPN_OS_WINDOWS,
@@ -169,6 +174,7 @@ static const link_test_t tests [] = {
     .name = "msvc_reactor_unsupported",
     .driver = SPN_CC_DRIVER_MSVC,
     .family = SPN_LD_FAMILY_MSVC,
+    .host = HOST_X64_WINDOWS,
     .profile = {
       .arch = SPN_ARCH_X64,
       .os = SPN_OS_WINDOWS,
@@ -257,6 +263,7 @@ static const link_test_t tests [] = {
     .name = "msvc_link_flag",
     .driver = SPN_CC_DRIVER_MSVC,
     .family = SPN_LD_FAMILY_MSVC,
+    .host = HOST_X64_WINDOWS,
     .profile = {
       .arch = SPN_ARCH_X64,
       .os = SPN_OS_WINDOWS,
@@ -669,6 +676,7 @@ static const link_test_t tests [] = {
     .name = "msvc_toolchain_link_args_after_link",
     .driver = SPN_CC_DRIVER_MSVC,
     .family = SPN_LD_FAMILY_MSVC,
+    .host = HOST_X64_WINDOWS,
     .link_args = { "/B" },
     .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_WINDOWS, .abi = SPN_ABI_MSVC },
     .kind = SPN_CC_OUTPUT_EXE,
@@ -682,6 +690,7 @@ static const link_test_t tests [] = {
     .name = "clang_msvc_link",
     .driver = SPN_CC_DRIVER_CLANG,
     .family = SPN_LD_FAMILY_MSVC,
+    .host = HOST_X64_WINDOWS,
     .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_WINDOWS, .abi = SPN_ABI_MSVC },
     .kind = SPN_CC_OUTPUT_EXE,
     .expect = {
@@ -693,6 +702,7 @@ static const link_test_t tests [] = {
     .name = "clang_msvc_shared_def",
     .driver = SPN_CC_DRIVER_CLANG,
     .family = SPN_LD_FAMILY_MSVC,
+    .host = HOST_X64_WINDOWS,
     .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_WINDOWS, .abi = SPN_ABI_MSVC },
     .kind = SPN_CC_OUTPUT_SHARED_LIB,
     .exports = "S.def",
@@ -715,6 +725,7 @@ static const link_test_t tests [] = {
     .name = "clang_msvc_subsystem",
     .driver = SPN_CC_DRIVER_CLANG,
     .family = SPN_LD_FAMILY_MSVC,
+    .host = HOST_X64_WINDOWS,
     .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_WINDOWS, .abi = SPN_ABI_MSVC },
     .kind = SPN_CC_OUTPUT_EXE,
     .subsystem = SPN_WIN_SUBSYSTEM_WINDOWS,
@@ -727,6 +738,7 @@ static const link_test_t tests [] = {
     .name = "clang_msvc_rpath_never_renders",
     .driver = SPN_CC_DRIVER_CLANG,
     .family = SPN_LD_FAMILY_MSVC,
+    .host = HOST_X64_WINDOWS,
     .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_WINDOWS, .abi = SPN_ABI_MSVC },
     .kind = SPN_CC_OUTPUT_EXE,
     .rpath = true,
@@ -776,6 +788,58 @@ static const link_test_t tests [] = {
     .expect = {
       .err = SPN_ERR_COMPILER_FEATURE_UNSUPPORTED,
       .feature = SPN_CC_FEATURE_LINKER_SCRIPT,
+    },
+  },
+  {
+    .name = "msvc_linker_needs_windows_host",
+    .driver = SPN_CC_DRIVER_CLANG,
+    .family = SPN_LD_FAMILY_MSVC,
+    .host = HOST_X64_LINUX,
+    .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_WINDOWS, .abi = SPN_ABI_MSVC },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .expect = { .err = SPN_ERR_TOOLCHAIN_MSVC_LINKER_HOST },
+  },
+  {
+    .name = "lld_links_msvc_off_windows",
+    .driver = SPN_CC_DRIVER_CLANG,
+    .family = SPN_LD_FAMILY_LLD,
+    .link_args = { "-fuse-ld=lld" },
+    .host = HOST_X64_LINUX,
+    .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_WINDOWS, .abi = SPN_ABI_MSVC },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .expect = {
+      .command = "cc",
+      .args = { "--target=x86_64-windows-msvc", "-fuse-ld=lld", "main.o", "-o", "main" },
+    },
+  },
+  {
+    .name = "zig_msvc_sdk_unsupported",
+    .driver = SPN_CC_DRIVER_ZIG,
+    .family = SPN_LD_FAMILY_LLD,
+    .host = HOST_X64_LINUX,
+    .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_WINDOWS, .abi = SPN_ABI_MSVC },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .expect = { .err = SPN_ERR_TOOLCHAIN_ZIG_MSVC_SDK },
+  },
+  {
+    .name = "zig_msvc_sdk_unsupported_on_windows",
+    .driver = SPN_CC_DRIVER_ZIG,
+    .family = SPN_LD_FAMILY_LLD,
+    .host = HOST_X64_WINDOWS,
+    .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_WINDOWS, .abi = SPN_ABI_MSVC },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .expect = { .err = SPN_ERR_TOOLCHAIN_ZIG_MSVC_SDK },
+  },
+  {
+    .name = "zig_mingw_links_off_windows",
+    .driver = SPN_CC_DRIVER_ZIG,
+    .family = SPN_LD_FAMILY_LLD,
+    .host = HOST_X64_LINUX,
+    .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_WINDOWS, .abi = SPN_ABI_GNU },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .expect = {
+      .command = "cc",
+      .args = { "--target=x86_64-windows-gnu", "main.o", "-o", "main" },
     },
   },
 };
@@ -846,13 +910,28 @@ sp_test_each(render_link, render, link_test_t, tests, .setup = spn_test_ctx_setu
 
   spn_profile_info_t profile = test_profile(it->profile);
   spn_invocation_t invocation = sp_zero;
-  spn_err_t err = spn_cc_render_link(mem, &toolchain, &profile, &link, &files, &invocation);
+  spn_err_t err = spn_cc_render_link(mem, &toolchain, it->host, &profile, &link, &files, &invocation);
   sp_expect_eq(t, err, it->expect.err);
   if (it->expect.err) {
     sp_da(spn_event_t) errs = spn_test_drain_errs(mem);
     sp_must_eq(t, 1, sp_da_size(errs));
     sp_expect_eq(t, errs[0].err.kind, it->expect.err);
-    sp_expect_eq(t, errs[0].err.compiler.feature, it->expect.feature);
+    switch (errs[0].err.kind) {
+      case SPN_ERR_COMPILER_FEATURE_UNSUPPORTED: {
+        sp_expect_eq(t, errs[0].err.compiler.feature, it->expect.feature);
+        sp_expect(t, spn_triple_equal(errs[0].err.compiler.target, triple));
+        break;
+      }
+      case SPN_ERR_TOOLCHAIN_MSVC_LINKER_HOST:
+      case SPN_ERR_TOOLCHAIN_ZIG_MSVC_SDK: {
+        sp_expect(t, spn_triple_equal(errs[0].err.toolchain.target, triple));
+        sp_expect(t, spn_triple_equal(errs[0].err.toolchain.host, it->host));
+        break;
+      }
+      default: {
+        break;
+      }
+    }
     return SP_OK;
   }
   return expect_args(t, &invocation, it->expect);
