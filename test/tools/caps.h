@@ -32,6 +32,7 @@ typedef struct {
   const c8* lanes [SPN_TEST_MAX_LANES];
   const c8* programs [SPN_TEST_MAX_PROGRAMS];
   bool exports;
+  bool cxx;
   bool deterministic;
   bool msvc_todo;
   bool shell;
@@ -46,6 +47,7 @@ const test_toolchain_t* test_toolchain(void);
 sp_str_t  test_lanes_toml(void);
 spn_triple_t test_host(void);
 const c8* test_target_alternate(void);
+const c8* test_host_triple(void);
 sp_str_t  test_when_blocked(test_when_t when);
 bool      test_when_runs(const test_when_t* when);
 

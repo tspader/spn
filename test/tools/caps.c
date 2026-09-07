@@ -3,6 +3,7 @@
 #include "fixture.h"
 
 #include "enum/enum.h"
+#include "paths/paths.h"
 #include "toolchain/catalog.h"
 #include "toolchain/linker.h"
 #include "toolchain/search.h"
@@ -84,6 +85,11 @@ static bool toolchain_targets(const spn_toolchain_info_t* info, spn_triple_t tar
   return false;
 }
 
+const c8* test_host_triple(void) {
+  sp_mem_t mem = sp_mem_os_new();
+  return sp_str_to_cstr(mem, spn_triple_to_str(mem, test_host()));
+}
+
 const c8* test_target_alternate(void) {
   const spn_toolchain_info_t* info = test_toolchain()->info;
   spn_triple_t host = test_host();
@@ -103,6 +109,27 @@ const c8* test_target_alternate(void) {
 }
 
 spn_sanitizer_set_t get_supported_sanitizers(const spn_cc_toolchain_t* toolchain, spn_triple_t target);
+
+// A default build asks for musl before the host libc, so a lane that lists
+// musl builds it, and builds it statically
+static spn_triple_t default_target(const spn_toolchain_info_t* info) {
+  spn_triple_t host = test_host();
+  spn_triple_t musl = { host.arch, SPN_OS_LINUX, SPN_ABI_MUSL };
+  return host.os == SPN_OS_LINUX && targets(info, musl) ? musl : host;
+}
+
+// A system gcc or clang carries sanitizer runtimes for the host libc only; a
+// lane that swaps the libc through a sysroot or a wrapper can't link them
+static bool toolchain_sanitizes(const test_toolchain_t* toolchain, spn_triple_t target) {
+  switch (toolchain->info->driver) {
+    case SPN_CC_DRIVER_GCC:
+    case SPN_CC_DRIVER_CLANG: return target.os != SPN_OS_LINUX || target.abi == spn_triple_host().abi;
+    case SPN_CC_DRIVER_ZIG:
+    case SPN_CC_DRIVER_MSVC: return true;
+    case SPN_CC_DRIVER_NONE: sp_unreachable_case();
+  }
+  sp_unreachable_return(true);
+}
 
 static bool toolchain_enforces_exports(const test_toolchain_t* toolchain, spn_triple_t target) {
   if (sp_cstr_equal(toolchain->name, "zig") && target.os == SPN_OS_MACOS) {
@@ -127,11 +154,11 @@ typedef struct {
 } lane_program_t;
 
 static const lane_program_t lane_programs [] = {
-  { "llvm",        SPN_LD_FLAVOR_ELF,   "ld.lld" },
-  { "llvm",        SPN_LD_FLAVOR_MACHO, "ld64.lld" },
-  { "gcc-lld",     SPN_LD_FLAVOR_ELF,   "ld.lld" },
-  { "clang-msvc",  SPN_LD_FLAVOR_MSVC,  "lld-link" },
-  { "clang-mingw", SPN_LD_FLAVOR_MINGW, "x86_64-w64-mingw32-ld" },
+  { "llvm",            SPN_LD_FLAVOR_ELF,   "ld.lld" },
+  { "llvm",            SPN_LD_FLAVOR_MACHO, "ld64.lld" },
+  { "gcc-lld",         SPN_LD_FLAVOR_ELF,   "ld.lld" },
+  { "clang-msvc",      SPN_LD_FLAVOR_MSVC,  "lld-link" },
+  { "clang-mingw",     SPN_LD_FLAVOR_MINGW, "x86_64-w64-mingw32-ld" },
 };
 
 static bool links_flavor(const spn_toolchain_info_t* info, spn_ld_flavor_t flavor) {
@@ -397,16 +424,32 @@ sp_str_t test_when_blocked(test_when_t when) {
   }
 
   if (when.sanitize) {
+    spn_triple_t picked = when.target ? target : default_target(toolchain->info);
     spn_cc_toolchain_t cc = {
       .name = toolchain->info->name,
       .driver = toolchain->info->driver,
     };
-    if (when.sanitize & ~get_supported_sanitizers(&cc, target)) {
+    if (when.sanitize & ~get_supported_sanitizers(&cc, picked)) {
       return sp_fmt(mem, "{} targeting {} can't build sanitize={}",
         sp_fmt_cstr(toolchain->name),
-        sp_fmt_str(spn_triple_to_str(mem, target)),
+        sp_fmt_str(spn_triple_to_str(mem, picked)),
         sp_fmt_str(spn_sanitizer_set_to_str(mem, when.sanitize))).value;
     }
+    if (picked.abi == SPN_ABI_MUSL && (when.sanitize & ~SPN_SANITIZER_UNDEFINED)) {
+      return sp_fmt(mem, "{} links {} statically, which refuses sanitize={}",
+        sp_fmt_cstr(toolchain->name),
+        sp_fmt_str(spn_triple_to_str(mem, picked)),
+        sp_fmt_str(spn_sanitizer_set_to_str(mem, when.sanitize))).value;
+    }
+    if (!toolchain_sanitizes(toolchain, picked)) {
+      return sp_fmt(mem, "{} targeting {} has no sanitizer runtime for that libc",
+        sp_fmt_cstr(toolchain->name),
+        sp_fmt_str(spn_triple_to_str(mem, picked))).value;
+    }
+  }
+
+  if (when.cxx && spn_arg_empty(toolchain->info->cxx.program)) {
+    return sp_fmt(mem, "{} has no C++ compiler", sp_fmt_cstr(toolchain->name)).value;
   }
 
   if (when.exports && !toolchain_enforces_exports(toolchain, target)) {

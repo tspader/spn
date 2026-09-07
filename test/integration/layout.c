@@ -79,13 +79,14 @@ sp_test(layout, reserved_bin_name) {
 }
 
 sp_test(layout, target_triple) {
+  const c8* triple = test_host_triple();
   return run_command_test(t, (command_test_t) {
     .project = "test/integration/fixtures/layout/test_shared",
     .when.msvc_todo = true,
     .copy = { "check.c", "packages/*" },
-    .args = { "build", "--target", SPN_TEST_TRIPLE },
+    .args = { "build", "--target", triple },
     .expect = {
-      .exists = { target_exe("main", SPN_TEST_TRIPLE), target_store_file("bin/main", SPN_TEST_TRIPLE) },
+      .exists = { target_exe("main", triple), target_store_file("bin/main", triple) },
       .missing = { sp_str_lit("build/debug") },
     },
   });

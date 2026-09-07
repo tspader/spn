@@ -242,3 +242,16 @@ sp_test(target, link_flags) {
     },
   });
 }
+
+sp_test(target, cross_exe) {
+  const c8* triple = test_target_alternate();
+  if (!triple) {
+    return sp_test_skip(t, "lane has no cross target");
+  }
+  return run_command_test(t, (command_test_t) {
+    .project = "test/integration/fixtures/profile/override",
+    .when = { .host = SPN_OS_LINUX, .target = triple },
+    .args = { "build", "--target", triple },
+    .expect = { .exists = { target_exe("main", triple) } },
+  });
+}

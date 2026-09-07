@@ -87,7 +87,7 @@ sp_test(profile, config_shared_demand_defaults_to_gnu) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/consume/multi_kind/shared",
     .copy = { "packages/*" },
-    .when.os = SPN_OS_LINUX,
+    .when.target = SPN_TEST_ARCH "-linux-gnu",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build" } },
       { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_INIT_BUILD_GRAPH, .key = "target", .value = SPN_TEST_ARCH "-linux-gnu" } },
@@ -99,7 +99,7 @@ sp_test(profile, root_shared_lib_demand_defaults_to_gnu) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/target/shared_lib",
     .copy = { "spum.c" },
-    .when.os = SPN_OS_LINUX,
+    .when.target = SPN_TEST_ARCH "-linux-gnu",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build" } },
       { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_INIT_BUILD_GRAPH, .key = "target", .value = SPN_TEST_ARCH "-linux-gnu" } },
