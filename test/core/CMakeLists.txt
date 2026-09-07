@@ -132,6 +132,7 @@ add_executable(core
   toolchain/probe.c
   toolchain/program.c
   toolchain/provision.c
+  toolchain/sdk.c
   toolchain/search.c
   toolchain/select.c
   toolchain/sha256.c
@@ -286,6 +287,7 @@ set_source_files_properties(
   toolchain/parse.c
   toolchain/probe.c
   toolchain/program.c
+  toolchain/sdk.c
   toolchain/search.c
   toolchain/provision.c
   toolchain/select.c

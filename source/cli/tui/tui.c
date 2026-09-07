@@ -1037,6 +1037,34 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
           );
           break;
         }
+        case SPN_ERR_TOOLCHAIN_SYSROOT: {
+          sp_tty_fmt(
+            &w,
+            "toolchain {} needs a sysroot to target {.yellow} from {.yellow}",
+            sp_fmt_str(colored_name(w.color, mem, event->err.toolchain.name)),
+            sp_fmt_str(spn_triple_to_str(mem, event->err.toolchain.target)),
+            sp_fmt_str(spn_triple_to_str(mem, event->err.toolchain.host))
+          );
+          break;
+        }
+        case SPN_ERR_TOOLCHAIN_SDK_MACOS: {
+          sp_tty_fmt(
+            &w,
+            "toolchain {} needs the macOS SDK to target {.yellow}, and none was found",
+            sp_fmt_str(colored_name(w.color, mem, event->err.toolchain.name)),
+            sp_fmt_str(spn_triple_to_str(mem, event->err.toolchain.target))
+          );
+          break;
+        }
+        case SPN_ERR_TOOLCHAIN_SDK_MSVC: {
+          sp_tty_fmt(
+            &w,
+            "toolchain {} needs the MSVC SDK to target {.yellow}, and none was found",
+            sp_fmt_str(colored_name(w.color, mem, event->err.toolchain.name)),
+            sp_fmt_str(spn_triple_to_str(mem, event->err.toolchain.target))
+          );
+          break;
+        }
         case SPN_ERR_TARGET_ABI: {
           sp_tty_fmt(
             &w,
@@ -1447,7 +1475,10 @@ static void render_event_extra(sp_tty_t* w, spn_event_t* event) {
           sp_io_write_str(w->io, event->err.publish.output, SP_NULLPTR);
           break;
         }
-        case SPN_ERR_TOOLCHAIN_TARGET: {
+        case SPN_ERR_TOOLCHAIN_TARGET:
+        case SPN_ERR_TOOLCHAIN_SYSROOT:
+        case SPN_ERR_TOOLCHAIN_SDK_MACOS:
+        case SPN_ERR_TOOLCHAIN_SDK_MSVC: {
           sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
           sp_da_for(event->err.toolchain.targets, it) {
             sp_io_write_str(w->io, it ? sp_str_lit(", ") : sp_str_lit("it can target: "), SP_NULLPTR);

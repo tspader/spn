@@ -127,7 +127,15 @@ bool spn_toolchain_driver_produces(spn_cc_driver_t driver, spn_ld_flavor_t flavo
 }
 
 spn_sdk_kind_t spn_sdk_kind(spn_triple_t target) {
-  return SPN_SDK_NONE;
+  switch (target.os) {
+    case SPN_OS_MACOS: return SPN_SDK_MACOS;
+    case SPN_OS_WINDOWS: return target.abi == SPN_ABI_MSVC ? SPN_SDK_MSVC : SPN_SDK_SYSROOT;
+    case SPN_OS_LINUX:
+    case SPN_OS_WASI: return SPN_SDK_SYSROOT;
+    case SPN_OS_FREESTANDING: return SPN_SDK_NONE;
+    case SPN_OS_NONE: sp_unreachable_case();
+  }
+  SP_UNREACHABLE_RETURN(SPN_SDK_NONE);
 }
 
 sp_str_t spn_toolchain_launcher_to_str(const spn_path_roots_t* roots, sp_mem_t mem, spn_toolchain_launcher_t launcher) {
