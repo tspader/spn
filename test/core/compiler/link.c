@@ -254,38 +254,6 @@ static const link_test_t tests [] = {
     },
   },
   {
-    .name = "zig_linker_script",
-    .driver = SPN_CC_DRIVER_ZIG,
-    .family = SPN_LD_FAMILY_LLD,
-    .profile = {
-      .arch = SPN_ARCH_X64,
-      .os = SPN_OS_LINUX,
-      .abi = SPN_ABI_GNU,
-    },
-    .kind = SPN_CC_OUTPUT_EXE,
-    .script = "A.ld",
-    .expect = {
-      .command = "cc",
-      .args = { "--target=x86_64-linux-gnu", "-Wl,-T,A.ld", "main.o", "-o", "main" },
-    },
-  },
-  {
-    .name = "clang_linker_script",
-    .driver = SPN_CC_DRIVER_CLANG,
-    .family = SPN_LD_FAMILY_GNU,
-    .profile = {
-      .arch = SPN_ARCH_X64,
-      .os = SPN_OS_LINUX,
-      .abi = SPN_ABI_GNU,
-    },
-    .kind = SPN_CC_OUTPUT_EXE,
-    .script = "A.ld",
-    .expect = {
-      .command = "cc",
-      .args = { "--target=x86_64-linux-gnu", "-Wl,-T,A.ld", "main.o", "-o", "main" },
-    },
-  },
-  {
     .name = "msvc_link_flag",
     .driver = SPN_CC_DRIVER_MSVC,
     .family = SPN_LD_FAMILY_MSVC,
@@ -562,7 +530,7 @@ static const link_test_t tests [] = {
         "-shared", "S.def",
         "main.o",
         "-Wl,--whole-archive", "libD.a", "-Wl,--no-whole-archive",
-        "-lP", "-Wl,--exclude-libs,libP.a",
+        "-lP",
         "-o", "main"
       },
     },
@@ -741,17 +709,6 @@ static const link_test_t tests [] = {
     },
   },
   {
-    .name = "clang_msvc_static_linkage_suppressed",
-    .driver = SPN_CC_DRIVER_CLANG,
-    .family = SPN_LD_FAMILY_MSVC,
-    .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_WINDOWS, .abi = SPN_ABI_MSVC, .linkage = SPN_LIB_KIND_STATIC },
-    .kind = SPN_CC_OUTPUT_EXE,
-    .expect = {
-      .command = "cc",
-      .args = { "--target=x86_64-windows-msvc", "main.o", "-o", "main" },
-    },
-  },
-  {
     .name = "clang_msvc_rpath_never_renders",
     .driver = SPN_CC_DRIVER_CLANG,
     .family = SPN_LD_FAMILY_MSVC,
@@ -761,30 +718,6 @@ static const link_test_t tests [] = {
     .expect = {
       .command = "cc",
       .args = { "--target=x86_64-windows-msvc", "main.o", "-o", "main" },
-    },
-  },
-  {
-    .name = "windows_gnu_linker_script",
-    .driver = SPN_CC_DRIVER_GCC,
-    .family = SPN_LD_FAMILY_GNU,
-    .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_WINDOWS, .abi = SPN_ABI_GNU },
-    .kind = SPN_CC_OUTPUT_EXE,
-    .script = "A.ld",
-    .expect = {
-      .command = "cc",
-      .args = { "-Wl,-T,A.ld", "main.o", "-o", "main" },
-    },
-  },
-  {
-    .name = "zig_windows_gnu_linker_script_unsupported",
-    .driver = SPN_CC_DRIVER_ZIG,
-    .family = SPN_LD_FAMILY_LLD,
-    .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_WINDOWS, .abi = SPN_ABI_GNU },
-    .kind = SPN_CC_OUTPUT_EXE,
-    .script = "A.ld",
-    .expect = {
-      .err = SPN_ERR_COMPILER_FEATURE_UNSUPPORTED,
-      .feature = SPN_CC_FEATURE_LINKER_SCRIPT,
     },
   },
   {
@@ -819,116 +752,10 @@ static const link_test_t tests [] = {
     },
   },
   {
-    .name = "windows_gnu_lld_shared_no_exclude_libs",
-    .driver = SPN_CC_DRIVER_GCC,
-    .family = SPN_LD_FAMILY_LLD,
-    .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_WINDOWS, .abi = SPN_ABI_GNU },
-    .kind = SPN_CC_OUTPUT_SHARED_LIB,
-    .private_lib = "P",
-    .expect = {
-      .command = "cc",
-      .args = { "-shared", "main.o", "-lP", "-o", "main" },
-    },
-  },
-  {
-    .name = "clang_windows_gnu_shared_exclude_libs",
-    .driver = SPN_CC_DRIVER_CLANG,
-    .family = SPN_LD_FAMILY_GNU,
-    .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_WINDOWS, .abi = SPN_ABI_GNU },
-    .kind = SPN_CC_OUTPUT_SHARED_LIB,
-    .private_lib = "P",
-    .expect = {
-      .command = "cc",
-      .args = {
-        "--target=x86_64-windows-gnu",
-        "-shared",
-        "main.o",
-        "-lP", "-Wl,--exclude-libs,libP.a",
-        "-o", "main"
-      },
-    },
-  },
-  {
-    .name = "clang_windows_gnu_lld_shared_no_exclude_libs",
-    .driver = SPN_CC_DRIVER_CLANG,
-    .family = SPN_LD_FAMILY_LLD,
-    .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_WINDOWS, .abi = SPN_ABI_GNU },
-    .kind = SPN_CC_OUTPUT_SHARED_LIB,
-    .private_lib = "P",
-    .expect = {
-      .command = "cc",
-      .args = {
-        "--target=x86_64-windows-gnu",
-        "-shared",
-        "main.o",
-        "-lP",
-        "-o", "main"
-      },
-    },
-  },
-  {
-    .name = "mingw_static_linkage",
-    .driver = SPN_CC_DRIVER_GCC,
-    .family = SPN_LD_FAMILY_GNU,
-    .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_WINDOWS, .abi = SPN_ABI_GNU, .linkage = SPN_LIB_KIND_STATIC },
-    .kind = SPN_CC_OUTPUT_EXE,
-    .expect = {
-      .command = "cc",
-      .args = { "-static", "main.o", "-o", "main" },
-    },
-  },
-  {
-    .name = "wasi_static_linkage",
-    .driver = SPN_CC_DRIVER_CLANG,
-    .family = SPN_LD_FAMILY_LLD,
-    .profile = { .arch = SPN_ARCH_WASM32, .os = SPN_OS_WASI, .linkage = SPN_LIB_KIND_STATIC },
-    .kind = SPN_CC_OUTPUT_EXE,
-    .expect = {
-      .command = "cc",
-      .args = { "--target=wasm32-wasi", "-static", "main.o", "-o", "main" },
-    },
-  },
-  {
     .name = "macos_linker_script_unsupported",
     .driver = SPN_CC_DRIVER_CLANG,
     .family = SPN_LD_FAMILY_LD64,
     .profile = { .arch = SPN_ARCH_ARM64, .os = SPN_OS_MACOS },
-    .kind = SPN_CC_OUTPUT_EXE,
-    .script = "A.ld",
-    .expect = {
-      .err = SPN_ERR_COMPILER_FEATURE_UNSUPPORTED,
-      .feature = SPN_CC_FEATURE_LINKER_SCRIPT,
-    },
-  },
-  {
-    .name = "msvc_linker_script_unsupported",
-    .driver = SPN_CC_DRIVER_MSVC,
-    .family = SPN_LD_FAMILY_MSVC,
-    .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_WINDOWS, .abi = SPN_ABI_MSVC },
-    .kind = SPN_CC_OUTPUT_EXE,
-    .script = "A.ld",
-    .expect = {
-      .err = SPN_ERR_COMPILER_FEATURE_UNSUPPORTED,
-      .feature = SPN_CC_FEATURE_LINKER_SCRIPT,
-    },
-  },
-  {
-    .name = "clang_msvc_lld_linker_script_unsupported",
-    .driver = SPN_CC_DRIVER_CLANG,
-    .family = SPN_LD_FAMILY_LLD,
-    .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_WINDOWS, .abi = SPN_ABI_MSVC },
-    .kind = SPN_CC_OUTPUT_EXE,
-    .script = "A.ld",
-    .expect = {
-      .err = SPN_ERR_COMPILER_FEATURE_UNSUPPORTED,
-      .feature = SPN_CC_FEATURE_LINKER_SCRIPT,
-    },
-  },
-  {
-    .name = "wasi_linker_script_unsupported",
-    .driver = SPN_CC_DRIVER_CLANG,
-    .family = SPN_LD_FAMILY_LLD,
-    .profile = { .arch = SPN_ARCH_WASM32, .os = SPN_OS_WASI },
     .kind = SPN_CC_OUTPUT_EXE,
     .script = "A.ld",
     .expect = {

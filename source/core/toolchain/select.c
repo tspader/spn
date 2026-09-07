@@ -3,7 +3,6 @@
 #include "ctx/types.h"
 #include "error/error.h"
 #include "toolchain/catalog.h"
-#include "toolchain/linker.h"
 #include "toolchain/toolchain.h"
 #include "triple/triple.h"
 
@@ -31,10 +30,7 @@ static bool lists_any_abi(const spn_toolchain_info_t* toolchain, spn_triple_t ta
 }
 
 static bool reaches(const spn_toolchain_info_t* toolchain, spn_triple_t target) {
-  if (lists_any_abi(toolchain, target)) {
-    return true;
-  }
-  return spn_toolchain_driver_retargets(toolchain->driver) && spn_ld_links(&toolchain->linkers, target);
+  return lists_any_abi(toolchain, target) || spn_toolchain_driver_retargets(toolchain->driver);
 }
 
 static bool complete_listed(const spn_toolchain_info_t* toolchain, spn_toolchain_query_t query, spn_triple_t* triple) {
@@ -48,22 +44,15 @@ static bool complete_listed(const spn_toolchain_info_t* toolchain, spn_toolchain
   return false;
 }
 
-static bool complete_linked(const spn_toolchain_info_t* toolchain, spn_toolchain_query_t query, spn_triple_t* triple) {
-  sp_for(it, query.abis.count) {
-    spn_triple_t candidate = { query.target.arch, query.target.os, query.abis.items[it] };
-    if (spn_ld_links(&toolchain->linkers, candidate)) {
-      *triple = candidate;
-      return true;
-    }
-  }
-  return false;
-}
-
 static bool complete(const spn_toolchain_info_t* toolchain, spn_toolchain_query_t query, spn_triple_t* triple) {
   if (complete_listed(toolchain, query, triple)) {
     return true;
   }
-  return spn_toolchain_driver_retargets(toolchain->driver) && complete_linked(toolchain, query, triple);
+  if (!spn_toolchain_driver_retargets(toolchain->driver)) {
+    return false;
+  }
+  *triple = (spn_triple_t) { query.target.arch, query.target.os, query.abis.items[0] };
+  return true;
 }
 
 static bool satisfies(const spn_toolchain_info_t* toolchain, spn_toolchain_query_t query, spn_triple_t* triple) {

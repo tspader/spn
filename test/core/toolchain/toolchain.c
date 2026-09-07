@@ -60,13 +60,13 @@ sp_test_each(launcher, resolve, launcher_test_t, tests) {
   sp_mem_t mem = sp_test_arena(t);
   spn_path_roots_t roots = sp_zero;
 
-  spn_toolchain_launcher_t launcher = { .program = spn_arg_lit(sp_str_view(it->launcher.name)) };
+  spn_toolchain_launcher_t launcher = { .program = spn_arg_lit(sp_cstr_as_str(it->launcher.name)) };
   launcher.args = sp_da_new(mem, sp_str_t);
   sp_carr_for(it->launcher.args, at) {
     if (!it->launcher.args[at]) {
       break;
     }
-    sp_da_push(launcher.args, sp_str_view(it->launcher.args[at]));
+    sp_da_push(launcher.args, sp_cstr_as_str(it->launcher.args[at]));
   }
 
   if (it->expect.program) {
@@ -91,25 +91,7 @@ sp_test_each(launcher, resolve, launcher_test_t, tests) {
 sp_test(launcher, has_cxx_requires_program) {
   spn_toolchain_info_t toolchain = sp_zero;
   sp_expect(t, !spn_toolchain_has_cxx(&toolchain));
-  toolchain.cxx.program = spn_arg_lit(sp_str_view("A"));
+  toolchain.cxx.program = spn_arg_lit(sp_cstr_as_str("A"));
   sp_expect(t, spn_toolchain_has_cxx(&toolchain));
-  return SP_OK;
-}
-
-typedef struct {
-  const c8* name;
-  spn_cc_driver_t driver;
-  spn_cc_cap_set_t expect;
-} caps_t;
-
-static const caps_t caps_tests [] = {
-  { "gcc",   SPN_CC_DRIVER_GCC,   SPN_CC_CAP_NOLIBC },
-  { "clang", SPN_CC_DRIVER_CLANG, SPN_CC_CAP_TARGET_TRIPLE | SPN_CC_CAP_LLVM_TRIPLE | SPN_CC_CAP_CLANG_FRONTEND | SPN_CC_CAP_NOLIBC },
-  { "zig",   SPN_CC_DRIVER_ZIG,   SPN_CC_CAP_TARGET_TRIPLE | SPN_CC_CAP_CLANG_FRONTEND },
-  { "msvc",  SPN_CC_DRIVER_MSVC,  0 },
-};
-
-sp_test_each(launcher, driver_caps, caps_t, caps_tests) {
-  sp_expect_eq(t, it->expect, spn_toolchain_driver_caps(it->driver));
   return SP_OK;
 }

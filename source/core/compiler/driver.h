@@ -15,7 +15,7 @@ spn_err_t spn_cc_render_archive(sp_mem_t mem, const spn_cc_toolchain_t* toolchai
 bool spn_cc_has(const spn_cc_toolchain_t* toolchain, spn_cc_cap_t cap);
 spn_cc_depfile_t spn_cc_depfile(const spn_cc_toolchain_t* toolchain, spn_lang_t lang);
 spn_err_t spn_cc_parse_depfile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, sp_str_t content, sp_da(sp_str_t)* prereqs);
-spn_cc_exports_format_t spn_cc_exports_format(spn_cc_output_kind_t kind, spn_os_t os);
+spn_cc_exports_format_t spn_cc_exports_format(spn_cc_output_kind_t kind, spn_ld_flavor_t flavor);
 const c8*               spn_cc_exports_extension(spn_cc_exports_format_t format);
 spn_err_t spn_cc_render_flags(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, spn_cc_flags_t* flags);
 

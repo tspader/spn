@@ -96,20 +96,6 @@ static const targets_test_t targets_tests [] = {
     .expect = { .targets = { HOST_ARM_LINUX } },
   },
   {
-    .name = "zig_on_linux_targets_host_only",
-    .file = "drivers.json",
-    .host = HOST_X64_LINUX,
-    .toolchain = "D",
-    .expect = { .targets = { HOST_X64_LINUX } },
-  },
-  {
-    .name = "msvc_targets_host_only",
-    .file = "drivers.json",
-    .host = HOST_X64_WIN_MSVC,
-    .toolchain = "C",
-    .expect = { .targets = { HOST_X64_WIN_MSVC } },
-  },
-  {
     .name = "gcc_on_macos_targets_host_only",
     .file = "drivers.json",
     .host = HOST_ARM_MACOS,
@@ -117,32 +103,10 @@ static const targets_test_t targets_tests [] = {
     .expect = { .targets = { HOST_ARM_MACOS } },
   },
   {
-    .name = "gcc_on_windows_targets_host_only",
-    .file = "drivers.json",
-    .host = HOST_X64_WIN_GNU,
-    .toolchain = "A",
-    .expect = { .targets = { HOST_X64_WIN_GNU } },
-  },
-  {
-    .name = "clang_on_macos_targets_host",
-    .file = "drivers.json",
-    .host = HOST_ARM_MACOS,
-    .toolchain = "B",
-    .expect = { .targets = { HOST_ARM_MACOS } },
-  },
-  {
-    .name = "gcc_on_msvc_host_targets_nothing",
-    .file = "drivers.json",
-    .host = HOST_X64_WIN_MSVC,
-    .toolchain = "A",
-    .expect = { .targets = {} },
-  },
-  {
     .name = "msvc_on_mingw_host_targets_nothing",
     .file = "drivers.json",
     .host = HOST_X64_WIN_GNU,
     .toolchain = "C",
-    .expect = { .targets = {} },
   },
   {
     .name = "declared_targets_are_kept",

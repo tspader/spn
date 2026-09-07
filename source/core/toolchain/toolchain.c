@@ -90,8 +90,8 @@ spn_toolchain_source_t spn_toolchain_source(sp_da(spn_toolchain_host_t) hosts) {
 
 spn_cc_cap_set_t spn_toolchain_driver_caps(spn_cc_driver_t driver) {
   switch (driver) {
-    case SPN_CC_DRIVER_GCC: return SPN_CC_CAP_NOLIBC;
-    case SPN_CC_DRIVER_CLANG: return SPN_CC_CAP_TARGET_TRIPLE | SPN_CC_CAP_LLVM_TRIPLE | SPN_CC_CAP_CLANG_FRONTEND | SPN_CC_CAP_NOLIBC;
+    case SPN_CC_DRIVER_GCC: return SPN_CC_CAP_NOLIBC | SPN_CC_CAP_FUSE_LD;
+    case SPN_CC_DRIVER_CLANG: return SPN_CC_CAP_TARGET_TRIPLE | SPN_CC_CAP_LLVM_TRIPLE | SPN_CC_CAP_CLANG_FRONTEND | SPN_CC_CAP_NOLIBC | SPN_CC_CAP_FUSE_LD;
     case SPN_CC_DRIVER_ZIG: return SPN_CC_CAP_TARGET_TRIPLE | SPN_CC_CAP_CLANG_FRONTEND;
     case SPN_CC_DRIVER_MSVC: return 0;
     case SPN_CC_DRIVER_NONE: sp_unreachable_case();
@@ -101,6 +101,17 @@ spn_cc_cap_set_t spn_toolchain_driver_caps(spn_cc_driver_t driver) {
 
 bool spn_toolchain_driver_retargets(spn_cc_driver_t driver) {
   return spn_toolchain_driver_caps(driver) & SPN_CC_CAP_TARGET_TRIPLE;
+}
+
+bool spn_toolchain_driver_produces(spn_cc_driver_t driver, spn_ld_flavor_t flavor) {
+  switch (driver) {
+    case SPN_CC_DRIVER_GCC: return flavor == SPN_LD_FLAVOR_ELF || flavor == SPN_LD_FLAVOR_MINGW || flavor == SPN_LD_FLAVOR_MACHO;
+    case SPN_CC_DRIVER_MSVC: return flavor == SPN_LD_FLAVOR_MSVC;
+    case SPN_CC_DRIVER_CLANG:
+    case SPN_CC_DRIVER_ZIG: return true;
+    case SPN_CC_DRIVER_NONE: sp_unreachable_case();
+  }
+  SP_UNREACHABLE_RETURN(false);
 }
 
 sp_str_t spn_toolchain_launcher_to_str(const spn_path_roots_t* roots, sp_mem_t mem, spn_toolchain_launcher_t launcher) {

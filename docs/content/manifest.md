@@ -68,7 +68,8 @@ readme: false
 |---|---|
 | `name` | `string` |
 | `compiler` | `string` |
-| `linker` | `string` |
+| `linker` | map from `elf` \| `mingw` \| `msvc` \| `macho` \| `wasm` to `gnu` \| `lld` \| `ld64` \| `msvc` |
+| `link_args` | array of `string` |
 | `archiver` | `string` |
 | `driver` | `gcc` \| `clang` \| `msvc` \| `zig` |
 | `cxx` | `string` |

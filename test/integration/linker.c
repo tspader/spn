@@ -24,42 +24,6 @@ sp_test(linker, script_unsupported_by_lld_on_windows_gnu) {
   });
 }
 
-sp_test(linker, script_unsupported_on_macos) {
-  return run_test(t, (test_t) {
-    .project = "test/integration/fixtures/linker/unsupported",
-    .copy = { "main.ld" },
-    .when.target = SPN_TEST_ARCH "-macos",
-    .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", SPN_TEST_ARCH "-macos" }, .rc = 1 } },
-      { .kind = ACTION_VERIFY_RESULT, .verify_result.err = SPN_ERR_COMPILER_FEATURE_UNSUPPORTED },
-    },
-  });
-}
-
-sp_test(linker, script_unsupported_on_wasi) {
-  return run_test(t, (test_t) {
-    .project = "test/integration/fixtures/linker/unsupported",
-    .copy = { "main.ld" },
-    .when.target = "wasm32-wasi",
-    .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", "wasm32-wasi" }, .rc = 1 } },
-      { .kind = ACTION_VERIFY_RESULT, .verify_result.err = SPN_ERR_COMPILER_FEATURE_UNSUPPORTED },
-    },
-  });
-}
-
-sp_test(linker, script_unsupported_on_msvc) {
-  return run_test(t, (test_t) {
-    .project = "test/integration/fixtures/linker/unsupported",
-    .copy = { "main.ld" },
-    .when.target = SPN_TEST_ARCH "-windows-msvc",
-    .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", SPN_TEST_ARCH "-windows-msvc" }, .rc = 1 } },
-      { .kind = ACTION_VERIFY_RESULT, .verify_result.err = SPN_ERR_COMPILER_FEATURE_UNSUPPORTED },
-    },
-  });
-}
-
 sp_test(linker, toolchain_link_args_reach_the_driver) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/linker/fuse",

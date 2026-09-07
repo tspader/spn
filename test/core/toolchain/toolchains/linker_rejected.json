@@ -9,13 +9,10 @@
       "archiver": {
         "program": "ar"
       },
-      "target": [
-        {
-          "arch": "x86_64",
-          "os": "windows",
-          "abi": "msvc"
-        }
-      ]
+      "linker": {
+        "msvc": "msvc",
+        "macho": "gnu"
+      }
     }
   ]
 }

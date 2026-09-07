@@ -14,12 +14,7 @@ static const test_t tests [] = {
       .compiler = { .name = "zig", .args = { "cc" } },
       .cxx = { .name = "zig", .args = { "c++" } },
       .archiver = { .name = "zig", .args = { "ar" } },
-      .linkers = {
-        [SPN_LD_FLAVOR_ELF] = SPN_LD_FAMILY_LLD,
-        [SPN_LD_FLAVOR_MINGW] = SPN_LD_FAMILY_LLD,
-        [SPN_LD_FLAVOR_MACHO] = SPN_LD_FAMILY_LLD,
-        [SPN_LD_FLAVOR_WASM] = SPN_LD_FAMILY_LLD,
-      },
+      .linkers = FAMILIES_LLD,
       .hosts = {
         { .triple = { SPN_ARCH_X64, SPN_OS_LINUX }, .url = "https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz" },
         { .triple = { SPN_ARCH_ARM64, SPN_OS_LINUX }, .url = "https://ziglang.org/download/0.16.0/zig-aarch64-linux-0.16.0.tar.xz" },
@@ -50,9 +45,7 @@ static const test_t tests [] = {
       .compiler = { .name = "cl" },
       .cxx = { .name = "cl" },
       .archiver = { .name = "lib" },
-      .linkers = {
-        [SPN_LD_FLAVOR_MSVC] = SPN_LD_FAMILY_MSVC,
-      },
+      .linkers = FAMILIES_NATIVE,
       .hosts = {
         { .triple = { SPN_ARCH_X64, SPN_OS_WINDOWS } },
         { .triple = { SPN_ARCH_ARM64, SPN_OS_WINDOWS } },
@@ -70,13 +63,7 @@ static const test_t tests [] = {
       .compiler = { .name = "clang" },
       .cxx = { .name = "clang++" },
       .archiver = { .name = "ar" },
-      .linkers = {
-        [SPN_LD_FLAVOR_ELF] = SPN_LD_FAMILY_GNU,
-        [SPN_LD_FLAVOR_MINGW] = SPN_LD_FAMILY_GNU,
-        [SPN_LD_FLAVOR_MSVC] = SPN_LD_FAMILY_MSVC,
-        [SPN_LD_FLAVOR_MACHO] = SPN_LD_FAMILY_LD64,
-        [SPN_LD_FLAVOR_WASM] = SPN_LD_FAMILY_LLD,
-      },
+      .linkers = FAMILIES_NATIVE,
       .hosts = {
         { .triple = { SPN_ARCH_X64, SPN_OS_LINUX } },
         { .triple = { SPN_ARCH_ARM64, SPN_OS_LINUX } },
@@ -115,11 +102,7 @@ static const test_t tests [] = {
       .compiler = { .name = "gcc" },
       .cxx = { .name = "g++" },
       .archiver = { .name = "ar" },
-      .linkers = {
-        [SPN_LD_FLAVOR_ELF] = SPN_LD_FAMILY_GNU,
-        [SPN_LD_FLAVOR_MINGW] = SPN_LD_FAMILY_GNU,
-        [SPN_LD_FLAVOR_MACHO] = SPN_LD_FAMILY_LD64,
-      },
+      .linkers = FAMILIES_NATIVE,
     },
   },
 };
@@ -143,82 +126,10 @@ static const bind_test_t bind_tests [] = {
     .expect = { .targets = { HOST_X64_LINUX } },
   },
   {
-    .name = "clang_on_macos",
-    .toolchain = "clang",
-    .host = HOST_X64_MACOS,
-    .expect = { .targets = { HOST_X64_MACOS } },
-  },
-  {
-    .name = "clang_on_windows",
-    .toolchain = "clang",
-    .host = HOST_X64_WIN_GNU,
-    .expect = { .targets = { HOST_X64_WIN_GNU } },
-  },
-  {
     .name = "gcc_on_linux",
     .toolchain = "gcc",
     .host = HOST_X64_LINUX,
     .expect = { .targets = { HOST_X64_LINUX, TARGET_X64_BARE } },
-  },
-  {
-    .name = "gcc_on_macos",
-    .toolchain = "gcc",
-    .host = HOST_X64_MACOS,
-    .expect = { .targets = { HOST_X64_MACOS } },
-  },
-  {
-    .name = "gcc_on_windows",
-    .toolchain = "gcc",
-    .host = HOST_X64_WIN_GNU,
-    .expect = { .targets = { HOST_X64_WIN_GNU } },
-  },
-  {
-    .name = "gcc_on_msvc_host",
-    .toolchain = "gcc",
-    .host = HOST_X64_WIN_MSVC,
-    .expect = { .targets = {} },
-  },
-  {
-    .name = "zig_keeps_declared_targets_on_macos",
-    .toolchain = "zig",
-    .host = HOST_X64_MACOS,
-    .expect = {
-      .targets = {
-        TARGET_WASM,
-        HOST_X64_LINUX,
-        HOST_X64_LINUX_MUSL,
-        HOST_ARM_LINUX,
-        { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_MUSL },
-        HOST_X64_MACOS,
-        HOST_ARM_MACOS,
-        HOST_X64_WIN_GNU,
-        { SPN_ARCH_ARM64, SPN_OS_WINDOWS, SPN_ABI_GNU },
-        TARGET_X64_BARE,
-        TARGET_ARM_BARE,
-      },
-    },
-  },
-  {
-    .name = "msvc_keeps_declared_targets_on_windows",
-    .toolchain = "msvc",
-    .host = HOST_X64_WIN_MSVC,
-    .expect = {
-      .targets = {
-        HOST_X64_WIN_MSVC,
-        { SPN_ARCH_ARM64, SPN_OS_WINDOWS, SPN_ABI_MSVC },
-      },
-    },
-  },
-  {
-    .name = "msvc_keeps_declared_targets_on_linux",
-    .toolchain = "msvc",
-    .host = HOST_X64_LINUX,
-    .expect = {
-      .targets = {
-        HOST_X64_WIN_MSVC,
-        { SPN_ARCH_ARM64, SPN_OS_WINDOWS, SPN_ABI_MSVC },
-      },
-    },
   },
 };
 

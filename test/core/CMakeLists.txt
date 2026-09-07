@@ -126,6 +126,7 @@ add_executable(core
   toml/set.c
   toolchain/builtins.c
   toolchain/catalog.c
+  toolchain/driver.c
   toolchain/linker.c
   toolchain/parse.c
   toolchain/probe.c
@@ -280,6 +281,7 @@ set_source_files_properties(config/config.c PROPERTIES COMPILE_DEFINITIONS
 set_source_files_properties(
   toolchain/builtins.c
   toolchain/catalog.c
+  toolchain/driver.c
   toolchain/linker.c
   toolchain/parse.c
   toolchain/probe.c

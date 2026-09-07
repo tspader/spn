@@ -4,6 +4,7 @@ version = "1.0.0"
 
 [[toolchain]]
 name = "custom"
-compiler = "cc"
+compiler = "gcc"
 archiver = "ar"
 driver = "gcc"
+linker = { msvc = "msvc", macho = "gnu" }

@@ -13,6 +13,7 @@ typedef enum {
   SPN_CC_CAP_CLANG_FRONTEND = 1 << 1,
   SPN_CC_CAP_NOLIBC         = 1 << 2,
   SPN_CC_CAP_LLVM_TRIPLE    = 1 << 3,
+  SPN_CC_CAP_FUSE_LD        = 1 << 4,
 } spn_cc_cap_t;
 
 typedef u32 spn_cc_cap_set_t;
@@ -26,33 +27,12 @@ typedef enum {
   SPN_LD_FLAVOR_COUNT,
 } spn_ld_flavor_t;
 
-#define spn_ld_family_bit(family) (1u << (family))
-
-typedef u32 spn_ld_family_set_t;
-
-typedef enum {
-  SPN_LD_CAP_SCRIPT       = 1 << 0,
-  SPN_LD_CAP_EXCLUDE_LIBS = 1 << 1,
-} spn_ld_cap_t;
-
-typedef u32 spn_ld_cap_set_t;
-
 typedef struct {
   spn_ld_family_t families [SPN_LD_FLAVOR_COUNT];
 } spn_toolchain_linkers_t;
 
-typedef enum {
-  SPN_LD_ISSUE_DECLARED,
-  SPN_LD_ISSUE_FORBIDDEN,
-} spn_ld_issue_kind_t;
-
 typedef struct {
-  spn_ld_issue_kind_t kind;
-  spn_ld_flavor_t flavor;
-} spn_ld_issue_t;
-
-typedef struct {
-  spn_ld_issue_t items [SPN_LD_FLAVOR_COUNT];
+  spn_ld_flavor_t items [SPN_LD_FLAVOR_COUNT];
   u32 count;
 } spn_ld_issues_t;
 

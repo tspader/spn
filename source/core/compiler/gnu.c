@@ -3,6 +3,7 @@
 #include "compiler/push.h"
 
 #include "enum/enum.h"
+#include "spn/core.h"
 #include "toolchain/linker.h"
 #include "macro/macro.h"
 #include "paths/paths.h"
@@ -333,7 +334,6 @@ static void add_rpath(sp_mem_t mem, spn_ld_flavor_t flavor, spn_invocation_t* in
 void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_link_t* link, const spn_cc_link_files_t* files, spn_invocation_t* invocation) {
   spn_triple_t triple = { profile->arch, profile->os, profile->abi };
   spn_ld_flavor_t flavor = spn_ld_flavor(triple);
-  spn_ld_cap_set_t caps = spn_ld_caps(spn_ld_family(&toolchain->linkers, triple), flavor);
 
   add_launcher(mem, toolchain, profile, link->lang, invocation);
   spn_cc_push_strs(mem, invocation, toolchain->link_args);
@@ -363,7 +363,7 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
       break;
     }
     case SPN_CC_OUTPUT_EXE: {
-      if (profile->linkage == SPN_LIB_KIND_STATIC && flavor != SPN_LD_FLAVOR_MACHO && flavor != SPN_LD_FLAVOR_MSVC) {
+      if (profile->linkage == SPN_LIB_KIND_STATIC && spn_ld_static(flavor)) {
         spn_cc_push_c(mem, invocation, "-static");
       }
       if (link->subsystem == SPN_WIN_SUBSYSTEM_WINDOWS) {
@@ -389,10 +389,6 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
   }
   sp_da_for(link->private_libs, it) {
     spn_cc_push_fmt(mem, invocation, "-l{}", sp_fmt_str(link->private_libs[it]));
-    if (caps & SPN_LD_CAP_EXCLUDE_LIBS) {
-      sp_str_t archive = spn_triple_lib_file_name(mem, triple, link->private_libs[it], SP_OS_LIB_STATIC);
-      spn_cc_push_fmt(mem, invocation, "-Wl,--exclude-libs,{}", sp_fmt_str(archive));
-    }
   }
   sp_da_for(link->libs, it) {
     spn_cc_push_fmt(mem, invocation, "-l{}", sp_fmt_str(link->libs[it]));

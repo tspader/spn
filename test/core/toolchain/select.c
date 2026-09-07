@@ -192,20 +192,12 @@ static const resolve_test_t resolve_tests [] = {
     .expect = { .err = SPN_ERR_TOOLCHAIN_TARGET, .targets = { HOST_ARM_LINUX, TARGET_ARM_BARE } },
   },
   {
-    .name = "named_retargeting_driver_attempts_undeclared_target",
-    .file = "auto.json",
-    .toolchain = "B",
-    .target = X64_WINDOWS,
-    .abis = { SPN_ABI_GNU },
-    .expect = { .name = "B", .triple = TARGET_WIN_GNU },
-  },
-  {
     .name = "named_retargeting_driver_takes_first_abi",
     .file = "auto.json",
     .toolchain = "B",
     .target = X64_WINDOWS,
     .abis = { SPN_ABI_MSVC, SPN_ABI_GNU },
-    .expect = { .name = "B", .triple = HOST_X64_WIN_MSVC },
+    .expect = { .name = "B", .triple = TARGET_WIN_MSVC },
   },
   {
     .name = "named_retargeting_driver_prefers_listed_abi",
@@ -223,14 +215,6 @@ static const resolve_test_t resolve_tests [] = {
     .abis = { SPN_ABI_GNU },
     .host = HOST_ARM_LINUX,
     .expect = { .err = SPN_ERR_TOOLCHAIN_HOST },
-  },
-  {
-    .name = "named_retargeting_driver_refuses_format_without_family",
-    .file = "drivers.json",
-    .toolchain = "D",
-    .target = X64_WINDOWS,
-    .abis = { SPN_ABI_MSVC },
-    .expect = { .err = SPN_ERR_TOOLCHAIN_TARGET, .targets = { HOST_X64_LINUX } },
   },
   {
     .name = "named_fixed_arch_driver_must_declare_target",

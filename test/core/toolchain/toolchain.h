@@ -3,6 +3,7 @@
 
 #include "spn_test.h"
 #include "arg.h"
+#include "linkers.h"
 #include "hash/digest/digest.h"
 #include "paths/paths.h"
 #include "enum/enum.h"
@@ -18,9 +19,9 @@
 #define HOST_ARM_LINUX      { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_GNU }
 #define HOST_X64_MACOS      { SPN_ARCH_X64, SPN_OS_MACOS, SPN_ABI_APPLE }
 #define HOST_ARM_MACOS      { SPN_ARCH_ARM64, SPN_OS_MACOS, SPN_ABI_APPLE }
-#define HOST_X64_WIN_MSVC   { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MSVC }
 #define HOST_X64_WIN_GNU    { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU }
 #define TARGET_WIN_GNU      { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU }
+#define TARGET_WIN_MSVC     { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MSVC }
 #define TARGET_WASM         { SPN_ARCH_WASM32, SPN_OS_WASI, SPN_ABI_MUSL }
 #define TARGET_X64_BARE     { SPN_ARCH_X64, SPN_OS_FREESTANDING, SPN_ABI_BARE }
 #define TARGET_ARM_BARE     { SPN_ARCH_ARM64, SPN_OS_FREESTANDING, SPN_ABI_BARE }
@@ -99,17 +100,8 @@ static sp_err_t fixture_check_targets(sp_test_t* t, sp_da(spn_triple_t) targets,
   return SP_OK;
 }
 
-static bool fixture_linkers_expected(const spn_ld_family_t* linkers) {
-  sp_for(flavor, SPN_LD_FLAVOR_COUNT) {
-    if (linkers[flavor]) {
-      return true;
-    }
-  }
-  return false;
-}
-
 static sp_err_t fixture_check_linkers(sp_test_t* t, const spn_toolchain_linkers_t* linkers, const spn_ld_family_t* expect) {
-  if (!fixture_linkers_expected(expect)) {
+  if (!test_families_expected(expect)) {
     return SP_OK;
   }
   sp_for(flavor, SPN_LD_FLAVOR_COUNT) {
@@ -141,9 +133,6 @@ static sp_err_t fixture_check_launchers(sp_test_t* t, spn_toolchain_launcher_t c
 static sp_err_t fixture_check_declared_targets(sp_test_t* t, sp_da(spn_triple_t) targets, fixture_toolchain_t expect) {
   u32 count = 0;
   sp_carr_detect_len(expect.targets, count, !fixture_triple_empty(expect.targets[count]));
-  if (!count) {
-    return SP_OK;
-  }
   return fixture_check_targets(t, targets, expect.targets, count);
 }
 
@@ -244,11 +233,7 @@ static spn_toolchain_decl_t fixture_local_toolchain(const c8* name, fixture_laun
     .driver = SPN_CC_DRIVER_GCC,
     .compiler = { .program = fixture_arg(compiler) },
     .archiver = { .program = spn_arg_lit(sp_cstr_as_str("ar")) },
-    .linkers.families = {
-      [SPN_LD_FLAVOR_ELF] = SPN_LD_FAMILY_GNU,
-      [SPN_LD_FLAVOR_MINGW] = SPN_LD_FAMILY_GNU,
-      [SPN_LD_FLAVOR_MACHO] = SPN_LD_FAMILY_LD64,
-    },
+    .linkers.families = FAMILIES_NATIVE,
   };
 }
 

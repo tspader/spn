@@ -71,11 +71,7 @@ static const parse_test_t tests [] = {
           .compiler = { .name = "cc" },
           .cxx = { .name = "" },
           .archiver = { .name = "ar" },
-          .linkers = {
-            [SPN_LD_FLAVOR_ELF] = SPN_LD_FAMILY_GNU,
-            [SPN_LD_FLAVOR_MINGW] = SPN_LD_FAMILY_GNU,
-            [SPN_LD_FLAVOR_MACHO] = SPN_LD_FAMILY_LD64,
-          },
+          .linkers = FAMILIES_NATIVE,
         },
       },
     },
@@ -151,6 +147,11 @@ static const parse_test_t tests [] = {
     .expect = { .err = SPN_ERROR },
   },
   {
+    .name = "linker_rejected",
+    .file = "linker_rejected.json",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
     .name = "target_beyond_driver",
     .file = "bad_target_driver.json",
     .expect = { .err = SPN_ERROR },
@@ -166,13 +167,7 @@ static const parse_test_t tests [] = {
           .driver = SPN_CC_DRIVER_CLANG,
           .compiler = { .name = "A" },
           .archiver = { .name = "llvm-ar" },
-          .linkers = {
-            [SPN_LD_FLAVOR_ELF] = SPN_LD_FAMILY_LLD,
-            [SPN_LD_FLAVOR_MINGW] = SPN_LD_FAMILY_LLD,
-            [SPN_LD_FLAVOR_MSVC] = SPN_LD_FAMILY_LLD,
-            [SPN_LD_FLAVOR_MACHO] = SPN_LD_FAMILY_LLD,
-            [SPN_LD_FLAVOR_WASM] = SPN_LD_FAMILY_LLD,
-          },
+          .linkers = FAMILIES_LLD,
           .targets = {
             { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU },
             TARGET_WIN_GNU,
@@ -183,76 +178,6 @@ static const parse_test_t tests [] = {
         },
       },
     },
-  },
-  {
-    .name = "fixed_driver_fills_linkers",
-    .file = "drivers.json",
-    .expect = {
-      .entries = 4,
-      .toolchains = {
-        {
-          .name = "C",
-          .driver = SPN_CC_DRIVER_MSVC,
-          .compiler = { .name = "cl" },
-          .linkers = {
-            [SPN_LD_FLAVOR_MSVC] = SPN_LD_FAMILY_MSVC,
-          },
-        },
-        {
-          .name = "D",
-          .driver = SPN_CC_DRIVER_ZIG,
-          .compiler = { .name = "D", .args = { "cc" } },
-          .linkers = {
-            [SPN_LD_FLAVOR_ELF] = SPN_LD_FAMILY_LLD,
-            [SPN_LD_FLAVOR_MINGW] = SPN_LD_FAMILY_LLD,
-            [SPN_LD_FLAVOR_MACHO] = SPN_LD_FAMILY_LLD,
-            [SPN_LD_FLAVOR_WASM] = SPN_LD_FAMILY_LLD,
-          },
-        },
-      },
-    },
-  },
-  {
-    .name = "undeclared_slots_take_driver_defaults",
-    .file = "drivers.json",
-    .expect = {
-      .entries = 4,
-      .toolchains = {
-        {
-          .name = "B",
-          .driver = SPN_CC_DRIVER_CLANG,
-          .compiler = { .name = "B" },
-          .linkers = {
-            [SPN_LD_FLAVOR_ELF] = SPN_LD_FAMILY_LLD,
-            [SPN_LD_FLAVOR_MINGW] = SPN_LD_FAMILY_GNU,
-            [SPN_LD_FLAVOR_MSVC] = SPN_LD_FAMILY_MSVC,
-            [SPN_LD_FLAVOR_MACHO] = SPN_LD_FAMILY_LD64,
-            [SPN_LD_FLAVOR_WASM] = SPN_LD_FAMILY_LLD,
-          },
-          .link_args = { "-fuse-ld=lld" },
-        },
-      },
-    },
-  },
-  {
-    .name = "linker_on_zig",
-    .file = "linker_fixed.json",
-    .expect = { .err = SPN_ERROR },
-  },
-  {
-    .name = "linker_on_msvc",
-    .file = "linker_fixed_msvc.json",
-    .expect = { .err = SPN_ERROR },
-  },
-  {
-    .name = "linker_family_forbidden",
-    .file = "linker_family_forbidden.json",
-    .expect = { .err = SPN_ERROR },
-  },
-  {
-    .name = "target_without_linker",
-    .file = "linker_target_unlinked.json",
-    .expect = { .err = SPN_ERROR },
   },
   {
     .name = "program_absolute",

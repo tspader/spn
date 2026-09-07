@@ -150,7 +150,7 @@ spn_err_t spn_cc_validate_profile(const spn_cc_toolchain_t* toolchain, const spn
 
   // @spader Not totally sure about this
   spn_sanitizer_set_t ubsan = profile->sanitizers & ~SPN_SANITIZER_UNDEFINED;
-  bool renders_static = profile->linkage == SPN_LIB_KIND_STATIC && profile->os != SPN_OS_MACOS && toolchain->driver != SPN_CC_DRIVER_MSVC;
+  bool renders_static = profile->linkage == SPN_LIB_KIND_STATIC && spn_ld_static(spn_ld_flavor(target));
   if (ubsan && renders_static) {
     return spn_err_emit(&spn, (spn_err_union_t) {
       .kind = SPN_ERR_SANITIZER_STATIC,
@@ -256,11 +256,8 @@ spn_err_t spn_cc_validate_link(const spn_cc_toolchain_t* toolchain, const spn_pr
     return feature_unsupported(toolchain, profile, SPN_CC_FEATURE_FRAMEWORKS);
   }
   spn_triple_t target = { profile->arch, profile->os, profile->abi };
-  if (!sp_da_empty(link->scripts) && !(spn_ld_caps(spn_ld_family(&toolchain->linkers, target), spn_ld_flavor(target)) & SPN_LD_CAP_SCRIPT)) {
+  if (!sp_da_empty(link->scripts) && !spn_ld_scripts(spn_ld_family(&toolchain->linkers, target), spn_ld_flavor(target))) {
     return feature_unsupported(toolchain, profile, SPN_CC_FEATURE_LINKER_SCRIPT);
-  }
-  if (toolchain->driver == SPN_CC_DRIVER_MSVC && link->kind == SPN_CC_OUTPUT_REACTOR) {
-    return feature_unsupported(toolchain, profile, feature);
   }
   return SPN_OK;
 }
@@ -310,19 +307,19 @@ spn_err_t spn_cc_render_archive(sp_mem_t mem, const spn_cc_toolchain_t* toolchai
   SP_UNREACHABLE_RETURN(SPN_ERROR);
 }
 
-spn_cc_exports_format_t spn_cc_exports_format(spn_cc_output_kind_t kind, spn_os_t os) {
+spn_cc_exports_format_t spn_cc_exports_format(spn_cc_output_kind_t kind, spn_ld_flavor_t flavor) {
   switch (kind) {
     case SPN_CC_OUTPUT_REACTOR: {
       return SPN_CC_EXPORTS_WASM;
     }
     case SPN_CC_OUTPUT_SHARED_LIB: {
-      switch (os) {
-        case SPN_OS_MACOS: return SPN_CC_EXPORTS_SYMBOL_LIST;
-        case SPN_OS_WINDOWS: return SPN_CC_EXPORTS_DEF;
-        case SPN_OS_LINUX:
-        case SPN_OS_WASI:
-        case SPN_OS_FREESTANDING:
-        case SPN_OS_NONE: return SPN_CC_EXPORTS_VERSION_SCRIPT;
+      switch (flavor) {
+        case SPN_LD_FLAVOR_MACHO: return SPN_CC_EXPORTS_SYMBOL_LIST;
+        case SPN_LD_FLAVOR_MINGW:
+        case SPN_LD_FLAVOR_MSVC: return SPN_CC_EXPORTS_DEF;
+        case SPN_LD_FLAVOR_ELF:
+        case SPN_LD_FLAVOR_WASM: return SPN_CC_EXPORTS_VERSION_SCRIPT;
+        case SPN_LD_FLAVOR_COUNT: sp_unreachable_case();
       }
       SP_UNREACHABLE_RETURN(SPN_CC_EXPORTS_VERSION_SCRIPT);
     }

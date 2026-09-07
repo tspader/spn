@@ -336,29 +336,40 @@ static void lower_targets(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, s
   lower_collection(ctx, cg->example, &out->examples, SPN_TARGET_KIND_EXAMPLE);
 }
 
-static void issue_linker(spn_toml_loader_t* ctx, spn_ld_issue_t issue) {
-  switch (issue.kind) {
-    case SPN_LD_ISSUE_DECLARED: {
-      spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "linker");
-      break;
-    }
-    case SPN_LD_ISSUE_FORBIDDEN: {
-      spn_toml_loader_push_key(ctx, "linker");
-      spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, sp_str_to_cstr(ctx->mem, spn_ld_flavor_to_str(issue.flavor)));
-      spn_toml_loader_pop(ctx);
-      break;
-    }
+static spn_toolchain_linkers_t lower_linkers(spn_toml_loader_t* ctx, const spn_cg_linkers_t* cg, spn_cc_driver_t driver) {
+  spn_toolchain_linkers_t linkers = sp_zero;
+  spn_ld_issues_t issues = spn_ld_resolve(driver, cg, &linkers);
+  spn_toml_loader_push_key(ctx, "linker");
+  sp_for(it, issues.count) {
+    spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, sp_str_to_cstr(ctx->mem, spn_ld_flavor_to_str(issues.items[it])));
   }
+  spn_toml_loader_pop(ctx);
+  return linkers;
 }
 
-static spn_toolchain_linkers_t lower_linkers(spn_toml_loader_t* ctx, const spn_cg_linkers_t* cg, spn_cc_driver_t driver) {
-  spn_toolchain_linkers_t declared = spn_toolchain_linkers_load(cg);
-  spn_toolchain_linkers_t linkers = sp_zero;
-  spn_ld_issues_t issues = spn_ld_resolve(driver, &declared, &linkers);
-  sp_for(it, issues.count) {
-    issue_linker(ctx, issues.items[it]);
+static sp_da(spn_triple_t) lower_toolchain_targets(spn_toml_loader_t* ctx, spn_cc_driver_t driver, sp_da(spn_cg_triple_t) cg) {
+  sp_da(spn_triple_t) targets = sp_da_new(ctx->mem, spn_triple_t);
+  spn_toml_loader_push_key(ctx, "target");
+  sp_da_for(cg, it) {
+    spn_triple_t partial = lower_triple(&cg[it]);
+    spn_triple_t full = sp_zero;
+    spn_triple_entry_t entry = spn_triple_entry(partial, &full);
+    if (entry != SPN_TRIPLE_ENTRY_OK) {
+      spn_toml_loader_push_index(ctx, it);
+      issue_triple_entry(ctx, entry);
+      spn_toml_loader_pop(ctx);
+      continue;
+    }
+    if (!spn_toolchain_driver_produces(driver, spn_ld_flavor(full))) {
+      spn_toml_loader_push_index(ctx, it);
+      spn_toml_loader_issue_at(ctx, SPN_ERR_CODEGEN_INVALID, spn_ld_flavor_to_str(spn_ld_flavor(full)));
+      spn_toml_loader_pop(ctx);
+      continue;
+    }
+    sp_da_push(targets, full);
   }
-  return linkers;
+  spn_toml_loader_pop(ctx);
+  return targets;
 }
 
 static sp_da(sp_str_t) lower_strs(spn_toml_loader_t* ctx, sp_da(sp_str_t) values) {
@@ -424,6 +435,7 @@ spn_toolchain_decl_t spn_toolchain_lower(spn_toml_loader_t* ctx, u32 at, spn_pat
   toolchain.driver = sp_opt_is_null(decl->driver) ? SPN_CC_DRIVER_NONE : sp_opt_get(decl->driver);
   if (toolchain.driver) {
     toolchain.linkers = lower_linkers(ctx, &decl->linker, toolchain.driver);
+    toolchain.targets = lower_toolchain_targets(ctx, toolchain.driver, decl->target);
   }
   toolchain.link_args = lower_strs(ctx, decl->link_args);
 
@@ -468,28 +480,6 @@ spn_toolchain_decl_t spn_toolchain_lower(spn_toml_loader_t* ctx, u32 at, spn_pat
   toolchain.compiler = lower_launcher(ctx, "compiler", toolchain.source, base, decl->compiler);
   toolchain.cxx = lower_launcher(ctx, "cxx", toolchain.source, base, decl->cxx);
   toolchain.archiver = lower_launcher(ctx, "archiver", toolchain.source, base, decl->archiver);
-
-  toolchain.targets = sp_da_new(ctx->mem, spn_triple_t);
-  spn_toml_loader_push_key(ctx, "target");
-  sp_da_for(decl->target, it) {
-    spn_triple_t partial = lower_triple(&decl->target[it]);
-    spn_triple_t full = sp_zero;
-    spn_triple_entry_t entry = spn_triple_entry(partial, &full);
-    if (entry != SPN_TRIPLE_ENTRY_OK) {
-      spn_toml_loader_push_index(ctx, it);
-      issue_triple_entry(ctx, entry);
-      spn_toml_loader_pop(ctx);
-      continue;
-    }
-    if (toolchain.driver && !spn_ld_links(&toolchain.linkers, full)) {
-      spn_toml_loader_push_index(ctx, it);
-      spn_toml_loader_issue_at(ctx, SPN_ERR_CODEGEN_INVALID, spn_ld_flavor_to_str(spn_ld_flavor(full)));
-      spn_toml_loader_pop(ctx);
-      continue;
-    }
-    sp_da_push(toolchain.targets, full);
-  }
-  spn_toml_loader_pop(ctx);
 
   spn_toml_loader_pop(ctx);
   spn_toml_loader_pop(ctx);

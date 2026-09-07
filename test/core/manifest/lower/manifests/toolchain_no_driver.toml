@@ -4,7 +4,6 @@ version = "1.0.0"
 
 [[toolchain]]
 name = "custom"
-compiler = "clang"
+compiler = "gcc"
 archiver = "ar"
-driver = "clang"
-linker = { wasm = "gnu" }
+target = [{ arch = "x86_64", os = "linux" }]
