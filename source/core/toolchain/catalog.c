@@ -7,7 +7,31 @@
 
 static spn_err_t load_launcher(const spn_cg_launcher_t* in, spn_toolchain_source_t source, spn_toolchain_launcher_t* launcher) {
   launcher->args = in->args;
-  if (spn_toolchain_program(source, SPN_PATH_ROOT_NONE, in->program, &launcher->program) != SPN_PROGRAM_OK) {
+  if (spn_toolchain_program(source, SPN_PATH_ROOT_NONE, in->program, &launcher->program) != SPN_PATH_OK) {
+    return SPN_ERROR;
+  }
+  return SPN_OK;
+}
+
+static spn_err_t load_target(const spn_cg_toolchain_target_t* in, spn_cc_driver_t driver, spn_toolchain_source_t source, spn_toolchain_target_t* target) {
+  spn_triple_t partial = {
+    .arch = sp_opt_is_null(in->arch) ? SPN_ARCH_NONE : sp_opt_get(in->arch),
+    .os = sp_opt_is_null(in->os) ? SPN_OS_NONE : sp_opt_get(in->os),
+    .abi = sp_opt_is_null(in->abi) ? SPN_ABI_NONE : sp_opt_get(in->abi),
+  };
+  if (spn_triple_entry(partial, &target->triple) != SPN_TRIPLE_ENTRY_OK) {
+    return SPN_ERROR;
+  }
+  if (!spn_toolchain_driver_produces(driver, spn_ld_flavor(target->triple))) {
+    return SPN_ERROR;
+  }
+  if (sp_str_empty(in->sysroot)) {
+    return SPN_OK;
+  }
+  if (!spn_sdk_takes_sysroot(spn_sdk_kind(target->triple))) {
+    return SPN_ERROR;
+  }
+  if (spn_toolchain_path(source, SPN_PATH_ROOT_NONE, in->sysroot, &target->sysroot) != SPN_PATH_OK) {
     return SPN_ERROR;
   }
   return SPN_OK;
@@ -55,21 +79,11 @@ spn_err_t spn_toolchain_decls_parse(sp_mem_t mem, sp_str_t json, sp_da(spn_toolc
     spn_try(load_launcher(&t->archiver, decl.source, &decl.archiver));
     spn_try(load_launcher(&t->cxx, decl.source, &decl.cxx));
 
-    decl.targets = sp_da_new(mem, spn_triple_t);
+    decl.targets = sp_da_new(mem, spn_toolchain_target_t);
     sp_da_for(t->target, it) {
-      spn_triple_t partial = {
-        .arch = sp_opt_is_null(t->target[it].arch) ? SPN_ARCH_NONE : sp_opt_get(t->target[it].arch),
-        .os = sp_opt_is_null(t->target[it].os) ? SPN_OS_NONE : sp_opt_get(t->target[it].os),
-        .abi = sp_opt_is_null(t->target[it].abi) ? SPN_ABI_NONE : sp_opt_get(t->target[it].abi),
-      };
-      spn_triple_t full = sp_zero;
-      if (spn_triple_entry(partial, &full) != SPN_TRIPLE_ENTRY_OK) {
-        return SPN_ERROR;
-      }
-      if (!spn_toolchain_driver_produces(decl.driver, spn_ld_flavor(full))) {
-        return SPN_ERROR;
-      }
-      sp_da_push(decl.targets, full);
+      spn_toolchain_target_t target = sp_zero;
+      spn_try(load_target(&t->target[it], decl.driver, decl.source, &target));
+      sp_da_push(decl.targets, target);
     }
 
     sp_da_push(*decls, decl);
@@ -78,24 +92,42 @@ spn_err_t spn_toolchain_decls_parse(sp_mem_t mem, sp_str_t json, sp_da(spn_toolc
   return SPN_OK;
 }
 
-static sp_da(spn_triple_t) bind_targets(spn_toolchain_catalog_t* catalog, const spn_toolchain_decl_t* decl) {
-  if (!sp_da_empty(decl->targets)) {
-    return decl->targets;
-  }
-
+static sp_da(spn_toolchain_target_t) default_targets(spn_toolchain_catalog_t* catalog, const spn_toolchain_decl_t* decl) {
   spn_triple_t host = catalog->host;
   host.abi = host.abi ? host.abi : spn_default_abi(decl->driver, host.os);
 
-  sp_da(spn_triple_t) targets = sp_da_new(catalog->mem, spn_triple_t);
+  sp_da(spn_toolchain_target_t) targets = sp_da_new(catalog->mem, spn_toolchain_target_t);
   spn_ld_flavor_t flavor = spn_ld_flavor(host);
   if (!spn_toolchain_driver_produces(decl->driver, flavor)) {
     return targets;
   }
-  sp_da_push(targets, host);
+  sp_da_push(targets, ((spn_toolchain_target_t) { .triple = host }));
   if (flavor == SPN_LD_FLAVOR_ELF && !spn_toolchain_driver_retargets(decl->driver)) {
-    sp_da_push(targets, ((spn_triple_t) { host.arch, SPN_OS_FREESTANDING, SPN_ABI_BARE }));
+    sp_da_push(targets, ((spn_toolchain_target_t) { .triple = { host.arch, SPN_OS_FREESTANDING, SPN_ABI_BARE } }));
   }
   return targets;
+}
+
+static sp_da(spn_toolchain_target_t) declared_targets(spn_toolchain_catalog_t* catalog, sp_da(spn_toolchain_target_t) declared, spn_toolchain_support_t support) {
+  switch (support.kind) {
+    case SPN_TOOLCHAIN_SUPPORT_ARTIFACT: {
+      spn_path_t root = spn_toolchain_artifact_root(support.artifact);
+      sp_da(spn_toolchain_target_t) targets = sp_da_new(catalog->mem, spn_toolchain_target_t);
+      sp_da_for(declared, it) {
+        spn_path_t sysroot = declared[it].sysroot;
+        sp_da_push(targets, ((spn_toolchain_target_t) {
+          .triple = declared[it].triple,
+          .sysroot = spn_path_empty(sysroot) ? sysroot : spn_path_join(catalog->mem, root, sysroot.sub),
+        }));
+      }
+      return targets;
+    }
+    case SPN_TOOLCHAIN_SUPPORT_LOCAL:
+    case SPN_TOOLCHAIN_SUPPORT_NONE: {
+      return declared;
+    }
+  }
+  sp_unreachable_return(declared);
 }
 
 static bool has_host(sp_da(spn_toolchain_host_t) hosts, spn_triple_t host) {
@@ -130,6 +162,7 @@ static spn_toolchain_support_t bind_support(spn_toolchain_catalog_t* catalog, co
 }
 
 static spn_toolchain_info_t bind_toolchain(spn_toolchain_catalog_t* catalog, const spn_toolchain_decl_t* decl) {
+  spn_toolchain_support_t support = bind_support(catalog, decl);
   return (spn_toolchain_info_t) {
     .name = decl->name,
     .version = decl->version,
@@ -139,8 +172,8 @@ static spn_toolchain_info_t bind_toolchain(spn_toolchain_catalog_t* catalog, con
     .archiver = decl->archiver,
     .linkers = decl->linkers,
     .link_args = decl->link_args,
-    .targets = bind_targets(catalog, decl),
-    .support = bind_support(catalog, decl),
+    .targets = sp_da_empty(decl->targets) ? default_targets(catalog, decl) : declared_targets(catalog, decl->targets, support),
+    .support = support,
   };
 }
 

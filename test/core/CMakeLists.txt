@@ -129,6 +129,7 @@ add_executable(core
   toolchain/driver.c
   toolchain/linker.c
   toolchain/parse.c
+  toolchain/path.c
   toolchain/probe.c
   toolchain/program.c
   toolchain/provision.c
@@ -285,6 +286,7 @@ set_source_files_properties(
   toolchain/driver.c
   toolchain/linker.c
   toolchain/parse.c
+  toolchain/path.c
   toolchain/probe.c
   toolchain/program.c
   toolchain/sdk.c

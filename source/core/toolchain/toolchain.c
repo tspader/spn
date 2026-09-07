@@ -3,8 +3,12 @@
 #include "paths/paths.h"
 #include "toolchain/toolchain.h"
 
+spn_path_t spn_toolchain_artifact_root(spn_artifact_t artifact) {
+  return (spn_path_t) { .root = SPN_PATH_ROOT_TOOLCHAIN, .sub = artifact.sha256 };
+}
+
 spn_toolchain_launcher_t spn_toolchain_launcher_with_root(sp_mem_t mem, spn_toolchain_launcher_t launcher, spn_path_t root) {
-  sp_str_t name = launcher.program.prefix;
+  sp_str_t name = launcher.program.path.sub;
 #if defined(SP_WIN32)
   name = sp_fmt(mem, "{}.exe", sp_fmt_str(name)).value;
 #endif
@@ -23,38 +27,56 @@ static bool pathless(sp_str_t program) {
   return true;
 }
 
-spn_program_check_t spn_toolchain_program(spn_toolchain_source_t source, spn_path_root_t base, sp_str_t program, spn_arg_t* arg) {
-  if (!spn_path_normal(program)) {
-    return SPN_PROGRAM_MALFORMED;
-  }
-  if (pathless(program)) {
-    *arg = spn_arg_lit(program);
-    return SPN_PROGRAM_OK;
+static bool searched(spn_toolchain_source_t source, sp_str_t program) {
+  return source != SPN_TOOLCHAIN_SOURCE_DISTRIBUTION && pathless(program);
+}
+
+spn_path_check_t spn_toolchain_path(spn_toolchain_source_t source, spn_path_root_t base, sp_str_t str, spn_path_t* path) {
+  if (!spn_path_normal(str)) {
+    return SPN_PATH_MALFORMED;
   }
 
-  bool absolute = sp_fs_is_absolute(program);
+  bool absolute = sp_fs_is_absolute(str);
   switch (source) {
     case SPN_TOOLCHAIN_SOURCE_DISTRIBUTION: {
       if (absolute) {
-        return SPN_PROGRAM_UNROOTED;
+        return SPN_PATH_UNROOTED;
       }
-      *arg = spn_arg_lit(program);
-      return SPN_PROGRAM_OK;
+      *path = (spn_path_t) { .sub = str };
+      return SPN_PATH_OK;
     }
     case SPN_TOOLCHAIN_SOURCE_LOCAL:
     case SPN_TOOLCHAIN_SOURCE_MIXED: {
       if (absolute) {
-        *arg = spn_arg_path((spn_path_t) { .sub = program });
-        return SPN_PROGRAM_OK;
+        *path = (spn_path_t) { .sub = str };
+        return SPN_PATH_OK;
       }
       if (base == SPN_PATH_ROOT_NONE) {
-        return SPN_PROGRAM_UNROOTED;
+        return SPN_PATH_UNROOTED;
       }
-      *arg = spn_arg_path((spn_path_t) { .root = base, .sub = program });
-      return SPN_PROGRAM_OK;
+      *path = (spn_path_t) { .root = base, .sub = str };
+      return SPN_PATH_OK;
     }
   }
-  SP_UNREACHABLE_RETURN(SPN_PROGRAM_MALFORMED);
+  SP_UNREACHABLE_RETURN(SPN_PATH_MALFORMED);
+}
+
+spn_path_check_t spn_toolchain_program(spn_toolchain_source_t source, spn_path_root_t base, sp_str_t program, spn_arg_t* arg) {
+  if (!spn_path_normal(program)) {
+    return SPN_PATH_MALFORMED;
+  }
+  if (searched(source, program)) {
+    *arg = spn_arg_lit(program);
+    return SPN_PATH_OK;
+  }
+
+  spn_path_t path = sp_zero;
+  spn_path_check_t check = spn_toolchain_path(source, base, program, &path);
+  if (check != SPN_PATH_OK) {
+    return check;
+  }
+  *arg = spn_arg_path(path);
+  return SPN_PATH_OK;
 }
 
 bool spn_toolchain_has_cxx(spn_toolchain_info_t* toolchain) {
@@ -136,6 +158,16 @@ spn_sdk_kind_t spn_sdk_kind(spn_triple_t target) {
     case SPN_OS_NONE: sp_unreachable_case();
   }
   SP_UNREACHABLE_RETURN(SPN_SDK_NONE);
+}
+
+bool spn_sdk_takes_sysroot(spn_sdk_kind_t kind) {
+  switch (kind) {
+    case SPN_SDK_SYSROOT:
+    case SPN_SDK_MACOS: return true;
+    case SPN_SDK_NONE:
+    case SPN_SDK_MSVC: return false;
+  }
+  SP_UNREACHABLE_RETURN(false);
 }
 
 sp_str_t spn_toolchain_launcher_to_str(const spn_path_roots_t* roots, sp_mem_t mem, spn_toolchain_launcher_t launcher) {

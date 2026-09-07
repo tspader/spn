@@ -44,10 +44,10 @@ typedef struct {
 } spn_ld_issues_t;
 
 typedef enum {
-  SPN_PROGRAM_OK,
-  SPN_PROGRAM_UNROOTED,
-  SPN_PROGRAM_MALFORMED,
-} spn_program_check_t;
+  SPN_PATH_OK,
+  SPN_PATH_UNROOTED,
+  SPN_PATH_MALFORMED,
+} spn_path_check_t;
 
 typedef struct {
   spn_arg_t program;
@@ -64,6 +64,11 @@ typedef struct {
   spn_triple_t triple;
   spn_artifact_t artifact;
 } spn_toolchain_host_t;
+
+typedef struct {
+  spn_triple_t triple;
+  spn_path_t sysroot;
+} spn_toolchain_target_t;
 
 typedef enum {
   SPN_TOOLCHAIN_SOURCE_LOCAL,
@@ -93,7 +98,7 @@ typedef struct {
   sp_da(sp_str_t) link_args;
   spn_toolchain_source_t source;
   sp_da(spn_toolchain_host_t) hosts;
-  sp_da(spn_triple_t) targets;
+  sp_da(spn_toolchain_target_t) targets;
 } spn_toolchain_decl_t;
 
 typedef struct {
@@ -105,7 +110,7 @@ typedef struct {
   spn_toolchain_launcher_t archiver;
   spn_toolchain_linkers_t linkers;
   sp_da(sp_str_t) link_args;
-  sp_da(spn_triple_t) targets;
+  sp_da(spn_toolchain_target_t) targets;
   spn_toolchain_support_t support;
 } spn_toolchain_info_t;
 
@@ -140,7 +145,7 @@ typedef struct {
 
 typedef struct {
   spn_toolchain_info_t* toolchain;
-  spn_triple_t triple;
+  spn_toolchain_target_t target;
 } spn_toolchain_selection_t;
 
 typedef spn_err_t (*spn_fetch_fn)(sp_str_t url, sp_str_t dest, void* user_data);

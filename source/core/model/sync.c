@@ -98,7 +98,7 @@ static spn_err_t setup_artifact(spn_toolchain_store_t* store, spn_toolchain_unit
     spn_try(spn_toolchain_provision(store, toolchain->name, artifact));
   }
 
-  spn_path_t root = spn_path_make(&spn.roots, dest);
+  spn_path_t root = spn_toolchain_artifact_root(artifact);
   spn_toolchain_launcher_t cxx = toolchain->cxx;
   if (spn_toolchain_has_cxx(toolchain)) {
     cxx = spn_toolchain_launcher_with_root(spn.mem, toolchain->cxx, root);

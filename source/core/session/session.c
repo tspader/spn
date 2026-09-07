@@ -23,7 +23,7 @@
 #include "toolchain/toolchain.h"
 #include "triple/triple.h"
 
-static sp_str_t resolve_macos_sdk(sp_mem_t mem, sp_env_t* env) {
+static sp_str_t macos_sdk(sp_mem_t mem, sp_env_t* env) {
   sp_str_t sdk = sp_env_get(env, sp_str_lit("SPN_MACOS_SDK"));
   if (!sp_str_empty(sdk)) {
     return sdk;
@@ -46,6 +46,28 @@ static sp_str_t resolve_macos_sdk(sp_mem_t mem, sp_env_t* env) {
     return sp_str_lit("");
   }
   return sp_str_trim(result.out);
+}
+
+static spn_path_t resolve_sysroot(sp_mem_t mem, spn_ctx_t* ctx, const spn_toolchain_selection_t* selection) {
+  if (!spn_path_empty(selection->target.sysroot)) {
+    return selection->target.sysroot;
+  }
+  switch (spn_sdk_kind(selection->target.triple)) {
+    case SPN_SDK_MACOS: {
+      return spn_path_canonicalize(mem, &ctx->roots, spn_path_join(mem, spn_path_from_root(SPN_PATH_ROOT_NONE), macos_sdk(mem, ctx->env)));
+    }
+    case SPN_SDK_NONE:
+    case SPN_SDK_SYSROOT:
+    case SPN_SDK_MSVC: {
+      return sp_zero_struct(spn_path_t);
+    }
+  }
+  sp_unreachable_return(sp_zero_struct(spn_path_t));
+}
+
+static void finalize_profile(spn_session_t* s, spn_profile_info_t* profile, const spn_toolchain_selection_t* selection) {
+  spn_profile_finalize(profile, selection);
+  profile->sysroot = resolve_sysroot(s->mem, s->ctx, selection);
 }
 
 static spn_target_rule_t copy_rule(sp_mem_t mem, spn_target_rule_t rule) {
@@ -118,22 +140,12 @@ spn_err_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem, spn_p
   }
   spn_toolchain_selection_t target = sp_zero;
   spn_try(spn_toolchain_select(&ctx->catalog, query, &target));
-  spn_profile_finalize(&s->profile, &target);
-
-  switch (s->profile.os) {
-    case SPN_OS_MACOS: {
-      s->profile.sysroot = spn_path_canonicalize(s->mem, &ctx->roots, spn_path_join(s->mem, spn_path_from_root(SPN_PATH_ROOT_NONE), resolve_macos_sdk(s->mem, ctx->env)));
-      break;
-    }
-    default: {
-      break;
-    }
-  }
+  finalize_profile(s, &s->profile, &target);
 
   spn_profile_info_t metaprogram = spn_profile_metaprogram();
   spn_toolchain_selection_t script = sp_zero;
   spn_try(spn_toolchain_select(&ctx->catalog, spn_profile_query(&metaprogram, host), &script));
-  spn_profile_finalize(&metaprogram, &script);
+  finalize_profile(s, &metaprogram, &script);
 
   spn_path_t target_root = spn_path_join(s->mem, s->paths.build, spn_profile_build_dir(s->mem, &s->profile));
   s->units.target = spn_build_add(s, s->profile, target_root, target.toolchain);

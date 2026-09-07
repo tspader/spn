@@ -11,9 +11,9 @@ static const test_t tests [] = {
     .expect = {
       .version = "0.16.0",
       .driver = SPN_CC_DRIVER_ZIG,
-      .compiler = { .name = "zig", .args = { "cc" } },
-      .cxx = { .name = "zig", .args = { "c++" } },
-      .archiver = { .name = "zig", .args = { "ar" } },
+      .compiler = { .path = "zig", .args = { "cc" } },
+      .cxx = { .path = "zig", .args = { "c++" } },
+      .archiver = { .path = "zig", .args = { "ar" } },
       .linkers = FAMILIES_LLD,
       .hosts = {
         { .triple = { SPN_ARCH_X64, SPN_OS_LINUX }, .url = "https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz" },
@@ -108,7 +108,7 @@ static const test_t tests [] = {
 };
 
 typedef struct {
-  spn_triple_t targets [FIXTURE_MAX_TARGETS];
+  fixture_target_t targets [FIXTURE_MAX_TARGETS];
 } bind_expect_t;
 
 typedef struct {
@@ -155,7 +155,7 @@ sp_test_each(builtins, bind, bind_test_t, bind_tests) {
   sp_must(t, info);
 
   u32 targets = 0;
-  sp_carr_detect_len(it->expect.targets, targets, !fixture_triple_empty(it->expect.targets[targets]));
+  sp_carr_detect_len(it->expect.targets, targets, !fixture_target_empty(it->expect.targets[targets]));
   return fixture_check_targets(t, info->targets, it->expect.targets, targets);
 }
 

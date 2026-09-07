@@ -25,9 +25,9 @@ static const parse_test_t tests [] = {
           .name = "A",
           .version = "1.0.0",
           .driver = SPN_CC_DRIVER_CLANG,
-          .compiler = { .name = "A", .args = { "cc" } },
-          .cxx = { .name = "A", .args = { "c++" } },
-          .archiver = { .name = "A", .args = { "ar" } },
+          .compiler = { .path = "A", .args = { "cc" } },
+          .cxx = { .path = "A", .args = { "c++" } },
+          .archiver = { .path = "A", .args = { "ar" } },
           .linkers = {
             [SPN_LD_FLAVOR_ELF] = SPN_LD_FAMILY_LLD,
             [SPN_LD_FLAVOR_MINGW] = SPN_LD_FAMILY_GNU,
@@ -197,6 +197,46 @@ static const parse_test_t tests [] = {
   {
     .name = "program_relative",
     .file = "program_relative.json",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "sysroot_per_target",
+    .file = "sysroot.json",
+    .expect = {
+      .entries = 1,
+      .toolchains = {
+        {
+          .name = "A",
+          .driver = SPN_CC_DRIVER_CLANG,
+          .compiler = { .path = "A" },
+          .archiver = { .path = "A" },
+          .hosts = {
+            { .triple = { SPN_ARCH_X64, SPN_OS_LINUX }, .url = "https://example.com/linux.tar.xz", .sha256 = "aa" },
+          },
+          .targets = {
+            { .triple = HOST_ARM_LINUX, .sysroot = { "S/linux" } },
+            { .triple = HOST_ARM_MACOS, .sysroot = { "S/macos" } },
+            { .triple = TARGET_WASM, .sysroot = { "S/wasi" } },
+            { .triple = TARGET_WIN_GNU, .sysroot = { "S/windows" } },
+            { .triple = HOST_X64_LINUX },
+          },
+        },
+      },
+    },
+  },
+  {
+    .name = "sysroot_on_msvc_target",
+    .file = "sysroot_msvc.json",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "sysroot_on_freestanding_target",
+    .file = "sysroot_freestanding.json",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "sysroot_absolute_in_distribution",
+    .file = "sysroot_absolute.json",
     .expect = { .err = SPN_ERROR },
   },
 };

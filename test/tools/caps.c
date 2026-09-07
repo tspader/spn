@@ -25,7 +25,7 @@ static sp_str_t read_repo_file(sp_mem_t mem, const c8* rel) {
 
 static bool targets(const spn_toolchain_info_t* info, spn_triple_t triple) {
   sp_da_for(info->targets, it) {
-    if (spn_triple_equal(info->targets[it], triple)) {
+    if (spn_triple_equal(info->targets[it].triple, triple)) {
       return true;
     }
   }
@@ -38,8 +38,8 @@ static spn_triple_t host_for(const spn_toolchain_info_t* info) {
     return host;
   }
   sp_da_for(info->targets, it) {
-    if (info->targets[it].arch == host.arch && info->targets[it].os == host.os) {
-      return info->targets[it];
+    if (info->targets[it].triple.arch == host.arch && info->targets[it].triple.os == host.os) {
+      return info->targets[it].triple;
     }
   }
   return host;
@@ -77,7 +77,7 @@ static bool triple_agrees(spn_triple_t a, spn_triple_t b) {
 
 static bool toolchain_targets(const spn_toolchain_info_t* info, spn_triple_t target) {
   sp_da_for(info->targets, it) {
-    if (triple_agrees(info->targets[it], target)) {
+    if (triple_agrees(info->targets[it].triple, target)) {
       return true;
     }
   }
@@ -89,7 +89,7 @@ const c8* test_target_alternate(void) {
   spn_triple_t host = test_host();
 
   sp_da_for(info->targets, it) {
-    spn_triple_t target = info->targets[it];
+    spn_triple_t target = info->targets[it].triple;
     if (target.os == SPN_OS_FREESTANDING) {
       continue;
     }
@@ -136,7 +136,7 @@ static const lane_program_t lane_programs [] = {
 
 static bool links_flavor(const spn_toolchain_info_t* info, spn_ld_flavor_t flavor) {
   sp_da_for(info->targets, it) {
-    if (spn_ld_flavor(info->targets[it]) == flavor) {
+    if (spn_ld_flavor(info->targets[it].triple) == flavor) {
       return true;
     }
   }

@@ -1,0 +1,22 @@
+{
+  "toolchain": [
+    {
+      "name": "A",
+      "driver": "clang",
+      "compiler": {
+        "program": "A"
+      },
+      "archiver": {
+        "program": "A"
+      },
+      "target": [
+        {
+          "arch": "aarch64",
+          "os": "linux",
+          "abi": "gnu",
+          "sysroot": "/S"
+        }
+      ]
+    }
+  ]
+}

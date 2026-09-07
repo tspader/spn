@@ -368,12 +368,26 @@ static const compile_test_t tests [] = {
       .os = SPN_OS_LINUX,
       .abi = SPN_ABI_GNU,
       .standard = SPN_C99,
-      .sysroot = "/sdk",
     },
     .min_os = { 13 },
     .expect = {
       .command = "cc",
       .args = { "-std=c99", "-c", "-Werror=return-type", "main.c", "-o", "main.o" },
+    },
+  },
+  {
+    .name = "gcc_linux_sysroot",
+    .driver = SPN_CC_DRIVER_GCC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_GNU,
+      .standard = SPN_C99,
+      .sysroot = "/S",
+    },
+    .expect = {
+      .command = "cc",
+      .args = { "-std=c99", "-c", "--sysroot=/S", "-Werror=return-type", "main.c", "-o", "main.o" },
     },
   },
 };

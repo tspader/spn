@@ -5,6 +5,7 @@
 #include "enum/enum.h"
 #include "spn/core.h"
 #include "toolchain/linker.h"
+#include "toolchain/toolchain.h"
 #include "macro/macro.h"
 #include "paths/paths.h"
 #include "triple/triple.h"
@@ -63,6 +64,10 @@ static sp_str_t cxx_standard_to_flag(spn_cxx_standard_t standard) {
 
 static bool is_os_version_present(spn_os_version_t version) {
   return version.major || version.minor;
+}
+
+static spn_triple_t profile_triple(const spn_profile_info_t* profile) {
+  return (spn_triple_t) { profile->arch, profile->os, profile->abi };
 }
 
 static sp_str_t render_target(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, spn_triple_t triple) {
@@ -153,8 +158,7 @@ static void add_launcher(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
   spn_cc_push_strs(mem, invocation, launcher.args);
   invocation->launcher = sp_da_size(invocation->args);
   if (spn_cc_has(toolchain, SPN_CC_CAP_TARGET_TRIPLE)) {
-    spn_triple_t triple = { profile->arch, profile->os, profile->abi };
-    sp_str_t target = render_target(mem, toolchain, triple);
+    sp_str_t target = render_target(mem, toolchain, profile_triple(profile));
     if (!sp_str_empty(target)) {
       spn_cc_push_fmt(mem, invocation, "--target={}", sp_fmt_str(target));
     }
@@ -191,16 +195,27 @@ void spn_gnu_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, c
   if (compile->pic) {
     spn_cc_push_c(mem, invocation, "-fPIC");
   }
-  if (profile->os == SPN_OS_MACOS) {
-    if (!spn_path_empty(profile->sysroot)) {
-      spn_cc_push_c(mem, invocation, "-isysroot");
-      spn_cc_push_path(mem, invocation, profile->sysroot);
-      spn_cc_push_c(mem, invocation, "-iframework");
-      spn_cc_push_path(mem, invocation, spn_path_join(mem, profile->sysroot, sp_str_lit("System/Library/Frameworks")));
+  if (!spn_path_empty(profile->sysroot)) {
+    switch (spn_sdk_kind(profile_triple(profile))) {
+      case SPN_SDK_SYSROOT: {
+        spn_cc_push_glued(mem, invocation, "--sysroot=", profile->sysroot);
+        break;
+      }
+      case SPN_SDK_MACOS: {
+        spn_cc_push_c(mem, invocation, "-isysroot");
+        spn_cc_push_path(mem, invocation, profile->sysroot);
+        spn_cc_push_c(mem, invocation, "-iframework");
+        spn_cc_push_path(mem, invocation, spn_path_join(mem, profile->sysroot, sp_str_lit("System/Library/Frameworks")));
+        break;
+      }
+      case SPN_SDK_NONE:
+      case SPN_SDK_MSVC: {
+        break;
+      }
     }
-    if (is_os_version_present(compile->min_os)) {
-      spn_cc_push_fmt(mem, invocation, "-mmacosx-version-min={}.{}", sp_fmt_uint(compile->min_os.major), sp_fmt_uint(compile->min_os.minor));
-    }
+  }
+  if (profile->os == SPN_OS_MACOS && is_os_version_present(compile->min_os)) {
+    spn_cc_push_fmt(mem, invocation, "-mmacosx-version-min={}.{}", sp_fmt_uint(compile->min_os.major), sp_fmt_uint(compile->min_os.minor));
   }
   if (profile->os == SPN_OS_WINDOWS && spn_cc_has(toolchain, SPN_CC_CAP_CLANG_FRONTEND)) {
     spn_cc_push_c(mem, invocation, "-gno-codeview-command-line");
@@ -332,7 +347,7 @@ static void add_rpath(sp_mem_t mem, spn_ld_flavor_t flavor, spn_invocation_t* in
 }
 
 void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_link_t* link, const spn_cc_link_files_t* files, spn_invocation_t* invocation) {
-  spn_triple_t triple = { profile->arch, profile->os, profile->abi };
+  spn_triple_t triple = profile_triple(profile);
   spn_ld_flavor_t flavor = spn_ld_flavor(triple);
 
   add_launcher(mem, toolchain, profile, link->lang, invocation);
@@ -396,13 +411,26 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
   sp_da_for(link->system_libs, it) {
     spn_cc_push_fmt(mem, invocation, "-l{}", sp_fmt_str(link->system_libs[it]));
   }
-  if (profile->os == SPN_OS_MACOS) {
-    if (!spn_path_empty(profile->sysroot)) {
-      spn_cc_push_c(mem, invocation, "-isysroot");
-      spn_cc_push_path(mem, invocation, profile->sysroot);
-      spn_cc_push_glued(mem, invocation, "-F", spn_path_join(mem, profile->sysroot, sp_str_lit("System/Library/Frameworks")));
-      spn_cc_push_glued(mem, invocation, "-L", spn_path_join(mem, profile->sysroot, sp_str_lit("usr/lib")));
+  if (!spn_path_empty(profile->sysroot)) {
+    switch (spn_sdk_kind(triple)) {
+      case SPN_SDK_SYSROOT: {
+        spn_cc_push_glued(mem, invocation, "--sysroot=", profile->sysroot);
+        break;
+      }
+      case SPN_SDK_MACOS: {
+        spn_cc_push_c(mem, invocation, "-isysroot");
+        spn_cc_push_path(mem, invocation, profile->sysroot);
+        spn_cc_push_glued(mem, invocation, "-F", spn_path_join(mem, profile->sysroot, sp_str_lit("System/Library/Frameworks")));
+        spn_cc_push_glued(mem, invocation, "-L", spn_path_join(mem, profile->sysroot, sp_str_lit("usr/lib")));
+        break;
+      }
+      case SPN_SDK_NONE:
+      case SPN_SDK_MSVC: {
+        break;
+      }
     }
+  }
+  if (profile->os == SPN_OS_MACOS) {
     if (is_os_version_present(link->min_os)) {
       spn_cc_push_fmt(mem, invocation, "-mmacosx-version-min={}.{}", sp_fmt_uint(link->min_os.major), sp_fmt_uint(link->min_os.minor));
     }

@@ -12,6 +12,7 @@
 #include "toolchain/types.h"
 #include "toml/loader.h"
 #include "semver/compare.h"
+#include "triple/triple.h"
 #include "when/when.h"
 
 ////////////////
@@ -74,6 +75,11 @@ typedef struct {
 } option_t;
 
 typedef struct {
+  spn_triple_t triple;
+  test_path_t sysroot;
+} toolchain_target_t;
+
+typedef struct {
   const c8* name;
   const c8* url;
   const c8* sha256;
@@ -87,7 +93,7 @@ typedef struct {
   spn_ld_family_t linkers [SPN_LD_FLAVOR_COUNT];
   const c8* link_args [2];
   spn_triple_t hosts [2];
-  spn_triple_t targets [5];
+  toolchain_target_t targets [5];
 } toolchain_t;
 
 typedef struct {
@@ -573,12 +579,48 @@ static const test_t tests [] = {
     .toolchains = {
       {
         .name = "T",
-        .compiler = { .name = "bin/cc" },
-        .archiver = { .name = "bin/ar" },
+        .compiler = { .path = "bin/cc" },
+        .archiver = { .path = "bin/ar" },
         .driver = SPN_CC_DRIVER_GCC,
         .url = "https://tc",
         .sha256 = "deadbeef",
       },
+    },
+  },
+  {
+    .name = "toolchain_sysroot",
+    .manifest = "toolchain_sysroot",
+    .toolchains = {
+      {
+        .name = "L",
+        .compiler = { .name = "cc" },
+        .archiver = { .name = "ar" },
+        .driver = SPN_CC_DRIVER_GCC,
+        .targets = { { .triple = { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_GNU }, .sysroot = { "S", SPN_PATH_ROOT_PROJECT } } },
+      },
+      {
+        .name = "D",
+        .compiler = { .path = "cc" },
+        .archiver = { .path = "ar" },
+        .driver = SPN_CC_DRIVER_CLANG,
+        .url = "https://tc",
+        .sha256 = "deadbeef",
+        .targets = { { .triple = { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_GNU }, .sysroot = { "S" } } },
+      },
+    },
+  },
+  {
+    .name = "validate_toolchain_sysroot_forbidden",
+    .manifest = "toolchain_sysroot_msvc",
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].target[0].sysroot" }
+    },
+  },
+  {
+    .name = "validate_toolchain_sysroot_malformed",
+    .manifest = "toolchain_sysroot_malformed",
+    .issues = {
+      { SPN_ERR_CODEGEN_PATH, "toolchain[0].target[0].sysroot" }
     },
   },
   {
@@ -773,9 +815,9 @@ static const test_t tests [] = {
         .url = "https://tc",
         .sha256 = "deadbeef",
         .mirrors = "https://mirrors",
-        .compiler = { .name = "zig" },
+        .compiler = { .path = "zig" },
         .args = { "cc", "-target", "x86_64-linux-gnu" },
-        .archiver = { .name = "ar" },
+        .archiver = { .path = "ar" },
         .driver = SPN_CC_DRIVER_CLANG,
         .linkers = {
           [SPN_LD_FLAVOR_ELF] = SPN_LD_FAMILY_GNU,
@@ -1459,12 +1501,11 @@ sp_test_each(lower, cases, test_t, tests) {
     sp_must_strs_eq(t, tc->cxx.args, sp_da_size(tc->cxx.args), expected.cxx_args);
 
     sp_carr_for(expected.targets, r) {
-      spn_triple_t triple = expected.targets[r];
-      if (triple.arch == SPN_ARCH_NONE) break;
+      toolchain_target_t target = expected.targets[r];
+      if (target.triple.arch == SPN_ARCH_NONE) break;
       sp_must(t, r < sp_da_size(tc->targets));
-      sp_expect_eq(t, (u32)triple.arch, (u32)tc->targets[r].arch);
-      sp_expect_eq(t, (u32)triple.os, (u32)tc->targets[r].os);
-      sp_expect_eq(t, (u32)triple.abi, (u32)tc->targets[r].abi);
+      sp_expect(t, spn_triple_equal(target.triple, tc->targets[r].triple));
+      if (test_check_path(t, tc->targets[r].sysroot, target.sysroot)) return SP_ERR;
     }
 
     sp_carr_for(expected.hosts, r) {

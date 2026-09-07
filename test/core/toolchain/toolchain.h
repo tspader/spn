@@ -41,6 +41,11 @@ typedef struct {
 } fixture_host_t;
 
 typedef struct {
+  spn_triple_t triple;
+  test_path_t sysroot;
+} fixture_target_t;
+
+typedef struct {
   const c8* name;
   bool absent;
   const c8* version;
@@ -51,11 +56,15 @@ typedef struct {
   spn_ld_family_t linkers [SPN_LD_FLAVOR_COUNT];
   const c8* link_args [FIXTURE_MAX_ARGS];
   fixture_host_t hosts [FIXTURE_MAX_HOSTS];
-  spn_triple_t targets [FIXTURE_MAX_TARGETS];
+  fixture_target_t targets [FIXTURE_MAX_TARGETS];
 } fixture_toolchain_t;
 
 static bool fixture_triple_empty(spn_triple_t triple) {
   return !triple.arch && !triple.os && !triple.abi;
+}
+
+static bool fixture_target_empty(fixture_target_t target) {
+  return fixture_triple_empty(target.triple);
 }
 
 static spn_arg_t fixture_arg(fixture_launcher_t launcher) {
@@ -63,6 +72,17 @@ static spn_arg_t fixture_arg(fixture_launcher_t launcher) {
     return spn_arg_path((spn_path_t) { .root = launcher.root, .sub = sp_cstr_as_str(launcher.path) });
   }
   return spn_arg_lit(sp_cstr_as_str(launcher.name));
+}
+
+static spn_path_t fixture_path(test_path_t path) {
+  if (!path.path) {
+    return sp_zero_struct(spn_path_t);
+  }
+  return (spn_path_t) { .root = path.root, .sub = sp_cstr_as_str(path.path) };
+}
+
+static spn_toolchain_target_t fixture_target(fixture_target_t target) {
+  return (spn_toolchain_target_t) { .triple = target.triple, .sysroot = fixture_path(target.sysroot) };
 }
 
 static sp_err_t fixture_check_launcher(sp_test_t* t, spn_toolchain_launcher_t launcher, fixture_launcher_t expect) {
@@ -92,10 +112,21 @@ static sp_err_t fixture_check_host(sp_test_t* t, spn_toolchain_host_t host, fixt
   return SP_OK;
 }
 
-static sp_err_t fixture_check_targets(sp_test_t* t, sp_da(spn_triple_t) targets, const spn_triple_t* expect, u32 count) {
+static sp_err_t fixture_check_triples(sp_test_t* t, sp_da(spn_triple_t) triples, const spn_triple_t* expect, u32 count) {
+  sp_must_eq(t, count, (u32)sp_da_size(triples));
+  sp_for(it, count) {
+    sp_expect(t, spn_triple_equal(expect[it], triples[it]));
+  }
+  return SP_OK;
+}
+
+static sp_err_t fixture_check_targets(sp_test_t* t, sp_da(spn_toolchain_target_t) targets, const fixture_target_t* expect, u32 count) {
   sp_must_eq(t, count, (u32)sp_da_size(targets));
   sp_for(it, count) {
-    sp_expect(t, spn_triple_equal(expect[it], targets[it]));
+    sp_expect(t, spn_triple_equal(expect[it].triple, targets[it].triple));
+    if (test_check_path(t, targets[it].sysroot, expect[it].sysroot)) {
+      return SP_ERR;
+    }
   }
   return SP_OK;
 }
@@ -130,9 +161,9 @@ static sp_err_t fixture_check_launchers(sp_test_t* t, spn_toolchain_launcher_t c
   return SP_OK;
 }
 
-static sp_err_t fixture_check_declared_targets(sp_test_t* t, sp_da(spn_triple_t) targets, fixture_toolchain_t expect) {
+static sp_err_t fixture_check_declared_targets(sp_test_t* t, sp_da(spn_toolchain_target_t) targets, fixture_toolchain_t expect) {
   u32 count = 0;
-  sp_carr_detect_len(expect.targets, count, !fixture_triple_empty(expect.targets[count]));
+  sp_carr_detect_len(expect.targets, count, !fixture_target_empty(expect.targets[count]));
   return fixture_check_targets(t, targets, expect.targets, count);
 }
 

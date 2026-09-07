@@ -1,0 +1,49 @@
+{
+  "toolchain": [
+    {
+      "name": "A",
+      "driver": "clang",
+      "compiler": {
+        "program": "A"
+      },
+      "archiver": {
+        "program": "A"
+      },
+      "host": {
+        "x86_64-linux": {
+          "url": "https://example.com/linux.tar.xz",
+          "sha256": "aa"
+        }
+      },
+      "target": [
+        {
+          "arch": "aarch64",
+          "os": "linux",
+          "abi": "gnu",
+          "sysroot": "S/linux"
+        },
+        {
+          "arch": "aarch64",
+          "os": "macos",
+          "sysroot": "S/macos"
+        },
+        {
+          "arch": "wasm32",
+          "os": "wasi",
+          "sysroot": "S/wasi"
+        },
+        {
+          "arch": "x86_64",
+          "os": "windows",
+          "abi": "gnu",
+          "sysroot": "S/windows"
+        },
+        {
+          "arch": "x86_64",
+          "os": "linux",
+          "abi": "gnu"
+        }
+      ]
+    }
+  ]
+}

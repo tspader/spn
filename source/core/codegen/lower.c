@@ -29,11 +29,11 @@ static sp_str_t lower_canonicalize(spn_toml_loader_t* ctx, sp_str_t name) {
   return lower_qualify(ctx, pair.first, pair.second);
 }
 
-static spn_err_t program_issue(spn_program_check_t check) {
+static spn_err_t path_issue(spn_path_check_t check) {
   switch (check) {
-    case SPN_PROGRAM_UNROOTED: return SPN_ERR_CODEGEN_UNROOTED;
-    case SPN_PROGRAM_MALFORMED: return SPN_ERR_CODEGEN_PATH;
-    case SPN_PROGRAM_OK: sp_unreachable_case();
+    case SPN_PATH_UNROOTED: return SPN_ERR_CODEGEN_UNROOTED;
+    case SPN_PATH_MALFORMED: return SPN_ERR_CODEGEN_PATH;
+    case SPN_PATH_OK: sp_unreachable_case();
   }
   sp_unreachable_return(SPN_ERROR);
 }
@@ -41,14 +41,31 @@ static spn_err_t program_issue(spn_program_check_t check) {
 static spn_arg_t lower_program(spn_toml_loader_t* ctx, const c8* key, spn_toolchain_source_t source, spn_path_root_t base, sp_str_t program) {
   spn_arg_t arg = sp_zero;
   program = spn_toml_loader_intern(ctx, sp_fs_normalize_path(ctx->mem, program));
-  spn_program_check_t check = spn_toolchain_program(source, base, program, &arg);
-  if (check == SPN_PROGRAM_OK) {
+  spn_path_check_t check = spn_toolchain_program(source, base, program, &arg);
+  if (check == SPN_PATH_OK) {
     return arg;
   }
   spn_toml_loader_push_key(ctx, key);
-  spn_toml_loader_issue_at(ctx, program_issue(check), program);
+  spn_toml_loader_issue_at(ctx, path_issue(check), program);
   spn_toml_loader_pop(ctx);
   return sp_zero_struct(spn_arg_t);
+}
+
+static spn_path_t lower_sysroot(spn_toml_loader_t* ctx, spn_toolchain_source_t source, spn_path_root_t base, spn_triple_t triple, sp_str_t sysroot) {
+  if (!spn_sdk_takes_sysroot(spn_sdk_kind(triple))) {
+    spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "sysroot");
+    return sp_zero_struct(spn_path_t);
+  }
+  spn_path_t path = sp_zero;
+  sysroot = spn_toml_loader_intern(ctx, sp_fs_normalize_path(ctx->mem, sysroot));
+  spn_path_check_t check = spn_toolchain_path(source, base, sysroot, &path);
+  if (check == SPN_PATH_OK) {
+    return path;
+  }
+  spn_toml_loader_push_key(ctx, "sysroot");
+  spn_toml_loader_issue_at(ctx, path_issue(check), sysroot);
+  spn_toml_loader_pop(ctx);
+  return sp_zero_struct(spn_path_t);
 }
 
 static spn_toolchain_launcher_t lower_launcher(spn_toml_loader_t* ctx, const c8* key, spn_toolchain_source_t source, spn_path_root_t base, sp_str_t str) {
@@ -73,11 +90,11 @@ static spn_toolchain_launcher_t lower_launcher(spn_toml_loader_t* ctx, const c8*
   return launcher;
 }
 
-static spn_triple_t lower_triple(const spn_cg_triple_t* triple) {
+static spn_triple_t lower_triple(const spn_cg_toolchain_target_t* target) {
   return (spn_triple_t) {
-    .arch = sp_opt_is_null(triple->arch) ? SPN_ARCH_NONE : sp_opt_get(triple->arch),
-    .os   = sp_opt_is_null(triple->os)   ? SPN_OS_NONE   : sp_opt_get(triple->os),
-    .abi  = sp_opt_is_null(triple->abi)  ? SPN_ABI_NONE  : sp_opt_get(triple->abi),
+    .arch = sp_opt_is_null(target->arch) ? SPN_ARCH_NONE : sp_opt_get(target->arch),
+    .os   = sp_opt_is_null(target->os)   ? SPN_OS_NONE   : sp_opt_get(target->os),
+    .abi  = sp_opt_is_null(target->abi)  ? SPN_ABI_NONE  : sp_opt_get(target->abi),
   };
 }
 
@@ -347,26 +364,31 @@ static spn_toolchain_linkers_t lower_linkers(spn_toml_loader_t* ctx, const spn_c
   return linkers;
 }
 
-static sp_da(spn_triple_t) lower_toolchain_targets(spn_toml_loader_t* ctx, spn_cc_driver_t driver, sp_da(spn_cg_triple_t) cg) {
-  sp_da(spn_triple_t) targets = sp_da_new(ctx->mem, spn_triple_t);
+static sp_da(spn_toolchain_target_t) lower_toolchain_targets(spn_toml_loader_t* ctx, spn_cc_driver_t driver, spn_toolchain_source_t source, spn_path_root_t base, sp_da(spn_cg_toolchain_target_t) cg) {
+  sp_da(spn_toolchain_target_t) targets = sp_da_new(ctx->mem, spn_toolchain_target_t);
   spn_toml_loader_push_key(ctx, "target");
   sp_da_for(cg, it) {
     spn_triple_t partial = lower_triple(&cg[it]);
-    spn_triple_t full = sp_zero;
-    spn_triple_entry_t entry = spn_triple_entry(partial, &full);
+    spn_toolchain_target_t target = sp_zero;
+    spn_triple_entry_t entry = spn_triple_entry(partial, &target.triple);
     if (entry != SPN_TRIPLE_ENTRY_OK) {
       spn_toml_loader_push_index(ctx, it);
       issue_triple_entry(ctx, entry);
       spn_toml_loader_pop(ctx);
       continue;
     }
-    if (!spn_toolchain_driver_produces(driver, spn_ld_flavor(full))) {
+    if (!spn_toolchain_driver_produces(driver, spn_ld_flavor(target.triple))) {
       spn_toml_loader_push_index(ctx, it);
-      spn_toml_loader_issue_at(ctx, SPN_ERR_CODEGEN_INVALID, spn_ld_flavor_to_str(spn_ld_flavor(full)));
+      spn_toml_loader_issue_at(ctx, SPN_ERR_CODEGEN_INVALID, spn_ld_flavor_to_str(spn_ld_flavor(target.triple)));
       spn_toml_loader_pop(ctx);
       continue;
     }
-    sp_da_push(targets, full);
+    if (!sp_str_empty(cg[it].sysroot)) {
+      spn_toml_loader_push_index(ctx, it);
+      target.sysroot = lower_sysroot(ctx, source, base, target.triple, cg[it].sysroot);
+      spn_toml_loader_pop(ctx);
+    }
+    sp_da_push(targets, target);
   }
   spn_toml_loader_pop(ctx);
   return targets;
@@ -433,10 +455,6 @@ spn_toolchain_decl_t spn_toolchain_lower(spn_toml_loader_t* ctx, u32 at, spn_pat
   spn_toolchain_decl_t toolchain = sp_zero;
   toolchain.name = decl->name;
   toolchain.driver = sp_opt_is_null(decl->driver) ? SPN_CC_DRIVER_NONE : sp_opt_get(decl->driver);
-  if (toolchain.driver) {
-    toolchain.linkers = lower_linkers(ctx, &decl->linker, toolchain.driver);
-    toolchain.targets = lower_toolchain_targets(ctx, toolchain.driver, decl->target);
-  }
   toolchain.link_args = lower_strs(ctx, decl->link_args);
 
   toolchain.hosts = sp_da_new(ctx->mem, spn_toolchain_host_t);
@@ -480,6 +498,10 @@ spn_toolchain_decl_t spn_toolchain_lower(spn_toml_loader_t* ctx, u32 at, spn_pat
   toolchain.compiler = lower_launcher(ctx, "compiler", toolchain.source, base, decl->compiler);
   toolchain.cxx = lower_launcher(ctx, "cxx", toolchain.source, base, decl->cxx);
   toolchain.archiver = lower_launcher(ctx, "archiver", toolchain.source, base, decl->archiver);
+  if (toolchain.driver) {
+    toolchain.linkers = lower_linkers(ctx, &decl->linker, toolchain.driver);
+    toolchain.targets = lower_toolchain_targets(ctx, toolchain.driver, toolchain.source, base, decl->target);
+  }
 
   spn_toml_loader_pop(ctx);
   spn_toml_loader_pop(ctx);

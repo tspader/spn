@@ -19,6 +19,7 @@ typedef struct {
   spn_err_t err;
   const c8* name;
   spn_triple_t triple;
+  test_path_t sysroot;
   spn_triple_t targets [FIXTURE_MAX_TARGETS];
   const c8* candidates [SELECT_MAX_CANDIDATES];
   spn_abi_t abis [SELECT_MAX_ABIS];
@@ -33,7 +34,7 @@ typedef struct {
 typedef struct {
   const c8* name;
   spn_cc_driver_t driver;
-  spn_triple_t targets [FIXTURE_MAX_TARGETS];
+  fixture_target_t targets [FIXTURE_MAX_TARGETS];
   check_t checks [SELECT_MAX_CHECKS];
 } complete_test_t;
 
@@ -210,6 +211,16 @@ static const complete_test_t complete_tests [] = {
     .targets = { TARGET_WIN_GNU },
     .checks = {
       { .target = X64_WINDOWS, .expect = { .err = SPN_ERR_TARGET_ABI, .abis = { SPN_ABI_GNU, SPN_ABI_MSVC } } },
+    },
+  },
+  {
+    .name = "listed_sysroot_reaches_selection",
+    .driver = SPN_CC_DRIVER_CLANG,
+    .targets = { { .triple = HOST_ARM_LINUX, .sysroot = { "/S" } } },
+    .checks = {
+      { .target = ARM_LINUX, .abis = { SPN_ABI_GNU }, .expect = { .triple = HOST_ARM_LINUX, .sysroot = { "/S" } } },
+      { .target = ARM_LINUX, .abis = { SPN_ABI_MUSL }, .expect = { .err = SPN_ERR_TOOLCHAIN_SYSROOT, .targets = { HOST_ARM_LINUX } } },
+      { .target = X64_LINUX, .abis = { SPN_ABI_GNU }, .expect = { .triple = HOST_X64_LINUX } },
     },
   },
 };
@@ -394,7 +405,7 @@ static sp_err_t check_failure(sp_test_t* t, sp_mem_t mem, spn_toolchain_catalog_
 
   u32 targets = 0;
   sp_carr_detect_len(expect->targets, targets, !fixture_triple_empty(expect->targets[targets]));
-  if (fixture_check_targets(t, err->targets, expect->targets, targets)) {
+  if (fixture_check_triples(t, err->targets, expect->targets, targets)) {
     return SP_ERR;
   }
 
@@ -409,11 +420,11 @@ static spn_err_t query_catalog(spn_toolchain_catalog_t* catalog, spn_toolchain_q
   return spn_toolchain_select(catalog, query, selection);
 }
 
-static sp_err_t check_selection(sp_test_t* t, const spn_toolchain_selection_t* selection, const c8* name, spn_triple_t triple) {
+static sp_err_t check_selection(sp_test_t* t, const spn_toolchain_selection_t* selection, const c8* name, const expect_t* expect) {
   sp_must(t, selection->toolchain);
   sp_expect_str_eq_c(t, selection->toolchain->name, name);
-  sp_expect(t, spn_triple_equal(selection->triple, triple));
-  return SP_OK;
+  sp_expect(t, spn_triple_equal(selection->target.triple, expect->triple));
+  return test_check_path(t, selection->target.sysroot, expect->sysroot);
 }
 
 sp_test_each(select, complete, complete_test_t, complete_tests, .setup = spn_test_ctx_setup) {
@@ -422,11 +433,11 @@ sp_test_each(select, complete, complete_test_t, complete_tests, .setup = spn_tes
   spn_toolchain_decl_t toolchain = fixture_local_toolchain("A", (fixture_launcher_t) { .name = "cc" });
   toolchain.driver = it->driver;
   u32 declared = 0;
-  sp_carr_detect_len(it->targets, declared, !fixture_triple_empty(it->targets[declared]));
+  sp_carr_detect_len(it->targets, declared, !fixture_target_empty(it->targets[declared]));
   if (declared) {
-    toolchain.targets = sp_da_new(mem, spn_triple_t);
+    toolchain.targets = sp_da_new(mem, spn_toolchain_target_t);
     sp_for(at, declared) {
-      sp_da_push(toolchain.targets, it->targets[at]);
+      sp_da_push(toolchain.targets, fixture_target(it->targets[at]));
     }
   }
 
@@ -452,7 +463,7 @@ sp_test_each(select, complete, complete_test_t, complete_tests, .setup = spn_tes
         return SP_ERR;
       }
     } else {
-      if (check_selection(t, &selection, "A", check->expect.triple)) {
+      if (check_selection(t, &selection, "A", &check->expect)) {
         return SP_ERR;
       }
     }
@@ -485,5 +496,5 @@ sp_test_each(select, resolve, resolve_test_t, resolve_tests, .setup = spn_test_c
   if (err) {
     return check_failure(t, mem, &catalog, query, &it->expect);
   }
-  return check_selection(t, &selection, it->expect.name, it->expect.triple);
+  return check_selection(t, &selection, it->expect.name, &it->expect);
 }

@@ -22,7 +22,7 @@ typedef struct {
 } add_test_t;
 
 typedef struct {
-  spn_triple_t targets [FIXTURE_MAX_TARGETS];
+  fixture_target_t targets [FIXTURE_MAX_TARGETS];
 } targets_expect_t;
 
 typedef struct {
@@ -114,6 +114,28 @@ static const targets_test_t targets_tests [] = {
     .host = HOST_X64_LINUX,
     .toolchain = "A",
     .expect = { .targets = { TARGET_WIN_GNU } },
+  },
+  {
+    .name = "artifact_sysroots_root_under_artifact",
+    .file = "sysroot.json",
+    .host = HOST_X64_LINUX,
+    .toolchain = "A",
+    .expect = {
+      .targets = {
+        { .triple = HOST_ARM_LINUX, .sysroot = { "aa/S/linux", SPN_PATH_ROOT_TOOLCHAIN } },
+        { .triple = HOST_ARM_MACOS, .sysroot = { "aa/S/macos", SPN_PATH_ROOT_TOOLCHAIN } },
+        { .triple = TARGET_WASM, .sysroot = { "aa/S/wasi", SPN_PATH_ROOT_TOOLCHAIN } },
+        { .triple = TARGET_WIN_GNU, .sysroot = { "aa/S/windows", SPN_PATH_ROOT_TOOLCHAIN } },
+        { .triple = HOST_X64_LINUX },
+      },
+    },
+  },
+  {
+    .name = "local_sysroots_are_kept",
+    .file = "sysroot_local.json",
+    .host = HOST_X64_LINUX,
+    .toolchain = "A",
+    .expect = { .targets = { { .triple = HOST_ARM_LINUX, .sysroot = { "/S" } } } },
   },
 };
 
@@ -210,7 +232,7 @@ sp_test_each(catalog, targets, targets_test_t, targets_tests) {
   sp_must(t, info);
 
   u32 targets = 0;
-  sp_carr_detect_len(it->expect.targets, targets, !fixture_triple_empty(it->expect.targets[targets]));
+  sp_carr_detect_len(it->expect.targets, targets, !fixture_target_empty(it->expect.targets[targets]));
   return fixture_check_targets(t, info->targets, it->expect.targets, targets);
 }
 

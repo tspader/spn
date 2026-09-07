@@ -194,9 +194,9 @@ static spn_linkage_t abi_linkage(spn_abi_t abi) {
 }
 
 void spn_profile_finalize(spn_profile_info_t* profile, const spn_toolchain_selection_t* selection) {
-  profile->abi = selection->triple.abi;
+  profile->abi = selection->target.triple.abi;
   profile->driver = selection->toolchain->driver;
-  profile->linker = spn_ld_family(&selection->toolchain->linkers, selection->triple);
+  profile->linker = spn_ld_family(&selection->toolchain->linkers, selection->target.triple);
   if (!profile->linkage) {
     profile->linkage = abi_linkage(profile->abi);
   }

@@ -19,6 +19,15 @@
       }
     },
 
+    "toolchain_target": {
+      "optionalProperties": {
+        "arch": { "ref": "arch" },
+        "os": { "ref": "os" },
+        "abi": { "ref": "abi" },
+        "sysroot": { "type": "string" }
+      }
+    },
+
     "artifact": {
       "optionalProperties": {
         "url": { "type": "string" },
@@ -47,7 +56,7 @@
         "cxx": { "type": "string" },
         "host": { "values": { "ref": "artifact" } },
         "mirrors": { "type": "string" },
-        "target": { "elements": { "ref": "triple" } }
+        "target": { "elements": { "ref": "toolchain_target" } }
       }
     },
 

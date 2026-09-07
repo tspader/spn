@@ -8,12 +8,15 @@
 #include "toolchain/provision.h"
 #include "toolchain/linker.h"
 
-spn_program_check_t      spn_toolchain_program(spn_toolchain_source_t source, spn_path_root_t base, sp_str_t program, spn_arg_t* arg);
+spn_path_check_t         spn_toolchain_path(spn_toolchain_source_t source, spn_path_root_t base, sp_str_t str, spn_path_t* path);
+spn_path_check_t         spn_toolchain_program(spn_toolchain_source_t source, spn_path_root_t base, sp_str_t program, spn_arg_t* arg);
 spn_cc_cap_set_t         spn_toolchain_driver_caps(spn_cc_driver_t driver);
 bool                     spn_toolchain_driver_retargets(spn_cc_driver_t driver);
 bool                     spn_toolchain_driver_produces(spn_cc_driver_t driver, spn_ld_flavor_t flavor);
 spn_abi_t                spn_default_abi(spn_cc_driver_t driver, spn_os_t os);
 spn_sdk_kind_t           spn_sdk_kind(spn_triple_t target);
+bool                     spn_sdk_takes_sysroot(spn_sdk_kind_t kind);
+spn_path_t               spn_toolchain_artifact_root(spn_artifact_t artifact);
 spn_toolchain_launcher_t spn_toolchain_launcher_with_root(sp_mem_t mem, spn_toolchain_launcher_t launcher, spn_path_t root);
 sp_str_t                 spn_toolchain_launcher_to_str(const spn_path_roots_t* roots, sp_mem_t mem, spn_toolchain_launcher_t launcher);
 bool                     spn_toolchain_has_cxx(spn_toolchain_info_t* toolchain);

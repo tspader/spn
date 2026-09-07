@@ -11,6 +11,17 @@ typedef struct {
   spn_path_root_t root;
 } test_arg_t;
 
+typedef struct {
+  const c8* path;
+  spn_path_root_t root;
+} test_path_t;
+
+static sp_err_t test_check_path(sp_test_t* t, spn_path_t path, test_path_t expect) {
+  sp_expect_eq(t, (u32)expect.root, (u32)path.root);
+  sp_expect_str_eq_c(t, path.sub, expect.path ? expect.path : "");
+  return SP_OK;
+}
+
 static sp_err_t test_check_arg(sp_test_t* t, spn_arg_t arg, test_arg_t expect) {
   if (!expect.name && !expect.path) {
     return SP_OK;

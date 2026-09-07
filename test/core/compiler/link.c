@@ -589,7 +589,6 @@ static const link_test_t tests [] = {
       .arch = SPN_ARCH_X64,
       .os = SPN_OS_LINUX,
       .abi = SPN_ABI_GNU,
-      .sysroot = "/sdk",
     },
     .kind = SPN_CC_OUTPUT_EXE,
     .framework = "Cocoa",
@@ -598,6 +597,22 @@ static const link_test_t tests [] = {
     .expect = {
       .command = "cc",
       .args = { "main.o", "-o", "main" },
+    },
+  },
+  {
+    .name = "gcc_linux_sysroot",
+    .driver = SPN_CC_DRIVER_GCC,
+    .family = SPN_LD_FAMILY_GNU,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_GNU,
+      .sysroot = "/S",
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .expect = {
+      .command = "cc",
+      .args = { "main.o", "--sysroot=/S", "-o", "main" },
     },
   },
   {
