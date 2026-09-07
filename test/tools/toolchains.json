@@ -24,9 +24,18 @@
       "compiler": { "program": "x86_64-w64-mingw32-gcc" },
       "archiver": { "program": "x86_64-w64-mingw32-ar" },
       "cxx": { "program": "x86_64-w64-mingw32-g++" },
-      "linker": { "mingw": { "family": "gnu" } },
-      "host": { "x86_64-linux": {}, "aarch64-linux": {} },
-      "target": [{ "arch": "x86_64", "os": "windows", "abi": "gnu" }]
+      "linker": {
+        "mingw": {
+          "family": "gnu"
+        }
+      },
+      "host": {
+        "x86_64-linux": {},
+        "aarch64-linux": {}
+      },
+      "target": [
+        { "arch": "x86_64", "os": "windows", "abi": "gnu" }
+      ]
     },
     {
       "name": "clang-mingw",
@@ -34,7 +43,12 @@
       "compiler": { "program": "clang" },
       "archiver": { "program": "x86_64-w64-mingw32-ar" },
       "cxx": { "program": "clang++" },
-      "linker": { "mingw": { "family": "gnu", "program": "x86_64-w64-mingw32-ld" } },
+      "linker": {
+        "mingw": {
+          "family": "gnu",
+          "program": "x86_64-w64-mingw32-ld"
+        }
+      },
       "host": { "x86_64-linux": {}, "aarch64-linux": {} },
       "target": [{ "arch": "x86_64", "os": "windows", "abi": "gnu" }]
     },
