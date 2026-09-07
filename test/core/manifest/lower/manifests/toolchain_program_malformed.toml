@@ -1,0 +1,9 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[[toolchain]]
+name = "T"
+compiler = "./cc -m64"
+archiver = "ar"
+driver = "gcc"

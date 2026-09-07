@@ -210,6 +210,7 @@ const c8* spn_codegen_err_name(spn_err_t code) {
     case SPN_ERR_CODEGEN_INVALID:        return "invalid";
     case SPN_ERR_CODEGEN_ROOT_ONLY:      return "root_only";
     case SPN_ERR_CODEGEN_PATH:           return "path";
+    case SPN_ERR_CODEGEN_UNROOTED:       return "unrooted";
     default:                             return "unknown";
   }
 }
@@ -259,6 +260,9 @@ void spn_codegen_issue_write(sp_io_writer_t* w, const spn_codegen_issue_t* issue
       break;
     case SPN_ERR_CODEGEN_PATH:
       sp_fmt_io(w, "path {.yellow} must not contain '.', '..', or empty components", SP_FMT_STR(issue->detail));
+      break;
+    case SPN_ERR_CODEGEN_UNROOTED:
+      sp_fmt_io(w, "path {.yellow} cannot be rooted at {.cyan}", SP_FMT_STR(issue->detail), SP_FMT_STR(issue->path));
       break;
     default:
       sp_fmt_io(w, "invalid field at {.cyan}", SP_FMT_STR(issue->path));

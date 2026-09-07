@@ -5,6 +5,7 @@
 #include "config.gen.h"
 #include "intern/intern.h"
 #include "toml/loader.h"
+#include "arg.h"
 #include "toolchain/types.h"
 
 #define CONFIG_MAX_TOOLCHAINS 2
@@ -13,8 +14,8 @@
 typedef struct {
   const c8* name;
   spn_cc_driver_t driver;
-  const c8* compiler;
-  const c8* archiver;
+  test_arg_t compiler;
+  test_arg_t archiver;
 } toolchain_t;
 
 typedef struct {
@@ -39,7 +40,7 @@ static const test_t tests [] = {
     .config = "toolchain",
     .expect = {
       .toolchains = {
-        { .name = "T", .driver = SPN_CC_DRIVER_GCC, .compiler = "C", .archiver = "A" },
+        { .name = "T", .driver = SPN_CC_DRIVER_GCC, .compiler = { .name = "C" }, .archiver = { .name = "A" } },
       },
     },
   },
@@ -48,11 +49,32 @@ static const test_t tests [] = {
     .config = "toolchain_incomplete",
     .expect = {
       .toolchains = {
-        { .name = "T", .driver = SPN_CC_DRIVER_GCC, .compiler = "C", .archiver = "A" },
-        { .name = "U", .driver = SPN_CC_DRIVER_GCC, .archiver = "A" },
+        { .name = "T", .driver = SPN_CC_DRIVER_GCC, .compiler = { .name = "C" }, .archiver = { .name = "A" } },
+        { .name = "U", .driver = SPN_CC_DRIVER_GCC, .archiver = { .name = "A" } },
       },
       .issues = {
         { SPN_ERR_CODEGEN_MISSING_KEY, "toolchain[1].compiler" },
+      },
+    },
+  },
+  {
+    .name = "toolchain_program_absolute",
+    .config = "toolchain_program_absolute",
+    .expect = {
+      .toolchains = {
+        { .name = "T", .driver = SPN_CC_DRIVER_GCC, .compiler = { .path = "/T/C" }, .archiver = { .name = "A" } },
+      },
+    },
+  },
+  {
+    .name = "toolchain_program_relative",
+    .config = "toolchain_program_relative",
+    .expect = {
+      .toolchains = {
+        { .name = "T", .driver = SPN_CC_DRIVER_GCC, .archiver = { .name = "A" } },
+      },
+      .issues = {
+        { SPN_ERR_CODEGEN_UNROOTED, "toolchain[0].compiler" },
       },
     },
   },
@@ -70,7 +92,7 @@ sp_test_each(config, lower, test_t, tests) {
 
   sp_da(spn_toolchain_decl_t) toolchains = sp_da_new(mem, spn_toolchain_decl_t);
   sp_da_for(cg.toolchain, n) {
-    sp_da_push(toolchains, spn_toolchain_lower(&ctx, n, &cg.toolchain[n]));
+    sp_da_push(toolchains, spn_toolchain_lower(&ctx, n, SPN_PATH_ROOT_NONE, &cg.toolchain[n]));
   }
 
   const expect_t* expect = &it->expect;
@@ -89,10 +111,8 @@ sp_test_each(config, lower, test_t, tests) {
     const toolchain_t* expected = &expect->toolchains[n];
     sp_expect_str_eq_c(t, toolchains[n].name, expected->name);
     sp_expect_eq(t, (u32)expected->driver, (u32)toolchains[n].driver);
-    if (expected->compiler) {
-      sp_expect_str_eq_c(t, toolchains[n].compiler.program.prefix, expected->compiler);
-    }
-    sp_expect_str_eq_c(t, toolchains[n].archiver.program.prefix, expected->archiver);
+    if (test_check_arg(t, toolchains[n].compiler.program, expected->compiler)) return SP_ERR;
+    if (test_check_arg(t, toolchains[n].archiver.program, expected->archiver)) return SP_ERR;
   }
   return SP_OK;
 }

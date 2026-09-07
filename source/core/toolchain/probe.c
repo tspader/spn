@@ -129,42 +129,48 @@ SP_PRIVATE spn_err_t probe_hash(spn_probe_cache_t* cache, sp_str_t path, sp_hash
   return SPN_OK;
 }
 
-static bool probe_program(spn_probe_cache_t* cache, sp_str_t cwd, sp_da(sp_str_t) dirs, sp_mem_t mem, spn_arg_t* program, sp_hash_t* hash) {
-  sp_str_t resolved = spn_search_program(mem, cwd, program->prefix, dirs);
-  if (sp_str_empty(resolved) || probe_hash(cache, resolved, hash)) {
+static sp_str_t locate(const spn_path_roots_t* roots, sp_da(sp_str_t) dirs, sp_mem_t mem, spn_arg_t program) {
+  if (spn_path_empty(program.path)) {
+    return spn_search_program(mem, program.prefix, dirs);
+  }
+  return spn_search_file(mem, spn_path_str(roots, mem, program.path));
+}
+
+static bool probe_program(spn_probe_cache_t* cache, const spn_path_roots_t* roots, sp_da(sp_str_t) dirs, sp_mem_t mem, spn_arg_t* program, sp_hash_t* hash) {
+  sp_str_t found = locate(roots, dirs, mem, *program);
+  if (sp_str_empty(found) || probe_hash(cache, found, hash)) {
     return false;
   }
-  *program = spn_arg_lit(resolved);
+  *program = spn_arg_path(spn_path_make(roots, found));
   return true;
 }
 
-static spn_err_t probe_missing(const spn_cc_toolchain_t* cc, spn_arg_t program) {
+static spn_err_t probe_missing(const spn_cc_toolchain_t* cc, const spn_path_roots_t* roots, sp_mem_t mem, spn_arg_t program) {
   return spn_err_emit(&spn, (spn_err_union_t) {
     .kind = SPN_ERR_TOOLCHAIN_MISSING,
     .program = {
       .name = cc->name,
-      .program = program.prefix,
+      .program = spn_arg_str(roots, mem, program),
     },
   });
 }
 
-spn_err_t spn_toolchain_probe(spn_cc_toolchain_t* cc, sp_da(sp_str_t) dirs, spn_probe_cache_t* cache, sp_mem_t mem, sp_hash_t* identity) {
+spn_err_t spn_toolchain_probe(spn_cc_toolchain_t* cc, const spn_path_roots_t* roots, sp_da(sp_str_t) dirs, spn_probe_cache_t* cache, sp_mem_t mem, sp_hash_t* identity) {
   *identity = 0;
 
-  sp_str_t cwd = sp_fs_get_cwd(mem);
   sp_hash_t hashes [3] = sp_zero;
   u32 num_hashes = 0;
 
-  if (!probe_program(cache, cwd, dirs, mem, &cc->compiler.program, &hashes[num_hashes])) {
-    return probe_missing(cc, cc->compiler.program);
+  if (!probe_program(cache, roots, dirs, mem, &cc->compiler.program, &hashes[num_hashes])) {
+    return probe_missing(cc, roots, mem, cc->compiler.program);
   }
   num_hashes++;
-  if (!probe_program(cache, cwd, dirs, mem, &cc->archiver.program, &hashes[num_hashes])) {
-    return probe_missing(cc, cc->archiver.program);
+  if (!probe_program(cache, roots, dirs, mem, &cc->archiver.program, &hashes[num_hashes])) {
+    return probe_missing(cc, roots, mem, cc->archiver.program);
   }
   num_hashes++;
   if (!spn_arg_empty(cc->cxx.program)) {
-    if (probe_program(cache, cwd, dirs, mem, &cc->cxx.program, &hashes[num_hashes])) {
+    if (probe_program(cache, roots, dirs, mem, &cc->cxx.program, &hashes[num_hashes])) {
       num_hashes++;
     }
     else {

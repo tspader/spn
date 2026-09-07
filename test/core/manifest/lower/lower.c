@@ -7,6 +7,7 @@
 #include "target/types.h"
 #include "profile/types.h"
 #include "index/types.h"
+#include "arg.h"
 #include "toolchain/types.h"
 #include "toml/loader.h"
 #include "semver/compare.h"
@@ -76,10 +77,10 @@ typedef struct {
   const c8* url;
   const c8* sha256;
   const c8* mirrors;
-  const c8* compiler;
+  test_arg_t compiler;
   const c8* args [8];
-  const c8* archiver;
-  const c8* cxx;
+  test_arg_t archiver;
+  test_arg_t cxx;
   const c8* cxx_args [8];
   spn_cc_driver_t driver;
   spn_ld_family_t linkers [SPN_LD_FLAVOR_COUNT];
@@ -399,9 +400,9 @@ static const test_t tests [] = {
     .toolchains = {
       {
         .name = "custom",
-        .compiler = "cc",
-        .archiver = "ar",
-        .cxx = "g++",
+        .compiler = { .name = "cc" },
+        .archiver = { .name = "ar" },
+        .cxx = { .name = "g++" },
         .cxx_args = { "-pthread" },
         .driver = SPN_CC_DRIVER_GCC,
       },
@@ -526,8 +527,8 @@ static const test_t tests [] = {
     .toolchains = {
       {
         .name = "llvm",
-        .compiler = "clang",
-        .archiver = "llvm-ar",
+        .compiler = { .name = "clang" },
+        .archiver = { .name = "llvm-ar" },
         .driver = SPN_CC_DRIVER_CLANG,
         .linkers = {
           [SPN_LD_FLAVOR_ELF] = SPN_LD_FAMILY_LLD,
@@ -552,8 +553,8 @@ static const test_t tests [] = {
     .toolchains = {
       {
         .name = "custom",
-        .compiler = "cc",
-        .archiver = "ar",
+        .compiler = { .name = "cc" },
+        .archiver = { .name = "ar" },
         .driver = SPN_CC_DRIVER_GCC,
         .linkers = {
           [SPN_LD_FLAVOR_ELF] = SPN_LD_FAMILY_GNU,
@@ -569,8 +570,8 @@ static const test_t tests [] = {
     .toolchains = {
       {
         .name = "custom",
-        .compiler = "gcc",
-        .archiver = "ar",
+        .compiler = { .name = "gcc" },
+        .archiver = { .name = "ar" },
         .driver = SPN_CC_DRIVER_GCC,
         .linkers = {
           [SPN_LD_FLAVOR_ELF] = SPN_LD_FAMILY_LLD,
@@ -586,8 +587,8 @@ static const test_t tests [] = {
     .toolchains = {
       {
         .name = "custom",
-        .compiler = "gcc",
-        .archiver = "ar",
+        .compiler = { .name = "gcc" },
+        .archiver = { .name = "ar" },
         .driver = SPN_CC_DRIVER_GCC,
         .linkers = {
           [SPN_LD_FLAVOR_ELF] = SPN_LD_FAMILY_GNU,
@@ -604,7 +605,7 @@ static const test_t tests [] = {
     .toolchains = {
       {
         .name = "zig",
-        .compiler = "zig",
+        .compiler = { .name = "zig" },
         .args = { "cc" },
         .driver = SPN_CC_DRIVER_ZIG,
         .linkers = {
@@ -614,6 +615,39 @@ static const test_t tests [] = {
           [SPN_LD_FLAVOR_WASM] = SPN_LD_FAMILY_LLD,
         },
       },
+    },
+  },
+  {
+    .name = "toolchain_program_project",
+    .manifest = "toolchain_program_project",
+    .toolchains = {
+      {
+        .name = "T",
+        .compiler = { .path = "T/cc", .root = SPN_PATH_ROOT_PROJECT },
+        .archiver = { .name = "ar" },
+        .driver = SPN_CC_DRIVER_GCC,
+      },
+    },
+  },
+  {
+    .name = "toolchain_program_artifact",
+    .manifest = "toolchain_program_artifact",
+    .toolchains = {
+      {
+        .name = "T",
+        .compiler = { .name = "bin/cc" },
+        .archiver = { .name = "bin/ar" },
+        .driver = SPN_CC_DRIVER_GCC,
+        .url = "https://tc",
+        .sha256 = "deadbeef",
+      },
+    },
+  },
+  {
+    .name = "validate_toolchain_program_malformed",
+    .manifest = "toolchain_program_malformed",
+    .issues = {
+      { SPN_ERR_CODEGEN_PATH, "toolchain[0].compiler" }
     },
   },
   {
@@ -657,8 +691,8 @@ static const test_t tests [] = {
     .toolchains = {
       {
         .name = "pin",
-        .compiler = "cc",
-        .archiver = "ar",
+        .compiler = { .name = "cc" },
+        .archiver = { .name = "ar" },
         .driver = SPN_CC_DRIVER_GCC,
         .hosts = { { SPN_ARCH_X64, SPN_OS_LINUX } },
       },
@@ -801,9 +835,9 @@ static const test_t tests [] = {
         .url = "https://tc",
         .sha256 = "deadbeef",
         .mirrors = "https://mirrors",
-        .compiler = "zig",
+        .compiler = { .name = "zig" },
         .args = { "cc", "-target", "x86_64-linux-gnu" },
-        .archiver = "ar",
+        .archiver = { .name = "ar" },
         .driver = SPN_CC_DRIVER_CLANG,
         .linkers = {
           [SPN_LD_FLAVOR_ELF] = SPN_LD_FAMILY_GNU,
@@ -1481,15 +1515,15 @@ sp_test_each(lower, cases, test_t, tests) {
     if (expected.url)      sp_expect_str_eq_c(t, tc->hosts[0].artifact.url, expected.url);
     if (expected.sha256)   sp_expect_str_eq_c(t, tc->hosts[0].artifact.sha256, expected.sha256);
     if (expected.mirrors)  sp_expect_str_eq_c(t, tc->hosts[0].artifact.mirror_list, expected.mirrors);
-    if (expected.compiler) sp_expect_str_eq_c(t, tc->compiler.program.prefix, expected.compiler);
-    if (expected.archiver) sp_expect_str_eq_c(t, tc->archiver.program.prefix, expected.archiver);
+    if (test_check_arg(t, tc->compiler.program, expected.compiler)) return SP_ERR;
+    if (test_check_arg(t, tc->archiver.program, expected.archiver)) return SP_ERR;
     if (linkers_expected(expected.linkers)) {
       sp_for(flavor, SPN_LD_FLAVOR_COUNT) {
         sp_expect_eq(t, (u32)expected.linkers[flavor], (u32)tc->linkers.families[flavor]);
       }
     }
     sp_must_strs_eq(t, tc->link_args, sp_da_size(tc->link_args), expected.link_args);
-    if (expected.cxx)      sp_expect_str_eq_c(t, tc->cxx.program.prefix, expected.cxx);
+    if (test_check_arg(t, tc->cxx.program, expected.cxx)) return SP_ERR;
     if (expected.driver)   sp_expect_eq(t, (u32)expected.driver, (u32)tc->driver);
 
     sp_must_strs_eq(t, tc->compiler.args, sp_da_size(tc->compiler.args), expected.args);

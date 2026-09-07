@@ -2,6 +2,8 @@
 #include "toolchain/search.h"
 
 #define SEARCH_MAX_SPLIT 3
+#define SEARCH_MAX_FILES 2
+#define SEARCH_MAX_DIRS 2
 
 #if defined(SP_WIN32)
   #define SEARCH_SEP ";"
@@ -16,10 +18,13 @@ typedef struct {
 } split_t;
 
 static const split_t split_tests [] = {
-  { "single", "A", { "A" } },
-  { "two", "A" SEARCH_SEP "B", { "A", "B" } },
-  { "empty_entries_dropped", SEARCH_SEP "A" SEARCH_SEP SEARCH_SEP "B" SEARCH_SEP, { "A", "B" } },
-  { "empty", "" },
+  { "single",                     "/A",                                   { "/A" } },
+  { "two",                        "/A" SEARCH_SEP "/B",                   { "/A", "/B" } },
+  { "empty_entries_dropped",      SEARCH_SEP "/A" SEARCH_SEP SEARCH_SEP "/B" SEARCH_SEP, { "/A", "/B" } },
+  { "relative_entries_dropped",   "A" SEARCH_SEP "/B" SEARCH_SEP "C/D",   { "/B" } },
+  { "trailing_separator_trimmed", "/A/",                                  { "/A" } },
+  { "malformed_entries_dropped",  "/A//B" SEARCH_SEP "/./C" SEARCH_SEP "/D", { "/D" } },
+  { "empty",                      "" },
 };
 
 sp_test_each(search, split_path, split_t, split_tests) {
@@ -31,20 +36,15 @@ sp_test_each(search, split_path, split_t, split_tests) {
 typedef struct {
   const c8* name;
   const c8* program;
-  bool relative;
-  const c8* files [2];
-  const c8* dirs [2];
+  const c8* files [SEARCH_MAX_FILES];
+  const c8* dirs [SEARCH_MAX_DIRS];
   const c8* expect;
 } program_t;
 
 static const program_t program_tests [] = {
-  { "found_in_first_dir",       "A",   .files = { "X/A", "Y/A" }, .dirs = { "X", "Y" }, .expect = "X/A" },
-  { "found_in_later_dir",       "A",   .files = { "Y/A" },        .dirs = { "X", "Y" }, .expect = "Y/A" },
-  { "missing",                  "A",   .files = { "Y/B" },        .dirs = { "X", "Y" } },
-  { "path_bypasses_dirs",       "Y/A", .files = { "Y/A" },        .dirs = { "X" },      .expect = "Y/A" },
-  { "path_missing",             "Y/A", .files = { "X/A" },        .dirs = { "X" } },
-  { "relative_path_is_rooted",  "Y/A", .relative = true, .files = { "Y/A" }, .dirs = { "X" }, .expect = "Y/A" },
-  { "relative_dir_is_rooted",   "A",   .relative = true, .files = { "Y/A" }, .dirs = { "Y" }, .expect = "Y/A" },
+  { "found_in_first_dir", "A", .files = { "X/A", "Y/A" }, .dirs = { "X", "Y" }, .expect = "X/A" },
+  { "found_in_later_dir", "A", .files = { "Y/A" },        .dirs = { "X", "Y" }, .expect = "Y/A" },
+  { "missing",            "A", .files = { "Y/B" },        .dirs = { "X", "Y" } },
 };
 
 sp_test_each(search, program, program_t, program_tests) {
@@ -63,15 +63,10 @@ sp_test_each(search, program, program_t, program_tests) {
     if (!it->dirs[at]) {
       break;
     }
-    sp_str_t dir = sp_cstr_as_str(it->dirs[at]);
-    sp_da_push(dirs, it->relative ? dir : sp_fs_join_path(mem, root, dir));
+    sp_da_push(dirs, sp_fs_join_path(mem, root, sp_cstr_as_str(it->dirs[at])));
   }
 
-  sp_str_t program = sp_cstr_as_str(it->program);
-  if (!it->relative && sp_str_find_c8(program, '/') >= 0) {
-    program = sp_fs_join_path(mem, root, program);
-  }
   sp_str_t expect = it->expect ? sp_fs_join_path(mem, root, sp_cstr_as_str(it->expect)) : sp_str_lit("");
-  sp_expect_str_eq(t, spn_search_program(mem, root, program, dirs), expect);
+  sp_expect_str_eq(t, spn_search_program(mem, sp_cstr_as_str(it->program), dirs), expect);
   return SP_OK;
 }

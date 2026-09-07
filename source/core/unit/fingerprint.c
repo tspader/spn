@@ -59,6 +59,11 @@ static sp_hash_t hash_options(spn_session_t* session, spn_pkg_id_t id) {
   return hash;
 }
 
+static sp_hash_t hash_arg(spn_arg_t arg) {
+  sp_hash_t parts [] = { spn_digest_hash_str(arg.prefix), (sp_hash_t)arg.path.root, spn_digest_hash_str(arg.path.sub) };
+  return spn_digest_hash_combine(parts, sp_carr_len(parts));
+}
+
 static sp_hash_t hash_strs(sp_da(sp_str_t) strs) {
   sp_hash_t hash = 0;
   sp_da_for(strs, it) {
@@ -134,9 +139,9 @@ sp_hash_t spn_unit_fingerprint(spn_session_t* session, spn_build_unit_t* build, 
   fingerprint.abi = build->profile.abi;
   fingerprint.platform = spn_pkg_hash_platform(pkg, &build->profile);
   fingerprint.toolchain.name = spn_digest_hash_str(toolchain->name);
-  fingerprint.toolchain.cc = spn_digest_hash_str(toolchain->compiler.program.prefix);
-  fingerprint.toolchain.ar = spn_digest_hash_str(toolchain->archiver.program.prefix);
-  fingerprint.toolchain.cxx = spn_digest_hash_str(toolchain->cxx.program.prefix);
+  fingerprint.toolchain.cc = hash_arg(toolchain->compiler.program);
+  fingerprint.toolchain.ar = hash_arg(toolchain->archiver.program);
+  fingerprint.toolchain.cxx = hash_arg(toolchain->cxx.program);
   fingerprint.toolchain.ld = spn_ld_family(&toolchain->linkers, target);
   fingerprint.toolchain.link_args = hash_strs(toolchain->link_args);
   fingerprint.toolchain.identity = build->toolchain->identity;

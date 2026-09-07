@@ -129,6 +129,7 @@ add_executable(core
   toolchain/linker.c
   toolchain/parse.c
   toolchain/probe.c
+  toolchain/program.c
   toolchain/provision.c
   toolchain/search.c
   toolchain/select.c
@@ -282,6 +283,7 @@ set_source_files_properties(
   toolchain/linker.c
   toolchain/parse.c
   toolchain/probe.c
+  toolchain/program.c
   toolchain/search.c
   toolchain/provision.c
   toolchain/select.c

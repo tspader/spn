@@ -194,7 +194,7 @@ static spn_err_t open_ctx(spn_ctx_t* ctx, spn_open_request_t request) {
         sp_da_push(indexes, spn_index_lower(&loader, it, SPN_INDEX_KIND_USER, &config.index[it]));
       }
       sp_da_for(config.toolchain, it) {
-        sp_da_push(toolchains, spn_toolchain_lower(&loader, it, &config.toolchain[it]));
+        sp_da_push(toolchains, spn_toolchain_lower(&loader, it, SPN_PATH_ROOT_NONE, &config.toolchain[it]));
       }
     }
     if (!sp_da_empty(loader.issues)) {

@@ -25,9 +25,9 @@ static const parse_test_t tests [] = {
           .name = "A",
           .version = "1.0.0",
           .driver = SPN_CC_DRIVER_CLANG,
-          .compiler = { .program = "A", .args = { "cc" } },
-          .cxx = { .program = "A", .args = { "c++" } },
-          .archiver = { .program = "A", .args = { "ar" } },
+          .compiler = { .name = "A", .args = { "cc" } },
+          .cxx = { .name = "A", .args = { "c++" } },
+          .archiver = { .name = "A", .args = { "ar" } },
           .linkers = {
             [SPN_LD_FLAVOR_ELF] = SPN_LD_FAMILY_LLD,
             [SPN_LD_FLAVOR_MINGW] = SPN_LD_FAMILY_GNU,
@@ -68,9 +68,9 @@ static const parse_test_t tests [] = {
           .name = "A",
           .version = "",
           .driver = SPN_CC_DRIVER_GCC,
-          .compiler = { .program = "cc" },
-          .cxx = { .program = "" },
-          .archiver = { .program = "ar" },
+          .compiler = { .name = "cc" },
+          .cxx = { .name = "" },
+          .archiver = { .name = "ar" },
           .linkers = {
             [SPN_LD_FLAVOR_ELF] = SPN_LD_FAMILY_GNU,
             [SPN_LD_FLAVOR_MINGW] = SPN_LD_FAMILY_GNU,
@@ -90,7 +90,7 @@ static const parse_test_t tests [] = {
           .name = "A",
           .version = "",
           .driver = SPN_CC_DRIVER_GCC,
-          .compiler = { .program = "A" },
+          .compiler = { .name = "A" },
           .hosts = {
             {
               .triple = { SPN_ARCH_X64, SPN_OS_LINUX },
@@ -102,7 +102,7 @@ static const parse_test_t tests [] = {
         {
           .name = "B",
           .driver = SPN_CC_DRIVER_GCC,
-          .compiler = { .program = "B" },
+          .compiler = { .name = "B" },
         },
       },
     },
@@ -116,12 +116,12 @@ static const parse_test_t tests [] = {
         {
           .name = "A",
           .driver = SPN_CC_DRIVER_GCC,
-          .compiler = { .program = "A" },
+          .compiler = { .name = "A" },
         },
         {
           .name = "B",
           .driver = SPN_CC_DRIVER_CLANG,
-          .compiler = { .program = "B" },
+          .compiler = { .name = "B" },
         },
       },
     },
@@ -164,8 +164,8 @@ static const parse_test_t tests [] = {
         {
           .name = "A",
           .driver = SPN_CC_DRIVER_CLANG,
-          .compiler = { .program = "A" },
-          .archiver = { .program = "llvm-ar" },
+          .compiler = { .name = "A" },
+          .archiver = { .name = "llvm-ar" },
           .linkers = {
             [SPN_LD_FLAVOR_ELF] = SPN_LD_FAMILY_LLD,
             [SPN_LD_FLAVOR_MINGW] = SPN_LD_FAMILY_LLD,
@@ -193,7 +193,7 @@ static const parse_test_t tests [] = {
         {
           .name = "C",
           .driver = SPN_CC_DRIVER_MSVC,
-          .compiler = { .program = "cl" },
+          .compiler = { .name = "cl" },
           .linkers = {
             [SPN_LD_FLAVOR_MSVC] = SPN_LD_FAMILY_MSVC,
           },
@@ -201,7 +201,7 @@ static const parse_test_t tests [] = {
         {
           .name = "D",
           .driver = SPN_CC_DRIVER_ZIG,
-          .compiler = { .program = "D", .args = { "cc" } },
+          .compiler = { .name = "D", .args = { "cc" } },
           .linkers = {
             [SPN_LD_FLAVOR_ELF] = SPN_LD_FAMILY_LLD,
             [SPN_LD_FLAVOR_MINGW] = SPN_LD_FAMILY_LLD,
@@ -221,7 +221,7 @@ static const parse_test_t tests [] = {
         {
           .name = "B",
           .driver = SPN_CC_DRIVER_CLANG,
-          .compiler = { .program = "B" },
+          .compiler = { .name = "B" },
           .linkers = {
             [SPN_LD_FLAVOR_ELF] = SPN_LD_FAMILY_LLD,
             [SPN_LD_FLAVOR_MINGW] = SPN_LD_FAMILY_GNU,
@@ -252,6 +252,26 @@ static const parse_test_t tests [] = {
   {
     .name = "target_without_linker",
     .file = "linker_target_unlinked.json",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "program_absolute",
+    .file = "program_absolute.json",
+    .expect = {
+      .entries = 1,
+      .toolchains = {
+        {
+          .name = "A",
+          .driver = SPN_CC_DRIVER_GCC,
+          .compiler = { .path = "/A" },
+          .archiver = { .name = "ar" },
+        },
+      },
+    },
+  },
+  {
+    .name = "program_relative",
+    .file = "program_relative.json",
     .expect = { .err = SPN_ERROR },
   },
 };

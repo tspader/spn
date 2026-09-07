@@ -6,7 +6,7 @@
 
 typedef struct {
   const c8* name;
-  const c8* compiler;
+  fixture_launcher_t compiler;
 } add_t;
 
 typedef struct {
@@ -51,7 +51,7 @@ static const add_test_t add_tests [] = {
     .name = "overrides_by_name",
     .file = "multiple.json",
     .adds = {
-      { .name = "A", .compiler = "/A" },
+      { .name = "A", .compiler = { .path = "/A" } },
     },
     .expect = {
       .order = { "A", "B" },
@@ -59,7 +59,7 @@ static const add_test_t add_tests [] = {
         {
           .name = "A",
           .driver = SPN_CC_DRIVER_GCC,
-          .compiler = { .program = "/A" },
+          .compiler = { .path = "/A" },
           .targets = { HOST_X64_LINUX, TARGET_X64_BARE },
         },
       },
@@ -69,7 +69,7 @@ static const add_test_t add_tests [] = {
     .name = "coexists_with_entries",
     .file = "multiple.json",
     .adds = {
-      { .name = "C", .compiler = "C" },
+      { .name = "C", .compiler = { .name = "C" } },
     },
     .expect = {
       .order = { "A", "B", "C" },

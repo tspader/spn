@@ -1,0 +1,13 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[[toolchain]]
+name = "T"
+compiler = "bin/cc"
+archiver = "bin/ar"
+driver = "gcc"
+
+[toolchain.host.x86_64-linux]
+url = "https://tc"
+sha256 = "deadbeef"

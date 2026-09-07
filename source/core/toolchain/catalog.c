@@ -5,11 +5,12 @@
 #include "toolchains.gen.h"
 #include "triple/triple.h"
 
-static spn_toolchain_launcher_t load_launcher(const spn_cg_launcher_t* in) {
-  return (spn_toolchain_launcher_t) {
-    .program = spn_arg_lit(in->program),
-    .args = in->args,
-  };
+static spn_err_t load_launcher(const spn_cg_launcher_t* in, spn_toolchain_source_t source, spn_toolchain_launcher_t* launcher) {
+  launcher->args = in->args;
+  if (spn_toolchain_program(source, SPN_PATH_ROOT_NONE, in->program, &launcher->program) != SPN_PROGRAM_OK) {
+    return SPN_ERROR;
+  }
+  return SPN_OK;
 }
 
 spn_toolchain_linkers_t spn_toolchain_linkers_load(const spn_cg_linkers_t* in) {
@@ -38,9 +39,6 @@ spn_err_t spn_toolchain_decls_parse(sp_mem_t mem, sp_str_t json, sp_da(spn_toolc
     decl.name = t->name;
     decl.version = t->version;
     decl.driver = t->driver;
-    decl.compiler = load_launcher(&t->compiler);
-    decl.cxx = load_launcher(&t->cxx);
-    decl.archiver = load_launcher(&t->archiver);
     spn_toolchain_linkers_t declared = spn_toolchain_linkers_load(&t->linker);
     if (spn_ld_resolve(decl.driver, &declared, &decl.linkers).count) {
       return SPN_ERROR;
@@ -66,6 +64,9 @@ spn_err_t spn_toolchain_decls_parse(sp_mem_t mem, sp_str_t json, sp_da(spn_toolc
     if (decl.source == SPN_TOOLCHAIN_SOURCE_MIXED) {
       return SPN_ERROR;
     }
+    spn_try(load_launcher(&t->compiler, decl.source, &decl.compiler));
+    spn_try(load_launcher(&t->archiver, decl.source, &decl.archiver));
+    spn_try(load_launcher(&t->cxx, decl.source, &decl.cxx));
 
     decl.targets = sp_da_new(mem, spn_triple_t);
     sp_da_for(t->target, it) {

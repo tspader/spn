@@ -11,9 +11,9 @@ static const test_t tests [] = {
     .expect = {
       .version = "0.16.0",
       .driver = SPN_CC_DRIVER_ZIG,
-      .compiler = { .program = "zig", .args = { "cc" } },
-      .cxx = { .program = "zig", .args = { "c++" } },
-      .archiver = { .program = "zig", .args = { "ar" } },
+      .compiler = { .name = "zig", .args = { "cc" } },
+      .cxx = { .name = "zig", .args = { "c++" } },
+      .archiver = { .name = "zig", .args = { "ar" } },
       .linkers = {
         [SPN_LD_FLAVOR_ELF] = SPN_LD_FAMILY_LLD,
         [SPN_LD_FLAVOR_MINGW] = SPN_LD_FAMILY_LLD,
@@ -47,9 +47,9 @@ static const test_t tests [] = {
     .name = "msvc",
     .expect = {
       .driver = SPN_CC_DRIVER_MSVC,
-      .compiler = { .program = "cl" },
-      .cxx = { .program = "cl" },
-      .archiver = { .program = "lib" },
+      .compiler = { .name = "cl" },
+      .cxx = { .name = "cl" },
+      .archiver = { .name = "lib" },
       .linkers = {
         [SPN_LD_FLAVOR_MSVC] = SPN_LD_FAMILY_MSVC,
       },
@@ -67,9 +67,9 @@ static const test_t tests [] = {
     .name = "clang",
     .expect = {
       .driver = SPN_CC_DRIVER_CLANG,
-      .compiler = { .program = "clang" },
-      .cxx = { .program = "clang++" },
-      .archiver = { .program = "ar" },
+      .compiler = { .name = "clang" },
+      .cxx = { .name = "clang++" },
+      .archiver = { .name = "ar" },
       .linkers = {
         [SPN_LD_FLAVOR_ELF] = SPN_LD_FAMILY_GNU,
         [SPN_LD_FLAVOR_MINGW] = SPN_LD_FAMILY_GNU,
@@ -89,9 +89,9 @@ static const test_t tests [] = {
     .name = "llvm",
     .expect = {
       .driver = SPN_CC_DRIVER_CLANG,
-      .compiler = { .program = "clang" },
-      .cxx = { .program = "clang++" },
-      .archiver = { .program = "llvm-ar" },
+      .compiler = { .name = "clang" },
+      .cxx = { .name = "clang++" },
+      .archiver = { .name = "llvm-ar" },
       .linkers = {
         [SPN_LD_FLAVOR_ELF] = SPN_LD_FAMILY_LLD,
         [SPN_LD_FLAVOR_MINGW] = SPN_LD_FAMILY_GNU,
@@ -112,9 +112,9 @@ static const test_t tests [] = {
     .name = "gcc",
     .expect = {
       .driver = SPN_CC_DRIVER_GCC,
-      .compiler = { .program = "gcc" },
-      .cxx = { .program = "g++" },
-      .archiver = { .program = "ar" },
+      .compiler = { .name = "gcc" },
+      .cxx = { .name = "g++" },
+      .archiver = { .name = "ar" },
       .linkers = {
         [SPN_LD_FLAVOR_ELF] = SPN_LD_FAMILY_GNU,
         [SPN_LD_FLAVOR_MINGW] = SPN_LD_FAMILY_GNU,

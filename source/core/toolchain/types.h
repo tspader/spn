@@ -56,6 +56,12 @@ typedef struct {
   u32 count;
 } spn_ld_issues_t;
 
+typedef enum {
+  SPN_PROGRAM_OK,
+  SPN_PROGRAM_UNROOTED,
+  SPN_PROGRAM_MALFORMED,
+} spn_program_check_t;
+
 typedef struct {
   spn_arg_t program;
   sp_da(sp_str_t) args;

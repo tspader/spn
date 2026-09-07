@@ -117,7 +117,7 @@ static bool toolchain_deterministic_objects(const test_toolchain_t* toolchain) {
 
 static bool installed(sp_mem_t mem, sp_str_t program) {
   sp_da(sp_str_t) dirs = spn_search_split_path(mem, sp_os_env_get(sp_str_lit("PATH")));
-  return !sp_str_empty(spn_search_program(mem, sp_fs_get_cwd(mem), program, dirs));
+  return !sp_str_empty(spn_search_program(mem, program, dirs));
 }
 
 typedef struct {

@@ -10,6 +10,7 @@
 #endif
 
 sp_da(sp_str_t) spn_search_split_path(sp_mem_t mem, sp_str_t path);
-sp_str_t        spn_search_program(sp_mem_t mem, sp_str_t cwd, sp_str_t program, sp_da(sp_str_t) dirs);
+sp_str_t        spn_search_file(sp_mem_t mem, sp_str_t path);
+sp_str_t        spn_search_program(sp_mem_t mem, sp_str_t name, sp_da(sp_str_t) dirs);
 
 #endif

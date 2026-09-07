@@ -2,6 +2,7 @@
 #define SPN_TEST_TOOLCHAIN_FIXTURE_H
 
 #include "spn_test.h"
+#include "arg.h"
 #include "hash/digest/digest.h"
 #include "paths/paths.h"
 #include "enum/enum.h"
@@ -25,7 +26,9 @@
 #define TARGET_ARM_BARE     { SPN_ARCH_ARM64, SPN_OS_FREESTANDING, SPN_ABI_BARE }
 
 typedef struct {
-  const c8* program;
+  const c8* name;
+  const c8* path;
+  spn_path_root_t root;
   const c8* args [FIXTURE_MAX_ARGS];
 } fixture_launcher_t;
 
@@ -54,12 +57,20 @@ static bool fixture_triple_empty(spn_triple_t triple) {
   return !triple.arch && !triple.os && !triple.abi;
 }
 
+static spn_arg_t fixture_arg(fixture_launcher_t launcher) {
+  if (launcher.path) {
+    return spn_arg_path((spn_path_t) { .root = launcher.root, .sub = sp_cstr_as_str(launcher.path) });
+  }
+  return spn_arg_lit(sp_cstr_as_str(launcher.name));
+}
+
 static sp_err_t fixture_check_launcher(sp_test_t* t, spn_toolchain_launcher_t launcher, fixture_launcher_t expect) {
-  if (!expect.program) {
+  if (!expect.name && !expect.path) {
     return SP_OK;
   }
-
-  sp_expect_str_eq_c(t, launcher.program.prefix, expect.program);
+  if (test_check_arg(t, launcher.program, (test_arg_t) { .name = expect.name, .path = expect.path, .root = expect.root })) {
+    return SP_ERR;
+  }
   sp_must_strs_eq(t, launcher.args, sp_da_size(launcher.args), expect.args);
   return SP_OK;
 }
@@ -227,11 +238,11 @@ static spn_toolchain_info_t* fixture_catalog_at(spn_toolchain_catalog_t* catalog
   return sp_str_om_at(catalog->entries, index);
 }
 
-static spn_toolchain_decl_t fixture_local_toolchain(const c8* name, const c8* compiler) {
+static spn_toolchain_decl_t fixture_local_toolchain(const c8* name, fixture_launcher_t compiler) {
   return (spn_toolchain_decl_t) {
     .name = sp_cstr_as_str(name),
     .driver = SPN_CC_DRIVER_GCC,
-    .compiler = { .program = spn_arg_lit(sp_cstr_as_str(compiler)) },
+    .compiler = { .program = fixture_arg(compiler) },
     .archiver = { .program = spn_arg_lit(sp_cstr_as_str("ar")) },
     .linkers.families = {
       [SPN_LD_FLAVOR_ELF] = SPN_LD_FAMILY_GNU,

@@ -14,6 +14,49 @@ spn_toolchain_launcher_t spn_toolchain_launcher_with_root(sp_mem_t mem, spn_tool
   return result;
 }
 
+static bool pathless(sp_str_t program) {
+  sp_for(it, program.len) {
+    if (sp_fs_is_sep(program.data[it])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+spn_program_check_t spn_toolchain_program(spn_toolchain_source_t source, spn_path_root_t base, sp_str_t program, spn_arg_t* arg) {
+  if (!spn_path_normal(program)) {
+    return SPN_PROGRAM_MALFORMED;
+  }
+  if (pathless(program)) {
+    *arg = spn_arg_lit(program);
+    return SPN_PROGRAM_OK;
+  }
+
+  bool absolute = sp_fs_is_absolute(program);
+  switch (source) {
+    case SPN_TOOLCHAIN_SOURCE_DISTRIBUTION: {
+      if (absolute) {
+        return SPN_PROGRAM_UNROOTED;
+      }
+      *arg = spn_arg_lit(program);
+      return SPN_PROGRAM_OK;
+    }
+    case SPN_TOOLCHAIN_SOURCE_LOCAL:
+    case SPN_TOOLCHAIN_SOURCE_MIXED: {
+      if (absolute) {
+        *arg = spn_arg_path((spn_path_t) { .sub = program });
+        return SPN_PROGRAM_OK;
+      }
+      if (base == SPN_PATH_ROOT_NONE) {
+        return SPN_PROGRAM_UNROOTED;
+      }
+      *arg = spn_arg_path((spn_path_t) { .root = base, .sub = program });
+      return SPN_PROGRAM_OK;
+    }
+  }
+  SP_UNREACHABLE_RETURN(SPN_PROGRAM_MALFORMED);
+}
+
 bool spn_toolchain_has_cxx(spn_toolchain_info_t* toolchain) {
   return !spn_arg_empty(toolchain->cxx.program);
 }
