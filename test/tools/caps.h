@@ -27,6 +27,7 @@ typedef struct {
   spn_os_t os;
   spn_os_t host;
   spn_cc_driver_t driver;
+  spn_ld_family_t linker;
   const c8* target;
   const c8* lanes [SPN_TEST_MAX_LANES];
   const c8* programs [SPN_TEST_MAX_PROGRAMS];

@@ -59,6 +59,14 @@ typedef enum {
   SPN_CC_DRIVER_ZIG,
 } spn_cc_driver_t;
 
+typedef enum {
+  SPN_LD_FAMILY_NONE,
+  SPN_LD_FAMILY_GNU,
+  SPN_LD_FAMILY_LLD,
+  SPN_LD_FAMILY_LD64,
+  SPN_LD_FAMILY_MSVC,
+} spn_ld_family_t;
+
 typedef struct {
   u16 major;
   u16 minor;

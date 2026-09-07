@@ -10,9 +10,7 @@
         "program": "ar"
       },
       "linker": {
-        "macho": {
-          "family": "gnu"
-        }
+        "macho": "gnu"
       }
     }
   ]

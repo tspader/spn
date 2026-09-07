@@ -5,7 +5,6 @@ version = "1.0.0"
 [[toolchain]]
 name = "zig"
 compiler = "zig cc"
-linker = { elf = { family = "gnu", program = "ld" } }
 archiver = "ar"
 driver = "clang"
 

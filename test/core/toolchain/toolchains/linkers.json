@@ -10,24 +10,11 @@
         "program": "llvm-ar"
       },
       "linker": {
-        "elf": {
-          "family": "lld",
-          "program": "ld.lld"
-        },
-        "mingw": {
-          "family": "lld",
-          "program": "ld.lld"
-        },
-        "msvc": {
-          "family": "msvc"
-        },
-        "macho": {
-          "family": "lld",
-          "program": "ld64.lld"
-        },
-        "wasm": {
-          "family": "lld"
-        }
+        "elf": "lld",
+        "mingw": "lld",
+        "msvc": "lld",
+        "macho": "lld",
+        "wasm": "lld"
       },
       "target": [
         {

@@ -8,6 +8,7 @@
 #include "semver/parser.h"
 #include "target/types.h"
 #include "target/mutate.h"
+#include "toolchain/catalog.h"
 #include "toolchain/toolchain.h"
 #include "triple/triple.h"
 #include "profile/types.h"
@@ -313,41 +314,15 @@ static void lower_targets(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, s
   lower_collection(ctx, cg->example, &out->examples, SPN_TARGET_KIND_EXAMPLE);
 }
 
-static spn_toolchain_linker_t lower_linker(spn_toml_loader_t* ctx, const spn_cg_linker_t* cg) {
-  spn_toolchain_linker_t linker = {
-    .family = sp_opt_is_null(cg->family) ? SPN_LD_FAMILY_NONE : sp_opt_get(cg->family),
-  };
-  if (!sp_str_empty(cg->program)) {
-    linker.program = spn_arg_lit(spn_toml_loader_intern(ctx, cg->program));
-  }
-  return linker;
-}
-
-static void issue_slot(spn_toml_loader_t* ctx, spn_ld_check_t check) {
-  switch (check) {
-    case SPN_LD_CHECK_FAMILY_MISSING:    spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, "family"); break;
-    case SPN_LD_CHECK_FAMILY_FORBIDDEN:  spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "family"); break;
-    case SPN_LD_CHECK_PROGRAM_MISSING:   spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, "program"); break;
-    case SPN_LD_CHECK_PROGRAM_FORBIDDEN: spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "program"); break;
-    case SPN_LD_CHECK_OK: sp_unreachable_case();
-  }
-}
-
 static void issue_linker(spn_toml_loader_t* ctx, spn_ld_issue_t issue) {
   switch (issue.kind) {
     case SPN_LD_ISSUE_DECLARED: {
       spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "linker");
       break;
     }
-    case SPN_LD_ISSUE_UNDECLARED: {
-      spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, "linker");
-      break;
-    }
-    case SPN_LD_ISSUE_SLOT: {
+    case SPN_LD_ISSUE_FORBIDDEN: {
       spn_toml_loader_push_key(ctx, "linker");
-      spn_toml_loader_push_key(ctx, sp_str_to_cstr(ctx->mem, spn_ld_flavor_to_str(issue.flavor)));
-      issue_slot(ctx, issue.check);
-      spn_toml_loader_pop(ctx);
+      spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, sp_str_to_cstr(ctx->mem, spn_ld_flavor_to_str(issue.flavor)));
       spn_toml_loader_pop(ctx);
       break;
     }
@@ -355,21 +330,21 @@ static void issue_linker(spn_toml_loader_t* ctx, spn_ld_issue_t issue) {
 }
 
 static spn_toolchain_linkers_t lower_linkers(spn_toml_loader_t* ctx, const spn_cg_linkers_t* cg, spn_cc_driver_t driver) {
-  spn_toolchain_linkers_t declared = {
-    .slots = {
-      [SPN_LD_FLAVOR_ELF] = lower_linker(ctx, &cg->elf),
-      [SPN_LD_FLAVOR_MINGW] = lower_linker(ctx, &cg->mingw),
-      [SPN_LD_FLAVOR_MSVC] = lower_linker(ctx, &cg->msvc),
-      [SPN_LD_FLAVOR_MACHO] = lower_linker(ctx, &cg->macho),
-      [SPN_LD_FLAVOR_WASM] = lower_linker(ctx, &cg->wasm),
-    },
-  };
+  spn_toolchain_linkers_t declared = spn_toolchain_linkers_load(cg);
   spn_toolchain_linkers_t linkers = sp_zero;
   spn_ld_issues_t issues = spn_ld_resolve(driver, &declared, &linkers);
   sp_for(it, issues.count) {
     issue_linker(ctx, issues.items[it]);
   }
   return linkers;
+}
+
+static sp_da(sp_str_t) lower_strs(spn_toml_loader_t* ctx, sp_da(sp_str_t) values) {
+  sp_da(sp_str_t) out = sp_da_new(ctx->mem, sp_str_t);
+  sp_da_for(values, it) {
+    sp_da_push(out, spn_toml_loader_intern(ctx, values[it]));
+  }
+  return out;
 }
 
 static void lower_toolchains(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
@@ -431,6 +406,7 @@ spn_toolchain_decl_t spn_toolchain_lower(spn_toml_loader_t* ctx, u32 at, const s
   if (toolchain.driver) {
     toolchain.linkers = lower_linkers(ctx, &decl->linker, toolchain.driver);
   }
+  toolchain.link_args = lower_strs(ctx, decl->link_args);
 
   toolchain.hosts = sp_da_new(ctx->mem, spn_toolchain_host_t);
   sp_da_for(decl->host, it) {
@@ -703,6 +679,7 @@ static bool when_key_is_fact(sp_str_t key) {
     || sp_str_equal_cstr(key, "arch")
     || sp_str_equal_cstr(key, "abi")
     || sp_str_equal_cstr(key, "driver")
+    || sp_str_equal_cstr(key, "linker")
     || sp_str_equal_cstr(key, "mode")
     || sp_str_equal_cstr(key, "opt")
     || when_key_is_sanitizer_fact(key);
@@ -717,6 +694,7 @@ static bool when_fact_value_valid(sp_str_t key, spn_option_value_t value) {
   if (sp_str_equal_cstr(key, "arch"))   return spn_arch_from_str(value.str) != SPN_ARCH_NONE;
   if (sp_str_equal_cstr(key, "abi"))    return spn_abi_from_str(value.str) != SPN_ABI_NONE;
   if (sp_str_equal_cstr(key, "driver")) return spn_cc_driver_from_str(value.str) != SPN_CC_DRIVER_NONE;
+  if (sp_str_equal_cstr(key, "linker")) return spn_ld_family_from_str(value.str) != SPN_LD_FAMILY_NONE;
   if (sp_str_equal_cstr(key, "opt"))    return spn_opt_level_from_str(value.str) != SPN_OPT_LEVEL_NONE;
   return sp_str_equal(value.str, spn_mode_to_str(SPN_MODE_RELEASE))
       || sp_str_equal(value.str, spn_mode_to_str(SPN_MODE_DEBUG));

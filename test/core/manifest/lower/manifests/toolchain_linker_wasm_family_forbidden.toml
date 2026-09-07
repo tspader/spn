@@ -7,4 +7,4 @@ name = "custom"
 compiler = "clang"
 archiver = "ar"
 driver = "clang"
-linker = { wasm = { family = "gnu" } }
+linker = { wasm = "gnu" }

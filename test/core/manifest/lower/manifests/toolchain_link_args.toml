@@ -4,7 +4,7 @@ version = "1.0.0"
 
 [[toolchain]]
 name = "custom"
-compiler = "clang"
+compiler = "gcc"
 archiver = "ar"
-driver = "clang"
-linker = { elf = { program = "ld" } }
+driver = "gcc"
+link_args = ["-fuse-ld=mold", "-A"]

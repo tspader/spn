@@ -8,24 +8,15 @@
       "name": "llvm",
       "compiler": "clang",
       "linker": {
-        "elf": {
-          "family": "lld",
-          "program": "ld.lld"
-        },
-        "mingw": {
-          "family": "gnu",
-          "program": "x86_64-w64-mingw32-ld"
-        },
-        "msvc": {
-          "family": "msvc"
-        },
-        "macho": {
-          "family": "ld64"
-        },
-        "wasm": {
-          "family": "lld"
-        }
+        "elf": "lld",
+        "mingw": "gnu",
+        "msvc": "msvc",
+        "macho": "ld64",
+        "wasm": "lld"
       },
+      "link_args": [
+        "-fuse-ld=lld"
+      ],
       "archiver": "llvm-ar",
       "driver": "clang"
     }

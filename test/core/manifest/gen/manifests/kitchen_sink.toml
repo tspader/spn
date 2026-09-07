@@ -41,7 +41,6 @@ deps = ["everything"]
 [[toolchain]]
 name = "host-gcc"
 compiler = "gcc"
-linker = { elf = { family = "gnu" } }
 archiver = "ar"
 driver = "gcc"
 

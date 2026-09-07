@@ -20,6 +20,7 @@
         "version":  { "type": "string" },
         "cxx":      { "ref": "launcher" },
         "linker":   { "ref": "linkers" },
+        "link_args": { "elements": { "type": "string" } },
         "host":     { "values": { "ref": "artifact" } },
         "target":   { "elements": { "ref": "triple" } },
         "mirrors":  { "type": "string" }

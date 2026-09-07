@@ -2,17 +2,15 @@
   "toolchain": [
     {
       "name": "A",
-      "driver": "clang",
+      "driver": "msvc",
       "compiler": {
-        "program": "A"
+        "program": "cl"
       },
       "archiver": {
-        "program": "ar"
+        "program": "lib"
       },
       "linker": {
-        "elf": {
-          "program": "ld"
-        }
+        "msvc": "msvc"
       }
     }
   ]

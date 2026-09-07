@@ -9,6 +9,7 @@ struct spn_profile_info {
   sp_str_t name;
   spn_toolchain_ref_t toolchain;
   spn_cc_driver_t driver;
+  spn_ld_family_t linker;
   spn_os_t os;
   spn_arch_t arch;
   spn_abi_t abi;

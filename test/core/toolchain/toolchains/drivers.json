@@ -8,17 +8,6 @@
       },
       "archiver": {
         "program": "ar"
-      },
-      "linker": {
-        "elf": {
-          "family": "gnu"
-        },
-        "mingw": {
-          "family": "gnu"
-        },
-        "macho": {
-          "family": "ld64"
-        }
       }
     },
     {
@@ -31,11 +20,11 @@
         "program": "ar"
       },
       "linker": {
-        "elf": {
-          "family": "gnu",
-          "program": "ld"
-        }
-      }
+        "elf": "lld"
+      },
+      "link_args": [
+        "-fuse-ld=lld"
+      ]
     },
     {
       "name": "C",
@@ -61,22 +50,6 @@
         "args": [
           "ar"
         ]
-      }
-    },
-    {
-      "name": "E",
-      "driver": "clang",
-      "compiler": {
-        "program": "E"
-      },
-      "archiver": {
-        "program": "ar"
-      },
-      "linker": {
-        "macho": {
-          "family": "ld64",
-          "program": "ld"
-        }
       }
     }
   ]

@@ -12,21 +12,14 @@ static spn_toolchain_launcher_t load_launcher(const spn_cg_launcher_t* in) {
   };
 }
 
-static spn_toolchain_linker_t load_linker(const spn_cg_linker_t* in) {
-  return (spn_toolchain_linker_t) {
-    .family = sp_opt_is_null(in->family) ? SPN_LD_FAMILY_NONE : sp_opt_get(in->family),
-    .program = spn_arg_lit(in->program),
-  };
-}
-
-static spn_toolchain_linkers_t load_linkers(const spn_cg_linkers_t* in) {
+spn_toolchain_linkers_t spn_toolchain_linkers_load(const spn_cg_linkers_t* in) {
   return (spn_toolchain_linkers_t) {
-    .slots = {
-      [SPN_LD_FLAVOR_ELF] = load_linker(&in->elf),
-      [SPN_LD_FLAVOR_MINGW] = load_linker(&in->mingw),
-      [SPN_LD_FLAVOR_MSVC] = load_linker(&in->msvc),
-      [SPN_LD_FLAVOR_MACHO] = load_linker(&in->macho),
-      [SPN_LD_FLAVOR_WASM] = load_linker(&in->wasm),
+    .families = {
+      [SPN_LD_FLAVOR_ELF] = sp_opt_is_null(in->elf) ? SPN_LD_FAMILY_NONE : sp_opt_get(in->elf),
+      [SPN_LD_FLAVOR_MINGW] = sp_opt_is_null(in->mingw) ? SPN_LD_FAMILY_NONE : sp_opt_get(in->mingw),
+      [SPN_LD_FLAVOR_MSVC] = sp_opt_is_null(in->msvc) ? SPN_LD_FAMILY_NONE : sp_opt_get(in->msvc),
+      [SPN_LD_FLAVOR_MACHO] = sp_opt_is_null(in->macho) ? SPN_LD_FAMILY_NONE : sp_opt_get(in->macho),
+      [SPN_LD_FLAVOR_WASM] = sp_opt_is_null(in->wasm) ? SPN_LD_FAMILY_NONE : sp_opt_get(in->wasm),
     },
   };
 }
@@ -48,10 +41,11 @@ spn_err_t spn_toolchain_decls_parse(sp_mem_t mem, sp_str_t json, sp_da(spn_toolc
     decl.compiler = load_launcher(&t->compiler);
     decl.cxx = load_launcher(&t->cxx);
     decl.archiver = load_launcher(&t->archiver);
-    spn_toolchain_linkers_t declared = load_linkers(&t->linker);
+    spn_toolchain_linkers_t declared = spn_toolchain_linkers_load(&t->linker);
     if (spn_ld_resolve(decl.driver, &declared, &decl.linkers).count) {
       return SPN_ERROR;
     }
+    decl.link_args = t->link_args;
 
     decl.hosts = sp_da_new(mem, spn_toolchain_host_t);
     sp_da_for(t->host, it) {
@@ -102,12 +96,14 @@ static sp_da(spn_triple_t) bind_targets(spn_toolchain_catalog_t* catalog, const 
   }
 
   sp_da(spn_triple_t) targets = sp_da_new(catalog->mem, spn_triple_t);
-  if (spn_ld_links(&decl->linkers, catalog->host)) {
-    sp_da_push(targets, catalog->host);
+  if (!spn_ld_links(&decl->linkers, catalog->host)) {
+    return targets;
   }
-  spn_triple_t bare = { catalog->host.arch, SPN_OS_FREESTANDING, SPN_ABI_BARE };
-  if (catalog->host.os == SPN_OS_LINUX && spn_ld_links(&decl->linkers, bare)) {
-    sp_da_push(targets, bare);
+  sp_da_push(targets, catalog->host);
+
+  bool native_elf = spn_ld_flavor(catalog->host) == SPN_LD_FLAVOR_ELF;
+  if (native_elf && !spn_toolchain_driver_retargets(decl->driver)) {
+    sp_da_push(targets, ((spn_triple_t) { catalog->host.arch, SPN_OS_FREESTANDING, SPN_ABI_BARE }));
   }
   return targets;
 }
@@ -152,6 +148,7 @@ static spn_toolchain_info_t bind_toolchain(spn_toolchain_catalog_t* catalog, con
     .cxx = decl->cxx,
     .archiver = decl->archiver,
     .linkers = decl->linkers,
+    .link_args = decl->link_args,
     .targets = bind_targets(catalog, decl),
     .support = bind_support(catalog, decl),
   };

@@ -8,6 +8,7 @@ typedef struct {
   spn_cxx_options_t cxx;
   bool pic;
   const c8* arg;
+  const c8* link_arg;
   const c8* include;
   const c8* define;
   const c8* depfile;
@@ -30,6 +31,21 @@ static const compile_test_t tests [] = {
     .expect = {
       .command = "cc",
       .args = { "-std=c99", "-c", "-fPIC", "-fno-common", "-Werror=return-type", "main.c", "-o", "main.o" },
+    },
+  },
+  {
+    .name = "toolchain_link_args_never_compile",
+    .driver = SPN_CC_DRIVER_GCC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_GNU,
+      .standard = SPN_C99,
+    },
+    .link_arg = "-fuse-ld=lld",
+    .expect = {
+      .command = "cc",
+      .args = { "-std=c99", "-c", "-Werror=return-type", "main.c", "-o", "main.o" },
     },
   },
   {
@@ -374,8 +390,12 @@ sp_test_each(render_compile, render, compile_test_t, tests, .setup = spn_test_ct
   sp_da_init(mem, compile.include);
   sp_da_init(mem, compile.define);
   sp_da_init(mem, compile.args);
+  sp_da_init(mem, toolchain.link_args);
   if (it->arg) {
     sp_da_push(compile.args, sp_str_from_cstr(mem, it->arg));
+  }
+  if (it->link_arg) {
+    sp_da_push(toolchain.link_args, sp_str_from_cstr(mem, it->link_arg));
   }
   if (it->include) {
     sp_da_push(compile.include, test_arg_path(it->include));

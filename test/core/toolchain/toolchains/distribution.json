@@ -23,13 +23,7 @@
         ]
       },
       "linker": {
-        "elf": {
-          "family": "lld",
-          "program": "ld.lld"
-        },
-        "wasm": {
-          "family": "lld"
-        }
+        "elf": "lld"
       },
       "mirrors": "https://example.com/mirrors.txt",
       "host": {
@@ -52,6 +46,9 @@
           "os": "linux",
           "abi": "musl"
         }
+      ],
+      "link_args": [
+        "-fuse-ld=lld"
       ]
     }
   ]

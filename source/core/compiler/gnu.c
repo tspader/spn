@@ -235,23 +235,6 @@ spn_err_t spn_gnu_parse_depfile(sp_mem_t mem, sp_str_t content, sp_da(sp_str_t)*
   return parser.err ? SPN_ERROR : SPN_OK;
 }
 
-static void add_linker(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, spn_triple_t target, spn_invocation_t* invocation) {
-  spn_toolchain_linker_t linker = toolchain->linkers.slots[spn_ld_flavor(target)];
-  switch (spn_ld_arg(toolchain->driver, target, linker.family)) {
-    case SPN_LD_ARG_NONE: {
-      break;
-    }
-    case SPN_LD_ARG_LD_PATH: {
-      spn_cc_push(mem, invocation, spn_arg_prepend(mem, sp_str_lit("--ld-path="), linker.program));
-      break;
-    }
-    case SPN_LD_ARG_FUSE_LLD: {
-      spn_cc_push_c(mem, invocation, "-fuse-ld=lld");
-      break;
-    }
-  }
-}
-
 static void add_exports(sp_mem_t mem, spn_ld_flavor_t flavor, spn_path_t exports, spn_invocation_t* invocation) {
   switch (flavor) {
     case SPN_LD_FLAVOR_ELF: {
@@ -350,10 +333,10 @@ static void add_rpath(sp_mem_t mem, spn_ld_flavor_t flavor, spn_invocation_t* in
 void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_link_t* link, const spn_cc_link_files_t* files, spn_invocation_t* invocation) {
   spn_triple_t triple = { profile->arch, profile->os, profile->abi };
   spn_ld_flavor_t flavor = spn_ld_flavor(triple);
-  spn_ld_cap_set_t caps = spn_ld_caps(toolchain->linkers.slots[flavor].family, flavor);
+  spn_ld_cap_set_t caps = spn_ld_caps(spn_ld_family(&toolchain->linkers, triple), flavor);
 
   add_launcher(mem, toolchain, profile, link->lang, invocation);
-  add_linker(mem, toolchain, triple, invocation);
+  spn_cc_push_strs(mem, invocation, toolchain->link_args);
   spn_cc_flags_t flags = sp_zero;
   sp_da_init(mem, flags.compile);
   sp_da_init(mem, flags.link);

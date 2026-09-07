@@ -5,7 +5,7 @@
     "abi": { "enum": ["gnu", "musl", "msvc", "apple", "none"] },
     "linkage": { "enum": ["shared", "static", "source", "object"] },
     "cc_driver": { "enum": ["gcc", "clang", "msvc", "zig"] },
-    "ld_family": { "enum": ["gnu", "lld", "ld64", "msvc"], "metadata": { "include": "toolchain/types.h" } },
+    "ld_family": { "enum": ["gnu", "lld", "ld64", "msvc"] },
     "index_protocol": { "enum": ["git", "http", "dir"], "metadata": { "include": "index/types.h" } },
     "option_type": { "enum": ["bool", "enum"], "metadata": { "include": "when/types.h" } },
     "pkg_source": { "enum": ["root", "file", "index"], "metadata": { "include": "pkg/types.h" } },
@@ -26,20 +26,13 @@
       }
     },
 
-    "linker": {
-      "optionalProperties": {
-        "family": { "ref": "ld_family" },
-        "program": { "type": "string" }
-      }
-    },
-
     "linkers": {
       "optionalProperties": {
-        "elf": { "ref": "linker" },
-        "mingw": { "ref": "linker" },
-        "msvc": { "ref": "linker" },
-        "macho": { "ref": "linker" },
-        "wasm": { "ref": "linker" }
+        "elf": { "ref": "ld_family" },
+        "mingw": { "ref": "ld_family" },
+        "msvc": { "ref": "ld_family" },
+        "macho": { "ref": "ld_family" },
+        "wasm": { "ref": "ld_family" }
       }
     },
 
@@ -48,6 +41,7 @@
         "name": { "type": "string" },
         "compiler": { "type": "string" },
         "linker": { "ref": "linkers" },
+        "link_args": { "elements": { "type": "string" } },
         "archiver": { "type": "string" },
         "driver": { "ref": "cc_driver" },
         "cxx": { "type": "string" },

@@ -8,7 +8,6 @@ spum = { path = "packages/spum" }
 [[toolchain]]
 name = "custom"
 compiler = "cc"
-linker = { elf = { family = "gnu" }, mingw = { family = "gnu" }, macho = { family = "ld64" } }
 archiver = "ar"
 driver = "gcc"
 cxx = "c++"

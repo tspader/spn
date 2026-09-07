@@ -6,3 +6,4 @@ version = "1.0.0"
 a = { version = "^1.0.0", when = { opt = "9" } }
 b = { version = "^1.0.0", when = { sanitize_address = "yes" } }
 c = { version = "^1.0.0", when = { driver = "banana" } }
+d = { version = "^1.0.0", when = { linker = "banana" } }

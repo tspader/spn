@@ -3,4 +3,3 @@ name = "gcc"
 driver = "gcc"
 compiler = "/Q"
 archiver = "/Q"
-linker = { elf = { family = "gnu" }, mingw = { family = "gnu" }, macho = { family = "ld64" } }

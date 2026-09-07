@@ -9,11 +9,6 @@
       "archiver": {
         "program": "ar"
       },
-      "linker": {
-        "elf": {
-          "family": "gnu"
-        }
-      },
       "target": [
         {
           "arch": "x86_64",
@@ -30,11 +25,6 @@
       },
       "archiver": {
         "program": "ar"
-      },
-      "linker": {
-        "elf": {
-          "family": "gnu"
-        }
       },
       "target": [
         {

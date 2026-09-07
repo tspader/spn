@@ -16,9 +16,7 @@
         ]
       },
       "linker": {
-        "elf": {
-          "family": "lld"
-        }
+        "elf": "lld"
       }
     }
   ]

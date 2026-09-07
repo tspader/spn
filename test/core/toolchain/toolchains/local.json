@@ -8,11 +8,6 @@
       },
       "archiver": {
         "program": "ar"
-      },
-      "linker": {
-        "elf": {
-          "family": "gnu"
-        }
       }
     }
   ]

@@ -148,36 +148,9 @@
       "cxx": {
         "program": "clang++"
       },
-      "linker": {
-        "elf": {
-          "family": "gnu",
-          "program": "ld"
-        }
-      },
       "host": {
         "x86_64-linux": {},
-        "aarch64-linux": {}
-      }
-    },
-    {
-      "name": "apple-clang",
-      "driver": "clang",
-      "compiler": {
-        "program": "clang"
-      },
-      "archiver": {
-        "program": "ar"
-      },
-      "cxx": {
-        "program": "clang++"
-      },
-      "linker": {
-        "macho": {
-          "family": "ld64",
-          "program": "ld"
-        }
-      },
-      "host": {
+        "aarch64-linux": {},
         "x86_64-macos": {},
         "aarch64-macos": {}
       }
@@ -195,15 +168,12 @@
         "program": "clang++"
       },
       "linker": {
-        "elf": {
-          "family": "lld",
-          "program": "ld.lld"
-        },
-        "macho": {
-          "family": "lld",
-          "program": "ld64.lld"
-        }
+        "elf": "lld",
+        "macho": "lld"
       },
+      "link_args": [
+        "-fuse-ld=lld"
+      ],
       "host": {
         "x86_64-linux": {},
         "aarch64-linux": {},
@@ -222,17 +192,6 @@
       },
       "cxx": {
         "program": "g++"
-      },
-      "linker": {
-        "elf": {
-          "family": "gnu"
-        },
-        "mingw": {
-          "family": "gnu"
-        },
-        "macho": {
-          "family": "ld64"
-        }
       }
     }
   ]

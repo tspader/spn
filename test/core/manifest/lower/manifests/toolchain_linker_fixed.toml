@@ -7,4 +7,4 @@ name = "zig"
 compiler = "zig cc"
 archiver = "zig ar"
 driver = "zig"
-linker = { elf = { family = "lld" } }
+linker = { elf = "lld" }

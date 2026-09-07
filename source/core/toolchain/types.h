@@ -26,18 +26,6 @@ typedef enum {
   SPN_LD_FLAVOR_COUNT,
 } spn_ld_flavor_t;
 
-#define spn_ld_flavor_bit(flavor) (1u << (flavor))
-
-typedef u32 spn_ld_flavor_set_t;
-
-typedef enum {
-  SPN_LD_FAMILY_NONE,
-  SPN_LD_FAMILY_GNU,
-  SPN_LD_FAMILY_LLD,
-  SPN_LD_FAMILY_LD64,
-  SPN_LD_FAMILY_MSVC,
-} spn_ld_family_t;
-
 #define spn_ld_family_bit(family) (1u << (family))
 
 typedef u32 spn_ld_family_set_t;
@@ -49,39 +37,18 @@ typedef enum {
 
 typedef u32 spn_ld_cap_set_t;
 
-typedef enum {
-  SPN_LD_ARG_NONE,
-  SPN_LD_ARG_LD_PATH,
-  SPN_LD_ARG_FUSE_LLD,
-} spn_ld_arg_t;
-
-typedef enum {
-  SPN_LD_CHECK_OK,
-  SPN_LD_CHECK_FAMILY_MISSING,
-  SPN_LD_CHECK_FAMILY_FORBIDDEN,
-  SPN_LD_CHECK_PROGRAM_MISSING,
-  SPN_LD_CHECK_PROGRAM_FORBIDDEN,
-} spn_ld_check_t;
-
 typedef struct {
-  spn_ld_family_t family;
-  spn_arg_t program;
-} spn_toolchain_linker_t;
-
-typedef struct {
-  spn_toolchain_linker_t slots [SPN_LD_FLAVOR_COUNT];
+  spn_ld_family_t families [SPN_LD_FLAVOR_COUNT];
 } spn_toolchain_linkers_t;
 
 typedef enum {
   SPN_LD_ISSUE_DECLARED,
-  SPN_LD_ISSUE_UNDECLARED,
-  SPN_LD_ISSUE_SLOT,
+  SPN_LD_ISSUE_FORBIDDEN,
 } spn_ld_issue_kind_t;
 
 typedef struct {
   spn_ld_issue_kind_t kind;
   spn_ld_flavor_t flavor;
-  spn_ld_check_t check;
 } spn_ld_issue_t;
 
 typedef struct {
@@ -130,6 +97,7 @@ typedef struct {
   spn_toolchain_launcher_t cxx;
   spn_toolchain_launcher_t archiver;
   spn_toolchain_linkers_t linkers;
+  sp_da(sp_str_t) link_args;
   spn_toolchain_source_t source;
   sp_da(spn_toolchain_host_t) hosts;
   sp_da(spn_triple_t) targets;
@@ -143,6 +111,7 @@ typedef struct {
   spn_toolchain_launcher_t cxx;
   spn_toolchain_launcher_t archiver;
   spn_toolchain_linkers_t linkers;
+  sp_da(sp_str_t) link_args;
   sp_da(spn_triple_t) targets;
   spn_toolchain_support_t support;
 } spn_toolchain_info_t;

@@ -193,11 +193,12 @@ static spn_linkage_t abi_linkage(spn_abi_t abi) {
   sp_unreachable_return(SPN_LIB_KIND_NONE);
 }
 
-void spn_profile_finalize(spn_profile_info_t* profile, spn_abi_t abi, spn_cc_driver_t driver) {
-  profile->abi = abi;
-  profile->driver = driver;
+void spn_profile_finalize(spn_profile_info_t* profile, const spn_toolchain_selection_t* selection) {
+  profile->abi = selection->triple.abi;
+  profile->driver = selection->toolchain->driver;
+  profile->linker = spn_ld_family(&selection->toolchain->linkers, selection->triple);
   if (!profile->linkage) {
-    profile->linkage = abi_linkage(abi);
+    profile->linkage = abi_linkage(profile->abi);
   }
 }
 
@@ -342,6 +343,7 @@ spn_when_facts_t spn_profile_facts(const spn_profile_info_t* profile) {
     .arch = profile->arch,
     .abi = profile->abi,
     .driver = profile->driver,
+    .linker = profile->linker,
     .mode = profile->mode,
     .opt = profile->opt,
     .sanitizers = profile->sanitizers,

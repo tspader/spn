@@ -7,4 +7,4 @@ name = "custom"
 compiler = "gcc"
 archiver = "ar"
 driver = "gcc"
-linker = { macho = { family = "gnu" } }
+linker = { macho = "gnu" }

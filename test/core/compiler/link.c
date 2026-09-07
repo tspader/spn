@@ -5,7 +5,7 @@ typedef struct {
   const c8* name;
   spn_cc_driver_t driver;
   spn_ld_family_t family;
-  const c8* program;
+  const c8* link_args [2];
   test_profile_t profile;
   spn_cc_output_kind_t kind;
   const c8* exports;
@@ -184,7 +184,6 @@ static const link_test_t tests [] = {
     .name = "clang_macos_frameworks",
     .driver = SPN_CC_DRIVER_CLANG,
     .family = SPN_LD_FAMILY_LD64,
-    .program = "ld",
     .profile = {
       .arch = SPN_ARCH_ARM64,
       .os = SPN_OS_MACOS,
@@ -197,7 +196,6 @@ static const link_test_t tests [] = {
       .command = "cc",
       .args = {
         "--target=aarch64-macos",
-        "--ld-path=ld",
         "main.o",
         "-isysroot", "/sdk",
         "-F/sdk/System/Library/Frameworks",
@@ -212,7 +210,6 @@ static const link_test_t tests [] = {
     .name = "frameworks_require_sdk",
     .driver = SPN_CC_DRIVER_CLANG,
     .family = SPN_LD_FAMILY_LD64,
-    .program = "ld",
     .profile = {
       .arch = SPN_ARCH_ARM64,
       .os = SPN_OS_MACOS,
@@ -276,7 +273,6 @@ static const link_test_t tests [] = {
     .name = "clang_linker_script",
     .driver = SPN_CC_DRIVER_CLANG,
     .family = SPN_LD_FAMILY_GNU,
-    .program = "ld",
     .profile = {
       .arch = SPN_ARCH_X64,
       .os = SPN_OS_LINUX,
@@ -286,7 +282,7 @@ static const link_test_t tests [] = {
     .script = "A.ld",
     .expect = {
       .command = "cc",
-      .args = { "--target=x86_64-linux-gnu", "--ld-path=ld", "-Wl,-T,A.ld", "main.o", "-o", "main" },
+      .args = { "--target=x86_64-linux-gnu", "-Wl,-T,A.ld", "main.o", "-o", "main" },
     },
   },
   {
@@ -356,7 +352,6 @@ static const link_test_t tests [] = {
     .name = "macos_static_linkage_suppressed",
     .driver = SPN_CC_DRIVER_CLANG,
     .family = SPN_LD_FAMILY_LD64,
-    .program = "ld",
     .profile = {
       .arch = SPN_ARCH_ARM64,
       .os = SPN_OS_MACOS,
@@ -365,7 +360,7 @@ static const link_test_t tests [] = {
     .kind = SPN_CC_OUTPUT_EXE,
     .expect = {
       .command = "cc",
-      .args = { "--target=aarch64-macos", "--ld-path=ld", "main.o", "-o", "main" },
+      .args = { "--target=aarch64-macos", "main.o", "-o", "main" },
     },
   },
   {
@@ -389,7 +384,6 @@ static const link_test_t tests [] = {
     .name = "macos_rpath",
     .driver = SPN_CC_DRIVER_CLANG,
     .family = SPN_LD_FAMILY_LD64,
-    .program = "ld",
     .profile = {
       .arch = SPN_ARCH_ARM64,
       .os = SPN_OS_MACOS,
@@ -398,7 +392,7 @@ static const link_test_t tests [] = {
     .rpath = true,
     .expect = {
       .command = "cc",
-      .args = { "--target=aarch64-macos", "--ld-path=ld", "main.o", "-Wl,-rpath,@loader_path", "-o", "main" },
+      .args = { "--target=aarch64-macos", "main.o", "-Wl,-rpath,@loader_path", "-o", "main" },
     },
   },
   {
@@ -529,7 +523,6 @@ static const link_test_t tests [] = {
     .name = "macos_shared_exports",
     .driver = SPN_CC_DRIVER_CLANG,
     .family = SPN_LD_FAMILY_LD64,
-    .program = "ld",
     .profile = {
       .arch = SPN_ARCH_ARM64,
       .os = SPN_OS_MACOS,
@@ -542,7 +535,6 @@ static const link_test_t tests [] = {
       .command = "cc",
       .args = {
         "--target=aarch64-macos",
-        "--ld-path=ld",
         "-shared", "-Wl,-install_name,@rpath/main", "-Wl,-exported_symbols_list,S.exp",
         "main.o",
         "-Wl,-force_load,libD.a",
@@ -641,27 +633,66 @@ static const link_test_t tests [] = {
     },
   },
   {
-    .name = "gcc_lld_family",
+    .name = "family_alone_renders_nothing",
     .driver = SPN_CC_DRIVER_GCC,
     .family = SPN_LD_FAMILY_LLD,
     .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_LINUX, .abi = SPN_ABI_GNU },
     .kind = SPN_CC_OUTPUT_EXE,
     .expect = {
       .command = "cc",
-      .args = { "-fuse-ld=lld", "main.o", "-o", "main" },
+      .args = { "main.o", "-o", "main" },
     },
   },
   {
-    .name = "clang_lld_elf",
+    .name = "toolchain_link_args_precede_target_args",
+    .driver = SPN_CC_DRIVER_GCC,
+    .family = SPN_LD_FAMILY_LLD,
+    .link_args = { "-fuse-ld=lld", "-B" },
+    .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_LINUX, .abi = SPN_ABI_GNU },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .arg = "-A",
+    .script = "A.ld",
+    .expect = {
+      .command = "cc",
+      .args = { "-fuse-ld=lld", "-B", "-Wl,-T,A.ld", "-A", "main.o", "-o", "main" },
+    },
+  },
+  {
+    .name = "clang_toolchain_link_args_follow_target_triple",
     .driver = SPN_CC_DRIVER_CLANG,
     .family = SPN_LD_FAMILY_LLD,
-    .program = "ld.lld",
+    .link_args = { "-fuse-ld=lld" },
     .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_LINUX, .abi = SPN_ABI_GNU },
     .kind = SPN_CC_OUTPUT_EXE,
     .script = "A.ld",
     .expect = {
       .command = "cc",
-      .args = { "--target=x86_64-linux-gnu", "--ld-path=ld.lld", "-Wl,-T,A.ld", "main.o", "-o", "main" },
+      .args = { "--target=x86_64-linux-gnu", "-fuse-ld=lld", "-Wl,-T,A.ld", "main.o", "-o", "main" },
+    },
+  },
+  {
+    .name = "zig_toolchain_link_args_follow_target_triple",
+    .driver = SPN_CC_DRIVER_ZIG,
+    .family = SPN_LD_FAMILY_LLD,
+    .link_args = { "-A" },
+    .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_LINUX, .abi = SPN_ABI_GNU },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .expect = {
+      .command = "cc",
+      .args = { "--target=x86_64-linux-gnu", "-A", "main.o", "-o", "main" },
+    },
+  },
+  {
+    .name = "msvc_toolchain_link_args_after_link",
+    .driver = SPN_CC_DRIVER_MSVC,
+    .family = SPN_LD_FAMILY_MSVC,
+    .link_args = { "/B" },
+    .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_WINDOWS, .abi = SPN_ABI_MSVC },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .arg = "/A",
+    .expect = {
+      .command = "cc",
+      .args = { "/nologo", "main.o", "/Femain", "/link", "/B", "/A" },
     },
   },
   {
@@ -757,16 +788,15 @@ static const link_test_t tests [] = {
     },
   },
   {
-    .name = "clang_x64_freestanding_links_through_gcc",
+    .name = "clang_freestanding_exe",
     .driver = SPN_CC_DRIVER_CLANG,
-    .family = SPN_LD_FAMILY_LLD,
-    .program = "ld.lld",
+    .family = SPN_LD_FAMILY_GNU,
     .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_FREESTANDING, .abi = SPN_ABI_BARE },
     .kind = SPN_CC_OUTPUT_EXE,
     .script = "A.ld",
     .expect = {
       .command = "cc",
-      .args = { "--target=x86_64-none-elf", "-fuse-ld=lld", "-nostartfiles", "-nolibc", "-Wl,-T,A.ld", "main.o", "-o", "main" },
+      .args = { "--target=x86_64-none-elf", "-nostartfiles", "-nolibc", "-Wl,-T,A.ld", "main.o", "-o", "main" },
     },
   },
   {
@@ -797,14 +827,13 @@ static const link_test_t tests [] = {
     .private_lib = "P",
     .expect = {
       .command = "cc",
-      .args = { "-fuse-ld=lld", "-shared", "main.o", "-lP", "-o", "main" },
+      .args = { "-shared", "main.o", "-lP", "-o", "main" },
     },
   },
   {
     .name = "clang_windows_gnu_shared_exclude_libs",
     .driver = SPN_CC_DRIVER_CLANG,
     .family = SPN_LD_FAMILY_GNU,
-    .program = "x86_64-w64-mingw32-ld",
     .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_WINDOWS, .abi = SPN_ABI_GNU },
     .kind = SPN_CC_OUTPUT_SHARED_LIB,
     .private_lib = "P",
@@ -812,7 +841,6 @@ static const link_test_t tests [] = {
       .command = "cc",
       .args = {
         "--target=x86_64-windows-gnu",
-        "--ld-path=x86_64-w64-mingw32-ld",
         "-shared",
         "main.o",
         "-lP", "-Wl,--exclude-libs,libP.a",
@@ -824,7 +852,6 @@ static const link_test_t tests [] = {
     .name = "clang_windows_gnu_lld_shared_no_exclude_libs",
     .driver = SPN_CC_DRIVER_CLANG,
     .family = SPN_LD_FAMILY_LLD,
-    .program = "ld.lld",
     .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_WINDOWS, .abi = SPN_ABI_GNU },
     .kind = SPN_CC_OUTPUT_SHARED_LIB,
     .private_lib = "P",
@@ -832,46 +859,11 @@ static const link_test_t tests [] = {
       .command = "cc",
       .args = {
         "--target=x86_64-windows-gnu",
-        "--ld-path=ld.lld",
         "-shared",
         "main.o",
         "-lP",
         "-o", "main"
       },
-    },
-  },
-  {
-    .name = "clang_msvc_lld_fuse_ld",
-    .driver = SPN_CC_DRIVER_CLANG,
-    .family = SPN_LD_FAMILY_LLD,
-    .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_WINDOWS, .abi = SPN_ABI_MSVC },
-    .kind = SPN_CC_OUTPUT_EXE,
-    .expect = {
-      .command = "cc",
-      .args = { "--target=x86_64-windows-msvc", "-fuse-ld=lld", "main.o", "-o", "main" },
-    },
-  },
-  {
-    .name = "clang_macos_lld_path",
-    .driver = SPN_CC_DRIVER_CLANG,
-    .family = SPN_LD_FAMILY_LLD,
-    .program = "ld64.lld",
-    .profile = { .arch = SPN_ARCH_ARM64, .os = SPN_OS_MACOS },
-    .kind = SPN_CC_OUTPUT_EXE,
-    .expect = {
-      .command = "cc",
-      .args = { "--target=aarch64-macos", "--ld-path=ld64.lld", "main.o", "-o", "main" },
-    },
-  },
-  {
-    .name = "gcc_macos_ld64_no_linker_arg",
-    .driver = SPN_CC_DRIVER_GCC,
-    .family = SPN_LD_FAMILY_LD64,
-    .profile = { .arch = SPN_ARCH_ARM64, .os = SPN_OS_MACOS },
-    .kind = SPN_CC_OUTPUT_EXE,
-    .expect = {
-      .command = "cc",
-      .args = { "main.o", "-o", "main" },
     },
   },
   {
@@ -900,7 +892,6 @@ static const link_test_t tests [] = {
     .name = "macos_linker_script_unsupported",
     .driver = SPN_CC_DRIVER_CLANG,
     .family = SPN_LD_FAMILY_LD64,
-    .program = "ld",
     .profile = { .arch = SPN_ARCH_ARM64, .os = SPN_OS_MACOS },
     .kind = SPN_CC_OUTPUT_EXE,
     .script = "A.ld",
@@ -951,10 +942,11 @@ sp_test_each(render_link, render, link_test_t, tests, .setup = spn_test_ctx_setu
   sp_mem_t mem = sp_test_arena(t);
   spn_cc_toolchain_t toolchain = test_toolchain(it->driver);
   spn_triple_t triple = { it->profile.arch, it->profile.os, it->profile.abi };
-  spn_toolchain_linker_t* linker = &toolchain.linkers.slots[spn_ld_flavor(triple)];
-  linker->family = it->family;
-  if (it->program) {
-    linker->program = spn_arg_lit(sp_cstr_as_str(it->program));
+  toolchain.linkers.families[spn_ld_flavor(triple)] = it->family;
+  toolchain.link_args = sp_da_new(mem, sp_str_t);
+  sp_carr_for(it->link_args, at) {
+    if (!it->link_args[at]) break;
+    sp_da_push(toolchain.link_args, sp_cstr_as_str(it->link_args[at]));
   }
   spn_cc_link_t link = {
     .lang = SPN_LANG_C,

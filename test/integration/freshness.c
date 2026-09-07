@@ -218,12 +218,12 @@ sp_test(freshness, linker_script_change) {
   });
 }
 
-sp_test(freshness, linker_family_change) {
+sp_test(freshness, link_args_change) {
   return run_rebuild_test(t, (rebuild_test_t) {
-    .project = "test/integration/fixtures/freshness/linker_family",
-    .copy = { "gnu.toml", "lld.toml" },
+    .project = "test/integration/fixtures/freshness/link_args",
+    .copy = { "lld.toml" },
     .toolchain = "L",
-    .when.lanes = { "gcc-lld" },
+    .when = { .os = SPN_OS_LINUX, .programs = { "gcc", "ld.lld" } },
     .first = {
       .args = { "build" },
       .expect.exists = { exe("main") },

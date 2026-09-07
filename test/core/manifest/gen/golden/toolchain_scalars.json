@@ -8,9 +8,7 @@
       "name": "gcc",
       "compiler": "gcc",
       "linker": {
-        "elf": {
-          "family": "lld"
-        }
+        "elf": "lld"
       },
       "archiver": "ar",
       "driver": "gcc",

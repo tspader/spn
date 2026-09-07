@@ -9,16 +9,11 @@
       "archiver": {
         "program": "ar"
       },
-      "linker": {
-        "elf": {
-          "family": "gnu"
-        }
-      },
       "target": [
         {
-          "arch": "aarch64",
-          "os": "macos",
-          "abi": "apple"
+          "arch": "x86_64",
+          "os": "windows",
+          "abi": "msvc"
         }
       ]
     }

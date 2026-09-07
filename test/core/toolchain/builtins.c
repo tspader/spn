@@ -15,10 +15,10 @@ static const test_t tests [] = {
       .cxx = { .program = "zig", .args = { "c++" } },
       .archiver = { .program = "zig", .args = { "ar" } },
       .linkers = {
-        [SPN_LD_FLAVOR_ELF] = { SPN_LD_FAMILY_LLD },
-        [SPN_LD_FLAVOR_MINGW] = { SPN_LD_FAMILY_LLD },
-        [SPN_LD_FLAVOR_MACHO] = { SPN_LD_FAMILY_LLD },
-        [SPN_LD_FLAVOR_WASM] = { SPN_LD_FAMILY_LLD },
+        [SPN_LD_FLAVOR_ELF] = SPN_LD_FAMILY_LLD,
+        [SPN_LD_FLAVOR_MINGW] = SPN_LD_FAMILY_LLD,
+        [SPN_LD_FLAVOR_MACHO] = SPN_LD_FAMILY_LLD,
+        [SPN_LD_FLAVOR_WASM] = SPN_LD_FAMILY_LLD,
       },
       .hosts = {
         { .triple = { SPN_ARCH_X64, SPN_OS_LINUX }, .url = "https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz" },
@@ -51,7 +51,7 @@ static const test_t tests [] = {
       .cxx = { .program = "cl" },
       .archiver = { .program = "lib" },
       .linkers = {
-        [SPN_LD_FLAVOR_MSVC] = { SPN_LD_FAMILY_MSVC },
+        [SPN_LD_FLAVOR_MSVC] = SPN_LD_FAMILY_MSVC,
       },
       .hosts = {
         { .triple = { SPN_ARCH_X64, SPN_OS_WINDOWS } },
@@ -71,25 +71,15 @@ static const test_t tests [] = {
       .cxx = { .program = "clang++" },
       .archiver = { .program = "ar" },
       .linkers = {
-        [SPN_LD_FLAVOR_ELF] = { SPN_LD_FAMILY_GNU, "ld" },
+        [SPN_LD_FLAVOR_ELF] = SPN_LD_FAMILY_GNU,
+        [SPN_LD_FLAVOR_MINGW] = SPN_LD_FAMILY_GNU,
+        [SPN_LD_FLAVOR_MSVC] = SPN_LD_FAMILY_MSVC,
+        [SPN_LD_FLAVOR_MACHO] = SPN_LD_FAMILY_LD64,
+        [SPN_LD_FLAVOR_WASM] = SPN_LD_FAMILY_LLD,
       },
       .hosts = {
         { .triple = { SPN_ARCH_X64, SPN_OS_LINUX } },
         { .triple = { SPN_ARCH_ARM64, SPN_OS_LINUX } },
-      },
-    },
-  },
-  {
-    .name = "apple-clang",
-    .expect = {
-      .driver = SPN_CC_DRIVER_CLANG,
-      .compiler = { .program = "clang" },
-      .cxx = { .program = "clang++" },
-      .archiver = { .program = "ar" },
-      .linkers = {
-        [SPN_LD_FLAVOR_MACHO] = { SPN_LD_FAMILY_LD64, "ld" },
-      },
-      .hosts = {
         { .triple = { SPN_ARCH_X64, SPN_OS_MACOS } },
         { .triple = { SPN_ARCH_ARM64, SPN_OS_MACOS } },
       },
@@ -103,9 +93,13 @@ static const test_t tests [] = {
       .cxx = { .program = "clang++" },
       .archiver = { .program = "llvm-ar" },
       .linkers = {
-        [SPN_LD_FLAVOR_ELF] = { SPN_LD_FAMILY_LLD, "ld.lld" },
-        [SPN_LD_FLAVOR_MACHO] = { SPN_LD_FAMILY_LLD, "ld64.lld" },
+        [SPN_LD_FLAVOR_ELF] = SPN_LD_FAMILY_LLD,
+        [SPN_LD_FLAVOR_MINGW] = SPN_LD_FAMILY_GNU,
+        [SPN_LD_FLAVOR_MSVC] = SPN_LD_FAMILY_MSVC,
+        [SPN_LD_FLAVOR_MACHO] = SPN_LD_FAMILY_LLD,
+        [SPN_LD_FLAVOR_WASM] = SPN_LD_FAMILY_LLD,
       },
+      .link_args = { "-fuse-ld=lld" },
       .hosts = {
         { .triple = { SPN_ARCH_X64, SPN_OS_LINUX } },
         { .triple = { SPN_ARCH_ARM64, SPN_OS_LINUX } },
@@ -122,9 +116,9 @@ static const test_t tests [] = {
       .cxx = { .program = "g++" },
       .archiver = { .program = "ar" },
       .linkers = {
-        [SPN_LD_FLAVOR_ELF] = { SPN_LD_FAMILY_GNU },
-        [SPN_LD_FLAVOR_MINGW] = { SPN_LD_FAMILY_GNU },
-        [SPN_LD_FLAVOR_MACHO] = { SPN_LD_FAMILY_LD64 },
+        [SPN_LD_FLAVOR_ELF] = SPN_LD_FAMILY_GNU,
+        [SPN_LD_FLAVOR_MINGW] = SPN_LD_FAMILY_GNU,
+        [SPN_LD_FLAVOR_MACHO] = SPN_LD_FAMILY_LD64,
       },
     },
   },
@@ -146,49 +140,19 @@ static const bind_test_t bind_tests [] = {
     .name = "clang_on_linux",
     .toolchain = "clang",
     .host = HOST_X64_LINUX,
-    .expect = { .targets = { HOST_X64_LINUX, TARGET_X64_BARE } },
+    .expect = { .targets = { HOST_X64_LINUX } },
   },
   {
     .name = "clang_on_macos",
     .toolchain = "clang",
     .host = HOST_X64_MACOS,
-    .expect = { .targets = {} },
+    .expect = { .targets = { HOST_X64_MACOS } },
   },
   {
     .name = "clang_on_windows",
     .toolchain = "clang",
     .host = HOST_X64_WIN_GNU,
-    .expect = { .targets = {} },
-  },
-  {
-    .name = "apple_clang_on_macos",
-    .toolchain = "apple-clang",
-    .host = HOST_X64_MACOS,
-    .expect = { .targets = { HOST_X64_MACOS } },
-  },
-  {
-    .name = "apple_clang_on_linux",
-    .toolchain = "apple-clang",
-    .host = HOST_X64_LINUX,
-    .expect = { .targets = {} },
-  },
-  {
-    .name = "llvm_on_linux",
-    .toolchain = "llvm",
-    .host = HOST_X64_LINUX,
-    .expect = { .targets = { HOST_X64_LINUX, TARGET_X64_BARE } },
-  },
-  {
-    .name = "llvm_on_macos",
-    .toolchain = "llvm",
-    .host = HOST_X64_MACOS,
-    .expect = { .targets = { HOST_X64_MACOS } },
-  },
-  {
-    .name = "llvm_on_windows",
-    .toolchain = "llvm",
-    .host = HOST_X64_WIN_GNU,
-    .expect = { .targets = {} },
+    .expect = { .targets = { HOST_X64_WIN_GNU } },
   },
   {
     .name = "gcc_on_linux",
@@ -207,6 +171,12 @@ static const bind_test_t bind_tests [] = {
     .toolchain = "gcc",
     .host = HOST_X64_WIN_GNU,
     .expect = { .targets = { HOST_X64_WIN_GNU } },
+  },
+  {
+    .name = "gcc_on_msvc_host",
+    .toolchain = "gcc",
+    .host = HOST_X64_WIN_MSVC,
+    .expect = { .targets = {} },
   },
   {
     .name = "zig_keeps_declared_targets_on_macos",
@@ -293,7 +263,7 @@ sp_test(builtins, declared_order) {
     return SP_ERR;
   }
 
-  const c8* order [] = { "zig", "msvc", "clang", "apple-clang", "llvm", "gcc" };
+  const c8* order [] = { "zig", "msvc", "clang", "llvm", "gcc" };
   sp_must_eq(t, (u32)sp_carr_len(order), fixture_catalog_size(&catalog));
   sp_carr_for(order, it) {
     sp_expect_str_eq_c(t, fixture_catalog_at(&catalog, it)->name, order[it]);

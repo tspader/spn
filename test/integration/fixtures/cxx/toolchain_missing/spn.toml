@@ -8,7 +8,6 @@ spum = { path = "packages/spum" }
 [[toolchain]]
 name = "conly"
 compiler = "cc"
-linker = { elf = { family = "gnu" }, mingw = { family = "gnu" }, macho = { family = "ld64" } }
 archiver = "ar"
 driver = "gcc"
 

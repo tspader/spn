@@ -7,20 +7,11 @@ name = "llvm"
 compiler = "clang"
 archiver = "llvm-ar"
 driver = "clang"
+link_args = ["-fuse-ld=lld"]
 
-[toolchain.linker.elf]
-family = "lld"
-program = "ld.lld"
-
-[toolchain.linker.mingw]
-family = "gnu"
-program = "x86_64-w64-mingw32-ld"
-
-[toolchain.linker.msvc]
-family = "msvc"
-
-[toolchain.linker.macho]
-family = "ld64"
-
-[toolchain.linker.wasm]
-family = "lld"
+[toolchain.linker]
+elf = "lld"
+mingw = "gnu"
+msvc = "msvc"
+macho = "ld64"
+wasm = "lld"

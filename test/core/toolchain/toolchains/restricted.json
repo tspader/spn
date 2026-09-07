@@ -9,14 +9,6 @@
       "archiver": {
         "program": "ar"
       },
-      "linker": {
-        "elf": {
-          "family": "gnu"
-        },
-        "macho": {
-          "family": "ld64"
-        }
-      },
       "host": {
         "x86_64-linux": {}
       }
@@ -29,14 +21,6 @@
       },
       "archiver": {
         "program": "ar"
-      },
-      "linker": {
-        "elf": {
-          "family": "gnu"
-        },
-        "macho": {
-          "family": "ld64"
-        }
       }
     }
   ]

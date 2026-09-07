@@ -256,8 +256,7 @@ spn_err_t spn_cc_validate_link(const spn_cc_toolchain_t* toolchain, const spn_pr
     return feature_unsupported(toolchain, profile, SPN_CC_FEATURE_FRAMEWORKS);
   }
   spn_triple_t target = { profile->arch, profile->os, profile->abi };
-  spn_ld_flavor_t flavor = spn_ld_flavor(target);
-  if (!sp_da_empty(link->scripts) && !(spn_ld_caps(toolchain->linkers.slots[flavor].family, flavor) & SPN_LD_CAP_SCRIPT)) {
+  if (!sp_da_empty(link->scripts) && !(spn_ld_caps(spn_ld_family(&toolchain->linkers, target), spn_ld_flavor(target)) & SPN_LD_CAP_SCRIPT)) {
     return feature_unsupported(toolchain, profile, SPN_CC_FEATURE_LINKER_SCRIPT);
   }
   if (toolchain->driver == SPN_CC_DRIVER_MSVC && link->kind == SPN_CC_OUTPUT_REACTOR) {

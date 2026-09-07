@@ -7,11 +7,6 @@
     {
       "name": "partial",
       "compiler": "cc",
-      "linker": {
-        "elf": {
-          "family": "gnu"
-        }
-      },
       "archiver": "ar",
       "driver": "gcc",
       "target": [

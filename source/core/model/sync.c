@@ -57,6 +57,7 @@ static spn_cc_toolchain_t cc_toolchain(spn_toolchain_info_t* toolchain, spn_tool
     .cxx = cxx,
     .archiver = archiver,
     .linkers = toolchain->linkers,
+    .link_args = toolchain->link_args,
     .archiver_driver = toolchain->driver == SPN_CC_DRIVER_MSVC ? SPN_AR_DRIVER_MSVC : SPN_AR_DRIVER_GNU,
   };
 }
@@ -66,7 +67,7 @@ static spn_err_t setup_local(spn_toolchain_store_t* store, spn_toolchain_unit_t*
   sp_tm_timer_t timer = sp_tm_start_timer();
 
   unit->cc = cc_toolchain(toolchain, toolchain->compiler, toolchain->cxx, toolchain->archiver);
-  spn_try(spn_toolchain_probe(&unit->cc, spn_search_split_path(spn.mem, sp_env_get_path(spn.env)), &store->probes, spn.mem, unit->flavors, &unit->identity));
+  spn_try(spn_toolchain_probe(&unit->cc, spn_search_split_path(spn.mem, sp_env_get_path(spn.env)), &store->probes, spn.mem, &unit->identity));
   spn_probe_cache_flush(&store->probes);
 
   spn_event_buffer_push(spn.events, (spn_event_t) {
@@ -109,12 +110,6 @@ static spn_err_t setup_artifact(spn_toolchain_store_t* store, spn_toolchain_unit
     cxx,
     spn_toolchain_launcher_with_root(spn.mem, toolchain->archiver, root)
   );
-  sp_for(flavor, SPN_LD_FLAVOR_COUNT) {
-    spn_arg_t* program = &unit->cc.linkers.slots[flavor].program;
-    if (!spn_arg_empty(*program)) {
-      *program = spn_toolchain_program_with_root(spn.mem, *program, root);
-    }
-  }
 
   spn_event_buffer_push(spn.events, (spn_event_t) {
     .kind = SPN_EVENT_SYNC_PACKAGE,

@@ -29,10 +29,8 @@ typedef struct {
     sp_hash_t ar;
     sp_hash_t url;
     sp_hash_t identity;
-    struct {
-      spn_ld_family_t family;
-      sp_hash_t program;
-    } ld;
+    spn_ld_family_t ld;
+    sp_hash_t link_args;
   } toolchain;
 } fingerprint_input_t;
 
@@ -56,6 +54,15 @@ static sp_hash_t hash_options(spn_session_t* session, spn_pkg_id_t id) {
       (sp_hash_t)option->value.kind,
       option->value.kind == SPN_OPTION_VALUE_STR ? spn_digest_hash_str(option->value.str) : (sp_hash_t)option->value.b,
     };
+    hash = spn_digest_hash_combine(parts, sp_carr_len(parts));
+  }
+  return hash;
+}
+
+static sp_hash_t hash_strs(sp_da(sp_str_t) strs) {
+  sp_hash_t hash = 0;
+  sp_da_for(strs, it) {
+    sp_hash_t parts [] = { hash, spn_digest_hash_str(strs[it]) };
     hash = spn_digest_hash_combine(parts, sp_carr_len(parts));
   }
   return hash;
@@ -115,7 +122,6 @@ sp_hash_t spn_unit_fingerprint(spn_session_t* session, spn_build_unit_t* build, 
 
   spn_toolchain_info_t* toolchain = build->toolchain->info;
   spn_triple_t target = { build->profile.arch, build->profile.os, build->profile.abi };
-  spn_toolchain_linker_t linker = toolchain->linkers.slots[spn_ld_flavor(target)];
   sp_opt_spn_linkage_t config = spn_session_config_kind(session, pkg->name);
 
   fingerprint.mode = build->profile.mode;
@@ -131,8 +137,8 @@ sp_hash_t spn_unit_fingerprint(spn_session_t* session, spn_build_unit_t* build, 
   fingerprint.toolchain.cc = spn_digest_hash_str(toolchain->compiler.program.prefix);
   fingerprint.toolchain.ar = spn_digest_hash_str(toolchain->archiver.program.prefix);
   fingerprint.toolchain.cxx = spn_digest_hash_str(toolchain->cxx.program.prefix);
-  fingerprint.toolchain.ld.family = linker.family;
-  fingerprint.toolchain.ld.program = spn_digest_hash_str(linker.program.prefix);
+  fingerprint.toolchain.ld = spn_ld_family(&toolchain->linkers, target);
+  fingerprint.toolchain.link_args = hash_strs(toolchain->link_args);
   fingerprint.toolchain.identity = build->toolchain->identity;
   if (toolchain->support.kind == SPN_TOOLCHAIN_SUPPORT_ARTIFACT) {
     fingerprint.toolchain.url = spn_digest_hash_str(toolchain->support.artifact.sha256);

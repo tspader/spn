@@ -7,7 +7,7 @@ name = "llvm"
 compiler = "clang"
 archiver = "llvm-ar"
 driver = "clang"
-linker = { elf = { family = "lld", program = "ld.lld" }, mingw = { family = "gnu", program = "x86_64-w64-mingw32-ld" }, msvc = { family = "msvc" }, macho = { family = "lld", program = "ld64.lld" }, wasm = { family = "lld" } }
+linker = { elf = "lld", mingw = "lld", msvc = "lld", macho = "lld", wasm = "lld" }
 target = [
   { arch = "x86_64", os = "linux", abi = "gnu" },
   { arch = "x86_64", os = "windows", abi = "gnu" },

@@ -9,11 +9,6 @@
       "archiver": {
         "program": "ar"
       },
-      "linker": {
-        "elf": {
-          "family": "gnu"
-        }
-      },
       "host": {
         "x86-linux": {}
       }

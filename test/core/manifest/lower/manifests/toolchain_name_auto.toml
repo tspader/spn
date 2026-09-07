@@ -5,6 +5,5 @@ version = "1.0.0"
 [[toolchain]]
 name = "auto"
 compiler = "cc"
-linker = { elf = { family = "gnu" } }
 archiver = "ar"
 driver = "gcc"

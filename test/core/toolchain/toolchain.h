@@ -30,11 +30,6 @@ typedef struct {
 } fixture_launcher_t;
 
 typedef struct {
-  spn_ld_family_t family;
-  const c8* program;
-} fixture_linker_t;
-
-typedef struct {
   spn_triple_t triple;
   const c8* url;
   const c8* sha256;
@@ -49,7 +44,8 @@ typedef struct {
   fixture_launcher_t compiler;
   fixture_launcher_t cxx;
   fixture_launcher_t archiver;
-  fixture_linker_t linkers [SPN_LD_FLAVOR_COUNT];
+  spn_ld_family_t linkers [SPN_LD_FLAVOR_COUNT];
+  const c8* link_args [FIXTURE_MAX_ARGS];
   fixture_host_t hosts [FIXTURE_MAX_HOSTS];
   spn_triple_t targets [FIXTURE_MAX_TARGETS];
 } fixture_toolchain_t;
@@ -92,25 +88,29 @@ static sp_err_t fixture_check_targets(sp_test_t* t, sp_da(spn_triple_t) targets,
   return SP_OK;
 }
 
-static bool fixture_linkers_expected(const fixture_linker_t* linkers) {
+static bool fixture_linkers_expected(const spn_ld_family_t* linkers) {
   sp_for(flavor, SPN_LD_FLAVOR_COUNT) {
-    if (linkers[flavor].family || linkers[flavor].program) {
+    if (linkers[flavor]) {
       return true;
     }
   }
   return false;
 }
 
-static sp_err_t fixture_check_linkers(sp_test_t* t, const spn_toolchain_linkers_t* linkers, const fixture_linker_t* expect) {
+static sp_err_t fixture_check_linkers(sp_test_t* t, const spn_toolchain_linkers_t* linkers, const spn_ld_family_t* expect) {
   if (!fixture_linkers_expected(expect)) {
     return SP_OK;
   }
   sp_for(flavor, SPN_LD_FLAVOR_COUNT) {
     sp_test_kv(t, "flavor", spn_ld_flavor_to_str((spn_ld_flavor_t)flavor));
-    sp_expect_eq(t, (u32)expect[flavor].family, (u32)linkers->slots[flavor].family);
-    sp_expect_str_eq_c(t, linkers->slots[flavor].program.prefix, expect[flavor].program ? expect[flavor].program : "");
+    sp_expect_eq(t, (u32)expect[flavor], (u32)linkers->families[flavor]);
   }
   sp_test_kv_clear(t, SP_NULLPTR);
+  return SP_OK;
+}
+
+static sp_err_t fixture_check_link_args(sp_test_t* t, sp_da(sp_str_t) link_args, const c8* const* expect) {
+  sp_must_strs_eq(t, link_args, sp_da_size(link_args), expect);
   return SP_OK;
 }
 
@@ -153,6 +153,9 @@ static sp_err_t fixture_check_decl(sp_test_t* t, const spn_toolchain_decl_t* dec
   if (fixture_check_linkers(t, &decl->linkers, expect.linkers)) {
     return SP_ERR;
   }
+  if (fixture_check_link_args(t, decl->link_args, expect.link_args)) {
+    return SP_ERR;
+  }
 
   u32 hosts = 0;
   sp_carr_detect_len(expect.hosts, hosts, !fixture_triple_empty(expect.hosts[hosts].triple));
@@ -181,6 +184,9 @@ static sp_err_t fixture_check_entry(sp_test_t* t, spn_toolchain_info_t* info, fi
     return SP_ERR;
   }
   if (fixture_check_linkers(t, &info->linkers, expect.linkers)) {
+    return SP_ERR;
+  }
+  if (fixture_check_link_args(t, info->link_args, expect.link_args)) {
     return SP_ERR;
   }
 
@@ -227,10 +233,10 @@ static spn_toolchain_decl_t fixture_local_toolchain(const c8* name, const c8* co
     .driver = SPN_CC_DRIVER_GCC,
     .compiler = { .program = spn_arg_lit(sp_cstr_as_str(compiler)) },
     .archiver = { .program = spn_arg_lit(sp_cstr_as_str("ar")) },
-    .linkers.slots = {
-      [SPN_LD_FLAVOR_ELF] = { .family = SPN_LD_FAMILY_GNU },
-      [SPN_LD_FLAVOR_MINGW] = { .family = SPN_LD_FAMILY_GNU },
-      [SPN_LD_FLAVOR_MACHO] = { .family = SPN_LD_FAMILY_LD64 },
+    .linkers.families = {
+      [SPN_LD_FLAVOR_ELF] = SPN_LD_FAMILY_GNU,
+      [SPN_LD_FLAVOR_MINGW] = SPN_LD_FAMILY_GNU,
+      [SPN_LD_FLAVOR_MACHO] = SPN_LD_FAMILY_LD64,
     },
   };
 }

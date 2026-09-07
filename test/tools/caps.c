@@ -120,18 +120,53 @@ static bool installed(sp_mem_t mem, sp_str_t program) {
   return !sp_str_empty(spn_search_program(mem, sp_fs_get_cwd(mem), program, dirs));
 }
 
-static sp_str_t missing_toolchain_program(sp_mem_t mem, const spn_toolchain_info_t* info, spn_triple_t target) {
+typedef struct {
+  const c8* lane;
+  spn_ld_flavor_t flavor;
+  const c8* program;
+} lane_program_t;
+
+static const lane_program_t lane_programs [] = {
+  { "llvm",        SPN_LD_FLAVOR_ELF,   "ld.lld" },
+  { "llvm",        SPN_LD_FLAVOR_MACHO, "ld64.lld" },
+  { "gcc-lld",     SPN_LD_FLAVOR_ELF,   "ld.lld" },
+  { "clang-msvc",  SPN_LD_FLAVOR_MSVC,  "lld-link" },
+  { "clang-mingw", SPN_LD_FLAVOR_MINGW, "x86_64-w64-mingw32-ld" },
+};
+
+static bool links_flavor(const spn_toolchain_info_t* info, spn_ld_flavor_t flavor) {
+  sp_da_for(info->targets, it) {
+    if (spn_ld_flavor(info->targets[it]) == flavor) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static sp_str_t missing_lane_program(sp_mem_t mem, const spn_toolchain_info_t* info) {
+  sp_carr_for(lane_programs, it) {
+    const lane_program_t* row = &lane_programs[it];
+    if (!sp_str_equal_cstr(info->name, row->lane) || !links_flavor(info, row->flavor)) {
+      continue;
+    }
+    if (!installed(mem, sp_cstr_as_str(row->program))) {
+      return sp_cstr_as_str(row->program);
+    }
+  }
+  return sp_str_lit("");
+}
+
+static sp_str_t missing_toolchain_program(sp_mem_t mem, const spn_toolchain_info_t* info) {
   sp_str_t programs [] = {
     info->compiler.program.prefix,
     info->archiver.program.prefix,
-    info->linkers.slots[spn_ld_flavor(target)].program.prefix,
   };
   sp_carr_for(programs, it) {
     if (!sp_str_empty(programs[it]) && !installed(mem, programs[it])) {
       return programs[it];
     }
   }
-  return sp_str_lit("");
+  return missing_lane_program(mem, info);
 }
 
 static sp_str_t lane_broken(sp_mem_t mem, const spn_toolchain_info_t* info) {
@@ -143,11 +178,9 @@ static sp_str_t lane_broken(sp_mem_t mem, const spn_toolchain_info_t* info) {
       return sp_str_lit("");
     }
     case SPN_TOOLCHAIN_SUPPORT_LOCAL: {
-      sp_da_for(info->targets, it) {
-        sp_str_t missing = missing_toolchain_program(mem, info, info->targets[it]);
-        if (!sp_str_empty(missing)) {
-          return sp_fmt(mem, "{} isn't installed", sp_fmt_str(missing)).value;
-        }
+      sp_str_t missing = missing_toolchain_program(mem, info);
+      if (!sp_str_empty(missing)) {
+        return sp_fmt(mem, "{} isn't installed", sp_fmt_str(missing)).value;
       }
       return sp_str_lit("");
     }
@@ -193,6 +226,16 @@ static void write_tables(sp_io_writer_t* io, const c8* name, yyjson_val* obj) {
   sp_io_write_cstr(io, " }\n", SP_NULLPTR);
 }
 
+static void write_str_array(sp_io_writer_t* io, const c8* name, yyjson_val* arr) {
+  sp_fmt_io(io, "{} = [", sp_fmt_cstr(name));
+  size_t idx, max;
+  yyjson_val* value;
+  yyjson_arr_foreach(arr, idx, max, value) {
+    sp_fmt_io(io, "{} \"{}\"", sp_fmt_cstr(idx ? "," : ""), sp_fmt_cstr(yyjson_get_str(value)));
+  }
+  sp_io_write_cstr(io, " ]\n", SP_NULLPTR);
+}
+
 static void write_table_array(sp_io_writer_t* io, const c8* name, yyjson_val* arr) {
   sp_fmt_io(io, "{} = [", sp_fmt_cstr(name));
   size_t idx, max;
@@ -214,7 +257,12 @@ static void write_lane(sp_io_writer_t* io, yyjson_val* toolchain) {
     write_launcher(io, "cxx", yyjson_obj_get(toolchain, "cxx"));
   }
   if (yyjson_obj_get(toolchain, "linker")) {
-    write_tables(io, "linker", yyjson_obj_get(toolchain, "linker"));
+    sp_io_write_cstr(io, "linker = ", SP_NULLPTR);
+    write_table(io, yyjson_obj_get(toolchain, "linker"));
+    sp_io_write_cstr(io, "\n", SP_NULLPTR);
+  }
+  if (yyjson_obj_get(toolchain, "link_args")) {
+    write_str_array(io, "link_args", yyjson_obj_get(toolchain, "link_args"));
   }
   if (yyjson_obj_get(toolchain, "host")) {
     write_tables(io, "host", yyjson_obj_get(toolchain, "host"));
@@ -333,15 +381,19 @@ sp_str_t test_when_blocked(test_when_t when) {
       sp_fmt_str(spn_cc_driver_to_str(when.driver))).value;
   }
 
+  spn_ld_family_t family = toolchain->info->linkers.families[spn_ld_flavor(target)];
+  if (when.linker && when.linker != family) {
+    return sp_fmt(mem, "{} links {} with {}, test needs {}",
+      sp_fmt_cstr(toolchain->name),
+      sp_fmt_str(spn_triple_to_str(mem, target)),
+      sp_fmt_str(spn_ld_family_to_str(family)),
+      sp_fmt_str(spn_ld_family_to_str(when.linker))).value;
+  }
+
   if (!toolchain_targets(toolchain->info, target)) {
     return sp_fmt(mem, "{} can't target {}",
       sp_fmt_cstr(toolchain->name),
       sp_fmt_str(spn_triple_to_str(mem, target))).value;
-  }
-
-  sp_str_t missing = toolchain->info->support.kind == SPN_TOOLCHAIN_SUPPORT_LOCAL ? missing_toolchain_program(mem, toolchain->info, target) : sp_str_lit("");
-  if (!sp_str_empty(missing)) {
-    return sp_fmt(mem, "{} needs {}, which isn't installed", sp_fmt_cstr(toolchain->name), sp_fmt_str(missing)).value;
   }
 
   if (when.sanitize) {
