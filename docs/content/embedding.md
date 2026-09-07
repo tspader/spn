@@ -1,6 +1,5 @@
 ---
 title: Embedding `spn`
-order: 10
 site: false
 ---
 

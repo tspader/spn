@@ -1,7 +1,6 @@
 ---
 title: Manifest reference
 group: Reference
-order: 9
 readme: false
 ---
 

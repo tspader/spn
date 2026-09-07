@@ -1,6 +1,5 @@
 ---
 title: Building
-order: 5
 ---
 
 `spn build` compiles your project and all dependencies. Compilation targets a *triple* (e.g. `x86_64-windows-gnu`) and uses a *profile* (e.g. release, O2, statically linked).

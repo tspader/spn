@@ -253,7 +253,6 @@ ul {
 }
 
 .prose :is(ul, ol) {
-  margin-block: var(--s-5);
   padding-left: var(--s-8);
 }
 
@@ -273,9 +272,9 @@ ul {
 }
 
 .prose h3 {
-  margin-block: var(--s-5);
+  margin-block: var(--s-1);
   font-size: var(--text-xl);
-  font-weight: var(--weight-semibold);
+  font-weight: var(--weight-bold);
   letter-spacing: var(--tracking-tight);
 }
 

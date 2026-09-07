@@ -2,9 +2,10 @@
 import { getCollection, render } from 'astro:content'
 import Nav from '@spn/docs/components/Nav.astro'
 import Shell from '@spn/docs/layouts/Shell.astro'
+import { position } from '@spn/docs/lib/order'
 
 export async function getStaticPaths() {
-  const docs = (await getCollection('docs', (doc) => doc.data.site)).sort((a, b) => a.data.order - b.data.order)
+  const docs = (await getCollection('docs', (doc) => doc.data.site)).sort((a, b) => position(a.id) - position(b.id))
   return docs.map((doc) => ({ params: { slug: doc.id }, props: { doc, docs } }))
 }
 

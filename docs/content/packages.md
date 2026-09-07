@@ -1,6 +1,5 @@
 ---
 title: Packages
-order: 3
 ---
 
 Packages are defined by TOML manifests.
@@ -27,6 +26,10 @@ system_deps = ['m']
 ```
 
 A `[[bin]]` and a `[[script]]`, for instance, are both executables, but their difference isn't strictly cosmetic. `[[bin]]` entries are taken to be *exports* of your package, able to be pulled in by consumers. `[[script]]` entries aren't. `[[test]]` entries are executed in `spn test`, and compiled to `test/` instead of `bin/`.
+
+## Paths
+
+Paths may not contain relative components like `.` and `..`, with the exception of the literal `"."`.
 
 ## Target fields
 

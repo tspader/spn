@@ -10,6 +10,7 @@ import { unified } from 'unified'
 import { visit } from 'unist-util-visit'
 import { targets } from '@spn/docs/data/install'
 import { Page } from '@spn/docs/lib/page'
+import { position } from '@spn/docs/lib/order'
 
 const DOCS = join(import.meta.dir, '..')
 const CONTENT = join(DOCS, 'content')
@@ -94,7 +95,7 @@ const intro = readFileSync(INTRO, 'utf8').trim()
 const sections = readdirSync(CONTENT)
   .map(load)
   .filter((section) => section.page.readme)
-  .sort((a, b) => a.page.order - b.page.order)
+  .sort((a, b) => position(a.id) - position(b.id))
 const map = anchors(intro, sections)
 const parts = [rewrite(intro, map), ...sections.map((section) => `# ${section.page.title}\n\n${rewrite(section.body, map)}`)]
 writeFileSync(README, `${parts.join('\n\n')}\n`)

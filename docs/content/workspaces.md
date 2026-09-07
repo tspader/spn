@@ -1,6 +1,5 @@
 ---
 title: Workspaces
-order: 11
 site: false
 ---
 

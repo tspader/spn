@@ -1,6 +1,5 @@
 ---
 title: Package indexes
-order: 8
 ---
 
 When you run `spn add lua`, a version appears from the mist. Where does it come from? And what happens when I want to maintain my own versions of Lua, or some private package?
