@@ -83,14 +83,17 @@ static sp_da(spn_triple_t) bind_targets(spn_toolchain_catalog_t* catalog, const 
     return decl->targets;
   }
 
+  spn_triple_t host = catalog->host;
+  host.abi = host.abi ? host.abi : spn_default_abi(decl->driver, host.os);
+
   sp_da(spn_triple_t) targets = sp_da_new(catalog->mem, spn_triple_t);
-  spn_ld_flavor_t flavor = spn_ld_flavor(catalog->host);
+  spn_ld_flavor_t flavor = spn_ld_flavor(host);
   if (!spn_toolchain_driver_produces(decl->driver, flavor)) {
     return targets;
   }
-  sp_da_push(targets, catalog->host);
+  sp_da_push(targets, host);
   if (flavor == SPN_LD_FLAVOR_ELF && !spn_toolchain_driver_retargets(decl->driver)) {
-    sp_da_push(targets, ((spn_triple_t) { catalog->host.arch, SPN_OS_FREESTANDING, SPN_ABI_BARE }));
+    sp_da_push(targets, ((spn_triple_t) { host.arch, SPN_OS_FREESTANDING, SPN_ABI_BARE }));
   }
   return targets;
 }

@@ -238,8 +238,6 @@ spn_triple_t spn_triple_host() {
   }
 #elif defined(SP_MACOS)
   host.abi = SPN_ABI_APPLE;
-#elif defined(SP_WIN32)
-  host.abi = SPN_ABI_GNU;
 #endif
 
   return host;

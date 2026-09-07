@@ -131,6 +131,18 @@ static const bind_test_t bind_tests [] = {
     .host = HOST_X64_LINUX,
     .expect = { .targets = { HOST_X64_LINUX, TARGET_X64_BARE } },
   },
+  {
+    .name = "clang_on_windows",
+    .toolchain = "clang",
+    .host = HOST_X64_WINDOWS,
+    .expect = { .targets = { TARGET_WIN_MSVC } },
+  },
+  {
+    .name = "gcc_on_windows",
+    .toolchain = "gcc",
+    .host = HOST_X64_WINDOWS,
+    .expect = { .targets = { TARGET_WIN_GNU } },
+  },
 };
 
 sp_test_each(builtins, bind, bind_test_t, bind_tests) {

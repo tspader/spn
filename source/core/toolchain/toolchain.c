@@ -104,7 +104,15 @@ bool spn_toolchain_driver_retargets(spn_cc_driver_t driver) {
 }
 
 spn_abi_t spn_default_abi(spn_cc_driver_t driver, spn_os_t os) {
-  return SPN_ABI_NONE;
+  switch (os) {
+    case SPN_OS_LINUX: return SPN_ABI_NONE;
+    case SPN_OS_MACOS: return SPN_ABI_APPLE;
+    case SPN_OS_WASI: return SPN_ABI_MUSL;
+    case SPN_OS_FREESTANDING: return SPN_ABI_BARE;
+    case SPN_OS_WINDOWS: return driver == SPN_CC_DRIVER_CLANG || driver == SPN_CC_DRIVER_MSVC ? SPN_ABI_MSVC : SPN_ABI_GNU;
+    case SPN_OS_NONE: sp_unreachable_case();
+  }
+  SP_UNREACHABLE_RETURN(SPN_ABI_NONE);
 }
 
 bool spn_toolchain_driver_produces(spn_cc_driver_t driver, spn_ld_flavor_t flavor) {

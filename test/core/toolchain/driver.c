@@ -53,6 +53,41 @@ sp_test_each(driver, produces, produces_t, produces_tests) {
   return SP_OK;
 }
 
+typedef struct {
+  const c8* name;
+  spn_cc_driver_t driver;
+  spn_os_t os;
+  spn_abi_t expect;
+} default_abi_t;
+
+static const default_abi_t default_abi_tests [] = {
+  { "gcc_windows",   SPN_CC_DRIVER_GCC,   SPN_OS_WINDOWS,      SPN_ABI_GNU },
+  { "clang_windows", SPN_CC_DRIVER_CLANG, SPN_OS_WINDOWS,      SPN_ABI_MSVC },
+  { "zig_windows",   SPN_CC_DRIVER_ZIG,   SPN_OS_WINDOWS,      SPN_ABI_GNU },
+  { "msvc_windows",  SPN_CC_DRIVER_MSVC,  SPN_OS_WINDOWS,      SPN_ABI_MSVC },
+  { "gcc_linux",     SPN_CC_DRIVER_GCC,   SPN_OS_LINUX },
+  { "clang_linux",   SPN_CC_DRIVER_CLANG, SPN_OS_LINUX },
+  { "zig_linux",     SPN_CC_DRIVER_ZIG,   SPN_OS_LINUX },
+  { "msvc_linux",    SPN_CC_DRIVER_MSVC,  SPN_OS_LINUX },
+  { "gcc_macos",     SPN_CC_DRIVER_GCC,   SPN_OS_MACOS,        SPN_ABI_APPLE },
+  { "clang_macos",   SPN_CC_DRIVER_CLANG, SPN_OS_MACOS,        SPN_ABI_APPLE },
+  { "zig_macos",     SPN_CC_DRIVER_ZIG,   SPN_OS_MACOS,        SPN_ABI_APPLE },
+  { "msvc_macos",    SPN_CC_DRIVER_MSVC,  SPN_OS_MACOS,        SPN_ABI_APPLE },
+  { "gcc_wasi",      SPN_CC_DRIVER_GCC,   SPN_OS_WASI,         SPN_ABI_MUSL },
+  { "clang_wasi",    SPN_CC_DRIVER_CLANG, SPN_OS_WASI,         SPN_ABI_MUSL },
+  { "zig_wasi",      SPN_CC_DRIVER_ZIG,   SPN_OS_WASI,         SPN_ABI_MUSL },
+  { "msvc_wasi",     SPN_CC_DRIVER_MSVC,  SPN_OS_WASI,         SPN_ABI_MUSL },
+  { "gcc_bare",      SPN_CC_DRIVER_GCC,   SPN_OS_FREESTANDING, SPN_ABI_BARE },
+  { "clang_bare",    SPN_CC_DRIVER_CLANG, SPN_OS_FREESTANDING, SPN_ABI_BARE },
+  { "zig_bare",      SPN_CC_DRIVER_ZIG,   SPN_OS_FREESTANDING, SPN_ABI_BARE },
+  { "msvc_bare",     SPN_CC_DRIVER_MSVC,  SPN_OS_FREESTANDING, SPN_ABI_BARE },
+};
+
+sp_test_each(driver, default_abi, default_abi_t, default_abi_tests) {
+  sp_expect_eq(t, (u32)it->expect, (u32)spn_default_abi(it->driver, it->os));
+  return SP_OK;
+}
+
 sp_test(driver, retargeting_drivers_produce_every_flavor) {
   sp_carr_for(produces_tests, it) {
     if (spn_toolchain_driver_retargets(produces_tests[it].driver)) {

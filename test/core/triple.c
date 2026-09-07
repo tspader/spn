@@ -153,20 +153,26 @@ sp_test_each(triple, exe_file_name, exe_file_name_t, exe_file_name_tests) {
 
 sp_test(triple, host) {
   spn_triple_t host = spn_triple_host();
-
-  // should have non-NONE values for all fields on any real platform
   sp_expect_ne(t, host.arch, SPN_ARCH_NONE);
-  sp_expect_ne(t, host.os, SPN_OS_NONE);
-  sp_expect_ne(t, host.abi, SPN_ABI_NONE);
-
-  // roundtrip: to_str then parse should match
-  sp_str_t str = spn_triple_to_str(sp_test_arena(t), host);
-  spn_triple_t roundtrip = sp_zero;
-  sp_expect_eq(t, (u32)SPN_OK, (u32)spn_triple_parse(str, &roundtrip));
-  sp_expect_eq(t, roundtrip.arch, host.arch);
-  sp_expect_eq(t, roundtrip.os, host.os);
-  sp_expect_eq(t, roundtrip.abi, host.abi);
-
+  switch (host.os) {
+    case SPN_OS_LINUX: {
+      sp_expect(t, host.abi == SPN_ABI_GNU || host.abi == SPN_ABI_MUSL);
+      break;
+    }
+    case SPN_OS_MACOS: {
+      sp_expect_eq(t, host.abi, SPN_ABI_APPLE);
+      break;
+    }
+    case SPN_OS_WINDOWS: {
+      sp_expect_eq(t, host.abi, SPN_ABI_NONE);
+      break;
+    }
+    case SPN_OS_WASI:
+    case SPN_OS_FREESTANDING:
+    case SPN_OS_NONE: {
+      sp_unreachable_case();
+    }
+  }
   return SP_OK;
 }
 

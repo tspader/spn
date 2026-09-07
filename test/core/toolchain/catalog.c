@@ -103,9 +103,9 @@ static const targets_test_t targets_tests [] = {
     .expect = { .targets = { HOST_ARM_MACOS } },
   },
   {
-    .name = "msvc_on_mingw_host_targets_nothing",
+    .name = "msvc_on_linux_targets_nothing",
     .file = "drivers.json",
-    .host = HOST_X64_WIN_GNU,
+    .host = HOST_X64_LINUX,
     .toolchain = "C",
   },
   {
