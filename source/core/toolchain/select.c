@@ -87,19 +87,13 @@ static reach_t reach_first(const spn_toolchain_info_t* toolchain, const spn_tool
   return (reach_t) { .err = reach(toolchain, catalog, with_abi(target, abis.items[0])) };
 }
 
-static bool listed_first(const spn_toolchain_info_t* toolchain, spn_toolchain_query_t query, spn_toolchain_target_t* target) {
-  sp_for(it, query.abis.count) {
-    const spn_toolchain_target_t* entry = listed(toolchain, with_abi(query.target, query.abis.items[it]));
-    if (entry) {
-      *target = *entry;
-      return true;
-    }
+static bool satisfies(const spn_toolchain_info_t* toolchain, const spn_toolchain_catalog_t* catalog, spn_toolchain_query_t query, spn_toolchain_target_t* target) {
+  if (!usable(toolchain)) {
+    return false;
   }
-  return false;
-}
-
-static bool satisfies(const spn_toolchain_info_t* toolchain, spn_toolchain_query_t query, spn_toolchain_target_t* target) {
-  return usable(toolchain) && listed_first(toolchain, query, target);
+  reach_t reached = reach_first(toolchain, catalog, query.target, query.abis);
+  *target = reached.target;
+  return reached.err == SPN_OK;
 }
 
 static sp_da(sp_str_t) satisfying(spn_toolchain_catalog_t* catalog, spn_toolchain_query_t query) {
@@ -107,7 +101,7 @@ static sp_da(sp_str_t) satisfying(spn_toolchain_catalog_t* catalog, spn_toolchai
   sp_om_for(catalog->entries, it) {
     spn_toolchain_info_t* entry = sp_om_at(catalog->entries, it);
     spn_toolchain_target_t target = sp_zero;
-    if (satisfies(entry, query, &target)) {
+    if (satisfies(entry, catalog, query, &target)) {
       sp_da_push(names, entry->name);
     }
   }
@@ -159,7 +153,7 @@ static spn_err_t select_auto(spn_toolchain_catalog_t* catalog, spn_toolchain_que
   sp_om_for(catalog->entries, it) {
     spn_toolchain_info_t* entry = sp_om_at(catalog->entries, it);
     spn_toolchain_target_t target = sp_zero;
-    if (satisfies(entry, query, &target)) {
+    if (satisfies(entry, catalog, query, &target)) {
       *selection = (spn_toolchain_selection_t) { .toolchain = entry, .target = target };
       return SPN_OK;
     }
