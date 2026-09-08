@@ -71,41 +71,17 @@ void spn_msvc_render_flags(sp_mem_t mem, const spn_profile_info_t* profile, spn_
   }
 }
 
-static void add_sdk_compile(sp_mem_t mem, const spn_sdk_t* sdk, spn_invocation_t* invocation) {
-  switch (sdk->kind) {
-    case SPN_SDK_NONE: {
-      break;
-    }
-    case SPN_SDK_MSVC: {
-      spn_path_t includes [] = { sdk->msvc.include.vc, sdk->msvc.include.ucrt, sdk->msvc.include.um, sdk->msvc.include.shared };
-      sp_carr_for(includes, it) {
-        spn_cc_push_glued(mem, invocation, "/I", includes[it]);
-      }
-      spn_cc_push_env_paths(mem, invocation, "INCLUDE", includes, sp_carr_len(includes));
-      break;
-    }
-    case SPN_SDK_SYSROOT:
-    case SPN_SDK_MACOS: {
-      sp_unreachable_case();
-    }
+static void add_sdk_compile(sp_mem_t mem, const spn_sdk_msvc_t* sdk, spn_invocation_t* invocation) {
+  spn_path_t includes [] = { sdk->include.vc, sdk->include.ucrt, sdk->include.um, sdk->include.shared };
+  sp_carr_for(includes, it) {
+    spn_cc_push_glued(mem, invocation, "/I", includes[it]);
   }
+  spn_cc_push_env_paths(mem, invocation, "INCLUDE", includes, sp_carr_len(includes));
 }
 
-static void add_sdk_link(sp_mem_t mem, const spn_sdk_t* sdk, spn_invocation_t* invocation) {
-  switch (sdk->kind) {
-    case SPN_SDK_NONE: {
-      break;
-    }
-    case SPN_SDK_MSVC: {
-      spn_path_t libs [] = { sdk->msvc.lib.vc, sdk->msvc.lib.ucrt, sdk->msvc.lib.um };
-      spn_cc_push_env_paths(mem, invocation, "LIB", libs, sp_carr_len(libs));
-      break;
-    }
-    case SPN_SDK_SYSROOT:
-    case SPN_SDK_MACOS: {
-      sp_unreachable_case();
-    }
-  }
+static void add_sdk_link(sp_mem_t mem, const spn_sdk_msvc_t* sdk, spn_invocation_t* invocation) {
+  spn_path_t libs [] = { sdk->lib.vc, sdk->lib.ucrt, sdk->lib.um };
+  spn_cc_push_env_paths(mem, invocation, "LIB", libs, sp_carr_len(libs));
 }
 
 static void add_launcher(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, spn_lang_t lang, spn_invocation_t* invocation) {
@@ -146,7 +122,9 @@ void spn_msvc_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, 
   sp_da_for(compile->include, it) {
     spn_cc_push_glued(mem, invocation, "/I", compile->include[it]);
   }
-  add_sdk_compile(mem, &profile->sdk, invocation);
+  if (profile->sdk.kind == SPN_SDK_MSVC) {
+    add_sdk_compile(mem, &profile->sdk.msvc, invocation);
+  }
   sp_da_for(compile->define, it) {
     spn_cc_push_fmt(mem, invocation, "/D{}", sp_fmt_str(compile->define[it]));
   }
@@ -222,7 +200,9 @@ void spn_msvc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, con
     spn_cc_push_fmt(mem, invocation, "{}.lib", sp_fmt_str(link->system_libs[it]));
   }
   spn_cc_push_glued(mem, invocation, "/Fe", files->output);
-  add_sdk_link(mem, &profile->sdk, invocation);
+  if (profile->sdk.kind == SPN_SDK_MSVC) {
+    add_sdk_link(mem, &profile->sdk.msvc, invocation);
+  }
 
   // Everything past /link goes to link.exe verbatim
   sp_da(spn_arg_t) linker = sp_da_new(mem, spn_arg_t);

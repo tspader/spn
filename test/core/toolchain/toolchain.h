@@ -41,6 +41,16 @@ typedef struct {
 } fixture_sdk_t;
 
 typedef struct {
+  test_path_t root;
+  spn_arch_t arch;
+} fixture_msvc_t;
+
+typedef struct {
+  test_path_t macos;
+  fixture_msvc_t msvc [FIXTURE_MAX_SDKS];
+} fixture_sdks_t;
+
+typedef struct {
   const c8* name;
   bool absent;
   const c8* version;
@@ -86,27 +96,16 @@ static spn_sdk_t fixture_sdk(sp_mem_t mem, fixture_sdk_t sdk) {
   sp_unreachable_return(sp_zero_struct(spn_sdk_t));
 }
 
-static spn_sdk_host_t fixture_sdks(sp_mem_t mem, const fixture_sdk_t* sdks, u32 max) {
+static spn_sdk_host_t fixture_sdks(sp_mem_t mem, fixture_sdks_t sdks) {
   spn_sdk_host_t host = { .msvc = sp_da_new(mem, spn_sdk_msvc_t) };
-  sp_for(it, max) {
-    if (!sdks[it].kind) {
+  if (sdks.macos.path) {
+    host.macos = spn_sdk_from_root(mem, SPN_SDK_MACOS, fixture_path(sdks.macos), SPN_ARCH_NONE).macos;
+  }
+  sp_carr_for(sdks.msvc, it) {
+    if (!sdks.msvc[it].root.path) {
       break;
     }
-    spn_sdk_t sdk = fixture_sdk(mem, sdks[it]);
-    switch (sdk.kind) {
-      case SPN_SDK_MACOS: {
-        host.macos = sdk.macos;
-        break;
-      }
-      case SPN_SDK_MSVC: {
-        sp_da_push(host.msvc, sdk.msvc);
-        break;
-      }
-      case SPN_SDK_NONE:
-      case SPN_SDK_SYSROOT: {
-        sp_unreachable_case();
-      }
-    }
+    sp_da_push(host.msvc, spn_sdk_from_root(mem, SPN_SDK_MSVC, fixture_path(sdks.msvc[it].root), sdks.msvc[it].arch).msvc);
   }
   return host;
 }

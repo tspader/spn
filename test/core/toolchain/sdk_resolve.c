@@ -3,7 +3,7 @@
 typedef struct {
   const c8* name;
   fixture_target_t target;
-  fixture_sdk_t sdks [FIXTURE_MAX_SDKS];
+  fixture_sdks_t sdks;
   fixture_sdk_expect_t expect;
 } test_t;
 
@@ -11,19 +11,19 @@ static const test_t tests [] = {
   {
     .name = "entry_path_wins_over_host",
     .target = { HOST_ARM_MACOS, { "/E" } },
-    .sdks = { { SPN_SDK_MACOS, { "/H" } } },
+    .sdks = { .macos = { "/H" } },
     .expect = { SPN_SDK_MACOS, { "/E" } },
   },
   {
     .name = "host_serves_unlisted_macos",
     .target = { HOST_ARM_MACOS },
-    .sdks = { { SPN_SDK_MACOS, { "/H" } } },
+    .sdks = { .macos = { "/H" } },
     .expect = { SPN_SDK_MACOS, { "/H" } },
   },
   {
     .name = "host_serves_unlisted_msvc",
     .target = { TARGET_WIN_MSVC },
-    .sdks = { { SPN_SDK_MSVC, { "/X" }, SPN_ARCH_X64 } },
+    .sdks = { .msvc = { { { "/X" }, SPN_ARCH_X64 } } },
     .expect = { SPN_SDK_MSVC, .vc = { "/X/crt/lib/x86_64" } },
   },
   {
@@ -39,18 +39,18 @@ static const test_t tests [] = {
   {
     .name = "nothing_resolves_to_none",
     .target = { HOST_X64_LINUX },
-    .sdks = { { SPN_SDK_MACOS, { "/H" } } },
+    .sdks = { .macos = { "/H" } },
   },
   {
     .name = "wrong_kind_on_host_is_none",
     .target = { HOST_ARM_MACOS },
-    .sdks = { { SPN_SDK_MSVC, { "/X" }, SPN_ARCH_X64 } },
+    .sdks = { .msvc = { { { "/X" }, SPN_ARCH_X64 } } },
   },
 };
 
 sp_test_each(sdk_resolve, precedence, test_t, tests) {
   sp_mem_t mem = sp_test_arena(t);
   spn_toolchain_selection_t selection = { .target = fixture_target(it->target) };
-  spn_sdk_host_t host = fixture_sdks(mem, it->sdks, FIXTURE_MAX_SDKS);
+  spn_sdk_host_t host = fixture_sdks(mem, it->sdks);
   return fixture_check_sdk(t, spn_sdk_resolve(mem, &host, &selection), it->expect);
 }

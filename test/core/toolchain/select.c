@@ -35,7 +35,7 @@ typedef struct {
   const c8* name;
   spn_cc_driver_t driver;
   fixture_target_t targets [FIXTURE_MAX_TARGETS];
-  fixture_sdk_t sdks [FIXTURE_MAX_SDKS];
+  fixture_sdks_t sdks;
   check_t checks [SELECT_MAX_CHECKS];
 } complete_test_t;
 
@@ -46,7 +46,7 @@ typedef struct {
   spn_triple_t target;
   spn_abi_t abis [SELECT_MAX_ABIS];
   spn_triple_t host;
-  fixture_sdk_t sdks [FIXTURE_MAX_SDKS];
+  fixture_sdks_t sdks;
   expect_t expect;
 } resolve_test_t;
 
@@ -237,7 +237,7 @@ static const complete_test_t complete_tests [] = {
     .name = "host_sdk_reaches_macos",
     .driver = SPN_CC_DRIVER_CLANG,
     .targets = { HOST_X64_LINUX },
-    .sdks = { { SPN_SDK_MACOS, { "/S" } } },
+    .sdks = { .macos = { "/S" } },
     .checks = {
       { .target = ARM_MACOS, .abis = { SPN_ABI_APPLE }, .expect = { .triple = HOST_ARM_MACOS } },
       { .target = X64_MACOS, .abis = { SPN_ABI_APPLE }, .expect = { .triple = HOST_X64_MACOS } },
@@ -247,7 +247,7 @@ static const complete_test_t complete_tests [] = {
     .name = "host_sdk_reaches_msvc",
     .driver = SPN_CC_DRIVER_ZIG,
     .targets = { TARGET_WIN_GNU },
-    .sdks = { { SPN_SDK_MSVC, { "/X" }, SPN_ARCH_X64 } },
+    .sdks = { .msvc = { { { "/X" }, SPN_ARCH_X64 } } },
     .checks = {
       { .target = X64_WINDOWS, .abis = { SPN_ABI_MSVC }, .expect = { .triple = TARGET_WIN_MSVC } },
     },
@@ -256,7 +256,7 @@ static const complete_test_t complete_tests [] = {
     .name = "fixed_driver_ignores_host_sdk",
     .driver = SPN_CC_DRIVER_GCC,
     .targets = { HOST_X64_LINUX },
-    .sdks = { { SPN_SDK_MACOS, { "/S" } } },
+    .sdks = { .macos = { "/S" } },
     .checks = {
       { .target = ARM_MACOS, .abis = { SPN_ABI_APPLE }, .expect = { .err = SPN_ERR_TOOLCHAIN_TARGET, .targets = { HOST_X64_LINUX } } },
     },
@@ -312,7 +312,7 @@ static const resolve_test_t resolve_tests [] = {
     .file = "auto.json",
     .target = ARM_MACOS,
     .abis = { SPN_ABI_APPLE },
-    .sdks = { { SPN_SDK_MACOS, { "/S" } } },
+    .sdks = { .macos = { "/S" } },
     .expect = { .name = "B", .triple = HOST_ARM_MACOS },
   },
   {
@@ -495,7 +495,7 @@ sp_test_each(select, complete, complete_test_t, complete_tests, .setup = spn_tes
   }
 
   spn_toolchain_catalog_t catalog = sp_zero;
-  spn_toolchain_catalog_init(&catalog, (spn_triple_t) HOST_X64_LINUX, fixture_sdks(mem, it->sdks, FIXTURE_MAX_SDKS), mem);
+  spn_toolchain_catalog_init(&catalog, (spn_triple_t) HOST_X64_LINUX, fixture_sdks(mem, it->sdks), mem);
   spn_toolchain_catalog_add(&catalog, toolchain);
 
   u32 checks = 0;
@@ -530,7 +530,7 @@ sp_test_each(select, resolve, resolve_test_t, resolve_tests, .setup = spn_test_c
 
   spn_triple_t host = fixture_triple_empty(it->host) ? (spn_triple_t) HOST_X64_LINUX : it->host;
   spn_toolchain_catalog_t catalog = sp_zero;
-  if (fixture_catalog(t, &catalog, it->file, host, fixture_sdks(mem, it->sdks, FIXTURE_MAX_SDKS))) {
+  if (fixture_catalog(t, &catalog, it->file, host, fixture_sdks(mem, it->sdks))) {
     return SP_ERR;
   }
 
