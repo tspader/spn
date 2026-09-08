@@ -13,8 +13,7 @@ sp_str_t spn_profile_build_dir(sp_mem_t mem, const spn_profile_info_t* profile) 
   if (!profile->targeted) {
     return profile->name;
   }
-  spn_triple_t target = { profile->arch, profile->os, profile->abi };
-  return sp_fs_join_path(mem, spn_triple_to_str(mem, target), profile->name);
+  return sp_fs_join_path(mem, spn_triple_to_str(mem, spn_profile_triple(profile)), profile->name);
 }
 
 static void overlay_profile(spn_profile_info_t* to, spn_profile_info_t* from) {
@@ -168,7 +167,7 @@ static spn_abi_list_t abi_order(const spn_profile_info_t* profile, spn_triple_t 
 spn_toolchain_query_t spn_profile_query(const spn_profile_info_t* profile, spn_triple_t host) {
   return (spn_toolchain_query_t) {
     .toolchain = profile->toolchain,
-    .target = { profile->arch, profile->os, profile->abi },
+    .target = spn_profile_triple(profile),
     .abis = abi_order(profile, host),
   };
 }
@@ -218,11 +217,11 @@ static bool shared_demand(const spn_pkg_info_t* pkg) {
   return false;
 }
 
-static spn_linkage_t resolve_linkage(spn_linkage_t linkage, spn_os_t os, const spn_pkg_info_t* pkg) {
+static spn_linkage_t resolve_linkage(spn_linkage_t linkage, spn_triple_t target, const spn_pkg_info_t* pkg) {
   if (linkage) {
     return linkage;
   }
-  if (!spn_os_dynamic(os)) {
+  if (!spn_triple_dynamic(target)) {
     return SPN_LIB_KIND_STATIC;
   }
   if (shared_demand(pkg)) {
@@ -299,7 +298,7 @@ spn_err_t spn_profile_resolve(spn_profile_table_t profiles, const spn_profile_ov
       sp_unreachable_case();
     }
   }
-  if (merged.linkage == SPN_LIB_KIND_SHARED && !spn_os_dynamic(pinned.os)) {
+  if (merged.linkage == SPN_LIB_KIND_SHARED && !spn_triple_dynamic(pinned)) {
     return spn_err_emit(&spn, (spn_err_union_t) {
       .kind = SPN_ERR_PROFILE_LINKAGE,
       .profile = { .name = name, .target = pinned },
@@ -312,7 +311,7 @@ spn_err_t spn_profile_resolve(spn_profile_table_t profiles, const spn_profile_ov
     .os         = pinned.os,
     .arch       = pinned.arch,
     .abi        = pinned.abi,
-    .linkage    = resolve_linkage(merged.linkage, pinned.os, pkg),
+    .linkage    = resolve_linkage(merged.linkage, pinned, pkg),
     .standard   = merged.standard,
     .mode       = merged.mode,
     .opt        = merged.opt,

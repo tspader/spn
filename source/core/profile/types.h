@@ -27,4 +27,8 @@ struct spn_profile_info {
 
 typedef sp_str_ht(spn_profile_info_t) spn_profile_table_t;
 
+static inline spn_triple_t spn_profile_triple(const spn_profile_info_t* profile) {
+  return (spn_triple_t) { profile->arch, profile->os, profile->abi };
+}
+
 #endif

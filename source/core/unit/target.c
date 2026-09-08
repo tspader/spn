@@ -21,6 +21,7 @@
 #include "session/session.h"
 #include "target/select.h"
 #include "graph/build.h"
+#include "profile/types.h"
 #include "toolchain/toolchain.h"
 #include "triple/triple.h"
 
@@ -257,8 +258,7 @@ static bool is_target_dynamic(spn_target_unit_t* target) {
 }
 
 static spn_path_t static_archive_path(sp_mem_t mem, spn_target_unit_t* lib) {
-  spn_profile_info_t* profile = &lib->pkg->build->profile;
-  spn_triple_t triple = { profile->arch, profile->os, profile->abi };
+  spn_triple_t triple = spn_profile_triple(&lib->pkg->build->profile);
   sp_mem_arena_marker_t s = sp_mem_begin_scratch_for(mem);
   sp_str_t file_name = spn_triple_lib_file_name(s.mem, triple, lib->info->name, SP_OS_LIB_STATIC);
   spn_path_t path = spn_path_join(mem, lib->pkg->paths.lib, file_name);

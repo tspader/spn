@@ -395,7 +395,21 @@ static const link_test_t tests [] = {
     .rpath = true,
     .expect = {
       .command = "cc",
-      .args = { "--target=aarch64-freestanding-none", "main.o", "-o", "main" },
+      .args = { "--target=aarch64-freestanding-none", "-nostartfiles", "-nolibc", "main.o", "-o", "main" },
+    },
+  },
+  {
+    .name = "zig_freestanding_exe",
+    .driver = SPN_CC_DRIVER_ZIG,
+    .profile = {
+      .arch = SPN_ARCH_ARM64,
+      .os = SPN_OS_FREESTANDING,
+      .abi = SPN_ABI_BARE,
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .expect = {
+      .command = "cc",
+      .args = { "--target=aarch64-freestanding-none", "-nostartfiles", "-nolibc", "main.o", "-o", "main" },
     },
   },
   {

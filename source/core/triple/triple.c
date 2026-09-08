@@ -173,8 +173,11 @@ spn_format_t spn_os_format(spn_os_t os) {
   SP_UNREACHABLE_RETURN(SPN_FORMAT_ELF);
 }
 
-bool spn_os_pic(spn_os_t os) {
-  switch (os) {
+bool spn_triple_pic(spn_triple_t triple) {
+  if (triple.abi == SPN_ABI_BARE) {
+    return false;
+  }
+  switch (triple.os) {
     case SPN_OS_LINUX:
     case SPN_OS_MACOS: {
       return true;
@@ -189,8 +192,11 @@ bool spn_os_pic(spn_os_t os) {
   SP_UNREACHABLE_RETURN(false);
 }
 
-bool spn_os_dynamic(spn_os_t os) {
-  switch (os) {
+bool spn_triple_dynamic(spn_triple_t triple) {
+  if (triple.abi == SPN_ABI_BARE) {
+    return false;
+  }
+  switch (triple.os) {
     case SPN_OS_LINUX:
     case SPN_OS_WINDOWS:
     case SPN_OS_MACOS: {

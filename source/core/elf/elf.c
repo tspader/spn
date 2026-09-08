@@ -28,18 +28,47 @@ typedef struct {
   u64 p_align;
 } elf_phdr_t;
 
+typedef struct {
+  u32 sh_name;
+  u32 sh_type;
+  u64 sh_flags;
+  u64 sh_addr;
+  u64 sh_offset;
+  u64 sh_size;
+  u32 sh_link;
+  u32 sh_info;
+  u64 sh_addralign;
+  u64 sh_entsize;
+} elf_shdr_t;
+
+typedef struct {
+  u32 st_name;
+  u8 st_info;
+  u8 st_other;
+  u16 st_shndx;
+  u64 st_value;
+  u64 st_size;
+} elf_sym_t;
+
 #define SPN_ELF_PT_INTERP 3
 #define SPN_ELF_CLASS_64 2
+#define SPN_ELF_SHT_SYMTAB 2
+#define SPN_ELF_SHN_UNDEF 0
 
-static spn_err_t read_header(sp_io_seeking_reader_t* elf, elf_ehdr_t* ehdr) {
+static spn_err_t read_at(sp_io_seeking_reader_t* elf, u64 offset, void* data, u64 size) {
   s64 position = 0;
   u64 bytes = 0;
-  if (sp_io_seeking_reader_seek(elf, 0, SP_IO_SEEK_SET, &position)) {
+  if (sp_io_seeking_reader_seek(elf, (s64)offset, SP_IO_SEEK_SET, &position)) {
     return SPN_ERROR;
   }
-  if (sp_io_read_all(elf->reader, ehdr, sizeof(*ehdr), &bytes) || bytes != sizeof(*ehdr)) {
+  if (sp_io_read_all(elf->reader, data, size, &bytes) || bytes != size) {
     return SPN_ERROR;
   }
+  return SPN_OK;
+}
+
+static spn_err_t read_header(sp_io_seeking_reader_t* elf, elf_ehdr_t* ehdr) {
+  spn_try(read_at(elf, 0, ehdr, sizeof(*ehdr)));
   if (ehdr->e_ident[0] != 0x7f || ehdr->e_ident[1] != 'E' || ehdr->e_ident[2] != 'L' || ehdr->e_ident[3] != 'F') {
     return SPN_ERROR;
   }
@@ -47,6 +76,10 @@ static spn_err_t read_header(sp_io_seeking_reader_t* elf, elf_ehdr_t* ehdr) {
     return SPN_ERROR;
   }
   return SPN_OK;
+}
+
+static spn_err_t read_section(sp_io_seeking_reader_t* elf, const elf_ehdr_t* ehdr, u32 index, elf_shdr_t* shdr) {
+  return read_at(elf, ehdr->e_shoff + index * ehdr->e_shentsize, shdr, sizeof(*shdr));
 }
 
 spn_err_t spn_elf_entry(sp_io_seeking_reader_t* elf, u64* entry) {
@@ -58,8 +91,6 @@ spn_err_t spn_elf_entry(sp_io_seeking_reader_t* elf, u64* entry) {
 
 spn_err_t spn_elf_interp(sp_mem_t mem, sp_io_seeking_reader_t* elf, sp_str_t* interp) {
   *interp = sp_str_lit("");
-  s64 position = 0;
-  u64 bytes = 0;
 
   elf_ehdr_t ehdr = sp_zero;
   spn_try(read_header(elf, &ehdr));
@@ -68,12 +99,7 @@ spn_err_t spn_elf_interp(sp_mem_t mem, sp_io_seeking_reader_t* elf, sp_str_t* in
   u64 interp_size = 0;
   sp_for(it, ehdr.e_phnum) {
     elf_phdr_t phdr = sp_zero;
-    if (sp_io_seeking_reader_seek(elf, (s64)(ehdr.e_phoff + it * ehdr.e_phentsize), SP_IO_SEEK_SET, &position)) {
-      return SPN_ERROR;
-    }
-    if (sp_io_read_all(elf->reader, &phdr, sizeof(phdr), &bytes) || bytes != sizeof(phdr)) {
-      return SPN_ERROR;
-    }
+    spn_try(read_at(elf, ehdr.e_phoff + it * ehdr.e_phentsize, &phdr, sizeof(phdr)));
     if (phdr.p_type == SPN_ELF_PT_INTERP && !interp_size) {
       interp_offset = phdr.p_offset;
       interp_size = phdr.p_filesz;
@@ -85,12 +111,7 @@ spn_err_t spn_elf_interp(sp_mem_t mem, sp_io_seeking_reader_t* elf, sp_str_t* in
   }
 
   c8* data = sp_alloc(mem, interp_size);
-  if (sp_io_seeking_reader_seek(elf, (s64)interp_offset, SP_IO_SEEK_SET, &position)) {
-    return SPN_ERROR;
-  }
-  if (sp_io_read_all(elf->reader, data, interp_size, &bytes) || bytes != interp_size) {
-    return SPN_ERROR;
-  }
+  spn_try(read_at(elf, interp_offset, data, interp_size));
 
   u32 len = 0;
   while (len < interp_size && data[len]) {
@@ -98,4 +119,59 @@ spn_err_t spn_elf_interp(sp_mem_t mem, sp_io_seeking_reader_t* elf, sp_str_t* in
   }
   *interp = sp_str(data, len);
   return SPN_OK;
+}
+
+static spn_err_t find_symtab(sp_io_seeking_reader_t* elf, const elf_ehdr_t* ehdr, elf_shdr_t* symtab) {
+  sp_for(it, ehdr->e_shnum) {
+    spn_try(read_section(elf, ehdr, it, symtab));
+    if (symtab->sh_type == SPN_ELF_SHT_SYMTAB) {
+      return SPN_OK;
+    }
+  }
+  return SPN_ERROR;
+}
+
+static spn_err_t scan_symbols(sp_mem_t mem, sp_io_seeking_reader_t* elf, const elf_shdr_t* symtab, const elf_shdr_t* strtab, sp_str_t prefix, bool* defined) {
+  c8* names = sp_alloc(mem, strtab->sh_size);
+  c8* symbols = sp_alloc(mem, symtab->sh_size);
+  spn_try(read_at(elf, strtab->sh_offset, names, strtab->sh_size));
+  spn_try(read_at(elf, symtab->sh_offset, symbols, symtab->sh_size));
+
+  u64 count = symtab->sh_size / symtab->sh_entsize;
+  sp_for(it, count) {
+    elf_sym_t sym = sp_zero;
+    sp_mem_copy(&sym, symbols + it * symtab->sh_entsize, sizeof(sym));
+    if (sym.st_shndx == SPN_ELF_SHN_UNDEF || sym.st_name >= strtab->sh_size) {
+      continue;
+    }
+    u32 len = 0;
+    while (sym.st_name + len < strtab->sh_size && names[sym.st_name + len]) {
+      len++;
+    }
+    if (sp_str_starts_with(sp_str(names + sym.st_name, len), prefix)) {
+      *defined = true;
+      return SPN_OK;
+    }
+  }
+  return SPN_OK;
+}
+
+spn_err_t spn_elf_defines_prefix(sp_io_seeking_reader_t* elf, sp_str_t prefix, bool* defined) {
+  *defined = false;
+
+  elf_ehdr_t ehdr = sp_zero;
+  spn_try(read_header(elf, &ehdr));
+
+  elf_shdr_t symtab = sp_zero;
+  spn_try(find_symtab(elf, &ehdr, &symtab));
+  if (symtab.sh_entsize < sizeof(elf_sym_t)) {
+    return SPN_ERROR;
+  }
+  elf_shdr_t strtab = sp_zero;
+  spn_try(read_section(elf, &ehdr, symtab.sh_link, &strtab));
+
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  spn_err_t err = scan_symbols(scratch.mem, elf, &symtab, &strtab, prefix, defined);
+  sp_mem_end_scratch(scratch);
+  return err;
 }

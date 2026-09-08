@@ -5,6 +5,7 @@
 
 #include "error/error.h"
 #include "paths/paths.h"
+#include "profile/types.h"
 #include "toolchain/toolchain.h"
 #include "triple/triple.h"
 
@@ -142,7 +143,7 @@ static spn_err_t feature_unsupported(const spn_cc_toolchain_t* toolchain, const 
     .kind = SPN_ERR_COMPILER_FEATURE_UNSUPPORTED,
     .compiler = {
       .toolchain = toolchain->name,
-      .target = { profile->arch, profile->os, profile->abi },
+      .target = spn_profile_triple(profile),
       .feature = feature,
     },
   });
@@ -153,14 +154,14 @@ static spn_err_t link_refused(spn_err_t kind, const spn_cc_toolchain_t* toolchai
     .kind = kind,
     .toolchain = {
       .name = toolchain->name,
-      .target = { profile->arch, profile->os, profile->abi },
+      .target = spn_profile_triple(profile),
       .host = host,
     },
   });
 }
 
 spn_err_t spn_cc_validate_profile(const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile) {
-  spn_triple_t target = { profile->arch, profile->os, profile->abi };
+  spn_triple_t target = spn_profile_triple(profile);
   spn_sanitizer_set_t supported = get_supported_sanitizers(toolchain, target);
   spn_sanitizer_set_t unsupported = profile->sanitizers & ~supported;
   if (unsupported) {
@@ -273,17 +274,17 @@ spn_invocation_t spn_cc_render_compile_command(sp_mem_t mem, const spn_cc_toolch
 spn_err_t spn_cc_validate_link(const spn_cc_toolchain_t* toolchain, spn_triple_t host, const spn_profile_info_t* profile, const spn_cc_link_t* link) {
   spn_try(spn_cc_validate_profile(toolchain, profile));
   spn_cc_feature_t feature = link_feature(link->kind);
+  spn_triple_t target = spn_profile_triple(profile);
 
   if (link->kind == SPN_CC_OUTPUT_REACTOR && profile->os != SPN_OS_WASI) {
     return feature_unsupported(toolchain, profile, feature);
   }
-  if (link->kind == SPN_CC_OUTPUT_SHARED_LIB && !spn_os_dynamic(profile->os)) {
+  if (link->kind == SPN_CC_OUTPUT_SHARED_LIB && !spn_triple_dynamic(target)) {
     return feature_unsupported(toolchain, profile, feature);
   }
   if (profile->os == SPN_OS_MACOS && !sp_da_empty(link->frameworks) && profile->sdk.kind == SPN_SDK_NONE) {
     return feature_unsupported(toolchain, profile, SPN_CC_FEATURE_FRAMEWORKS);
   }
-  spn_triple_t target = { profile->arch, profile->os, profile->abi };
   spn_ld_family_t family = spn_ld_family(toolchain->driver, toolchain->linker, target);
   if (!sp_da_empty(link->scripts) && !spn_ld_scripts(family, spn_os_format(profile->os))) {
     return feature_unsupported(toolchain, profile, SPN_CC_FEATURE_LINKER_SCRIPT);

@@ -130,7 +130,7 @@ static const compile_test_t tests [] = {
     },
     .expect = {
       .command = "cc",
-      .args = { "--target=aarch64-freestanding-none", "-std=c99", "-ffreestanding", "-fno-stack-protector", "-c", "-Werror=return-type", "main.c", "-o", "main.o" },
+      .args = { "--target=aarch64-freestanding-none", "-std=c99", "-ffreestanding", "-fno-stack-protector", "-fno-sanitize=undefined", "-c", "-Werror=return-type", "main.c", "-o", "main.o" },
     },
   },
   {

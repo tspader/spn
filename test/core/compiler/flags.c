@@ -203,14 +203,14 @@ static const flags_test_t tests [] = {
     },
   },
   {
-    .name = "freestanding_zig_strips_nothing",
+    .name = "freestanding_zig_strips_runtime",
     .profile = {
       .arch = SPN_ARCH_ARM64,
       .os = SPN_OS_FREESTANDING,
       .abi = SPN_ABI_BARE,
     },
     .driver = SPN_CC_DRIVER_ZIG,
-    .expect = { .compile = { "-ffreestanding", "-fno-stack-protector" } },
+    .expect = { .compile = { "-ffreestanding", "-fno-stack-protector", "-fno-sanitize=undefined" }, .link = { "-nostartfiles", "-nolibc" } },
   },
   {
     .name = "freestanding_gcc_strips_runtime",
@@ -231,6 +231,49 @@ static const flags_test_t tests [] = {
     },
     .driver = SPN_CC_DRIVER_CLANG,
     .expect = { .compile = { "-ffreestanding", "-fno-stack-protector" }, .link = { "-nostartfiles", "-nolibc" } },
+  },
+  {
+    .name = "linux_none_zig_strips_runtime",
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_BARE,
+    },
+    .driver = SPN_CC_DRIVER_ZIG,
+    .expect = { .compile = { "-ffreestanding", "-fno-stack-protector", "-fno-sanitize=undefined" }, .link = { "-nostartfiles", "-nolibc" } },
+  },
+  {
+    .name = "gcc_rejects_sanitizers_on_none",
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_BARE,
+      .sanitizers = SPN_SANITIZER_ADDRESS,
+    },
+    .driver = SPN_CC_DRIVER_GCC,
+    .expect = { .kind = SPN_ERR_SANITIZER_UNSUPPORTED, .unsupported = SPN_SANITIZER_ADDRESS },
+  },
+  {
+    .name = "clang_rejects_sanitizers_on_none",
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_BARE,
+      .sanitizers = SPN_SANITIZER_ADDRESS,
+    },
+    .driver = SPN_CC_DRIVER_CLANG,
+    .expect = { .kind = SPN_ERR_SANITIZER_UNSUPPORTED, .unsupported = SPN_SANITIZER_ADDRESS },
+  },
+  {
+    .name = "zig_rejects_sanitizers_on_none",
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_BARE,
+      .sanitizers = SPN_SANITIZER_UNDEFINED,
+    },
+    .driver = SPN_CC_DRIVER_ZIG,
+    .expect = { .kind = SPN_ERR_SANITIZER_UNSUPPORTED, .unsupported = SPN_SANITIZER_UNDEFINED },
   },
   {
     .name = "reject_sanitizers_with_static_linkage",

@@ -7,6 +7,9 @@
 #include "triple/triple.h"
 
 spn_sdk_kind_t spn_sdk_kind(spn_triple_t target) {
+  if (target.abi == SPN_ABI_BARE) {
+    return SPN_SDK_NONE;
+  }
   switch (target.os) {
     case SPN_OS_MACOS: return SPN_SDK_MACOS;
     case SPN_OS_WINDOWS: return target.abi == SPN_ABI_MSVC ? SPN_SDK_MSVC : SPN_SDK_SYSROOT;

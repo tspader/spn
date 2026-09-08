@@ -4,6 +4,7 @@
 #include "pkg/pkg.h"
 #include "session/session.h"
 #include "str/str.h"
+#include "profile/types.h"
 #include "toolchain/linker.h"
 #include "toolchain/sdk.h"
 
@@ -128,7 +129,7 @@ sp_hash_t spn_unit_fingerprint(spn_session_t* session, spn_build_unit_t* build, 
   }
 
   spn_toolchain_info_t* toolchain = build->toolchain->info;
-  spn_triple_t target = { build->profile.arch, build->profile.os, build->profile.abi };
+  spn_triple_t target = spn_profile_triple(&build->profile);
   sp_opt_spn_linkage_t config = spn_session_config_kind(session, pkg->name);
 
   fingerprint.mode = build->profile.mode;

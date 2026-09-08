@@ -6,6 +6,7 @@
 #include "compiler/driver.h"
 #include "external/cc.h"
 #include "paths/paths.h"
+#include "profile/types.h"
 #include "session/invocation.h"
 #include "session/session.h"
 #include "unit/unit.h"
@@ -16,10 +17,11 @@ static spn_cc_compile_t compile_desc(sp_mem_t mem, spn_compile_unit_t* unit) {
   spn_pkg_unit_t* pkg = unit->target->pkg;
   spn_build_unit_t* build = pkg->build;
 
+  spn_triple_t target = spn_profile_triple(&build->profile);
   spn_cc_compile_t compile = {
     .lang = unit->lang,
     .cxx = unit->target->info->cxx,
-    .pic = unit->target->info->kind == SPN_TARGET_KIND_LIB && spn_os_pic(build->profile.os),
+    .pic = unit->target->info->kind == SPN_TARGET_KIND_LIB && spn_triple_pic(target),
   };
   if (build->profile.os == SPN_OS_MACOS) {
     compile.min_os = unit->target->link.cc.min_os;

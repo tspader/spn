@@ -18,12 +18,11 @@
 #include "unit/unit.h"
 #include "graph/build.h"
 #include "toolchain/linker.h"
+#include "profile/types.h"
 #include "triple/triple.h"
 
-
-static spn_triple_t get_target_triple(spn_target_unit_t* target) {
-  spn_profile_info_t* profile = &target->pkg->build->profile;
-  return (spn_triple_t) { profile->arch, profile->os, profile->abi };
+static spn_triple_t target_triple(spn_target_unit_t* target) {
+  return spn_profile_triple(&target->pkg->build->profile);
 }
 
 spn_cc_exports_format_t spn_target_exports_format(spn_target_unit_t* target) {
@@ -48,7 +47,7 @@ spn_path_t spn_target_unit_staged_path(sp_mem_t mem, spn_target_unit_t* target) 
   if (target->kind != SPN_CC_OUTPUT_EXE) return sp_zero_s(spn_path_t);
 
   sp_mem_arena_marker_t s = sp_mem_begin_scratch_for(mem);
-  sp_str_t file_name = spn_triple_exe_file_name(s.mem, get_target_triple(target), target->info->name);
+  sp_str_t file_name = spn_triple_exe_file_name(s.mem, target_triple(target), target->info->name);
   spn_path_t root = target->pkg->build->paths.root;
 
   spn_path_t path = sp_zero;
@@ -86,17 +85,17 @@ spn_path_t spn_target_output_path(sp_mem_t mem, spn_target_unit_t* target) {
 
   switch (target->kind) {
     case SPN_CC_OUTPUT_EXE: {
-      sp_str_t file_name = spn_triple_exe_file_name(s.mem, get_target_triple(target), info->name);
+      sp_str_t file_name = spn_triple_exe_file_name(s.mem, target_triple(target), info->name);
       path = spn_path_join(mem, target->pkg->paths.bin, file_name);
       break;
     }
     case SPN_CC_OUTPUT_STATIC_LIB: {
-      sp_str_t file_name = spn_triple_lib_file_name(s.mem, get_target_triple(target), info->name, SP_OS_LIB_STATIC);
+      sp_str_t file_name = spn_triple_lib_file_name(s.mem, target_triple(target), info->name, SP_OS_LIB_STATIC);
       path = spn_path_join(mem, target->pkg->paths.lib, file_name);
       break;
     }
     case SPN_CC_OUTPUT_SHARED_LIB: {
-      sp_str_t file_name = spn_triple_lib_file_name(s.mem, get_target_triple(target), info->name, SP_OS_LIB_SHARED);
+      sp_str_t file_name = spn_triple_lib_file_name(s.mem, target_triple(target), info->name, SP_OS_LIB_SHARED);
       path = spn_path_join(mem, target->pkg->paths.lib, file_name);
       break;
     }

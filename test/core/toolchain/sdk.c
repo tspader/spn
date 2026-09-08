@@ -19,6 +19,7 @@ static const test_t tests [] = {
   { .name = "windows_msvc", .target = TARGET_WIN_MSVC,     .expect = { SPN_SDK_MSVC, .declarable = true } },
   { .name = "macos",        .target = HOST_ARM_MACOS,      .expect = { SPN_SDK_MACOS, .declarable = true } },
   { .name = "freestanding", .target = TARGET_X64_BARE },
+  { .name = "linux_none",   .target = TARGET_X64_LINUX_NONE },
 };
 
 sp_test_each(sdk, kind, test_t, tests) {

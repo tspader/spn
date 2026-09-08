@@ -3,6 +3,7 @@
 #include "spn/core.h"
 #include "triple/triple.h"
 #include "elf_emit.h"
+#include "triples.h"
 
 
 typedef struct {
@@ -349,39 +350,41 @@ sp_test_each(triple, os_archs, os_archs_t, os_archs_tests) {
 
 typedef struct {
   const c8* name;
-  spn_os_t os;
+  spn_triple_t triple;
   bool expect;
-} os_dynamic_t;
+} dynamic_t;
 
-static const os_dynamic_t os_dynamic_tests [] = {
-  { "linux",        SPN_OS_LINUX,        true },
-  { "windows",      SPN_OS_WINDOWS,      true },
-  { "macos",        SPN_OS_MACOS,        true },
-  { "wasi",         SPN_OS_WASI },
-  { "freestanding", SPN_OS_FREESTANDING },
+static const dynamic_t dynamic_tests [] = {
+  { "linux",        HOST_X64_LINUX,  true },
+  { "windows",      TARGET_WIN_GNU,  true },
+  { "macos",        HOST_ARM_MACOS,  true },
+  { "wasi",         TARGET_WASM },
+  { "freestanding", TARGET_ARM_BARE },
+  { "linux_none",   TARGET_X64_LINUX_NONE },
 };
 
-sp_test_each(triple, os_dynamic, os_dynamic_t, os_dynamic_tests) {
-  sp_expect_eq(t, it->expect, spn_os_dynamic(it->os));
+sp_test_each(triple, dynamic, dynamic_t, dynamic_tests) {
+  sp_expect_eq(t, it->expect, spn_triple_dynamic(it->triple));
   return SP_OK;
 }
 
 typedef struct {
   const c8* name;
-  spn_os_t os;
+  spn_triple_t triple;
   bool expect;
-} os_pic_t;
+} pic_t;
 
-static const os_pic_t os_pic_tests [] = {
-  { "linux",        SPN_OS_LINUX,        true },
-  { "macos",        SPN_OS_MACOS,        true },
-  { "windows",      SPN_OS_WINDOWS,      false },
-  { "wasi",         SPN_OS_WASI,         false },
-  { "freestanding", SPN_OS_FREESTANDING, false },
+static const pic_t pic_tests [] = {
+  { "linux",        HOST_X64_LINUX,  true },
+  { "macos",        HOST_ARM_MACOS,  true },
+  { "windows",      TARGET_WIN_GNU },
+  { "wasi",         TARGET_WASM },
+  { "freestanding", TARGET_ARM_BARE },
+  { "linux_none",   TARGET_X64_LINUX_NONE },
 };
 
-sp_test_each(triple, os_pic, os_pic_t, os_pic_tests) {
-  sp_expect_eq(t, it->expect, spn_os_pic(it->os));
+sp_test_each(triple, pic, pic_t, pic_tests) {
+  sp_expect_eq(t, it->expect, spn_triple_pic(it->triple));
   return SP_OK;
 }
 

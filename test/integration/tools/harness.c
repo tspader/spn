@@ -195,6 +195,30 @@ static sp_err_t expect_elf_entry(sp_test_t* t, fixture_t* fixture, sp_str_t path
   return SP_ERR;
 }
 
+static sp_err_t expect_elf_no_symbol(sp_test_t* t, fixture_t* fixture, sp_str_t path, const c8* prefix, const c8* file, u32 line) {
+  sp_io_file_reader_t reader = sp_zero;
+  sp_must_ok(t, sp_io_file_reader_from_path(&reader, path));
+  sp_io_seeking_reader_t elf = sp_zero;
+  sp_io_seeking_reader_from_file_reader(&elf, &reader);
+  bool defined = false;
+  spn_err_t err = spn_elf_defines_prefix(&elf, sp_cstr_as_str(prefix), &defined);
+  sp_io_file_reader_close(&reader);
+  if (!err && !defined) {
+    return SP_OK;
+  }
+
+  sp_mem_t mem = harness_mem();
+  sp_test_kv(t, "root", fixture->root);
+  sp_test_kv(t, "path", display_path(fixture, path));
+  sp_test_record(t, (sp_test_failure_t) {
+    .file = sp_cstr_as_str(file),
+    .line = line,
+    .expected = sp_fmt(mem, "an elf64 image defining no symbol starting with {}", sp_fmt_cstr(prefix)).value,
+    .actual = err ? sp_cstr_as_str("not an elf64 image with a symbol table") : sp_fmt(mem, "a symbol starting with {}", sp_fmt_cstr(prefix)).value,
+  });
+  return SP_ERR;
+}
+
 static bool event_matches(yyjson_val* line, const c8* event, const c8* key, const c8* value) {
   const c8* name = yyjson_get_str(yyjson_obj_get(line, "event"));
   if (!name || !sp_cstr_equal(name, event)) return false;
@@ -767,6 +791,11 @@ sp_err_t run_actions(sp_test_t* t, fixture_t* fixture, const action_t* actions) 
       case ACTION_VERIFY_ELF_ENTRY: {
         sp_str_t path = fixture_path(fixture, action.verify_elf_entry.file);
         expect_elf_entry(t, fixture, path, action.verify_elf_entry.entry, __FILE__, __LINE__);
+        break;
+      }
+      case ACTION_VERIFY_ELF_NO_SYMBOL: {
+        sp_str_t path = fixture_path(fixture, action.verify_elf_no_symbol.file);
+        expect_elf_no_symbol(t, fixture, path, action.verify_elf_no_symbol.prefix, __FILE__, __LINE__);
         break;
       }
       case ACTION_VERIFY_DIR_COUNT: {

@@ -173,6 +173,18 @@ sp_test(profile, freestanding_exe_has_no_interp) {
   });
 }
 
+sp_test(profile, freestanding_image_has_no_sanitizer_runtime) {
+  return run_test(t, (test_t) {
+    .project = "test/integration/fixtures/profile/freestanding",
+    .copy = { "a.c" },
+    .when.target = SPN_TEST_ARCH "-freestanding",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", SPN_TEST_ARCH "-freestanding" } } },
+      { .kind = ACTION_VERIFY_ELF_NO_SYMBOL, .verify_elf_no_symbol = { target_exe("main", SPN_TEST_ARCH "-freestanding-none"), "__ubsan_" } },
+    },
+  });
+}
+
 sp_test(profile, freestanding_libs_not_pic) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/profile/freestanding",

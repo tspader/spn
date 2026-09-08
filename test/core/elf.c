@@ -67,3 +67,36 @@ sp_test_each(elf, entry, entry_t, entry_tests) {
   }
   return SP_OK;
 }
+
+typedef struct {
+  bool value;
+  bool malformed;
+} defines_expect_t;
+
+typedef struct {
+  const c8* name;
+  elf_spec_t elf;
+  const c8* prefix;
+  defines_expect_t expect;
+} defines_t;
+
+static const defines_t defines_tests [] = {
+  { .name = "defined_symbol",    .elf = { .symbols = { "A", "BC" } },                .prefix = "B", .expect = { .value = true } },
+  { .name = "prefix_not_substr", .elf = { .symbols = { "A", "BC" } },                .prefix = "C" },
+  { .name = "undefined_ignored", .elf = { .symbols = { "A" }, .undefined = { "B" } }, .prefix = "B" },
+  { .name = "no_symbol_table",                                                       .prefix = "B", .expect = { .malformed = true } },
+  { .name = "bad_magic",         .elf = { .symbols = { "B" }, .bad_magic = true },    .prefix = "B", .expect = { .malformed = true } },
+};
+
+sp_test_each(elf, defines_prefix, defines_t, defines_tests) {
+  sp_str_t elf = elf_emit(sp_test_arena(t), &it->elf);
+  sp_io_reader_t backing = sp_zero;
+  sp_io_seeking_reader_t reader = elf_reader(&backing, elf);
+  bool defined = false;
+  spn_err_t err = spn_elf_defines_prefix(&reader, sp_cstr_as_str(it->prefix), &defined);
+  sp_expect_eq(t, (u32)(it->expect.malformed ? SPN_ERROR : SPN_OK), (u32)err);
+  if (!err) {
+    sp_expect_eq(t, it->expect.value, defined);
+  }
+  return SP_OK;
+}

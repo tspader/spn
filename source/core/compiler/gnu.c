@@ -8,6 +8,7 @@
 #include "toolchain/toolchain.h"
 #include "macro/macro.h"
 #include "paths/paths.h"
+#include "profile/types.h"
 #include "triple/triple.h"
 
 static void push_flag(sp_da(sp_str_t)* flags, sp_str_t flag) {
@@ -66,10 +67,6 @@ static bool is_os_version_present(spn_os_version_t version) {
   return version.major || version.minor;
 }
 
-static spn_triple_t profile_triple(const spn_profile_info_t* profile) {
-  return (spn_triple_t) { profile->arch, profile->os, profile->abi };
-}
-
 // clang writes CodeView for the msvc abi and DWARF for mingw; zig writes
 // CodeView for every Windows target. Only CodeView records the command line
 // and object name, and only clang 15 and later knows the flag that drops them
@@ -101,6 +98,9 @@ static sp_str_t render_target(sp_mem_t mem, const spn_cc_toolchain_t* toolchain,
 }
 
 spn_sanitizer_set_t spn_gcc_supported_sanitizers(spn_triple_t target) {
+  if (target.abi == SPN_ABI_BARE) {
+    return 0;
+  }
   switch (target.os) {
     case SPN_OS_WASI:
     case SPN_OS_FREESTANDING:
@@ -113,6 +113,9 @@ spn_sanitizer_set_t spn_gcc_supported_sanitizers(spn_triple_t target) {
 }
 
 spn_sanitizer_set_t spn_clang_supported_sanitizers(spn_triple_t target) {
+  if (target.abi == SPN_ABI_BARE) {
+    return 0;
+  }
   switch (target.os) {
     case SPN_OS_WASI:
     case SPN_OS_FREESTANDING: return 0;
@@ -125,6 +128,9 @@ spn_sanitizer_set_t spn_clang_supported_sanitizers(spn_triple_t target) {
 }
 
 spn_sanitizer_set_t spn_zig_supported_sanitizers(spn_triple_t target) {
+  if (target.abi == SPN_ABI_BARE) {
+    return 0;
+  }
   switch (target.os) {
     case SPN_OS_WASI:
     case SPN_OS_FREESTANDING: return 0;
@@ -151,13 +157,14 @@ void spn_gnu_render_flags(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, con
     sp_da_push(flags->compile, sp_str_lit("-fno-sanitize-recover=all"));
     sp_da_push(flags->compile, sp_str_lit("-fno-omit-frame-pointer"));
   }
-  if (profile->os == SPN_OS_FREESTANDING) {
+  if (profile->abi == SPN_ABI_BARE) {
     sp_da_push(flags->compile, sp_str_lit("-ffreestanding"));
     sp_da_push(flags->compile, sp_str_lit("-fno-stack-protector"));
-    if (spn_cc_has(toolchain, SPN_CC_CAP_NOLIBC)) {
-      sp_da_push(flags->link, sp_str_lit("-nostartfiles"));
-      sp_da_push(flags->link, sp_str_lit("-nolibc"));
+    if (spn_cc_has(toolchain, SPN_CC_CAP_DEFAULT_UBSAN)) {
+      sp_da_push(flags->compile, sp_str_lit("-fno-sanitize=undefined"));
     }
+    sp_da_push(flags->link, sp_str_lit("-nostartfiles"));
+    sp_da_push(flags->link, sp_str_lit("-nolibc"));
   }
 }
 
@@ -244,7 +251,7 @@ static void add_launcher(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
   spn_cc_push_strs(mem, invocation, launcher.args);
   invocation->launcher = sp_da_size(invocation->args);
   if (spn_cc_has(toolchain, SPN_CC_CAP_TARGET_TRIPLE)) {
-    sp_str_t target = render_target(mem, toolchain, profile_triple(profile));
+    sp_str_t target = render_target(mem, toolchain, spn_profile_triple(profile));
     if (!sp_str_empty(target)) {
       spn_cc_push_fmt(mem, invocation, "--target={}", sp_fmt_str(target));
     }
@@ -426,7 +433,7 @@ static void add_rpath(sp_mem_t mem, spn_os_t os, spn_invocation_t* invocation) {
 }
 
 void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_link_t* link, const spn_cc_link_files_t* files, spn_invocation_t* invocation) {
-  spn_triple_t triple = profile_triple(profile);
+  spn_triple_t triple = spn_profile_triple(profile);
   spn_format_t format = spn_os_format(profile->os);
   spn_ld_dialect_t dialect = spn_ld_dialect(triple);
 
