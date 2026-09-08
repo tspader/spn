@@ -63,6 +63,7 @@ readme: false
 | `cxx` | [`cxx_options`](#cxx_options) | |
 | `macos` | [`platform_macos`](#platform_macos) | |
 | `windows` | [`platform_windows`](#platform_windows) | |
+| `when` | [`when`](#extern-types) | |
 
 ## toolchain_decl
 
@@ -102,7 +103,7 @@ readme: false
 | `sanitize` | array of `address` \| `thread` \| `undefined` \| `memory` \| `leak` |
 | `os` | `windows` \| `linux` \| `macos` \| `wasi` \| `freestanding` |
 | `arch` | `x86_64` \| `aarch64` \| `wasm32` |
-| `abi` | `gnu` \| `musl` \| `msvc` \| `apple` \| `none` |
+| `abi` | `gnu` \| `musl` \| `msvc` \| `apple` \| `none` \| `elf` |
 | `options` | [`when`](#extern-types) |
 
 ## option
@@ -223,8 +224,8 @@ readme: false
 |---|---|
 | `arch` | `x86_64` \| `aarch64` \| `wasm32` |
 | `os` | `windows` \| `linux` \| `macos` \| `wasi` \| `freestanding` |
-| `abi` | `gnu` \| `musl` \| `msvc` \| `apple` \| `none` |
-| `sysroot` | `string` |
+| `abi` | `gnu` \| `musl` \| `msvc` \| `apple` \| `none` \| `elf` |
+| `sdk` | `string` |
 
 ## dep
 

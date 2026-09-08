@@ -55,6 +55,20 @@
     sp_ht_insert((sm)->index, (sm)->index->tmp_key, (sm)->temp);              \
   } while (0)
 
+#define sp_om_remove(sm, key)                                                  \
+  do {                                                                         \
+    (sm)->temp = sp_om_get(sm, (key));                                         \
+    sp_ht_erase((sm)->index, (key));                                           \
+    u32 _om_at = 0;                                                            \
+    while ((sm)->order[_om_at] != (sm)->temp) {                                \
+      _om_at++;                                                                \
+    }                                                                          \
+    for (u32 _om_it = _om_at + 1; _om_it < sp_da_size((sm)->order); _om_it++) { \
+      (sm)->order[_om_it - 1] = (sm)->order[_om_it];                           \
+    }                                                                          \
+    sp_da_pop((sm)->order);                                                    \
+  } while (0)
+
 #define sp_om_free(sm)                                                         \
   do {                                                                         \
     if ((sm)) {                                                                \
@@ -98,6 +112,7 @@
   } while (0)
 
 #define sp_str_om_new(om)           sp_str_om_init(om);
+#define sp_str_om_remove(om, key)   sp_om_remove(om, (key))
 #define sp_str_om_free(om)          sp_om_free(om)
 #define sp_str_om_get(om, key)      sp_om_get(om, (key))
 #define sp_str_om_getp(om, key)     sp_om_getp(om, (key))

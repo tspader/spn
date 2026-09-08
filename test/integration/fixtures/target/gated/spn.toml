@@ -1,0 +1,19 @@
+[package]
+name = "target_gated"
+version = "0.1.0"
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+
+[[test]]
+name = "T"
+source = ["main.c"]
+
+[[test]]
+name = "G"
+source = ["main.c"]
+when = { abi = { not = "none" } }
+
+[profile.nolibc]
+abi = "none"

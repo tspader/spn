@@ -412,6 +412,7 @@ source = [
   "test/integration/cxx.c",
   "test/integration/defines.c",
   "test/integration/deps.c",
+  "test/integration/example.c",
   "test/integration/exports.c",
   "test/integration/freshness.c",
   "test/integration/harness_test.c",

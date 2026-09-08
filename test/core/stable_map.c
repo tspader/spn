@@ -499,6 +499,50 @@ sp_test(sm_u64, many_entries) {
   return SP_OK;
 }
 
+typedef struct {
+  const c8* name;
+  s32 keys [4];
+  s32 remove;
+  s32 reinsert;
+  struct { s32 values [4]; } expect;
+} remove_t;
+
+static const remove_t remove_tests [] = {
+  { .name = "middle",           .keys = { 1, 2, 3 }, .remove = 2, .expect = { { 10, 30 } } },
+  { .name = "first",            .keys = { 1, 2, 3 }, .remove = 1, .expect = { { 20, 30 } } },
+  { .name = "last",             .keys = { 1, 2, 3 }, .remove = 3, .expect = { { 10, 20 } } },
+  { .name = "only",             .keys = { 1 },       .remove = 1 },
+  { .name = "reinsert_appends", .keys = { 1, 2, 3 }, .remove = 1, .reinsert = 1, .expect = { { 20, 30, 100 } } },
+};
+
+sp_test_each(sm_s32, remove, remove_t, remove_tests) {
+  sp_om(s32, s32) map = SP_NULLPTR;
+
+  u32 keys = 0;
+  sp_carr_detect_len(it->keys, keys, it->keys[keys]);
+  sp_for(kt, keys) {
+    sp_om_insert(map, it->keys[kt], it->keys[kt] * 10);
+  }
+  sp_om_remove(map, it->remove);
+  if (it->reinsert) {
+    sp_om_insert(map, it->reinsert, it->reinsert * 100);
+  }
+
+  u32 values = 0;
+  sp_carr_detect_len(it->expect.values, values, it->expect.values[values]);
+  sp_must_eq(t, sp_om_size(map), values);
+  sp_for(vt, values) {
+    sp_expect_eq(t, *sp_om_at(map, vt), it->expect.values[vt]);
+  }
+  sp_expect_eq(t, sp_om_has(map, it->remove), it->reinsert != 0);
+  if (it->reinsert) {
+    sp_expect_eq(t, *sp_om_get(map, it->reinsert), it->reinsert * 100);
+  }
+
+  sp_om_free(map);
+  return SP_OK;
+}
+
 // ---- sp_str_om (string-keyed specialization) ----
 
 sp_test(om, insert_and_get) {

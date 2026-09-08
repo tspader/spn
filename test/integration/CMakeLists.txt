@@ -40,6 +40,7 @@ add_executable(integration
   cxx.c
   defines.c
   deps.c
+  example.c
   exports.c
   freshness.c
   harness_test.c

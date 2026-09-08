@@ -32,6 +32,7 @@ typedef struct {
 
 typedef struct {
   const c8* name;
+  const c8* when;
   spn_linkage_set_t linkages;
   bool no_link;
   gated_t source [4];
@@ -980,6 +981,13 @@ static const test_t tests [] = {
     },
   },
   {
+    .name = "target_gated",
+    .manifest = "target_gated",
+    .tests = {
+      { .name = "t", .when = "abi != \"none\"", .source = { { "a.c" } } },
+    },
+  },
+  {
     .name = "option_extras",
     .manifest = "option_extras",
     .options = {
@@ -1090,6 +1098,13 @@ static const test_t tests [] = {
     .manifest = "validate_when_unknown_key",
     .issues = {
       { SPN_ERR_CODEGEN_INVALID, "deps.package[0].when.simd" }
+    },
+  },
+  {
+    .name = "validate_target_when_unknown_key",
+    .manifest = "validate_target_when_unknown_key",
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "lib[0].when.simd" }
     },
   },
   {
@@ -1310,6 +1325,7 @@ static sp_err_t check_targets(sp_test_t* t, spn_target_map_t om, const target_t*
     sp_expect_eq(t, arr[i].linkages.static_lib, info->linkages.static_lib);
     sp_expect_eq(t, arr[i].linkages.object, info->linkages.object);
     sp_expect_eq(t, arr[i].no_link, info->no_link);
+    sp_expect_str_eq_c(t, spn_when_to_str(sp_test_arena(t), &info->when), arr[i].when ? arr[i].when : "always");
     sp_expect_eq(t, (u32)0, (u32)sp_da_size(info->source));
     sp_expect_eq(t, (u32)0, (u32)sp_da_size(info->include));
     sp_expect_eq(t, (u32)0, (u32)sp_da_size(info->define));

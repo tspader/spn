@@ -160,7 +160,8 @@
         "link": { "type": "boolean" },
         "cxx": { "ref": "cxx_options" },
         "macos": { "ref": "platform_macos" },
-        "windows": { "ref": "platform_windows" }
+        "windows": { "ref": "platform_windows" },
+        "when": { "metadata": { "extern": "when", "include": "when/types.h" } }
       }
     },
 

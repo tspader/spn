@@ -166,6 +166,29 @@ sp_test(target, selection_named_script) {
   });
 }
 
+sp_test(target, gated_test_is_not_defined) {
+  return run_test(t, (test_t) {
+    .project = "test/integration/fixtures/target/gated",
+    .when = { .host = SPN_OS_LINUX, .target = SPN_TEST_ARCH "-linux-none" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "test", .args = { "-p", "nolibc", "G" }, .rc = 1 } },
+      { .kind = ACTION_VERIFY_RESULT, .verify_result = { .err = SPN_ERR_TARGET_SELECTION } },
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--abi", "none" } } },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = target_exe("main", SPN_TEST_ARCH "-linux-none") },
+    },
+  });
+}
+
+sp_test(target, ungated_test_survives_gate) {
+  return run_test(t, (test_t) {
+    .project = "test/integration/fixtures/target/gated",
+    .when = { .host = SPN_OS_LINUX, .target = SPN_TEST_ARCH "-linux-none" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "test", .args = { "-p", "nolibc", "T" } } },
+    },
+  });
+}
+
 sp_test(target, example) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/target/example",

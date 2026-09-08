@@ -1,0 +1,17 @@
+[package]
+name = "kernel"
+version = "0.1.0"
+
+[[bin]]
+name = "main"
+source = [
+  "main.c",
+  { path = "start/x86_64.S", when = { arch = "x86_64" } },
+  { path = "start/aarch64.S", when = { arch = "aarch64" } },
+]
+linker_script = ["kernel.ld"]
+link_flags = ["-Wl,--build-id=none"]
+
+[profile.default]
+os = "freestanding"
+abi = "none"

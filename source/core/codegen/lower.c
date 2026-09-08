@@ -198,6 +198,7 @@ static spn_target_info_t lower_target(spn_toml_loader_t* ctx, const spn_cg_targe
     .windows = {
       .subsystem = sp_opt_is_null(cg->windows.subsystem) ? SPN_WIN_SUBSYSTEM_NONE : sp_opt_get(cg->windows.subsystem),
     },
+    .when = cg->when,
     .gated = {
       .source = lower_gated_paths(ctx, cg->source),
       .headers = lower_gated_paths(ctx, cg->headers),
@@ -809,6 +810,7 @@ static void validate_target_whens(spn_toml_loader_t* ctx, spn_cg_target_om_t tar
   sp_om_for(targets, it) {
     const spn_cg_target_t* target = sp_str_om_at(targets, it);
     spn_toml_loader_push_index(ctx, it);
+    validate_when(ctx, &target->when, out);
     validate_source_whens(ctx, target->source, "source", out);
     validate_source_whens(ctx, target->headers, "headers", out);
     validate_source_whens(ctx, target->include, "include", out);
