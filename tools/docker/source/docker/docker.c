@@ -160,26 +160,29 @@ static void write_lane(sp_io_writer_t* io, yyjson_val* toolchain) {
   }
 }
 
-static bool render_lanes(docker_t* docker) {
-  sp_mem_t mem = docker->mem;
-
+static bool load_lanes(docker_t* docker) {
   sp_str_t json = sp_zero;
-  if (sp_io_read_file(mem, docker->paths.lanes, &json)) {
+  if (sp_io_read_file(docker->mem, docker->paths.lanes, &json)) {
     return false;
   }
   yyjson_doc* doc = yyjson_read(json.data, json.len, 0);
   if (!doc) {
     return false;
   }
+  docker->lanes = yyjson_obj_get(yyjson_doc_get_root(doc), "toolchain");
+  return docker->lanes != SP_NULLPTR;
+}
+
+static bool render_lanes(docker_t* docker) {
+  sp_mem_t mem = docker->mem;
 
   sp_io_dyn_mem_writer_t writer = sp_zero;
   sp_io_dyn_mem_writer_init(mem, &writer);
   size_t idx, max;
   yyjson_val* toolchain;
-  yyjson_arr_foreach(yyjson_obj_get(yyjson_doc_get_root(doc), "toolchain"), idx, max, toolchain) {
+  yyjson_arr_foreach(docker->lanes, idx, max, toolchain) {
     write_lane(&writer.base, toolchain);
   }
-  yyjson_doc_free(doc);
 
   sp_str_t config = sp_fs_join_path(mem, docker->paths.config, sp_str_lit("spn/spn.toml"));
   sp_fs_create_dir(sp_fs_parent_path(config));
@@ -237,7 +240,7 @@ docker_init_err_t docker_init(docker_t* docker, sp_mem_t mem) {
   }
 
   sp_fs_create_dir(docker->paths.dockerfiles);
-  if (!render_lanes(docker)) {
+  if (!load_lanes(docker) || !render_lanes(docker)) {
     return DOCKER_INIT_ERR_LANES;
   }
   return DOCKER_INIT_OK;
@@ -295,7 +298,7 @@ docker_render_err_t docker_render(docker_t* docker, const variant_t* variant) {
 
   sp_template_scope_t* scope = sp_template_scope_create(mem);
   sp_template_set(scope, sp_str_lit("packages"), get_variant_packages(mem, variant));
-  sp_template_set(scope, sp_str_lit("setup"), get_variant_setup(mem, variant));
+  sp_template_set(scope, sp_str_lit("setup"), get_variant_setup(mem, variant, docker->lanes));
 
   sp_io_dyn_mem_writer_t writer = sp_zero;
   sp_io_dyn_mem_writer_init(mem, &writer);
@@ -330,8 +333,29 @@ sp_ps_config_cstr_t docker_check(docker_t* docker, const variant_t* variant) {
   return launch(docker, variant, "--init", CONTAINER_CHECK, toolchain_name(variant->toolchain));
 }
 
+static const c8* seed_profile(docker_t* docker, const variant_t* variant) {
+  const c8* seed = variant_seed(variant);
+  if (!seed) {
+    return SP_NULLPTR;
+  }
+
+  sp_io_dyn_mem_writer_t writer = sp_zero;
+  sp_io_dyn_mem_writer_init(docker->mem, &writer);
+  sp_fmt_io(&writer.base, "toolchain = \"{}\"\n", sp_fmt_cstr(seed));
+
+  yyjson_val* target = yyjson_arr_get_first(yyjson_obj_get(lane_find(docker->lanes, seed), "target"));
+  if (target) {
+    write_str(&writer.base, "arch", yyjson_obj_get(target, "arch"));
+    write_str(&writer.base, "os", yyjson_obj_get(target, "os"));
+    if (yyjson_obj_get(target, "abi")) {
+      write_str(&writer.base, "abi", yyjson_obj_get(target, "abi"));
+    }
+  }
+  return sp_str_to_cstr(docker->mem, sp_io_dyn_mem_writer_as_str(&writer));
+}
+
 sp_ps_config_cstr_t docker_shell(docker_t* docker, const variant_t* variant) {
-  return launch(docker, variant, "-it", CONTAINER_SHELL, SP_NULLPTR);
+  return launch(docker, variant, "-it", CONTAINER_SHELL, seed_profile(docker, variant));
 }
 
 sp_ps_config_cstr_t docker_test(docker_t* docker, const variant_t* variant, const c8* lane, const c8* filter) {

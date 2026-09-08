@@ -69,8 +69,12 @@ declared as data in `tools/docker/source/variant/variant.c`: `debian-musl`
 links Debian's musl headers and libs under `/sysroot/musl`, `debian-sysroot`
 unpacks the arm64 libc and libgcc debs under `/sysroot/arm64`, and
 `debian-wasi` names `/usr` because Debian's wasi-libc is already laid out as
-one. `musl-gcc` and `clang-cross` list a target with no sysroot and lean on
-the wrapper or on clang's gcc-cross discovery instead.
+one, and `debian-wasi-sdk` unpacks the wasi-sdk tarball under `/opt/wasi-sdk`
+for `wasi-sdk-local`. `wasi-sdk` names the same tarball as a hosted artifact,
+so its `share/wasi-sysroot` is joined onto the artifact root by spn; that lane
+is the artifact-relative sysroot coverage. `musl-gcc` and `clang-cross` list
+a target with no sysroot and lean on the wrapper or on clang's gcc-cross
+discovery instead.
 clang hands an `x86_64-none-elf` link to `gcc`, so `clang-bare` lives where
 both are installed. Debian names its mingw libgcc directory `12-win32`, which clang 14 does not
 parse as a version, so both clang mingw lanes name it with `-L`.
@@ -106,11 +110,14 @@ proves the `linker` fact matches the family the lane declares.
 | `musl-gcc`    | gcc     | gnu                        |                                    | `debian-musl`                                 |
 | `clang-musl`  | clang   | gnu                        | `-rtlib=compiler-rt -unwindlib=none` | `debian-musl`, host gnu and sysroot musl    |
 | `clang-wasi`  | clang   | lld (wasm)                 |                                    | `debian-wasi`                                 |
+| `wasi-sdk`    | clang   | lld (wasm)                 |                                    | `debian-wasi-sdk`                             |
+| `wasi-sdk-local` | clang | lld (wasm)                |                                    | `debian-wasi-sdk`                             |
 | `clang-sysroot` | clang | lld                        | `-fuse-ld=lld`                     | `debian-sysroot`                              |
 | `clang-cross` | clang   | gnu                        |                                    | `debian-cross`                                |
 
 The cross lanes (`aarch64-gnu`, `mingw-gnu`, `clang-mingw`, `clang-mingw-lld`,
-`clang-wasi`, `clang-sysroot`, `clang-cross`) can't target the host, so only
+`clang-wasi`, `wasi-sdk`, `wasi-sdk-local`, `clang-sysroot`, `clang-cross`)
+can't target the host, so only
 cases with a matching `.target` run there; `target.cross_exe` builds for a
 lane's first cross target so every one of them links something. The `clang` and `llvm`
 lanes claim only the host: a bare-name clang reaches bare metal only through

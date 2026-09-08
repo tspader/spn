@@ -34,7 +34,17 @@ typedef enum {
   SYSROOT_MUSL,
   SYSROOT_WASI,
   SYSROOT_ARM64,
+  SYSROOT_WASI_SDK,
 } sysroot_kind_t;
+
+typedef enum {
+  INSTALL_PACKAGES,
+  INSTALL_LINKS,
+  INSTALL_DEBS,
+  INSTALL_TARBALL,
+} install_kind_t;
+
+typedef struct yyjson_val yyjson_val;
 
 #define SMOKE_MAX_LANES 5
 #define SMOKE_MAX_SYSROOTS 2
@@ -47,12 +57,24 @@ typedef struct {
 } sysroot_link_t;
 
 typedef struct {
+  const c8* arch;
+  const c8* names [SMOKE_MAX_DEBS];
+} sysroot_debs_t;
+
+typedef struct {
+  const c8* lane;
+} sysroot_tarball_t;
+
+typedef struct {
   const c8* name;
   const c8* path;
   const c8* packages;
-  const c8* arch;
-  const c8* debs [SMOKE_MAX_DEBS];
-  sysroot_link_t links [SMOKE_MAX_LINKS];
+  install_kind_t kind;
+  union {
+    sysroot_link_t links [SMOKE_MAX_LINKS];
+    sysroot_debs_t debs;
+    sysroot_tarball_t tarball;
+  };
 } sysroot_t;
 
 typedef struct {
@@ -74,8 +96,10 @@ const variant_t* variant_hosting(const c8* lane);
 bool             variant_hosts(const variant_t* variant, const c8* lane);
 sp_str_t get_template_name(const variant_t* variant);
 const c8* toolchain_name(toolchain_t toolchain);
+const c8* variant_seed(const variant_t* variant);
+yyjson_val* lane_find(yyjson_val* lanes, const c8* name);
 sp_str_t get_variant_packages(sp_mem_t mem, const variant_t* variant);
-sp_str_t get_variant_setup(sp_mem_t mem, const variant_t* variant);
+sp_str_t get_variant_setup(sp_mem_t mem, const variant_t* variant, yyjson_val* lanes);
 sp_str_t variant_summary(sp_mem_t mem, const variant_t* variant);
 
 #endif

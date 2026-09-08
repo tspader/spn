@@ -6,6 +6,7 @@
 #include "variant/variant.h"
 
 typedef struct sp_template_registry sp_template_registry_t;
+typedef struct yyjson_val yyjson_val;
 
 typedef enum {
   DOCKER_INIT_OK,
@@ -31,6 +32,7 @@ typedef enum {
 typedef struct {
   sp_mem_t mem;
   sp_template_registry_t* templates;
+  yyjson_val* lanes;
   struct {
     sp_str_t repo;
     sp_str_t git;

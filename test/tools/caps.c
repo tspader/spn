@@ -147,6 +147,13 @@ static bool installed(sp_mem_t mem, sp_str_t program) {
   return !sp_str_empty(spn_search_program(mem, program, dirs));
 }
 
+static bool present(sp_mem_t mem, spn_arg_t program) {
+  if (!sp_str_empty(program.prefix)) {
+    return installed(mem, program.prefix);
+  }
+  return sp_fs_is_target_file(program.path.sub);
+}
+
 typedef struct {
   const c8* lane;
   spn_ld_dialect_t dialect;
@@ -187,13 +194,13 @@ static sp_str_t missing_lane_program(sp_mem_t mem, const spn_toolchain_info_t* i
 }
 
 static sp_str_t missing_toolchain_program(sp_mem_t mem, const spn_toolchain_info_t* info) {
-  sp_str_t programs [] = {
-    info->compiler.program.prefix,
-    info->archiver.program.prefix,
+  spn_arg_t programs [] = {
+    info->compiler.program,
+    info->archiver.program,
   };
   sp_carr_for(programs, it) {
-    if (!sp_str_empty(programs[it]) && !installed(mem, programs[it])) {
-      return programs[it];
+    if (!present(mem, programs[it])) {
+      return sp_str_empty(programs[it].prefix) ? programs[it].path.sub : programs[it].prefix;
     }
   }
   return missing_lane_program(mem, info);
