@@ -24,16 +24,6 @@ static const spn_toolchain_target_t* listed(const spn_toolchain_info_t* toolchai
   return SP_NULLPTR;
 }
 
-static bool lists_any_abi(const spn_toolchain_info_t* toolchain, spn_triple_t target) {
-  spn_triple_t pattern = { target.arch, target.os, SPN_ABI_NONE };
-  sp_da_for(toolchain->targets, it) {
-    if (spn_triple_match(pattern, toolchain->targets[it].triple)) {
-      return true;
-    }
-  }
-  return false;
-}
-
 static sp_da(spn_triple_t) triples(sp_mem_t mem, sp_da(spn_toolchain_target_t) targets) {
   sp_da(spn_triple_t) out = sp_da_new(mem, spn_triple_t);
   sp_da_for(targets, it) {
@@ -54,6 +44,16 @@ static spn_abi_list_t completions(spn_os_t os) {
     list.items[it] = abis[it];
   }
   return list;
+}
+
+static bool lists_completion(const spn_toolchain_info_t* toolchain, spn_triple_t target) {
+  spn_abi_list_t abis = completions(target.os);
+  sp_for(it, abis.count) {
+    if (listed(toolchain, with_abi(target, abis.items[it]))) {
+      return true;
+    }
+  }
+  return false;
 }
 
 static spn_err_t reach(const spn_toolchain_info_t* toolchain, const spn_toolchain_catalog_t* catalog, spn_triple_t target) {
@@ -113,7 +113,7 @@ static sp_da(sp_str_t) listing(spn_toolchain_catalog_t* catalog, spn_triple_t ta
   sp_da(sp_str_t) names = sp_da_new(catalog->mem, sp_str_t);
   sp_om_for(catalog->entries, it) {
     spn_toolchain_info_t* entry = sp_om_at(catalog->entries, it);
-    if (usable(entry) && lists_any_abi(entry, target)) {
+    if (usable(entry) && lists_completion(entry, target)) {
       sp_da_push(names, entry->name);
     }
   }

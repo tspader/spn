@@ -1,0 +1,21 @@
+{
+  "toolchain": [
+    {
+      "name": "A",
+      "driver": "gcc",
+      "compiler": {
+        "program": "A"
+      },
+      "archiver": {
+        "program": "A"
+      },
+      "target": [
+        {
+          "arch": "x86_64",
+          "os": "linux",
+          "abi": "none"
+        }
+      ]
+    }
+  ]
+}
