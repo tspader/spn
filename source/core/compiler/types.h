@@ -101,10 +101,16 @@ typedef enum {
 } spn_cc_exports_format_t;
 
 typedef struct {
+  sp_str_t key;
+  spn_arg_t value;
+} spn_invocation_env_t;
+
+typedef struct {
   spn_arg_t program;
   sp_da(spn_arg_t) args;
   u32 launcher;
   spn_path_t cwd;
+  sp_da(spn_invocation_env_t) env;
 } spn_invocation_t;
 
 typedef enum {

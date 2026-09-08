@@ -230,7 +230,7 @@ static sp_err_t load_lanes(void* user) {
   }
 
   sp_str_t lanes = read_repo_file(mem, SPN_LANES_TEST);
-  spn_toolchain_catalog_init(&catalog, spn_triple_host(), mem);
+  spn_toolchain_catalog_init(&catalog, spn_triple_host(), SP_NULLPTR, mem);
   sp_assert(spn_toolchain_catalog_load(&catalog, read_repo_file(mem, SPN_LANES_BUILTIN)) == SPN_OK);
   sp_assert(spn_toolchain_catalog_load(&catalog, lanes) == SPN_OK);
 

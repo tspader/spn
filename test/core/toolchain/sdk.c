@@ -2,7 +2,7 @@
 
 typedef struct {
   spn_sdk_kind_t kind;
-  bool sysroot;
+  bool declarable;
 } expect_t;
 
 typedef struct {
@@ -24,6 +24,6 @@ static const test_t tests [] = {
 sp_test_each(sdk, kind, test_t, tests) {
   spn_sdk_kind_t kind = spn_sdk_kind(it->target);
   sp_expect_eq(t, (u32)it->expect.kind, (u32)kind);
-  sp_expect_eq(t, it->expect.sysroot, spn_sdk_takes_sysroot(kind));
+  sp_expect_eq(t, it->expect.declarable, spn_sdk_declarable(kind));
   return SP_OK;
 }

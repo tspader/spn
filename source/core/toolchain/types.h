@@ -15,6 +15,7 @@ typedef enum {
   SPN_CC_CAP_LLVM_TRIPLE    = 1 << 3,
   SPN_CC_CAP_FUSE_LD        = 1 << 4,
   SPN_CC_CAP_CODEVIEW       = 1 << 5,
+  SPN_CC_CAP_LIBC_FILE      = 1 << 6,
 } spn_cc_cap_t;
 
 typedef u32 spn_cc_cap_set_t;
@@ -33,6 +34,29 @@ typedef enum {
   SPN_SDK_MACOS,
   SPN_SDK_MSVC,
 } spn_sdk_kind_t;
+
+typedef struct {
+  spn_arch_t arch;
+  struct {
+    spn_path_t vc;
+    spn_path_t ucrt;
+    spn_path_t um;
+    spn_path_t shared;
+  } include;
+  struct {
+    spn_path_t vc;
+    spn_path_t ucrt;
+    spn_path_t um;
+  } lib;
+} spn_sdk_msvc_t;
+
+typedef struct {
+  spn_sdk_kind_t kind;
+  union {
+    spn_path_t root;
+    spn_sdk_msvc_t msvc;
+  };
+} spn_sdk_t;
 
 typedef enum {
   SPN_PATH_OK,
@@ -58,7 +82,7 @@ typedef struct {
 
 typedef struct {
   spn_triple_t triple;
-  spn_path_t sysroot;
+  spn_path_t sdk;
 } spn_toolchain_target_t;
 
 typedef enum {
@@ -109,6 +133,7 @@ typedef struct {
 struct spn_toolchain_catalog_t {
   sp_mem_t mem;
   spn_triple_t host;
+  sp_da(spn_sdk_t) sdks;
   sp_str_om(spn_toolchain_info_t) entries;
 };
 

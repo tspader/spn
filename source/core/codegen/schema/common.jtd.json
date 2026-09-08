@@ -24,7 +24,7 @@
         "arch": { "ref": "arch" },
         "os": { "ref": "os" },
         "abi": { "ref": "abi" },
-        "sysroot": { "type": "string" }
+        "sdk": { "type": "string" }
       }
     },
 

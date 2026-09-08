@@ -134,7 +134,7 @@ static const plan_test_t tests [] = {
     .target = { .kind = SPN_TARGET_KIND_EXE, .source = { "main.c" }, .min_os = { 11, 0 } },
     .graph = {
       .os = SPN_OS_MACOS,
-      .sysroot = "/sdk",
+      .sdk = "/sdk",
       .pkgs = {
         { .name = "P1", .deps = { { "D1" }, { "D2" } } },
         { .name = "D1", .min_os = { 12, 5 },
@@ -155,7 +155,7 @@ static const plan_test_t tests [] = {
     .target = { .kind = SPN_TARGET_KIND_EXE, .source = { "main.c" }, .frameworks = { "Metal" } },
     .graph = {
       .os = SPN_OS_MACOS,
-      .sysroot = "/sdk",
+      .sdk = "/sdk",
       .pkgs = {
         { .name = "P1", .deps = { { "D1" }, { "D2" }, { "D3" } } },
         { .name = "D1", .frameworks = { "Cocoa" },

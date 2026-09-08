@@ -114,7 +114,7 @@ spn_cc_cap_set_t spn_toolchain_driver_caps(spn_cc_driver_t driver) {
   switch (driver) {
     case SPN_CC_DRIVER_GCC: return SPN_CC_CAP_NOLIBC | SPN_CC_CAP_FUSE_LD;
     case SPN_CC_DRIVER_CLANG: return SPN_CC_CAP_TARGET_TRIPLE | SPN_CC_CAP_LLVM_TRIPLE | SPN_CC_CAP_CLANG_FRONTEND | SPN_CC_CAP_NOLIBC | SPN_CC_CAP_FUSE_LD;
-    case SPN_CC_DRIVER_ZIG: return SPN_CC_CAP_TARGET_TRIPLE | SPN_CC_CAP_CLANG_FRONTEND | SPN_CC_CAP_CODEVIEW;
+    case SPN_CC_DRIVER_ZIG: return SPN_CC_CAP_TARGET_TRIPLE | SPN_CC_CAP_CLANG_FRONTEND | SPN_CC_CAP_CODEVIEW | SPN_CC_CAP_LIBC_FILE;
     case SPN_CC_DRIVER_MSVC: return 0;
     case SPN_CC_DRIVER_NONE: sp_unreachable_case();
   }
@@ -144,28 +144,6 @@ bool spn_toolchain_driver_composes(spn_cc_driver_t driver, spn_ld_dialect_t dial
     case SPN_CC_DRIVER_CLANG:
     case SPN_CC_DRIVER_ZIG: return true;
     case SPN_CC_DRIVER_NONE: sp_unreachable_case();
-  }
-  SP_UNREACHABLE_RETURN(false);
-}
-
-spn_sdk_kind_t spn_sdk_kind(spn_triple_t target) {
-  switch (target.os) {
-    case SPN_OS_MACOS: return SPN_SDK_MACOS;
-    case SPN_OS_WINDOWS: return target.abi == SPN_ABI_MSVC ? SPN_SDK_MSVC : SPN_SDK_SYSROOT;
-    case SPN_OS_LINUX:
-    case SPN_OS_WASI: return SPN_SDK_SYSROOT;
-    case SPN_OS_FREESTANDING: return SPN_SDK_NONE;
-    case SPN_OS_NONE: sp_unreachable_case();
-  }
-  SP_UNREACHABLE_RETURN(SPN_SDK_NONE);
-}
-
-bool spn_sdk_takes_sysroot(spn_sdk_kind_t kind) {
-  switch (kind) {
-    case SPN_SDK_SYSROOT:
-    case SPN_SDK_MACOS: return true;
-    case SPN_SDK_NONE:
-    case SPN_SDK_MSVC: return false;
   }
   SP_UNREACHABLE_RETURN(false);
 }

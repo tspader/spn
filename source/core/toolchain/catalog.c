@@ -25,13 +25,13 @@ static spn_err_t load_target(const spn_cg_toolchain_target_t* in, spn_cc_driver_
   if (!spn_toolchain_driver_composes(driver, spn_ld_dialect(target->triple))) {
     return SPN_ERROR;
   }
-  if (sp_str_empty(in->sysroot)) {
+  if (sp_str_empty(in->sdk)) {
     return SPN_OK;
   }
-  if (!spn_sdk_takes_sysroot(spn_sdk_kind(target->triple))) {
+  if (!spn_sdk_declarable(spn_sdk_kind(target->triple))) {
     return SPN_ERROR;
   }
-  if (spn_toolchain_path(source, SPN_PATH_ROOT_NONE, in->sysroot, &target->sysroot) != SPN_PATH_OK) {
+  if (spn_toolchain_path(source, SPN_PATH_ROOT_NONE, in->sdk, &target->sdk) != SPN_PATH_OK) {
     return SPN_ERROR;
   }
   return SPN_OK;
@@ -114,10 +114,10 @@ static sp_da(spn_toolchain_target_t) declared_targets(spn_toolchain_catalog_t* c
       spn_path_t root = spn_toolchain_artifact_root(support.artifact);
       sp_da(spn_toolchain_target_t) targets = sp_da_new(catalog->mem, spn_toolchain_target_t);
       sp_da_for(declared, it) {
-        spn_path_t sysroot = declared[it].sysroot;
+        spn_path_t sdk = declared[it].sdk;
         sp_da_push(targets, ((spn_toolchain_target_t) {
           .triple = declared[it].triple,
-          .sysroot = spn_path_empty(sysroot) ? sysroot : spn_path_join(catalog->mem, root, sysroot.sub),
+          .sdk = spn_path_empty(sdk) ? sdk : spn_path_join(catalog->mem, root, sdk.sub),
         }));
       }
       return targets;
@@ -177,9 +177,10 @@ static spn_toolchain_info_t bind_toolchain(spn_toolchain_catalog_t* catalog, con
   };
 }
 
-void spn_toolchain_catalog_init(spn_toolchain_catalog_t* catalog, spn_triple_t host, sp_mem_t mem) {
+void spn_toolchain_catalog_init(spn_toolchain_catalog_t* catalog, spn_triple_t host, sp_da(spn_sdk_t) sdks, sp_mem_t mem) {
   catalog->mem = mem;
   catalog->host = host;
+  catalog->sdks = sdks;
   sp_str_om_init(catalog->entries);
 }
 

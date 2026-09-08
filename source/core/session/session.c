@@ -23,51 +23,14 @@
 #include "toolchain/toolchain.h"
 #include "triple/triple.h"
 
-static sp_str_t macos_sdk(sp_mem_t mem, sp_env_t* env) {
-  sp_str_t sdk = sp_env_get(env, sp_str_lit("SPN_MACOS_SDK"));
-  if (!sp_str_empty(sdk)) {
-    return sdk;
-  }
-  if (spn_triple_host().os != SPN_OS_MACOS) {
-    return sp_str_lit("");
-  }
-
-  sp_ps_output_t result = sp_ps_run(mem, (sp_ps_config_t) {
-    .command = sp_str_lit("xcrun"),
-    .args = {
-      sp_str_lit("--show-sdk-path"),
-    },
-    .io = {
-      .in = { .mode = SP_PS_IO_MODE_NULL },
-      .err = { .mode = SP_PS_IO_MODE_NULL },
-    },
-  });
-  if (result.status.exit_code) {
-    return sp_str_lit("");
-  }
-  return sp_str_trim(result.out);
-}
-
-static spn_path_t resolve_sysroot(sp_mem_t mem, spn_ctx_t* ctx, const spn_toolchain_selection_t* selection) {
-  if (!spn_path_empty(selection->target.sysroot)) {
-    return selection->target.sysroot;
-  }
-  switch (spn_sdk_kind(selection->target.triple)) {
-    case SPN_SDK_MACOS: {
-      return spn_path_canonicalize(mem, &ctx->roots, spn_path_join(mem, spn_path_from_root(SPN_PATH_ROOT_NONE), macos_sdk(mem, ctx->env)));
-    }
-    case SPN_SDK_NONE:
-    case SPN_SDK_SYSROOT:
-    case SPN_SDK_MSVC: {
-      return sp_zero_struct(spn_path_t);
-    }
-  }
-  sp_unreachable_return(sp_zero_struct(spn_path_t));
-}
-
-static void finalize_profile(spn_session_t* s, spn_profile_info_t* profile, const spn_toolchain_selection_t* selection) {
+static spn_err_t finalize_profile(spn_session_t* s, spn_profile_info_t* profile, const spn_toolchain_selection_t* selection) {
   spn_profile_finalize(profile, selection);
-  profile->sysroot = resolve_sysroot(s->mem, s->ctx, selection);
+  profile->sdk = spn_sdk_resolve(s->mem, s->ctx->catalog.sdks, selection);
+  if (spn_toolchain_driver_caps(profile->driver) & SPN_CC_CAP_LIBC_FILE && spn_sdk_libc(profile->sdk.kind)) {
+    profile->libc = spn_sdk_libc_path(s->mem, &s->ctx->roots, &profile->sdk);
+    spn_try(spn_sdk_libc_write(s->mem, &s->ctx->roots, &profile->sdk));
+  }
+  return SPN_OK;
 }
 
 static spn_target_rule_t copy_rule(sp_mem_t mem, spn_target_rule_t rule) {
@@ -140,12 +103,12 @@ spn_err_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem, spn_p
   }
   spn_toolchain_selection_t target = sp_zero;
   spn_try(spn_toolchain_select(&ctx->catalog, query, &target));
-  finalize_profile(s, &s->profile, &target);
+  spn_try(finalize_profile(s, &s->profile, &target));
 
   spn_profile_info_t metaprogram = spn_profile_metaprogram();
   spn_toolchain_selection_t script = sp_zero;
   spn_try(spn_toolchain_select(&ctx->catalog, spn_profile_query(&metaprogram, host), &script));
-  finalize_profile(s, &metaprogram, &script);
+  spn_try(finalize_profile(s, &metaprogram, &script));
 
   spn_path_t target_root = spn_path_join(s->mem, s->paths.build, spn_profile_build_dir(s->mem, &s->profile));
   s->units.target = spn_build_add(s, s->profile, target_root, target.toolchain);

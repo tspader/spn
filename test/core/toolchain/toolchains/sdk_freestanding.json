@@ -11,10 +11,9 @@
       },
       "target": [
         {
-          "arch": "aarch64",
-          "os": "linux",
-          "abi": "gnu",
-          "sysroot": "/S"
+          "arch": "x86_64",
+          "os": "freestanding",
+          "sdk": "/S"
         }
       ]
     }

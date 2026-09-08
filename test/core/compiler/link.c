@@ -183,7 +183,7 @@ static const link_test_t tests [] = {
     .profile = {
       .arch = SPN_ARCH_ARM64,
       .os = SPN_OS_MACOS,
-      .sysroot = "/sdk",
+      .sdk = "/sdk",
     },
     .kind = SPN_CC_OUTPUT_EXE,
     .framework = "Cocoa",
@@ -581,7 +581,7 @@ static const link_test_t tests [] = {
       .arch = SPN_ARCH_X64,
       .os = SPN_OS_LINUX,
       .abi = SPN_ABI_GNU,
-      .sysroot = "/S",
+      .sdk = "/S",
     },
     .kind = SPN_CC_OUTPUT_EXE,
     .expect = {
@@ -770,22 +770,6 @@ static const link_test_t tests [] = {
     },
   },
   {
-    .name = "zig_msvc_sdk_unsupported",
-    .driver = SPN_CC_DRIVER_ZIG,
-    .host = HOST_X64_LINUX,
-    .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_WINDOWS, .abi = SPN_ABI_MSVC },
-    .kind = SPN_CC_OUTPUT_EXE,
-    .expect = { .err = SPN_ERR_TOOLCHAIN_ZIG_MSVC_SDK },
-  },
-  {
-    .name = "zig_msvc_sdk_unsupported_on_windows",
-    .driver = SPN_CC_DRIVER_ZIG,
-    .host = HOST_X64_WINDOWS,
-    .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_WINDOWS, .abi = SPN_ABI_MSVC },
-    .kind = SPN_CC_OUTPUT_EXE,
-    .expect = { .err = SPN_ERR_TOOLCHAIN_ZIG_MSVC_SDK },
-  },
-  {
     .name = "zig_mingw_links_off_windows",
     .driver = SPN_CC_DRIVER_ZIG,
     .host = HOST_X64_LINUX,
@@ -876,8 +860,7 @@ sp_test_each(render_link, render, link_test_t, tests, .setup = spn_test_ctx_setu
         sp_expect(t, spn_triple_equal(errs[0].err.compiler.target, triple));
         break;
       }
-      case SPN_ERR_TOOLCHAIN_MSVC_LINKER_HOST:
-      case SPN_ERR_TOOLCHAIN_ZIG_MSVC_SDK: {
+      case SPN_ERR_TOOLCHAIN_MSVC_LINKER_HOST: {
         sp_expect(t, spn_triple_equal(errs[0].err.toolchain.target, triple));
         sp_expect(t, spn_triple_equal(errs[0].err.toolchain.host, it->host));
         break;

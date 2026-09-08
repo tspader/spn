@@ -51,19 +51,19 @@ static spn_arg_t lower_program(spn_toml_loader_t* ctx, const c8* key, spn_toolch
   return sp_zero_struct(spn_arg_t);
 }
 
-static spn_path_t lower_sysroot(spn_toml_loader_t* ctx, spn_toolchain_source_t source, spn_path_root_t base, spn_triple_t triple, sp_str_t sysroot) {
-  if (!spn_sdk_takes_sysroot(spn_sdk_kind(triple))) {
-    spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "sysroot");
+static spn_path_t lower_sdk(spn_toml_loader_t* ctx, spn_toolchain_source_t source, spn_path_root_t base, spn_triple_t triple, sp_str_t sdk) {
+  if (!spn_sdk_declarable(spn_sdk_kind(triple))) {
+    spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "sdk");
     return sp_zero_struct(spn_path_t);
   }
   spn_path_t path = sp_zero;
-  sysroot = spn_toml_loader_intern(ctx, sp_fs_normalize_path(ctx->mem, sysroot));
-  spn_path_check_t check = spn_toolchain_path(source, base, sysroot, &path);
+  sdk = spn_toml_loader_intern(ctx, sp_fs_normalize_path(ctx->mem, sdk));
+  spn_path_check_t check = spn_toolchain_path(source, base, sdk, &path);
   if (check == SPN_PATH_OK) {
     return path;
   }
-  spn_toml_loader_push_key(ctx, "sysroot");
-  spn_toml_loader_issue_at(ctx, path_issue(check), sysroot);
+  spn_toml_loader_push_key(ctx, "sdk");
+  spn_toml_loader_issue_at(ctx, path_issue(check), sdk);
   spn_toml_loader_pop(ctx);
   return sp_zero_struct(spn_path_t);
 }
@@ -380,9 +380,9 @@ static sp_da(spn_toolchain_target_t) lower_toolchain_targets(spn_toml_loader_t* 
       spn_toml_loader_pop(ctx);
       continue;
     }
-    if (!sp_str_empty(cg[it].sysroot)) {
+    if (!sp_str_empty(cg[it].sdk)) {
       spn_toml_loader_push_index(ctx, it);
-      target.sysroot = lower_sysroot(ctx, source, base, target.triple, cg[it].sysroot);
+      target.sdk = lower_sdk(ctx, source, base, target.triple, cg[it].sdk);
       spn_toml_loader_pop(ctx);
     }
     sp_da_push(targets, target);

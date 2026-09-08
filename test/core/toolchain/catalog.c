@@ -117,25 +117,25 @@ static const targets_test_t targets_tests [] = {
   },
   {
     .name = "artifact_sysroots_root_under_artifact",
-    .file = "sysroot.json",
+    .file = "sdk.json",
     .host = HOST_X64_LINUX,
     .toolchain = "A",
     .expect = {
       .targets = {
-        { .triple = HOST_ARM_LINUX, .sysroot = { "aa/S/linux", SPN_PATH_ROOT_TOOLCHAIN } },
-        { .triple = HOST_ARM_MACOS, .sysroot = { "aa/S/macos", SPN_PATH_ROOT_TOOLCHAIN } },
-        { .triple = TARGET_WASM, .sysroot = { "aa/S/wasi", SPN_PATH_ROOT_TOOLCHAIN } },
-        { .triple = TARGET_WIN_GNU, .sysroot = { "aa/S/windows", SPN_PATH_ROOT_TOOLCHAIN } },
+        { .triple = HOST_ARM_LINUX, .sdk = { "aa/S/linux", SPN_PATH_ROOT_TOOLCHAIN } },
+        { .triple = HOST_ARM_MACOS, .sdk = { "aa/S/macos", SPN_PATH_ROOT_TOOLCHAIN } },
+        { .triple = TARGET_WASM, .sdk = { "aa/S/wasi", SPN_PATH_ROOT_TOOLCHAIN } },
+        { .triple = TARGET_WIN_GNU, .sdk = { "aa/S/windows", SPN_PATH_ROOT_TOOLCHAIN } },
         { .triple = HOST_X64_LINUX },
       },
     },
   },
   {
     .name = "local_sysroots_are_kept",
-    .file = "sysroot_local.json",
+    .file = "sdk_local.json",
     .host = HOST_X64_LINUX,
     .toolchain = "A",
-    .expect = { .targets = { { .triple = HOST_ARM_LINUX, .sysroot = { "/S" } } } },
+    .expect = { .targets = { { .triple = HOST_ARM_LINUX, .sdk = { "/S" } } } },
   },
 };
 

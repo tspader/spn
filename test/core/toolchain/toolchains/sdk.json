@@ -20,23 +20,23 @@
           "arch": "aarch64",
           "os": "linux",
           "abi": "gnu",
-          "sysroot": "S/linux"
+          "sdk": "S/linux"
         },
         {
           "arch": "aarch64",
           "os": "macos",
-          "sysroot": "S/macos"
+          "sdk": "S/macos"
         },
         {
           "arch": "wasm32",
           "os": "wasi",
-          "sysroot": "S/wasi"
+          "sdk": "S/wasi"
         },
         {
           "arch": "x86_64",
           "os": "windows",
           "abi": "gnu",
-          "sysroot": "S/windows"
+          "sdk": "S/windows"
         },
         {
           "arch": "x86_64",

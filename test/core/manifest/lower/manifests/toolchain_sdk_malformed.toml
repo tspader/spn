@@ -7,4 +7,4 @@ name = "T"
 compiler = "cc"
 archiver = "ar"
 driver = "gcc"
-target = [{ arch = "x86_64", os = "linux", abi = "gnu", sysroot = "./S" }]
+target = [{ arch = "x86_64", os = "linux", abi = "gnu", sdk = "./S" }]

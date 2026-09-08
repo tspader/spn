@@ -463,7 +463,7 @@ verify_t variant_verify(const variant_t* variant, const spn_cg_toolchains_t* bui
     const spn_cg_toolchain_t* lane = lane_decl(variant->lanes[it], builtin, lanes);
     sp_assert(lane);
     sp_da_for(lane->target, target) {
-      sp_str_t sysroot = lane->target[target].sysroot;
+      sp_str_t sysroot = lane->target[target].sdk;
       if (!sp_str_starts_with(sysroot, sp_str_lit("/")) || provides(variant, sysroot)) {
         continue;
       }

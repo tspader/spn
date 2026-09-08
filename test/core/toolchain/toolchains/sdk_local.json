@@ -11,10 +11,10 @@
       },
       "target": [
         {
-          "arch": "x86_64",
-          "os": "windows",
-          "abi": "msvc",
-          "sysroot": "/S"
+          "arch": "aarch64",
+          "os": "linux",
+          "abi": "gnu",
+          "sdk": "/S"
         }
       ]
     }

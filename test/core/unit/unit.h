@@ -51,7 +51,7 @@ typedef struct {
 
 typedef struct {
   spn_os_t os; // zero selects linux
-  const c8* sysroot;
+  const c8* sdk;
   unit_pkg_t pkgs [UNIT_TEST_MAX_PKGS]; // pkgs[0] is the root package
 } unit_graph_test_t;
 

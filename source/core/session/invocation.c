@@ -151,9 +151,17 @@ sp_da(sp_str_t) spn_invocation_args(const spn_path_roots_t* roots, sp_mem_t mem,
   return args;
 }
 
+sp_env_var_t spn_invocation_env_var(const spn_path_roots_t* roots, sp_mem_t mem, spn_invocation_env_t env) {
+  return (sp_env_var_t) { .key = env.key, .value = spn_arg_str(roots, mem, env.value) };
+}
+
 sp_str_t spn_invocation_to_str(sp_mem_t mem, const spn_invocation_t* invocation) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch_for(mem);
   sp_da(sp_str_t) parts = sp_da_new(scratch.mem, sp_str_t);
+  sp_da_for(invocation->env, it) {
+    sp_env_var_t var = spn_invocation_env_var(&spn.roots, scratch.mem, invocation->env[it]);
+    sp_da_push(parts, sp_fmt(scratch.mem, "{}={}", sp_fmt_str(var.key), sp_fmt_str(var.value)).value);
+  }
   sp_da_push(parts, spn_arg_str(&spn.roots, scratch.mem, invocation->program));
   sp_da_for(invocation->args, it) {
     sp_da_push(parts, spn_arg_str(&spn.roots, scratch.mem, invocation->args[it]));
@@ -180,6 +188,10 @@ spn_invocation_result_t spn_invocation_run(spn_invocation_t* invocation) {
       .err.mode = SP_PS_IO_MODE_REDIRECT,
     }
   };
+  sp_assert(sp_da_size(invocation->env) < SP_PS_MAX_ENV);
+  sp_da_for(invocation->env, it) {
+    ps.env.extra[it] = spn_invocation_env_var(roots, scratch.mem, invocation->env[it]);
+  }
 
   sp_tm_timer_t timer = sp_tm_start_timer();
   sp_ps_output_t result = sp_ps_run(spn.mem, ps);

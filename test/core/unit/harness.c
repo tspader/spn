@@ -2,6 +2,7 @@
 
 #include "paths/paths.h"
 #include "profile/profile.h"
+#include "toolchain/toolchain.h"
 #include "when/when.h"
 
 
@@ -113,8 +114,10 @@ spn_session_t* build_session(sp_mem_t mem, unit_graph_test_t* g) {
     .os = g->os ? g->os : SPN_OS_LINUX,
     .arch = SPN_ARCH_X64,
     .abi = g->os == SPN_OS_MACOS ? SPN_ABI_NONE : SPN_ABI_GNU,
-    .sysroot = { .sub = g->sysroot ? sp_str_view(g->sysroot) : sp_str_lit("") },
   };
+  if (g->sdk) {
+    profile.sdk = spn_sdk_from_root(mem, spn_sdk_kind((spn_triple_t) { profile.arch, profile.os, profile.abi }), (spn_path_t) { .sub = sp_cstr_as_str(g->sdk) }, profile.arch);
+  }
 
   s->units.target = add_build(s, 1, "/build/debug", profile);
   s->units.metaprogram = add_build(s, 2, "/build/wasm32-wasi", profile);

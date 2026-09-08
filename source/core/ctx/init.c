@@ -25,6 +25,7 @@
 #include "toolchain/catalog.h"
 #include "toolchain/probe.h"
 #include "toolchain/provision.h"
+#include "toolchain/sdk.h"
 #include "triple/triple.h"
 #include "version/version.h"
 
@@ -251,7 +252,7 @@ spn_ctx_t* spn_ctx_new(spn_wake_fn_t wake, void* wake_data) {
   ctx->host = spn_triple_host();
 
   sp_str_t builtins = sp_str((const c8*)toolchains_json, toolchains_json_size);
-  spn_toolchain_catalog_init(&ctx->catalog, ctx->host, ctx->heap);
+  spn_toolchain_catalog_init(&ctx->catalog, ctx->host, spn_sdk_detect(ctx->heap, ctx->env, ctx->host), ctx->heap);
   sp_assert(spn_toolchain_catalog_load(&ctx->catalog, builtins) == SPN_OK);
 
   ctx->paths.cwd = sp_fs_get_cwd(ctx->heap);

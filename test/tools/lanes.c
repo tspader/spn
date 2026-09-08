@@ -65,8 +65,8 @@ static void write_target(sp_io_writer_t* io, const spn_cg_toolchain_target_t* ta
   if (!sp_opt_is_null(target->abi)) {
     write_field(io, &first, "abi", spn_abi_to_str(sp_opt_get(target->abi)));
   }
-  if (!sp_str_empty(target->sysroot)) {
-    write_field(io, &first, "sysroot", target->sysroot);
+  if (!sp_str_empty(target->sdk)) {
+    write_field(io, &first, "sdk", target->sdk);
   }
   sp_io_write_cstr(io, " }", SP_NULLPTR);
 }

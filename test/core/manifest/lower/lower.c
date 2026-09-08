@@ -75,7 +75,7 @@ typedef struct {
 
 typedef struct {
   spn_triple_t triple;
-  test_path_t sysroot;
+  test_path_t sdk;
 } toolchain_target_t;
 
 typedef struct {
@@ -566,15 +566,15 @@ static const test_t tests [] = {
     },
   },
   {
-    .name = "toolchain_sysroot",
-    .manifest = "toolchain_sysroot",
+    .name = "toolchain_sdk",
+    .manifest = "toolchain_sdk",
     .toolchains = {
       {
         .name = "L",
         .compiler = { .name = "cc" },
         .archiver = { .name = "ar" },
         .driver = SPN_CC_DRIVER_GCC,
-        .targets = { { .triple = { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_GNU }, .sysroot = { "S", SPN_PATH_ROOT_PROJECT } } },
+        .targets = { { .triple = { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_GNU }, .sdk = { "S", SPN_PATH_ROOT_PROJECT } } },
       },
       {
         .name = "D",
@@ -583,22 +583,22 @@ static const test_t tests [] = {
         .driver = SPN_CC_DRIVER_CLANG,
         .url = "https://tc",
         .sha256 = "deadbeef",
-        .targets = { { .triple = { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_GNU }, .sysroot = { "S" } } },
+        .targets = { { .triple = { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_GNU }, .sdk = { "S" } } },
       },
     },
   },
   {
     .name = "validate_toolchain_sysroot_forbidden",
-    .manifest = "toolchain_sysroot_msvc",
+    .manifest = "toolchain_sdk_msvc",
     .issues = {
-      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].target[0].sysroot" }
+      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].target[0].sdk" }
     },
   },
   {
     .name = "validate_toolchain_sysroot_malformed",
-    .manifest = "toolchain_sysroot_malformed",
+    .manifest = "toolchain_sdk_malformed",
     .issues = {
-      { SPN_ERR_CODEGEN_PATH, "toolchain[0].target[0].sysroot" }
+      { SPN_ERR_CODEGEN_PATH, "toolchain[0].target[0].sdk" }
     },
   },
   {
@@ -1473,7 +1473,7 @@ sp_test_each(lower, cases, test_t, tests) {
       if (target.triple.arch == SPN_ARCH_NONE) break;
       sp_must(t, r < sp_da_size(tc->targets));
       sp_expect(t, spn_triple_equal(target.triple, tc->targets[r].triple));
-      if (test_check_path(t, tc->targets[r].sysroot, target.sysroot)) return SP_ERR;
+      if (test_check_path(t, tc->targets[r].sdk, target.sdk)) return SP_ERR;
     }
 
     sp_carr_for(expected.hosts, r) {

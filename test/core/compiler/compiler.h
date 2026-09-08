@@ -4,6 +4,7 @@
 #include "triples.h"
 
 #include "compiler/driver.h"
+#include "toolchain/toolchain.h"
 #include "compiler/exports.h"
 #include "compiler/rsp.h"
 #include "compiler/toc.h"
@@ -44,7 +45,8 @@ typedef struct {
   spn_mode_t mode;
   spn_opt_level_t opt;
   spn_sanitizer_set_t sanitizers;
-  const c8* sysroot;
+  const c8* sdk;
+  const c8* libc;
 } test_profile_t;
 
 spn_path_t         test_arg_path(const c8* value);

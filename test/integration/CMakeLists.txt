@@ -24,6 +24,7 @@ add_executable(integration
   ${UTIL}/str/str.c
   ${SRC}/toolchain/catalog.c
   ${SRC}/toolchain/toolchain.c
+  ${SRC}/toolchain/sdk.c
   ${SRC}/toolchain/linker.c
   ${SRC}/toolchain/search.c
   ${SRC}/triple/triple.c

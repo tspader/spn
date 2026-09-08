@@ -290,7 +290,7 @@ static const compile_test_t tests [] = {
       .os = SPN_OS_MACOS,
       .abi = SPN_ABI_APPLE,
       .standard = SPN_C99,
-      .sysroot = "/sdk",
+      .sdk = "/sdk",
     },
     .min_os = { 13 },
     .expect = {
@@ -397,7 +397,7 @@ static const compile_test_t tests [] = {
       .os = SPN_OS_LINUX,
       .abi = SPN_ABI_GNU,
       .standard = SPN_C99,
-      .sysroot = "/S",
+      .sdk = "/S",
     },
     .expect = {
       .command = "cc",

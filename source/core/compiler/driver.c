@@ -58,6 +58,14 @@ void spn_cc_push_args(sp_mem_t mem, spn_invocation_t* invocation, sp_da(spn_arg_
   }
 }
 
+void spn_cc_push_env(sp_mem_t mem, spn_invocation_t* invocation, const c8* key, spn_arg_t value) {
+  if (!invocation->env) sp_da_init(mem, invocation->env);
+  sp_da_push(invocation->env, ((spn_invocation_env_t) { .key = sp_cstr_as_str(key), .value = value }));
+}
+
+void spn_cc_push_env_paths(sp_mem_t mem, spn_invocation_t* invocation, const c8* key, const spn_path_t* paths, u32 count) {
+}
+
 bool spn_cc_has(const spn_cc_toolchain_t* toolchain, spn_cc_cap_t cap) {
   return (spn_toolchain_driver_caps(toolchain->driver) & cap) == (spn_cc_cap_set_t)cap;
 }
@@ -263,7 +271,7 @@ spn_err_t spn_cc_validate_link(const spn_cc_toolchain_t* toolchain, spn_triple_t
   if (link->kind == SPN_CC_OUTPUT_SHARED_LIB && !spn_os_dynamic(profile->os)) {
     return feature_unsupported(toolchain, profile, feature);
   }
-  if (profile->os == SPN_OS_MACOS && !sp_da_empty(link->frameworks) && spn_path_empty(profile->sysroot)) {
+  if (profile->os == SPN_OS_MACOS && !sp_da_empty(link->frameworks) && profile->sdk.kind == SPN_SDK_NONE) {
     return feature_unsupported(toolchain, profile, SPN_CC_FEATURE_FRAMEWORKS);
   }
   spn_triple_t target = { profile->arch, profile->os, profile->abi };
@@ -273,9 +281,6 @@ spn_err_t spn_cc_validate_link(const spn_cc_toolchain_t* toolchain, spn_triple_t
   }
   if (family == SPN_LD_FAMILY_MSVC && host.os != SPN_OS_WINDOWS) {
     return link_refused(SPN_ERR_TOOLCHAIN_MSVC_LINKER_HOST, toolchain, host, profile);
-  }
-  if (spn_ld_dialect(target) == SPN_LD_DIALECT_LINK && toolchain->driver == SPN_CC_DRIVER_ZIG) {
-    return link_refused(SPN_ERR_TOOLCHAIN_ZIG_MSVC_SDK, toolchain, host, profile);
   }
   return SPN_OK;
 }

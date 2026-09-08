@@ -24,8 +24,12 @@ spn_profile_info_t test_profile(test_profile_t desc) {
     .opt = desc.opt,
     .sanitizers = desc.sanitizers,
   };
-  if (desc.sysroot) {
-    profile.sysroot.sub = sp_cstr_as_str(desc.sysroot);
+  if (desc.sdk) {
+    spn_triple_t triple = { desc.arch, desc.os, desc.abi };
+    profile.sdk = spn_sdk_from_root(spn.mem, spn_sdk_kind(triple), test_arg_path(desc.sdk), desc.arch);
+  }
+  if (desc.libc) {
+    profile.libc = test_arg_path(desc.libc);
   }
   return profile;
 }

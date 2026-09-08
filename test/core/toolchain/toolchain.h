@@ -30,7 +30,7 @@ typedef struct {
 
 typedef struct {
   spn_triple_t triple;
-  test_path_t sysroot;
+  test_path_t sdk;
 } fixture_target_t;
 
 typedef struct {
@@ -70,7 +70,7 @@ static spn_path_t fixture_path(test_path_t path) {
 }
 
 static spn_toolchain_target_t fixture_target(fixture_target_t target) {
-  return (spn_toolchain_target_t) { .triple = target.triple, .sysroot = fixture_path(target.sysroot) };
+  return (spn_toolchain_target_t) { .triple = target.triple, .sdk = fixture_path(target.sdk) };
 }
 
 static sp_err_t fixture_check_launcher(sp_test_t* t, spn_toolchain_launcher_t launcher, fixture_launcher_t expect) {
@@ -112,7 +112,7 @@ static sp_err_t fixture_check_targets(sp_test_t* t, sp_da(spn_toolchain_target_t
   sp_must_eq(t, count, (u32)sp_da_size(targets));
   sp_for(it, count) {
     sp_expect(t, spn_triple_equal(expect[it].triple, targets[it].triple));
-    if (test_check_path(t, targets[it].sysroot, expect[it].sysroot)) {
+    if (test_check_path(t, targets[it].sdk, expect[it].sdk)) {
       return SP_ERR;
     }
   }
@@ -217,7 +217,7 @@ static sp_err_t fixture_catalog(sp_test_t* t, spn_toolchain_catalog_t* catalog, 
   if (fixture_read_json(t, file, &json)) {
     return SP_ERR;
   }
-  spn_toolchain_catalog_init(catalog, host, sp_test_arena(t));
+  spn_toolchain_catalog_init(catalog, host, SP_NULLPTR, sp_test_arena(t));
   sp_must_eq(t, (u32)SPN_OK, (u32)spn_toolchain_catalog_load(catalog, json));
   return SP_OK;
 }

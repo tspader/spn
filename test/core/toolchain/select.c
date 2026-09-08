@@ -19,7 +19,7 @@ typedef struct {
   spn_err_t err;
   const c8* name;
   spn_triple_t triple;
-  test_path_t sysroot;
+  test_path_t sdk;
   spn_triple_t targets [FIXTURE_MAX_TARGETS];
   const c8* candidates [SELECT_MAX_CANDIDATES];
   spn_abi_t abis [SELECT_MAX_ABIS];
@@ -216,9 +216,9 @@ static const complete_test_t complete_tests [] = {
   {
     .name = "listed_sysroot_reaches_selection",
     .driver = SPN_CC_DRIVER_CLANG,
-    .targets = { { .triple = HOST_ARM_LINUX, .sysroot = { "/S" } } },
+    .targets = { { .triple = HOST_ARM_LINUX, .sdk = { "/S" } } },
     .checks = {
-      { .target = ARM_LINUX, .abis = { SPN_ABI_GNU }, .expect = { .triple = HOST_ARM_LINUX, .sysroot = { "/S" } } },
+      { .target = ARM_LINUX, .abis = { SPN_ABI_GNU }, .expect = { .triple = HOST_ARM_LINUX, .sdk = { "/S" } } },
       { .target = ARM_LINUX, .abis = { SPN_ABI_MUSL }, .expect = { .err = SPN_ERR_TOOLCHAIN_SYSROOT, .targets = { HOST_ARM_LINUX } } },
       { .target = X64_LINUX, .abis = { SPN_ABI_GNU }, .expect = { .triple = HOST_X64_LINUX } },
     },
@@ -424,7 +424,7 @@ static sp_err_t check_selection(sp_test_t* t, const spn_toolchain_selection_t* s
   sp_must(t, selection->toolchain);
   sp_expect_str_eq_c(t, selection->toolchain->name, name);
   sp_expect(t, spn_triple_equal(selection->target.triple, expect->triple));
-  return test_check_path(t, selection->target.sysroot, expect->sysroot);
+  return test_check_path(t, selection->target.sdk, expect->sdk);
 }
 
 sp_test_each(select, complete, complete_test_t, complete_tests, .setup = spn_test_ctx_setup) {
@@ -442,7 +442,7 @@ sp_test_each(select, complete, complete_test_t, complete_tests, .setup = spn_tes
   }
 
   spn_toolchain_catalog_t catalog = sp_zero;
-  spn_toolchain_catalog_init(&catalog, (spn_triple_t) HOST_X64_LINUX, mem);
+  spn_toolchain_catalog_init(&catalog, (spn_triple_t) HOST_X64_LINUX, SP_NULLPTR, mem);
   spn_toolchain_catalog_add(&catalog, toolchain);
 
   u32 checks = 0;

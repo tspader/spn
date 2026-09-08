@@ -159,7 +159,7 @@
           "arch": "x86_64",
           "os": "linux",
           "abi": "musl",
-          "sysroot": "/sysroot/musl"
+          "sdk": "/sysroot/musl"
         }
       ]
     },
@@ -180,7 +180,7 @@
           "arch": "wasm32",
           "os": "wasi",
           "abi": "musl",
-          "sysroot": "/usr"
+          "sdk": "/usr"
         }
       ]
     },
@@ -207,7 +207,7 @@
           "arch": "wasm32",
           "os": "wasi",
           "abi": "musl",
-          "sysroot": "share/wasi-sysroot"
+          "sdk": "share/wasi-sysroot"
         }
       ]
     },
@@ -231,7 +231,7 @@
           "arch": "wasm32",
           "os": "wasi",
           "abi": "musl",
-          "sysroot": "/opt/wasi-sdk/share/wasi-sysroot"
+          "sdk": "/opt/wasi-sdk/share/wasi-sysroot"
         }
       ]
     },
@@ -256,7 +256,7 @@
           "arch": "aarch64",
           "os": "linux",
           "abi": "gnu",
-          "sysroot": "/sysroot/arm64"
+          "sdk": "/sysroot/arm64"
         }
       ]
     },
