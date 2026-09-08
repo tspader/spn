@@ -116,7 +116,9 @@ spn_session_t* build_session(sp_mem_t mem, unit_graph_test_t* g) {
     .abi = g->abi ? g->abi : (g->os == SPN_OS_MACOS ? SPN_ABI_NONE : SPN_ABI_GNU),
   };
   if (g->sdk) {
-    profile.sdk = spn_sdk_from_root(mem, spn_sdk_kind((spn_triple_t) { profile.arch, profile.os, profile.abi }), (spn_path_t) { .sub = sp_cstr_as_str(g->sdk) }, profile.arch);
+    spn_sdk_host_t host = sp_zero;
+    spn_toolchain_selection_t selection = { .target = { .triple = { profile.arch, profile.os, profile.abi }, .sdk = { .sub = sp_cstr_as_str(g->sdk) } } };
+    profile.sdk = spn_sdk_resolve(mem, &host, &selection);
   }
 
   s->units.target = add_build(s, 1, "/build/debug", profile);

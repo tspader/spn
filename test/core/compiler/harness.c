@@ -31,8 +31,9 @@ spn_profile_info_t test_profile(test_profile_t desc) {
     .sanitizers = desc.sanitizers,
   };
   if (desc.sdk) {
-    spn_triple_t triple = { desc.arch, desc.os, desc.abi };
-    profile.sdk = spn_sdk_from_root(spn.mem, spn_sdk_kind(triple), test_arg_path(desc.sdk), desc.arch);
+    spn_sdk_host_t host = sp_zero;
+    spn_toolchain_selection_t selection = { .target = { .triple = { desc.arch, desc.os, desc.abi }, .sdk = test_arg_path(desc.sdk) } };
+    profile.sdk = spn_sdk_resolve(spn.mem, &host, &selection);
   }
   if (desc.libc) {
     profile.libc = test_arg_path(desc.libc);

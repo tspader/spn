@@ -57,22 +57,16 @@ static spn_sdk_msvc_t msvc_layout(sp_mem_t mem, spn_path_t root, spn_arch_t arch
   return msvc;
 }
 
-spn_sdk_t spn_sdk_from_root(sp_mem_t mem, spn_sdk_kind_t kind, spn_path_t root, spn_arch_t arch) {
-  switch (kind) {
-    case SPN_SDK_SYSROOT: {
-      return (spn_sdk_t) { .kind = kind, .root = root };
-    }
-    case SPN_SDK_MACOS: {
-      return (spn_sdk_t) { .kind = kind, .macos = macos_layout(mem, root) };
-    }
-    case SPN_SDK_MSVC: {
-      return (spn_sdk_t) { .kind = kind, .msvc = msvc_layout(mem, root, arch) };
-    }
-    case SPN_SDK_NONE: {
-      sp_unreachable_case();
-    }
-  }
-  sp_unreachable_return(sp_zero_struct(spn_sdk_t));
+spn_sdk_t spn_sdk_sysroot(spn_path_t root) {
+  return (spn_sdk_t) { .kind = SPN_SDK_SYSROOT, .root = root };
+}
+
+spn_sdk_t spn_sdk_macos(sp_mem_t mem, spn_path_t root) {
+  return (spn_sdk_t) { .kind = SPN_SDK_MACOS, .macos = macos_layout(mem, root) };
+}
+
+spn_sdk_t spn_sdk_msvc(sp_mem_t mem, spn_path_t root, spn_arch_t arch) {
+  return (spn_sdk_t) { .kind = SPN_SDK_MSVC, .msvc = msvc_layout(mem, root, arch) };
 }
 
 static spn_path_t absolute(sp_str_t path) {
@@ -150,8 +144,9 @@ static sp_msvc_arch_t msvc_arch(spn_arch_t arch) {
 static void detect_msvc(sp_mem_t mem, sp_da(spn_sdk_msvc_t)* msvc) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch_for(mem);
   sp_msvc_t* found = sp_alloc_type(scratch.mem, sp_msvc_t);
-  spn_arch_t arches [] = { SPN_ARCH_X64, SPN_ARCH_ARM64 };
-  sp_carr_for(arches, it) {
+  const spn_arch_t* arches = SP_NULLPTR;
+  u32 count = spn_os_archs(SPN_OS_WINDOWS, &arches);
+  sp_for(it, count) {
     if (sp_msvc_find_ex(msvc_arch(arches[it]), found) != SP_MSVC_OK) {
       continue;
     }
@@ -177,10 +172,17 @@ spn_sdk_host_t spn_sdk_detect(sp_mem_t mem, const spn_path_roots_t* roots, sp_en
 
 spn_sdk_t spn_sdk_resolve(sp_mem_t mem, const spn_sdk_host_t* host, const spn_toolchain_selection_t* selection) {
   spn_triple_t triple = selection->target.triple;
-  if (spn_path_empty(selection->target.sdk)) {
+  spn_path_t root = selection->target.sdk;
+  if (spn_path_empty(root)) {
     return spn_sdk_from_host(host, triple);
   }
-  return spn_sdk_from_root(mem, spn_sdk_kind(triple), selection->target.sdk, triple.arch);
+  switch (spn_sdk_kind(triple)) {
+    case SPN_SDK_SYSROOT: return spn_sdk_sysroot(root);
+    case SPN_SDK_MACOS: return spn_sdk_macos(mem, root);
+    case SPN_SDK_MSVC: return spn_sdk_msvc(mem, root, triple.arch);
+    case SPN_SDK_NONE: sp_unreachable_case();
+  }
+  sp_unreachable_return(sp_zero_struct(spn_sdk_t));
 }
 
 sp_hash_t spn_sdk_hash(const spn_sdk_t* sdk) {
