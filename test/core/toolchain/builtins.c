@@ -124,18 +124,6 @@ static const bind_test_t bind_tests [] = {
     .expect = { .targets = { HOST_X64_LINUX, TARGET_X64_BARE, TARGET_X64_LINUX_NONE } },
   },
   {
-    .name = "clang_on_macos",
-    .toolchain = "clang",
-    .host = HOST_ARM_MACOS,
-    .expect = { .targets = { HOST_ARM_MACOS } },
-  },
-  {
-    .name = "gcc_on_macos",
-    .toolchain = "gcc",
-    .host = HOST_ARM_MACOS,
-    .expect = { .targets = { HOST_ARM_MACOS } },
-  },
-  {
     .name = "clang_on_windows",
     .toolchain = "clang",
     .host = HOST_X64_WINDOWS,

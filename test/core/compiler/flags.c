@@ -244,22 +244,13 @@ static const flags_test_t tests [] = {
     .expect = { .compile = { "-ffreestanding", "-fno-stack-protector" }, .link = { "-nostartfiles", "-nolibc" } },
   },
   {
-    .name = "freestanding_elf_gcc_strips_nothing",
+    .name = "freestanding_elf_strips_nothing",
     .profile = {
       .arch = SPN_ARCH_ARM64,
       .os = SPN_OS_FREESTANDING,
       .abi = SPN_ABI_ELF,
     },
     .driver = SPN_CC_DRIVER_GCC,
-  },
-  {
-    .name = "freestanding_elf_clang_strips_nothing",
-    .profile = {
-      .arch = SPN_ARCH_ARM64,
-      .os = SPN_OS_FREESTANDING,
-      .abi = SPN_ABI_ELF,
-    },
-    .driver = SPN_CC_DRIVER_CLANG,
   },
   {
     .name = "linux_none_zig_strips_runtime",

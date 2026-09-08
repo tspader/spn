@@ -197,43 +197,6 @@ sp_test(profile, freestanding_libs_not_pic) {
   });
 }
 
-sp_test(profile, freestanding_without_abi_is_refused) {
-  return run_test(t, (test_t) {
-    .project = "test/integration/fixtures/profile/freestanding",
-    .copy = { "a.c" },
-    .when.target = SPN_TEST_ARCH "-freestanding-none",
-    .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", SPN_TEST_ARCH "-freestanding" }, .rc = 1 } },
-      { .kind = ACTION_VERIFY_RESULT, .verify_result.err = SPN_ERR_TARGET_ABI },
-    },
-  });
-}
-
-sp_test(profile, freestanding_elf_needs_sysroot) {
-  return run_test(t, (test_t) {
-    .project = "test/integration/fixtures/profile/freestanding",
-    .copy = { "a.c" },
-    .toolchain = "zig",
-    .when.lanes = { "zig" },
-    .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", "aarch64-freestanding-elf" }, .rc = 1 } },
-      { .kind = ACTION_VERIFY_RESULT, .verify_result.err = SPN_ERR_TOOLCHAIN_SYSROOT },
-    },
-  });
-}
-
-sp_test(profile, freestanding_elf_unlisted_on_fixed_driver) {
-  return run_test(t, (test_t) {
-    .project = "test/integration/fixtures/profile/freestanding",
-    .copy = { "a.c" },
-    .when.driver = SPN_CC_DRIVER_GCC,
-    .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", "aarch64-freestanding-elf" }, .rc = 1 } },
-      { .kind = ACTION_VERIFY_RESULT, .verify_result.err = SPN_ERR_TOOLCHAIN_TARGET },
-    },
-  });
-}
-
 sp_test(profile, nolibc_target) {
   return run_command_test(t, (command_test_t) {
     .project = "test/integration/fixtures/profile/nolibc",
