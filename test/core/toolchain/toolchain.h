@@ -77,7 +77,15 @@ static spn_path_t fixture_path(test_path_t path) {
 }
 
 static spn_sdk_t fixture_sdk(sp_mem_t mem, fixture_sdk_t sdk) {
-  return spn_sdk_from_root(mem, sdk.kind, fixture_path(sdk.root), sdk.arch);
+  switch (sdk.kind) {
+    case SPN_SDK_NONE: return sp_zero_struct(spn_sdk_t);
+    case SPN_SDK_SYSROOT:
+    case SPN_SDK_MACOS:
+    case SPN_SDK_MSVC: return spn_sdk_from_root(mem, sdk.kind, fixture_path(sdk.root), sdk.arch);
+    case SPN_SDK_LIBC_MACOS: return (spn_sdk_t) { .kind = sdk.kind, .libc_macos = { .file = fixture_path(sdk.root) } };
+    case SPN_SDK_LIBC_MSVC: return (spn_sdk_t) { .kind = sdk.kind, .libc_msvc = { .file = fixture_path(sdk.root) } };
+  }
+  sp_unreachable_return(sp_zero_struct(spn_sdk_t));
 }
 
 static sp_da(spn_sdk_t) fixture_sdks(sp_mem_t mem, const fixture_sdk_t* sdks, u32 max) {

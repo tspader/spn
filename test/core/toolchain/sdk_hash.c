@@ -19,6 +19,8 @@ static const test_t tests [] = {
   { .name = "path_root_changes_hash",  .a = { SPN_SDK_SYSROOT, { "S" } },               .b = { SPN_SDK_SYSROOT, { "S", SPN_PATH_ROOT_TOOLCHAIN } } },
   { .name = "msvc_root_changes_hash",  .a = { SPN_SDK_MSVC, { "/X" }, SPN_ARCH_X64 },   .b = { SPN_SDK_MSVC, { "/Y" }, SPN_ARCH_X64 } },
   { .name = "arch_changes_hash",       .a = { SPN_SDK_MSVC, { "/X" }, SPN_ARCH_X64 },   .b = { SPN_SDK_MSVC, { "/X" }, SPN_ARCH_ARM64 } },
+  { .name = "libc_file_changes_hash",  .a = { SPN_SDK_LIBC_MSVC, { "/L" } },            .b = { SPN_SDK_LIBC_MSVC, { "/M" } } },
+  { .name = "libc_kind_changes_hash",  .a = { SPN_SDK_LIBC_MACOS, { "/L" } },           .b = { SPN_SDK_LIBC_MSVC, { "/L" } } },
 };
 
 sp_test_each(sdk_hash, hash, test_t, tests) {

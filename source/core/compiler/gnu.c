@@ -187,21 +187,12 @@ static void add_sdk_compile(sp_mem_t mem, const spn_sdk_t* sdk, spn_invocation_t
       spn_cc_push_path(mem, invocation, sdk->msvc.include.shared);
       break;
     }
-  }
-}
-
-static void add_sdk_compile_libc(sp_mem_t mem, const spn_profile_info_t* profile, spn_invocation_t* invocation) {
-  switch (profile->sdk.kind) {
-    case SPN_SDK_NONE: {
+    case SPN_SDK_LIBC_MACOS: {
+      spn_cc_push_env(mem, invocation, "ZIG_LIBC", spn_arg_path(sdk->libc_macos.file));
       break;
     }
-    case SPN_SDK_SYSROOT: {
-      spn_cc_push_glued(mem, invocation, "--sysroot=", profile->sdk.root);
-      break;
-    }
-    case SPN_SDK_MACOS:
-    case SPN_SDK_MSVC: {
-      spn_cc_push_env(mem, invocation, "ZIG_LIBC", spn_arg_path(profile->libc));
+    case SPN_SDK_LIBC_MSVC: {
+      spn_cc_push_env(mem, invocation, "ZIG_LIBC", spn_arg_path(sdk->libc_msvc.file));
       break;
     }
   }
@@ -226,26 +217,14 @@ static void add_sdk_link(sp_mem_t mem, const spn_sdk_t* sdk, spn_invocation_t* i
       spn_cc_push_env_paths(mem, invocation, "LIB", libs, sp_carr_len(libs));
       break;
     }
-  }
-}
-
-static void add_sdk_link_libc(sp_mem_t mem, const spn_profile_info_t* profile, spn_invocation_t* invocation) {
-  switch (profile->sdk.kind) {
-    case SPN_SDK_NONE: {
-      break;
-    }
-    case SPN_SDK_SYSROOT: {
-      spn_cc_push_glued(mem, invocation, "--sysroot=", profile->sdk.root);
-      break;
-    }
-    case SPN_SDK_MACOS: {
-      spn_cc_push_env(mem, invocation, "ZIG_LIBC", spn_arg_path(profile->libc));
+    case SPN_SDK_LIBC_MACOS: {
+      spn_cc_push_env(mem, invocation, "ZIG_LIBC", spn_arg_path(sdk->libc_macos.file));
       spn_cc_push_c(mem, invocation, "-F");
-      spn_cc_push_path(mem, invocation, spn_path_join(mem, profile->sdk.root, sp_str_lit("System/Library/Frameworks")));
+      spn_cc_push_path(mem, invocation, spn_path_join(mem, sdk->libc_macos.root, sp_str_lit("System/Library/Frameworks")));
       break;
     }
-    case SPN_SDK_MSVC: {
-      spn_cc_push_env(mem, invocation, "ZIG_LIBC", spn_arg_path(profile->libc));
+    case SPN_SDK_LIBC_MSVC: {
+      spn_cc_push_env(mem, invocation, "ZIG_LIBC", spn_arg_path(sdk->libc_msvc.file));
       break;
     }
   }
@@ -295,12 +274,7 @@ void spn_gnu_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, c
   if (compile->pic) {
     spn_cc_push_c(mem, invocation, "-fPIC");
   }
-  if (spn_cc_has(toolchain, SPN_CC_CAP_LIBC_FILE)) {
-    add_sdk_compile_libc(mem, profile, invocation);
-  }
-  else {
-    add_sdk_compile(mem, &profile->sdk, invocation);
-  }
+  add_sdk_compile(mem, &profile->sdk, invocation);
   if (profile->os == SPN_OS_MACOS && is_os_version_present(compile->min_os)) {
     spn_cc_push_fmt(mem, invocation, "-mmacosx-version-min={}.{}", sp_fmt_uint(compile->min_os.major), sp_fmt_uint(compile->min_os.minor));
   }
@@ -510,12 +484,7 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
   sp_da_for(link->system_libs, it) {
     spn_cc_push_fmt(mem, invocation, "-l{}", sp_fmt_str(link->system_libs[it]));
   }
-  if (spn_cc_has(toolchain, SPN_CC_CAP_LIBC_FILE)) {
-    add_sdk_link_libc(mem, profile, invocation);
-  }
-  else {
-    add_sdk_link(mem, &profile->sdk, invocation);
-  }
+  add_sdk_link(mem, &profile->sdk, invocation);
   if (profile->os == SPN_OS_MACOS) {
     if (is_os_version_present(link->min_os)) {
       spn_cc_push_fmt(mem, invocation, "-mmacosx-version-min={}.{}", sp_fmt_uint(link->min_os.major), sp_fmt_uint(link->min_os.minor));

@@ -13,7 +13,7 @@ typedef struct {
   spn_path_t kernel32_lib;
 } libc_t;
 
-static libc_t libc_layout(sp_mem_t mem, const spn_sdk_t* sdk) {
+static libc_t layout(sp_mem_t mem, const spn_sdk_t* sdk) {
   switch (sdk->kind) {
     case SPN_SDK_MACOS: {
       spn_path_t include = spn_path_join(mem, sdk->root, sp_str_lit("usr/include"));
@@ -29,7 +29,9 @@ static libc_t libc_layout(sp_mem_t mem, const spn_sdk_t* sdk) {
       };
     }
     case SPN_SDK_NONE:
-    case SPN_SDK_SYSROOT: {
+    case SPN_SDK_SYSROOT:
+    case SPN_SDK_LIBC_MACOS:
+    case SPN_SDK_LIBC_MSVC: {
       sp_unreachable_case();
     }
   }
@@ -37,32 +39,26 @@ static libc_t libc_layout(sp_mem_t mem, const spn_sdk_t* sdk) {
 }
 
 static void render_key(sp_io_writer_t* io, const spn_path_roots_t* roots, sp_mem_t mem, const c8* key, spn_path_t path) {
-  sp_str_t value = spn_path_empty(path) ? sp_str_lit("") : spn_path_str(roots, mem, path);
-  sp_fmt_io(io, "{}={}\n", sp_fmt_cstr(key), sp_fmt_str(value));
+  sp_fmt_io(io, "{}={}\n", sp_fmt_cstr(key), sp_fmt_str(spn_path_str(roots, mem, path)));
 }
 
-void spn_sdk_render_libc(sp_io_writer_t* io, const spn_path_roots_t* roots, const spn_sdk_t* sdk) {
-  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  libc_t libc = libc_layout(scratch.mem, sdk);
-  render_key(io, roots, scratch.mem, "include_dir", libc.include);
-  render_key(io, roots, scratch.mem, "sys_include_dir", libc.sys_include);
-  render_key(io, roots, scratch.mem, "crt_dir", libc.crt);
-  render_key(io, roots, scratch.mem, "msvc_lib_dir", libc.msvc_lib);
-  render_key(io, roots, scratch.mem, "kernel32_lib_dir", libc.kernel32_lib);
-  render_key(io, roots, scratch.mem, "gcc_dir", sp_zero_struct(spn_path_t));
-  sp_mem_end_scratch(scratch);
-}
-
-static sp_str_t libc_content(sp_mem_t mem, const spn_path_roots_t* roots, const spn_sdk_t* sdk) {
-  sp_io_dyn_mem_writer_t w;
+static sp_str_t render(sp_mem_t mem, const spn_path_roots_t* roots, const spn_sdk_t* sdk) {
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch_for(mem);
+  libc_t libc = layout(scratch.mem, sdk);
+  sp_io_dyn_mem_writer_t w = sp_zero;
   sp_io_dyn_mem_writer_init(mem, &w);
-  spn_sdk_render_libc(&w.base, roots, sdk);
+  render_key(&w.base, roots, scratch.mem, "include_dir", libc.include);
+  render_key(&w.base, roots, scratch.mem, "sys_include_dir", libc.sys_include);
+  render_key(&w.base, roots, scratch.mem, "crt_dir", libc.crt);
+  render_key(&w.base, roots, scratch.mem, "msvc_lib_dir", libc.msvc_lib);
+  render_key(&w.base, roots, scratch.mem, "kernel32_lib_dir", libc.kernel32_lib);
+  render_key(&w.base, roots, scratch.mem, "gcc_dir", sp_zero_struct(spn_path_t));
+  sp_mem_end_scratch(scratch);
   return sp_io_dyn_mem_writer_take_str(&w);
 }
 
-spn_path_t spn_sdk_libc_path(sp_mem_t mem, const spn_path_roots_t* roots, const spn_sdk_t* sdk) {
+static spn_path_t file_path(sp_mem_t mem, sp_str_t content) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch_for(mem);
-  sp_str_t content = libc_content(scratch.mem, roots, sdk);
   u8 digest [32] = sp_zero;
   spn_digest(SPN_DIGEST_BLAKE3, content.data, content.len, digest);
   sp_str_t name = sp_fmt(scratch.mem, "libc/{}.txt", sp_fmt_str(spn_digest_hex(scratch.mem, digest))).value;
@@ -71,16 +67,50 @@ spn_path_t spn_sdk_libc_path(sp_mem_t mem, const spn_path_roots_t* roots, const 
   return path;
 }
 
-spn_err_t spn_sdk_libc_write(sp_mem_t mem, const spn_path_roots_t* roots, const spn_sdk_t* sdk) {
+static spn_err_t write_file(sp_mem_t mem, const spn_path_roots_t* roots, spn_path_t file, sp_str_t content) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch_for(mem);
-  sp_str_t path = spn_path_str(roots, scratch.mem, spn_sdk_libc_path(scratch.mem, roots, sdk));
+  sp_str_t path = spn_path_str(roots, scratch.mem, file);
   spn_err_t err = SPN_OK;
   if (!sp_fs_is_file(path)) {
     sp_fs_create_dir(sp_fs_parent_path(path));
-    if (sp_fs_create_file_str(path, libc_content(scratch.mem, roots, sdk))) {
+    if (sp_fs_create_file_str(path, content)) {
       err = spn_err_emit(&spn, (spn_err_union_t) { .kind = SPN_ERR_FS_WRITE, .fs = { .path = sp_str_copy(mem, path) } });
     }
   }
   sp_mem_end_scratch(scratch);
   return err;
+}
+
+static spn_sdk_t as_libc(const spn_sdk_t* sdk, spn_path_t file) {
+  switch (sdk->kind) {
+    case SPN_SDK_MACOS: return (spn_sdk_t) { .kind = SPN_SDK_LIBC_MACOS, .libc_macos = { .file = file, .root = sdk->root } };
+    case SPN_SDK_MSVC: return (spn_sdk_t) { .kind = SPN_SDK_LIBC_MSVC, .libc_msvc = { .file = file } };
+    case SPN_SDK_NONE:
+    case SPN_SDK_SYSROOT:
+    case SPN_SDK_LIBC_MACOS:
+    case SPN_SDK_LIBC_MSVC: sp_unreachable_case();
+  }
+  sp_unreachable_return(*sdk);
+}
+
+spn_err_t spn_sdk_to_libc(sp_mem_t mem, const spn_path_roots_t* roots, spn_sdk_t* sdk) {
+  switch (sdk->kind) {
+    case SPN_SDK_NONE:
+    case SPN_SDK_SYSROOT: {
+      return SPN_OK;
+    }
+    case SPN_SDK_MACOS:
+    case SPN_SDK_MSVC: {
+      break;
+    }
+    case SPN_SDK_LIBC_MACOS:
+    case SPN_SDK_LIBC_MSVC: {
+      sp_unreachable_case();
+    }
+  }
+  sp_str_t content = render(mem, roots, sdk);
+  spn_path_t file = file_path(mem, content);
+  spn_try(write_file(mem, roots, file, content));
+  *sdk = as_libc(sdk, file);
+  return SPN_OK;
 }

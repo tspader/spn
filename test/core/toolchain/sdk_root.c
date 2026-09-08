@@ -18,10 +18,6 @@ typedef struct {
 
 static const test_t tests [] = {
   {
-    .name = "none_is_empty",
-    .sdk = { SPN_SDK_NONE, { "/S" } },
-  },
-  {
     .name = "sysroot_keeps_root",
     .sdk = { SPN_SDK_SYSROOT, { "/S" } },
     .expect = { .root = { "/S" } },
@@ -89,15 +85,17 @@ sp_test_each(sdk_root, layout, test_t, tests) {
   spn_sdk_t sdk = fixture_sdk(sp_test_arena(t), it->sdk);
   sp_must_eq(t, (u32)it->sdk.kind, (u32)sdk.kind);
   switch (sdk.kind) {
-    case SPN_SDK_NONE: {
-      return test_check_path(t, sdk.root, it->expect.root);
-    }
     case SPN_SDK_SYSROOT:
     case SPN_SDK_MACOS: {
       return test_check_path(t, sdk.root, it->expect.root);
     }
     case SPN_SDK_MSVC: {
       return check_msvc(t, &sdk.msvc, &it->expect.msvc, it->sdk.arch);
+    }
+    case SPN_SDK_NONE:
+    case SPN_SDK_LIBC_MACOS:
+    case SPN_SDK_LIBC_MSVC: {
+      sp_unreachable_case();
     }
   }
   sp_unreachable_return(SP_ERR);

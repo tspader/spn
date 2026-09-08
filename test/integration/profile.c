@@ -185,6 +185,18 @@ sp_test(profile, freestanding_libs_not_pic) {
   });
 }
 
+sp_test(profile, coff_libs_not_pic) {
+  return run_test(t, (test_t) {
+    .project = "test/integration/fixtures/profile/freestanding",
+    .copy = { "a.c" },
+    .when = { .os = SPN_OS_WINDOWS, .driver = SPN_CC_DRIVER_CLANG },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build" } },
+      { .kind = ACTION_VERIFY_NO_CC_ARG, .verify_cc_arg = { "-fPIC" } },
+    },
+  });
+}
+
 sp_test(profile, flags) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/profile/sanitize",

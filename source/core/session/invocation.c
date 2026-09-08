@@ -19,7 +19,7 @@ static spn_cc_compile_t compile_desc(sp_mem_t mem, spn_compile_unit_t* unit) {
   spn_cc_compile_t compile = {
     .lang = unit->lang,
     .cxx = unit->target->info->cxx,
-    .pic = unit->target->info->kind == SPN_TARGET_KIND_LIB && spn_os_dynamic(build->profile.os) && spn_os_format(build->profile.os) != SPN_FORMAT_COFF,
+    .pic = unit->target->info->kind == SPN_TARGET_KIND_LIB && spn_os_pic(build->profile.os),
   };
   if (build->profile.os == SPN_OS_MACOS) {
     compile.min_os = unit->target->link.cc.min_os;
@@ -195,7 +195,7 @@ spn_invocation_result_t spn_invocation_run(spn_invocation_t* invocation) {
       .err.mode = SP_PS_IO_MODE_REDIRECT,
     }
   };
-  sp_assert(sp_da_size(invocation->env) < SP_PS_MAX_ENV);
+  sp_assert(sp_da_size(invocation->env) <= SP_PS_MAX_ENV);
   sp_da_for(invocation->env, it) {
     ps.env.extra[it] = spn_invocation_env_var(roots, scratch.mem, invocation->env[it]);
   }

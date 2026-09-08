@@ -7,6 +7,7 @@
 #include "toolchain/catalog.h"
 #include "toolchain/linker.h"
 #include "toolchain/search.h"
+#include "toolchain/select.h"
 #include "toolchain/toolchain.h"
 #include "triple/triple.h"
 #include "lanes.h"
@@ -67,20 +68,8 @@ static spn_triple_t when_target(const test_when_t* when) {
   };
 }
 
-static bool triple_agrees(spn_triple_t a, spn_triple_t b) {
-  bool arch = !a.arch || !b.arch || a.arch == b.arch;
-  bool os = !a.os || !b.os || a.os == b.os;
-  bool abi = !a.abi || !b.abi || a.abi == b.abi;
-  return arch && os && abi;
-}
-
 static bool toolchain_targets(const spn_toolchain_info_t* info, spn_triple_t target) {
-  sp_da_for(info->targets, it) {
-    if (triple_agrees(info->targets[it].triple, target)) {
-      return true;
-    }
-  }
-  return spn_toolchain_driver_retargets(info->driver) && spn_sdk_find(catalog.sdks, target);
+  return spn_toolchain_reaches(&catalog, info, target);
 }
 
 const c8* test_host_triple(void) {
@@ -233,7 +222,8 @@ static sp_err_t load_lanes(void* user) {
 
   sp_str_t lanes = read_repo_file(mem, SPN_LANES_TEST);
   sp_env_t env = sp_env_capture(mem);
-  spn_toolchain_catalog_init(&catalog, spn_triple_host(), spn_sdk_detect(mem, &env, spn_triple_host()), mem);
+  spn_path_roots_t roots = sp_zero;
+  spn_toolchain_catalog_init(&catalog, spn_triple_host(), spn_sdk_detect(mem, &roots, &env, spn_triple_host()), mem);
   sp_assert(spn_toolchain_catalog_load(&catalog, read_repo_file(mem, SPN_LANES_BUILTIN)) == SPN_OK);
   sp_assert(spn_toolchain_catalog_load(&catalog, lanes) == SPN_OK);
 

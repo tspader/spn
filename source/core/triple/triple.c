@@ -173,6 +173,22 @@ spn_format_t spn_os_format(spn_os_t os) {
   SP_UNREACHABLE_RETURN(SPN_FORMAT_ELF);
 }
 
+bool spn_os_pic(spn_os_t os) {
+  switch (os) {
+    case SPN_OS_LINUX:
+    case SPN_OS_MACOS: {
+      return true;
+    }
+    case SPN_OS_WINDOWS:
+    case SPN_OS_WASI:
+    case SPN_OS_FREESTANDING:
+    case SPN_OS_NONE: {
+      return false;
+    }
+  }
+  SP_UNREACHABLE_RETURN(false);
+}
+
 bool spn_os_dynamic(spn_os_t os) {
   switch (os) {
     case SPN_OS_LINUX:

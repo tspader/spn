@@ -366,6 +366,25 @@ sp_test_each(triple, os_dynamic, os_dynamic_t, os_dynamic_tests) {
   return SP_OK;
 }
 
+typedef struct {
+  const c8* name;
+  spn_os_t os;
+  bool expect;
+} os_pic_t;
+
+static const os_pic_t os_pic_tests [] = {
+  { "linux",        SPN_OS_LINUX,        true },
+  { "macos",        SPN_OS_MACOS,        true },
+  { "windows",      SPN_OS_WINDOWS,      false },
+  { "wasi",         SPN_OS_WASI,         false },
+  { "freestanding", SPN_OS_FREESTANDING, false },
+};
+
+sp_test_each(triple, os_pic, os_pic_t, os_pic_tests) {
+  sp_expect_eq(t, it->expect, spn_os_pic(it->os));
+  return SP_OK;
+}
+
 sp_test_each(triple, os_abis, os_abis_t, os_abis_tests) {
   u32 expected = 0;
   sp_carr_detect_len(it->expect, expected, it->expect[expected]);

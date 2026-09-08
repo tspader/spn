@@ -3,7 +3,6 @@
 typedef struct {
   spn_sdk_kind_t kind;
   bool declarable;
-  bool libc;
 } expect_t;
 
 typedef struct {
@@ -17,8 +16,8 @@ static const test_t tests [] = {
   { .name = "linux_musl",   .target = HOST_X64_LINUX_MUSL, .expect = { SPN_SDK_SYSROOT, .declarable = true } },
   { .name = "windows_gnu",  .target = TARGET_WIN_GNU,      .expect = { SPN_SDK_SYSROOT, .declarable = true } },
   { .name = "wasi",         .target = TARGET_WASM,         .expect = { SPN_SDK_SYSROOT, .declarable = true } },
-  { .name = "windows_msvc", .target = TARGET_WIN_MSVC,     .expect = { SPN_SDK_MSVC, .declarable = true, .libc = true } },
-  { .name = "macos",        .target = HOST_ARM_MACOS,      .expect = { SPN_SDK_MACOS, .declarable = true, .libc = true } },
+  { .name = "windows_msvc", .target = TARGET_WIN_MSVC,     .expect = { SPN_SDK_MSVC, .declarable = true } },
+  { .name = "macos",        .target = HOST_ARM_MACOS,      .expect = { SPN_SDK_MACOS, .declarable = true } },
   { .name = "freestanding", .target = TARGET_X64_BARE },
 };
 
@@ -26,6 +25,5 @@ sp_test_each(sdk, kind, test_t, tests) {
   spn_sdk_kind_t kind = spn_sdk_kind(it->target);
   sp_expect_eq(t, (u32)it->expect.kind, (u32)kind);
   sp_expect_eq(t, it->expect.declarable, spn_sdk_declarable(kind));
-  sp_expect_eq(t, it->expect.libc, spn_sdk_libc(kind));
   return SP_OK;
 }

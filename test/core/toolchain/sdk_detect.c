@@ -34,7 +34,8 @@ sp_test_each(sdk_detect, env, test_t, tests) {
     sp_env_insert(&env, sp_cstr_as_str(it->vars[at].key), sp_cstr_as_str(it->vars[at].value));
   }
 
-  sp_da(spn_sdk_t) sdks = spn_sdk_detect(mem, &env, it->host);
+  spn_path_roots_t roots = sp_zero;
+  sp_da(spn_sdk_t) sdks = spn_sdk_detect(mem, &roots, &env, it->host);
   u32 count = 0;
   sp_carr_detect_len(it->expect.sdks, count, it->expect.sdks[count].kind);
   sp_must_eq(t, count, (u32)sp_da_size(sdks));

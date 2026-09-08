@@ -85,7 +85,9 @@ static void add_sdk_compile(sp_mem_t mem, const spn_sdk_t* sdk, spn_invocation_t
       break;
     }
     case SPN_SDK_SYSROOT:
-    case SPN_SDK_MACOS: {
+    case SPN_SDK_MACOS:
+    case SPN_SDK_LIBC_MACOS:
+    case SPN_SDK_LIBC_MSVC: {
       sp_unreachable_case();
     }
   }
@@ -102,7 +104,9 @@ static void add_sdk_link(sp_mem_t mem, const spn_sdk_t* sdk, spn_invocation_t* i
       break;
     }
     case SPN_SDK_SYSROOT:
-    case SPN_SDK_MACOS: {
+    case SPN_SDK_MACOS:
+    case SPN_SDK_LIBC_MACOS:
+    case SPN_SDK_LIBC_MSVC: {
       sp_unreachable_case();
     }
   }
