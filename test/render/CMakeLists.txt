@@ -31,6 +31,7 @@ add_executable(render
   main.c
   cases.c
   ${TEST_TOOLS}/caps.c
+  ${TEST_TOOLS}/lanes.c
   ${TEST_TOOLS}/env.c
   ${TEST_TOOLS}/fixture.c
   ${TEST_TOOLS}/toml.c

@@ -55,6 +55,7 @@ add_executable(integration
   upstream.c
   worlds.c
   ${TEST_TOOLS}/caps.c
+  ${TEST_TOOLS}/lanes.c
   ${TEST_TOOLS}/env.c
   tools/harness.c
   ${TEST_TOOLS}/fixture.c
