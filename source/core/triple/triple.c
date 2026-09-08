@@ -84,7 +84,7 @@ u32 spn_os_abis(spn_os_t os, const spn_abi_t** abis) {
   static const spn_abi_t windows_abis [] = { SPN_ABI_GNU, SPN_ABI_MSVC };
   static const spn_abi_t macos_abis [] = { SPN_ABI_APPLE };
   static const spn_abi_t wasi_abis [] = { SPN_ABI_MUSL };
-  static const spn_abi_t freestanding_abis [] = { SPN_ABI_BARE };
+  static const spn_abi_t freestanding_abis [] = { SPN_ABI_BARE, SPN_ABI_ELF };
 
   switch (os) {
     case SPN_OS_LINUX: {
@@ -120,7 +120,7 @@ u32 spn_os_completions(spn_os_t os, const spn_abi_t** abis) {
   static const spn_abi_t windows_abis [] = { SPN_ABI_GNU, SPN_ABI_MSVC };
   static const spn_abi_t macos_abis [] = { SPN_ABI_APPLE };
   static const spn_abi_t wasi_abis [] = { SPN_ABI_MUSL };
-  static const spn_abi_t freestanding_abis [] = { SPN_ABI_BARE };
+  static const spn_abi_t freestanding_abis [] = { SPN_ABI_BARE, SPN_ABI_ELF };
 
   switch (os) {
     case SPN_OS_LINUX: {

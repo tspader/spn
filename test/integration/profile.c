@@ -149,8 +149,8 @@ sp_test(profile, freestanding_target) {
   return run_command_test(t, (command_test_t) {
     .project = "test/integration/fixtures/profile/freestanding",
     .copy = { "a.c" },
-    .when.target = SPN_TEST_ARCH "-freestanding",
-    .args = { "build", "--target", SPN_TEST_ARCH "-freestanding" },
+    .when.target = SPN_TEST_ARCH "-freestanding-none",
+    .args = { "build", "--target", SPN_TEST_ARCH "-freestanding-none" },
     .expect = {
       .exists = { target_exe("main", SPN_TEST_ARCH "-freestanding-none") },
       .events = {
@@ -165,9 +165,9 @@ sp_test(profile, freestanding_exe_has_no_interp) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/profile/freestanding",
     .copy = { "a.c" },
-    .when.target = SPN_TEST_ARCH "-freestanding",
+    .when.target = SPN_TEST_ARCH "-freestanding-none",
     .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", SPN_TEST_ARCH "-freestanding" } } },
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", SPN_TEST_ARCH "-freestanding-none" } } },
       { .kind = ACTION_VERIFY_NO_INTERP, .verify_no_interp = target_exe("main", SPN_TEST_ARCH "-freestanding-none") },
     },
   });
@@ -177,9 +177,9 @@ sp_test(profile, freestanding_image_has_no_sanitizer_runtime) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/profile/freestanding",
     .copy = { "a.c" },
-    .when.target = SPN_TEST_ARCH "-freestanding",
+    .when.target = SPN_TEST_ARCH "-freestanding-none",
     .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", SPN_TEST_ARCH "-freestanding" } } },
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", SPN_TEST_ARCH "-freestanding-none" } } },
       { .kind = ACTION_VERIFY_ELF_NO_SYMBOL, .verify_elf_no_symbol = { target_exe("main", SPN_TEST_ARCH "-freestanding-none"), "__ubsan_" } },
     },
   });
@@ -189,10 +189,47 @@ sp_test(profile, freestanding_libs_not_pic) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/profile/freestanding",
     .copy = { "a.c" },
-    .when.target = SPN_TEST_ARCH "-freestanding",
+    .when.target = SPN_TEST_ARCH "-freestanding-none",
     .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", SPN_TEST_ARCH "-freestanding" } } },
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", SPN_TEST_ARCH "-freestanding-none" } } },
       { .kind = ACTION_VERIFY_NO_CC_ARG, .verify_cc_arg = { "-fPIC" } },
+    },
+  });
+}
+
+sp_test(profile, freestanding_without_abi_is_refused) {
+  return run_test(t, (test_t) {
+    .project = "test/integration/fixtures/profile/freestanding",
+    .copy = { "a.c" },
+    .when.target = SPN_TEST_ARCH "-freestanding-none",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", SPN_TEST_ARCH "-freestanding" }, .rc = 1 } },
+      { .kind = ACTION_VERIFY_RESULT, .verify_result.err = SPN_ERR_TARGET_ABI },
+    },
+  });
+}
+
+sp_test(profile, freestanding_elf_needs_sysroot) {
+  return run_test(t, (test_t) {
+    .project = "test/integration/fixtures/profile/freestanding",
+    .copy = { "a.c" },
+    .toolchain = "zig",
+    .when.lanes = { "zig" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", "aarch64-freestanding-elf" }, .rc = 1 } },
+      { .kind = ACTION_VERIFY_RESULT, .verify_result.err = SPN_ERR_TOOLCHAIN_SYSROOT },
+    },
+  });
+}
+
+sp_test(profile, freestanding_elf_unlisted_on_fixed_driver) {
+  return run_test(t, (test_t) {
+    .project = "test/integration/fixtures/profile/freestanding",
+    .copy = { "a.c" },
+    .when.driver = SPN_CC_DRIVER_GCC,
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", "aarch64-freestanding-elf" }, .rc = 1 } },
+      { .kind = ACTION_VERIFY_RESULT, .verify_result.err = SPN_ERR_TOOLCHAIN_TARGET },
     },
   });
 }

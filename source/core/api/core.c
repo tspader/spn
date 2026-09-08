@@ -275,6 +275,7 @@ spn_libc_kind_t spn_profile_get_libc(spn_profile_t* profile) {
   switch (info->abi) {
     case SPN_ABI_MUSL: return SPN_LIBC_MUSL;
     case SPN_ABI_BARE: return SPN_LIBC_NONE;
+    case SPN_ABI_ELF:  return SPN_LIBC_CUSTOM;
     default:           return SPN_LIBC_GNU;
   }
 }

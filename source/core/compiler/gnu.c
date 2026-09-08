@@ -88,6 +88,7 @@ static sp_str_t render_target(sp_mem_t mem, const spn_cc_toolchain_t* toolchain,
       if (spn_cc_has(toolchain, SPN_CC_CAP_LLVM_TRIPLE)) {
         return sp_fmt(mem, "{}-none-elf", sp_fmt_str(spn_arch_to_str(triple.arch))).value;
       }
+      triple.abi = SPN_ABI_BARE;
       return spn_triple_to_str(mem, triple);
     }
     case SPN_OS_LINUX:

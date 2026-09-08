@@ -106,7 +106,7 @@ Cross compiling works out of the box. The following commands produce `build/x86_
 ```sh
 spn build --target x86_64-windows-gnu
 spn build --target aarch64-macos
-spn build --target aarch64-freestanding
+spn build --target aarch64-freestanding-none
 ```
 
 A kernel image needs its own memory layout. Give the target a linker script and any raw flags the link needs:

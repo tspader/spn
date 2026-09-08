@@ -435,6 +435,22 @@ static const link_test_t tests [] = {
     },
   },
   {
+    .name = "clang_freestanding_elf_exe",
+    .driver = SPN_CC_DRIVER_CLANG,
+    .profile = {
+      .arch = SPN_ARCH_ARM64,
+      .os = SPN_OS_FREESTANDING,
+      .abi = SPN_ABI_ELF,
+      .linkage = SPN_LIB_KIND_STATIC,
+      .sdk = "/S",
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .expect = {
+      .command = "cc",
+      .args = { "--target=aarch64-none-elf", "-static", "main.o", "--sysroot=/S", "-o", "main" },
+    },
+  },
+  {
     .name = "freestanding_shared_lib_unsupported",
     .driver = SPN_CC_DRIVER_ZIG,
     .profile = {

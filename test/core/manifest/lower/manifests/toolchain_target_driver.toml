@@ -7,4 +7,4 @@ name = "cross"
 compiler = "cl"
 archiver = "lib"
 driver = "msvc"
-target = [{ arch = "x86_64", os = "freestanding" }]
+target = [{ arch = "x86_64", os = "freestanding", abi = "none" }]

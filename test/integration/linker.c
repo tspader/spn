@@ -4,9 +4,9 @@ sp_test(linker, script_sets_entry) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/linker/script",
     .copy = { "main.ld" },
-    .when.target = SPN_TEST_ARCH "-freestanding",
+    .when.target = SPN_TEST_ARCH "-freestanding-none",
     .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", SPN_TEST_ARCH "-freestanding" } } },
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", SPN_TEST_ARCH "-freestanding-none" } } },
       { .kind = ACTION_VERIFY_ELF_ENTRY, .verify_elf_entry = { target_exe("main", SPN_TEST_ARCH "-freestanding-none"), 0x400000 } },
     },
   });
@@ -64,9 +64,9 @@ sp_test(linker, cross_script_sets_entry) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/linker/cross",
     .copy = { "main.ld" },
-    .when = { .lanes = { "aarch64-gnu" }, .target = "aarch64-freestanding" },
+    .when = { .lanes = { "aarch64-gnu" }, .target = "aarch64-freestanding-none" },
     .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", "aarch64-freestanding" } } },
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", "aarch64-freestanding-none" } } },
       { .kind = ACTION_VERIFY_ELF_ENTRY, .verify_elf_entry = { target_exe("main", "aarch64-freestanding-none"), 0x400000 } },
     },
   });

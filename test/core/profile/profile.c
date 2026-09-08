@@ -152,12 +152,22 @@ static const test_t tests [] = {
     },
   },
   {
-    .name = "freestanding_defaults_to_static",
-    .overrides = { .arch = SPN_ARCH_ARM64, .os = SPN_OS_FREESTANDING },
+    .name = "freestanding_elf_defaults_to_static",
+    .overrides = { .arch = SPN_ARCH_ARM64, .os = SPN_OS_FREESTANDING, .abi = SPN_ABI_ELF },
     .host = PROFILE_HOST_LINUX_GNU,
     .shared_demand = true,
     .expect = {
-      .target = { SPN_ARCH_ARM64, SPN_OS_FREESTANDING, SPN_ABI_BARE },
+      .target = { SPN_ARCH_ARM64, SPN_OS_FREESTANDING, SPN_ABI_ELF },
+      .linkage = SPN_LIB_KIND_STATIC,
+      .targeted = true,
+    },
+  },
+  {
+    .name = "freestanding_without_abi_stays_incomplete",
+    .overrides = { .arch = SPN_ARCH_ARM64, .os = SPN_OS_FREESTANDING },
+    .host = PROFILE_HOST_LINUX_GNU,
+    .expect = {
+      .target = { SPN_ARCH_ARM64, SPN_OS_FREESTANDING },
       .linkage = SPN_LIB_KIND_STATIC,
       .targeted = true,
     },
@@ -403,6 +413,11 @@ static const query_test_t query_tests [] = {
     .expect = { .abis = { SPN_ABI_MUSL } },
   },
   {
+    .name = "freestanding_has_no_candidates",
+    .target = { SPN_ARCH_ARM64, SPN_OS_FREESTANDING },
+    .host = PROFILE_HOST_LINUX_GNU,
+  },
+  {
     .name = "cross_os_with_many_abis_has_no_candidates",
     .target = { SPN_ARCH_X64, SPN_OS_WINDOWS },
     .host = PROFILE_HOST_LINUX_GNU,
@@ -435,6 +450,7 @@ static const finalize_test_t finalize_tests [] = {
   { .name = "msvc_is_shared",  .abi = SPN_ABI_MSVC,  .driver = SPN_CC_DRIVER_GCC, .expect = { .linkage = SPN_LIB_KIND_SHARED, .driver = SPN_CC_DRIVER_GCC, .linker = SPN_LD_FAMILY_GNU } },
   { .name = "apple_is_shared", .abi = SPN_ABI_APPLE, .driver = SPN_CC_DRIVER_GCC, .expect = { .linkage = SPN_LIB_KIND_SHARED, .driver = SPN_CC_DRIVER_GCC, .linker = SPN_LD_FAMILY_GNU } },
   { .name = "bare_is_static",  .abi = SPN_ABI_BARE,  .driver = SPN_CC_DRIVER_GCC, .expect = { .linkage = SPN_LIB_KIND_STATIC, .driver = SPN_CC_DRIVER_GCC, .linker = SPN_LD_FAMILY_GNU } },
+  { .name = "elf_is_static",   .abi = SPN_ABI_ELF,   .driver = SPN_CC_DRIVER_GCC, .expect = { .linkage = SPN_LIB_KIND_STATIC, .driver = SPN_CC_DRIVER_GCC, .linker = SPN_LD_FAMILY_GNU } },
   { .name = "records_driver",  .abi = SPN_ABI_GNU,   .driver = SPN_CC_DRIVER_ZIG, .expect = { .linkage = SPN_LIB_KIND_SHARED, .driver = SPN_CC_DRIVER_ZIG, .linker = SPN_LD_FAMILY_LLD } },
   { .name = "records_linker",  .abi = SPN_ABI_GNU,   .driver = SPN_CC_DRIVER_GCC, .linker = SPN_LD_FAMILY_LLD, .expect = { .linkage = SPN_LIB_KIND_SHARED, .driver = SPN_CC_DRIVER_GCC, .linker = SPN_LD_FAMILY_LLD } },
 };

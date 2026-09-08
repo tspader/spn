@@ -177,6 +177,7 @@ sp_cli_cmd_t spn_cmd_build = {
         { .name = "msvc", .value = SPN_ABI_MSVC },
         { .name = "apple", .value = SPN_ABI_APPLE },
         { .name = "none", .value = SPN_ABI_BARE },
+        { .name = "elf", .value = SPN_ABI_ELF },
       },
     },
   },

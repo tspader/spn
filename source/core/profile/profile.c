@@ -180,7 +180,8 @@ static spn_linkage_t abi_linkage(spn_abi_t abi) {
       return SPN_LIB_KIND_SHARED;
     }
     case SPN_ABI_MUSL:
-    case SPN_ABI_BARE: {
+    case SPN_ABI_BARE:
+    case SPN_ABI_ELF: {
       return SPN_LIB_KIND_STATIC;
     }
     case SPN_ABI_NONE:

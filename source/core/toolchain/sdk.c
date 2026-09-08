@@ -14,8 +14,8 @@ spn_sdk_kind_t spn_sdk_kind(spn_triple_t target) {
     case SPN_OS_MACOS: return SPN_SDK_MACOS;
     case SPN_OS_WINDOWS: return target.abi == SPN_ABI_MSVC ? SPN_SDK_MSVC : SPN_SDK_SYSROOT;
     case SPN_OS_LINUX:
-    case SPN_OS_WASI: return SPN_SDK_SYSROOT;
-    case SPN_OS_FREESTANDING: return SPN_SDK_NONE;
+    case SPN_OS_WASI:
+    case SPN_OS_FREESTANDING: return SPN_SDK_SYSROOT;
     case SPN_OS_NONE: sp_unreachable_case();
   }
   SP_UNREACHABLE_RETURN(SPN_SDK_NONE);

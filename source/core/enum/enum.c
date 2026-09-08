@@ -176,6 +176,9 @@ spn_abi_t spn_abi_from_str(sp_str_t str) {
   if (sp_str_equal_cstr(str, "none")) {
     return SPN_ABI_BARE;
   }
+  if (sp_str_equal_cstr(str, "elf")) {
+    return SPN_ABI_ELF;
+  }
 
   return SPN_ABI_NONE;
 }
@@ -196,6 +199,9 @@ sp_str_t spn_abi_to_str(spn_abi_t abi) {
     }
     case SPN_ABI_BARE: {
       return sp_str_lit("none");
+    }
+    case SPN_ABI_ELF: {
+      return sp_str_lit("elf");
     }
     case SPN_ABI_NONE: {
       return sp_str_lit("");

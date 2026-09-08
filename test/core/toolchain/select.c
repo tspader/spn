@@ -152,6 +152,31 @@ static const complete_test_t complete_tests [] = {
     },
   },
   {
+    .name = "fixed_driver_lists_elf",
+    .driver = SPN_CC_DRIVER_GCC,
+    .targets = { TARGET_ARM_ELF },
+    .checks = {
+      { .target = ARM_FREESTANDING, .abis = { SPN_ABI_ELF }, .expect = { .triple = TARGET_ARM_ELF } },
+      { .target = ARM_FREESTANDING, .abis = { SPN_ABI_BARE }, .expect = { .err = SPN_ERR_TOOLCHAIN_TARGET, .targets = { TARGET_ARM_ELF } } },
+    },
+  },
+  {
+    .name = "retargeting_driver_needs_sysroot_for_elf",
+    .driver = SPN_CC_DRIVER_CLANG,
+    .targets = { HOST_X64_LINUX },
+    .checks = {
+      { .target = ARM_FREESTANDING, .abis = { SPN_ABI_ELF }, .expect = { .err = SPN_ERR_TOOLCHAIN_SYSROOT, .targets = { HOST_X64_LINUX } } },
+    },
+  },
+  {
+    .name = "freestanding_without_abi_needs_one",
+    .driver = SPN_CC_DRIVER_GCC,
+    .targets = { TARGET_ARM_BARE },
+    .checks = {
+      { .target = ARM_FREESTANDING, .expect = { .err = SPN_ERR_TARGET_ABI, .abis = { SPN_ABI_BARE, SPN_ABI_ELF } } },
+    },
+  },
+  {
     .name = "host_needs_no_sysroot",
     .driver = SPN_CC_DRIVER_CLANG,
     .targets = { TARGET_WASM },
@@ -340,6 +365,12 @@ static const resolve_test_t resolve_tests [] = {
     .expect = { .err = SPN_ERR_TARGET_ABI, .abis = { SPN_ABI_GNU, SPN_ABI_MSVC } },
   },
   {
+    .name = "auto_freestanding_without_abi_needs_one",
+    .file = "freestanding.json",
+    .target = ARM_FREESTANDING,
+    .expect = { .err = SPN_ERR_TARGET_ABI, .abis = { SPN_ABI_BARE, SPN_ABI_ELF } },
+  },
+  {
     .name = "auto_without_abis_rejects_unreachable_target",
     .file = "auto.json",
     .target = { SPN_ARCH_WASM32, SPN_OS_LINUX },
@@ -426,6 +457,13 @@ static const resolve_test_t resolve_tests [] = {
     .toolchain = "B",
     .target = X64_WINDOWS,
     .expect = { .err = SPN_ERR_TOOLCHAIN_SYSROOT, .targets = { HOST_X64_LINUX, TARGET_LINUX_MUSL, HOST_ARM_LINUX, TARGET_ARM_LINUX_MUSL }, .candidates = { "A", "C" } },
+  },
+  {
+    .name = "named_retargeting_driver_freestanding_without_abi_needs_one",
+    .file = "auto.json",
+    .toolchain = "B",
+    .target = ARM_FREESTANDING,
+    .expect = { .err = SPN_ERR_TARGET_ABI, .abis = { SPN_ABI_BARE, SPN_ABI_ELF } },
   },
   {
     .name = "auto_never_attempts_undeclared_targets",

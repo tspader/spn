@@ -2,18 +2,19 @@
   "toolchain": [
     {
       "name": "A",
-      "driver": "msvc",
+      "driver": "clang",
       "compiler": {
-        "program": "cl"
+        "program": "A"
       },
       "archiver": {
-        "program": "lib"
+        "program": "A"
       },
       "target": [
         {
           "arch": "x86_64",
           "os": "freestanding",
-          "abi": "none"
+          "abi": "elf",
+          "sdk": "/S"
         }
       ]
     }

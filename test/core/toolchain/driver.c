@@ -73,10 +73,10 @@ static const default_abi_t default_abi_tests [] = {
   { "clang_wasi",    SPN_CC_DRIVER_CLANG, SPN_OS_WASI,         SPN_ABI_MUSL },
   { "zig_wasi",      SPN_CC_DRIVER_ZIG,   SPN_OS_WASI,         SPN_ABI_MUSL },
   { "msvc_wasi",     SPN_CC_DRIVER_MSVC,  SPN_OS_WASI,         SPN_ABI_MUSL },
-  { "gcc_bare",      SPN_CC_DRIVER_GCC,   SPN_OS_FREESTANDING, SPN_ABI_BARE },
-  { "clang_bare",    SPN_CC_DRIVER_CLANG, SPN_OS_FREESTANDING, SPN_ABI_BARE },
-  { "zig_bare",      SPN_CC_DRIVER_ZIG,   SPN_OS_FREESTANDING, SPN_ABI_BARE },
-  { "msvc_bare",     SPN_CC_DRIVER_MSVC,  SPN_OS_FREESTANDING, SPN_ABI_BARE },
+  { "gcc_bare",      SPN_CC_DRIVER_GCC,   SPN_OS_FREESTANDING },
+  { "clang_bare",    SPN_CC_DRIVER_CLANG, SPN_OS_FREESTANDING },
+  { "zig_bare",      SPN_CC_DRIVER_ZIG,   SPN_OS_FREESTANDING },
+  { "msvc_bare",     SPN_CC_DRIVER_MSVC,  SPN_OS_FREESTANDING },
 };
 
 sp_test_each(driver, default_abi, default_abi_t, default_abi_tests) {

@@ -591,8 +591,21 @@ static const test_t tests [] = {
     },
   },
   {
+    .name = "toolchain_sdk_on_elf",
+    .manifest = "toolchain_sdk_elf",
+    .toolchains = {
+      {
+        .name = "T",
+        .compiler = { .name = "clang" },
+        .archiver = { .name = "ar" },
+        .driver = SPN_CC_DRIVER_CLANG,
+        .targets = { { .triple = { SPN_ARCH_X64, SPN_OS_FREESTANDING, SPN_ABI_ELF }, .sdk = { "/S" } } },
+      },
+    },
+  },
+  {
     .name = "validate_toolchain_sdk_forbidden",
-    .manifest = "toolchain_sdk_freestanding",
+    .manifest = "toolchain_sdk_none",
     .issues = {
       { SPN_ERR_CODEGEN_INVALID, "toolchain[0].target[0].sdk" }
     },

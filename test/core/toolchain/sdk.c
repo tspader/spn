@@ -18,8 +18,9 @@ static const test_t tests [] = {
   { .name = "wasi",         .target = TARGET_WASM,         .expect = { SPN_SDK_SYSROOT, .declarable = true } },
   { .name = "windows_msvc", .target = TARGET_WIN_MSVC,     .expect = { SPN_SDK_MSVC, .declarable = true } },
   { .name = "macos",        .target = HOST_ARM_MACOS,      .expect = { SPN_SDK_MACOS, .declarable = true } },
-  { .name = "freestanding", .target = TARGET_X64_BARE },
-  { .name = "linux_none",   .target = TARGET_X64_LINUX_NONE },
+  { .name = "freestanding_none", .target = TARGET_X64_BARE },
+  { .name = "freestanding_elf",  .target = TARGET_ARM_ELF,      .expect = { SPN_SDK_SYSROOT, .declarable = true } },
+  { .name = "linux_none",        .target = TARGET_X64_LINUX_NONE },
 };
 
 sp_test_each(sdk, kind, test_t, tests) {

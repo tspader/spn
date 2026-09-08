@@ -193,9 +193,9 @@ sp_test(freshness, linker_script_change) {
   return run_rebuild_test(t, (rebuild_test_t) {
     .project = "test/integration/fixtures/freshness/linker_script",
     .copy = { "main.ld", "main.change.ld" },
-    .when.target = SPN_TEST_ARCH "-freestanding",
+    .when.target = SPN_TEST_ARCH "-freestanding-none",
     .first = {
-      .args = { "build", "--target", SPN_TEST_ARCH "-freestanding" },
+      .args = { "build", "--target", SPN_TEST_ARCH "-freestanding-none" },
       .expect.exists = { target_exe("main", SPN_TEST_ARCH "-freestanding-none") },
     },
     .rebuilds = {
@@ -204,7 +204,7 @@ sp_test(freshness, linker_script_change) {
           { .from = sp_str_lit("main.change.ld"), .to = sp_str_lit("main.ld") },
         },
         .command = {
-          .args = { "build", "--target", SPN_TEST_ARCH "-freestanding" },
+          .args = { "build", "--target", SPN_TEST_ARCH "-freestanding-none" },
           .expect.events = {
             { .event = SPN_EVENT_TARGET_BUILD_PASSED, .absent = true },
             { .event = SPN_EVENT_LINK_PASSED },

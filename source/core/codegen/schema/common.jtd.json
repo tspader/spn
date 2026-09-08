@@ -2,7 +2,7 @@
   "definitions": {
     "arch": { "enum": ["x86_64", "aarch64", "wasm32"] },
     "os": { "enum": ["windows", "linux", "macos", "wasi", "freestanding"] },
-    "abi": { "enum": ["gnu", "musl", "msvc", "apple", "none"] },
+    "abi": { "enum": ["gnu", "musl", "msvc", "apple", "none", "elf"] },
     "linkage": { "enum": ["shared", "static", "source", "object"] },
     "cc_driver": { "enum": ["gcc", "clang", "msvc", "zig"] },
     "ld_family": { "enum": ["gnu", "lld", "ld64", "msvc"] },

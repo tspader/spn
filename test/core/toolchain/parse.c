@@ -219,9 +219,27 @@ static const parse_test_t tests [] = {
     },
   },
   {
-    .name = "sdk_on_freestanding_target",
-    .file = "sdk_freestanding.json",
+    .name = "sdk_on_none_target",
+    .file = "sdk_none.json",
     .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "sdk_on_elf_target",
+    .file = "sdk_elf.json",
+    .expect = {
+      .entries = 1,
+      .toolchains = {
+        {
+          .name = "A",
+          .driver = SPN_CC_DRIVER_CLANG,
+          .compiler = { .name = "A" },
+          .archiver = { .name = "A" },
+          .targets = {
+            { .triple = { SPN_ARCH_X64, SPN_OS_FREESTANDING, SPN_ABI_ELF }, .sdk = { "/S" } },
+          },
+        },
+      },
+    },
   },
   {
     .name = "sdk_absolute_in_distribution",
