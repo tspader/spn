@@ -187,8 +187,8 @@ sp_test(profile, freestanding_libs_not_pic) {
 
 sp_test(profile, coff_libs_not_pic) {
   return run_test(t, (test_t) {
-    .project = "test/integration/fixtures/profile/freestanding",
-    .copy = { "a.c" },
+    .project = "test/integration/fixtures/platform/fingerprint",
+    .copy = { "main.c", "packages/*" },
     .when = { .os = SPN_OS_WINDOWS, .driver = SPN_CC_DRIVER_CLANG },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build" } },
