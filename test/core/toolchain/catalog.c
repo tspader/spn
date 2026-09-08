@@ -60,7 +60,7 @@ static const add_test_t add_tests [] = {
           .name = "A",
           .driver = SPN_CC_DRIVER_GCC,
           .compiler = { .path = "/A" },
-          .targets = { HOST_X64_LINUX, TARGET_X64_BARE },
+          .targets = { HOST_X64_LINUX, TARGET_X64_BARE, TARGET_X64_LINUX_NONE },
         },
       },
     },
@@ -82,18 +82,18 @@ static const add_test_t add_tests [] = {
 
 static const targets_test_t targets_tests [] = {
   {
-    .name = "gcc_on_linux_targets_host_and_bare_metal",
+    .name = "gcc_on_linux_targets_host_and_none",
     .file = "drivers.json",
     .host = HOST_X64_LINUX,
     .toolchain = "A",
-    .expect = { .targets = { HOST_X64_LINUX, TARGET_X64_BARE } },
+    .expect = { .targets = { HOST_X64_LINUX, TARGET_X64_BARE, TARGET_X64_LINUX_NONE } },
   },
   {
-    .name = "clang_on_linux_targets_host_only",
+    .name = "clang_on_linux_targets_host_and_none",
     .file = "drivers.json",
     .host = HOST_ARM_LINUX,
     .toolchain = "B",
-    .expect = { .targets = { HOST_ARM_LINUX } },
+    .expect = { .targets = { HOST_ARM_LINUX, TARGET_ARM_BARE, TARGET_ARM_LINUX_NONE } },
   },
   {
     .name = "gcc_on_macos_targets_host_only",

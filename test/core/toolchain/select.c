@@ -1,6 +1,6 @@
 #include "toolchain.h"
 
-#define SELECT_MAX_CHECKS 3
+#define SELECT_MAX_CHECKS 4
 #define SELECT_MAX_ABIS 3
 #define SELECT_MAX_CANDIDATES 3
 
@@ -109,6 +109,7 @@ static const complete_test_t complete_tests [] = {
     .driver = SPN_CC_DRIVER_GCC,
     .checks = {
       { .target = X64_FREESTANDING, .abis = { SPN_ABI_BARE }, .expect = { .triple = TARGET_X64_BARE } },
+      { .target = X64_LINUX, .abis = { SPN_ABI_BARE }, .expect = { .triple = TARGET_X64_LINUX_NONE } },
     },
   },
   {
@@ -131,20 +132,23 @@ static const complete_test_t complete_tests [] = {
     },
   },
   {
-    .name = "fixed_driver_must_list_freestanding",
+    .name = "fixed_driver_must_list_none",
     .driver = SPN_CC_DRIVER_GCC,
     .targets = { HOST_X64_LINUX },
     .checks = {
       { .target = X64_FREESTANDING, .abis = { SPN_ABI_BARE }, .expect = { .err = SPN_ERR_TOOLCHAIN_TARGET, .targets = { HOST_X64_LINUX } } },
+      { .target = X64_LINUX, .abis = { SPN_ABI_BARE }, .expect = { .err = SPN_ERR_TOOLCHAIN_TARGET, .targets = { HOST_X64_LINUX } } },
     },
   },
   {
-    .name = "retargeting_driver_attempts_freestanding",
+    .name = "retargeting_driver_attempts_none",
     .driver = SPN_CC_DRIVER_CLANG,
     .targets = { HOST_X64_LINUX },
     .checks = {
       { .target = X64_FREESTANDING, .abis = { SPN_ABI_BARE }, .expect = { .triple = TARGET_X64_BARE } },
       { .target = ARM_FREESTANDING, .abis = { SPN_ABI_BARE }, .expect = { .triple = TARGET_ARM_BARE } },
+      { .target = X64_LINUX, .abis = { SPN_ABI_BARE }, .expect = { .triple = TARGET_X64_LINUX_NONE } },
+      { .target = ARM_LINUX, .abis = { SPN_ABI_BARE }, .expect = { .triple = TARGET_ARM_LINUX_NONE } },
     },
   },
   {
@@ -316,6 +320,13 @@ static const resolve_test_t resolve_tests [] = {
     .expect = { .name = "B", .triple = HOST_ARM_MACOS },
   },
   {
+    .name = "auto_reaches_none_unlisted",
+    .file = "auto.json",
+    .target = X64_LINUX,
+    .abis = { SPN_ABI_BARE },
+    .expect = { .name = "B", .triple = TARGET_X64_LINUX_NONE },
+  },
+  {
     .name = "auto_without_host_sdk_finds_none",
     .file = "auto.json",
     .target = ARM_MACOS,
@@ -374,7 +385,7 @@ static const resolve_test_t resolve_tests [] = {
     .target = X64_WINDOWS,
     .abis = { SPN_ABI_GNU },
     .host = HOST_ARM_LINUX,
-    .expect = { .err = SPN_ERR_TOOLCHAIN_TARGET, .targets = { HOST_ARM_LINUX, TARGET_ARM_BARE } },
+    .expect = { .err = SPN_ERR_TOOLCHAIN_TARGET, .targets = { HOST_ARM_LINUX, TARGET_ARM_BARE, TARGET_ARM_LINUX_NONE } },
   },
   {
     .name = "named_retargeting_driver_needs_msvc_sdk",
@@ -407,7 +418,7 @@ static const resolve_test_t resolve_tests [] = {
     .toolchain = "D",
     .target = X64_WINDOWS,
     .abis = { SPN_ABI_GNU },
-    .expect = { .err = SPN_ERR_TOOLCHAIN_TARGET, .targets = { HOST_X64_LINUX, TARGET_X64_BARE }, .candidates = { "A", "C" } },
+    .expect = { .err = SPN_ERR_TOOLCHAIN_TARGET, .targets = { HOST_X64_LINUX, TARGET_X64_BARE, TARGET_X64_LINUX_NONE }, .candidates = { "A", "C" } },
   },
   {
     .name = "named_retargeting_driver_without_abis_needs_sysroot",

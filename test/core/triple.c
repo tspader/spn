@@ -254,6 +254,7 @@ static const entry_t entry_tests [] = {
   { "single_abi_filled",       { SPN_ARCH_ARM64,  SPN_OS_MACOS },                       { .full = { SPN_ARCH_ARM64,  SPN_OS_MACOS,        SPN_ABI_APPLE } } },
   { "wasi_abi_filled",         { SPN_ARCH_WASM32, SPN_OS_WASI },                        { .full = { SPN_ARCH_WASM32, SPN_OS_WASI,         SPN_ABI_MUSL } } },
   { "freestanding_abi_filled", { SPN_ARCH_ARM64,  SPN_OS_FREESTANDING },                { .full = { SPN_ARCH_ARM64,  SPN_OS_FREESTANDING, SPN_ABI_BARE } } },
+  { "linux_none",              { SPN_ARCH_X64,    SPN_OS_LINUX,        SPN_ABI_BARE },  { .full = { SPN_ARCH_X64,    SPN_OS_LINUX,        SPN_ABI_BARE } } },
   { "ambiguous_abi",           { SPN_ARCH_X64,    SPN_OS_LINUX },                       { .result = SPN_TRIPLE_ENTRY_MISSING_ABI } },
   { "missing_os",              { SPN_ARCH_X64 },                                        { .result = SPN_TRIPLE_ENTRY_MISSING_OS } },
   { "missing_arch",            { SPN_ARCH_NONE,   SPN_OS_LINUX,        SPN_ABI_GNU },   { .result = SPN_TRIPLE_ENTRY_MISSING_ARCH } },
@@ -310,12 +311,21 @@ typedef struct {
 } os_abis_t;
 
 static const os_abis_t os_abis_tests [] = {
-  { "linux",   SPN_OS_LINUX,   { SPN_ABI_GNU, SPN_ABI_MUSL } },
-  { "windows", SPN_OS_WINDOWS, { SPN_ABI_GNU, SPN_ABI_MSVC } },
-  { "macos",   SPN_OS_MACOS,   { SPN_ABI_APPLE } },
-  { "wasi",    SPN_OS_WASI,    { SPN_ABI_MUSL } },
+  { "linux",        SPN_OS_LINUX,        { SPN_ABI_GNU, SPN_ABI_MUSL, SPN_ABI_BARE } },
+  { "windows",      SPN_OS_WINDOWS,      { SPN_ABI_GNU, SPN_ABI_MSVC } },
+  { "macos",        SPN_OS_MACOS,        { SPN_ABI_APPLE } },
+  { "wasi",         SPN_OS_WASI,         { SPN_ABI_MUSL } },
   { "freestanding", SPN_OS_FREESTANDING, { SPN_ABI_BARE } },
-  { "none",    SPN_OS_NONE },
+  { "none",         SPN_OS_NONE },
+};
+
+static const os_abis_t os_completions_tests [] = {
+  { "linux",        SPN_OS_LINUX,        { SPN_ABI_GNU, SPN_ABI_MUSL } },
+  { "windows",      SPN_OS_WINDOWS,      { SPN_ABI_GNU, SPN_ABI_MSVC } },
+  { "macos",        SPN_OS_MACOS,        { SPN_ABI_APPLE } },
+  { "wasi",         SPN_OS_WASI,         { SPN_ABI_MUSL } },
+  { "freestanding", SPN_OS_FREESTANDING, { SPN_ABI_BARE } },
+  { "none",         SPN_OS_NONE },
 };
 
 #define TRIPLE_MAX_ARCHS 3
@@ -394,6 +404,19 @@ sp_test_each(triple, os_abis, os_abis_t, os_abis_tests) {
 
   const spn_abi_t* abis = SP_NULLPTR;
   u32 count = spn_os_abis(it->os, &abis);
+  sp_must_eq(t, expected, count);
+  sp_for(at, count) {
+    sp_expect_eq(t, it->expect[at], abis[at]);
+  }
+  return SP_OK;
+}
+
+sp_test_each(triple, os_completions, os_abis_t, os_completions_tests) {
+  u32 expected = 0;
+  sp_carr_detect_len(it->expect, expected, it->expect[expected]);
+
+  const spn_abi_t* abis = SP_NULLPTR;
+  u32 count = spn_os_completions(it->os, &abis);
   sp_must_eq(t, expected, count);
   sp_for(at, count) {
     sp_expect_eq(t, it->expect[at], abis[at]);

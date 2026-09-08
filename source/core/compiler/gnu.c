@@ -421,11 +421,11 @@ static void add_rpath(sp_mem_t mem, spn_os_t os, spn_invocation_t* invocation) {
       spn_cc_push_c(mem, invocation, "-Wl,-rpath,@loader_path");
       break;
     }
-    case SPN_OS_WINDOWS:
-    case SPN_OS_WASI:
-    case SPN_OS_FREESTANDING: {
+    case SPN_OS_WINDOWS: {
       break;
     }
+    case SPN_OS_WASI:
+    case SPN_OS_FREESTANDING:
     case SPN_OS_NONE: {
       sp_unreachable_case();
     }
@@ -508,7 +508,7 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
       spn_cc_push_str(mem, invocation, link->frameworks[it]);
     }
   }
-  if (link->rpath) {
+  if (spn_triple_dynamic(triple)) {
     add_rpath(mem, profile->os, invocation);
   }
   spn_cc_push_c(mem, invocation, "-o");

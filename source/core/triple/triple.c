@@ -80,7 +80,7 @@ spn_abi_t spn_host_libc(sp_mem_t mem, sp_io_seeking_reader_t* elf) {
 }
 
 u32 spn_os_abis(spn_os_t os, const spn_abi_t** abis) {
-  static const spn_abi_t linux_abis [] = { SPN_ABI_GNU, SPN_ABI_MUSL };
+  static const spn_abi_t linux_abis [] = { SPN_ABI_GNU, SPN_ABI_MUSL, SPN_ABI_BARE };
   static const spn_abi_t windows_abis [] = { SPN_ABI_GNU, SPN_ABI_MSVC };
   static const spn_abi_t macos_abis [] = { SPN_ABI_APPLE };
   static const spn_abi_t wasi_abis [] = { SPN_ABI_MUSL };
@@ -113,6 +113,42 @@ u32 spn_os_abis(spn_os_t os, const spn_abi_t** abis) {
     }
   }
   SP_UNREACHABLE_RETURN(0);
+}
+
+u32 spn_os_completions(spn_os_t os, const spn_abi_t** abis) {
+  static const spn_abi_t linux_abis [] = { SPN_ABI_GNU, SPN_ABI_MUSL };
+  static const spn_abi_t windows_abis [] = { SPN_ABI_GNU, SPN_ABI_MSVC };
+  static const spn_abi_t macos_abis [] = { SPN_ABI_APPLE };
+  static const spn_abi_t wasi_abis [] = { SPN_ABI_MUSL };
+  static const spn_abi_t freestanding_abis [] = { SPN_ABI_BARE };
+
+  switch (os) {
+    case SPN_OS_LINUX: {
+      *abis = linux_abis;
+      return sp_carr_len(linux_abis);
+    }
+    case SPN_OS_WINDOWS: {
+      *abis = windows_abis;
+      return sp_carr_len(windows_abis);
+    }
+    case SPN_OS_MACOS: {
+      *abis = macos_abis;
+      return sp_carr_len(macos_abis);
+    }
+    case SPN_OS_WASI: {
+      *abis = wasi_abis;
+      return sp_carr_len(wasi_abis);
+    }
+    case SPN_OS_FREESTANDING: {
+      *abis = freestanding_abis;
+      return sp_carr_len(freestanding_abis);
+    }
+    case SPN_OS_NONE: {
+      *abis = SP_NULLPTR;
+      return 0;
+    }
+  }
+  sp_unreachable_return(0);
 }
 
 u32 spn_os_archs(spn_os_t os, const spn_arch_t** archs) {
@@ -232,7 +268,7 @@ spn_triple_entry_t spn_triple_entry(spn_triple_t partial, spn_triple_t* full) {
   }
 
   const spn_abi_t* abis = SP_NULLPTR;
-  u32 count = spn_os_abis(partial.os, &abis);
+  u32 count = spn_os_completions(partial.os, &abis);
   if (count != 1) {
     return SPN_TRIPLE_ENTRY_MISSING_ABI;
   }

@@ -102,8 +102,9 @@ static sp_da(spn_toolchain_target_t) default_targets(spn_toolchain_catalog_t* ca
     return targets;
   }
   sp_da_push(targets, ((spn_toolchain_target_t) { .triple = host }));
-  if (spn_os_format(host.os) == SPN_FORMAT_ELF && !spn_toolchain_driver_retargets(decl->driver)) {
+  if (spn_os_format(host.os) == SPN_FORMAT_ELF) {
     sp_da_push(targets, ((spn_toolchain_target_t) { .triple = { host.arch, SPN_OS_FREESTANDING, SPN_ABI_BARE } }));
+    sp_da_push(targets, ((spn_toolchain_target_t) { .triple = { host.arch, host.os, SPN_ABI_BARE } }));
   }
   return targets;
 }

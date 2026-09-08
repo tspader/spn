@@ -291,7 +291,6 @@ sp_test_each(link_plan, plan, plan_test_t, tests, .setup = spn_test_ctx_setup) {
   sp_expect_eq(t, it->expect.min_os.major, plan->cc.min_os.major);
   sp_expect_eq(t, it->expect.min_os.minor, plan->cc.min_os.minor);
   sp_expect_eq(t, it->expect.lang, plan->cc.lang);
-  sp_expect(t, plan->cc.rpath);
 
   return SP_OK;
 }

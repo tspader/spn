@@ -157,7 +157,7 @@ static spn_abi_list_t abi_order(const spn_profile_info_t* profile, spn_triple_t 
     push_abi(&list, profile->linkage == SPN_LIB_KIND_SHARED ? host.abi : SPN_ABI_MUSL);
   }
   const spn_abi_t* abis = SP_NULLPTR;
-  u32 count = spn_os_abis(profile->os, &abis);
+  u32 count = spn_os_completions(profile->os, &abis);
   sp_for(it, count) {
     push_abi(&list, abis[it]);
   }

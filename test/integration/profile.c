@@ -197,6 +197,58 @@ sp_test(profile, freestanding_libs_not_pic) {
   });
 }
 
+sp_test(profile, nolibc_target) {
+  return run_command_test(t, (command_test_t) {
+    .project = "test/integration/fixtures/profile/nolibc",
+    .copy = { "a.c" },
+    .when = { .host = SPN_OS_LINUX, .target = SPN_TEST_ARCH "-linux-none" },
+    .args = { "build", "--abi", "none" },
+    .expect = {
+      .exists = { target_exe("main", SPN_TEST_ARCH "-linux-none") },
+      .events = {
+        { .event = SPN_EVENT_INIT_BUILD_GRAPH, .key = "target", .value = SPN_TEST_ARCH "-linux-none" },
+        { .event = SPN_EVENT_INIT_BUILD_GRAPH, .key = "toolchain", .value = test_toolchain()->name },
+      },
+    },
+  });
+}
+
+sp_test(profile, nolibc_runs) {
+  return run_command_test(t, (command_test_t) {
+    .project = "test/integration/fixtures/profile/nolibc",
+    .copy = { "a.c" },
+    .when = { .host = SPN_OS_LINUX, .target = SPN_TEST_ARCH "-linux-none" },
+    .args = { "build", "--abi", "none" },
+    .expect = {
+      .bin = { .path = target_exe("main", SPN_TEST_ARCH "-linux-none"), .rc = 7, .contains = { "A" } },
+    },
+  });
+}
+
+sp_test(profile, nolibc_exe_has_no_interp) {
+  return run_test(t, (test_t) {
+    .project = "test/integration/fixtures/profile/nolibc",
+    .copy = { "a.c" },
+    .when = { .host = SPN_OS_LINUX, .target = SPN_TEST_ARCH "-linux-none" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--abi", "none" } } },
+      { .kind = ACTION_VERIFY_NO_INTERP, .verify_no_interp = target_exe("main", SPN_TEST_ARCH "-linux-none") },
+    },
+  });
+}
+
+sp_test(profile, nolibc_libs_not_pic) {
+  return run_test(t, (test_t) {
+    .project = "test/integration/fixtures/profile/nolibc",
+    .copy = { "a.c" },
+    .when = { .host = SPN_OS_LINUX, .target = SPN_TEST_ARCH "-linux-none" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--abi", "none" } } },
+      { .kind = ACTION_VERIFY_NO_CC_ARG, .verify_cc_arg = { "-fPIC" } },
+    },
+  });
+}
+
 sp_test(profile, coff_libs_not_pic) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/platform/fingerprint",

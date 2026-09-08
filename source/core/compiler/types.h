@@ -78,7 +78,6 @@ typedef struct {
   sp_da(spn_path_t) scripts;
   spn_os_version_t min_os;
   spn_win_subsystem_t subsystem;
-  bool rpath;
 } spn_cc_link_t;
 
 typedef struct {

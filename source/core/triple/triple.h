@@ -20,6 +20,7 @@ spn_triple_t spn_triple_host();
 spn_abi_t spn_abi_from_interp(sp_str_t interp);
 spn_abi_t spn_host_libc(sp_mem_t mem, sp_io_seeking_reader_t* elf);
 u32 spn_os_abis(spn_os_t os, const spn_abi_t** abis);
+u32 spn_os_completions(spn_os_t os, const spn_abi_t** abis);
 u32 spn_os_archs(spn_os_t os, const spn_arch_t** archs);
 spn_format_t spn_os_format(spn_os_t os);
 bool spn_triple_dynamic(spn_triple_t triple);

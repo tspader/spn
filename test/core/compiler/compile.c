@@ -148,6 +148,34 @@ static const compile_test_t tests [] = {
     },
   },
   {
+    .name = "zig_linux_none_target",
+    .driver = SPN_CC_DRIVER_ZIG,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_BARE,
+      .standard = SPN_C99,
+    },
+    .expect = {
+      .command = "cc",
+      .args = { "--target=x86_64-linux-none", "-std=c99", "-ffreestanding", "-fno-stack-protector", "-fno-sanitize=undefined", "-c", "-Werror=return-type", "main.c", "-o", "main.o" },
+    },
+  },
+  {
+    .name = "clang_linux_none_target",
+    .driver = SPN_CC_DRIVER_CLANG,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_BARE,
+      .standard = SPN_C99,
+    },
+    .expect = {
+      .command = "cc",
+      .args = { "--target=x86_64-linux-none", "-std=c99", "-ffreestanding", "-fno-stack-protector", "-c", "-Werror=return-type", "main.c", "-o", "main.o" },
+    },
+  },
+  {
     .name = "zig_windows_deterministic_codeview",
     .driver = SPN_CC_DRIVER_ZIG,
     .profile = {

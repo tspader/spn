@@ -104,6 +104,16 @@
           "arch": "aarch64",
           "os": "freestanding",
           "abi": "none"
+        },
+        {
+          "arch": "x86_64",
+          "os": "linux",
+          "abi": "none"
+        },
+        {
+          "arch": "aarch64",
+          "os": "linux",
+          "abi": "none"
         }
       ]
     },

@@ -19,7 +19,6 @@ typedef struct {
   const c8* lib_dir;
   const c8* arg;
   const c8* script;
-  bool rpath;
   spn_os_version_t min_os;
   spn_win_subsystem_t subsystem;
   render_expect_t expect;
@@ -41,7 +40,7 @@ static const link_test_t tests [] = {
       .args = {
         "main.o",
         "-lm",
-        "-o", "main"
+        "-Wl,-rpath,$ORIGIN", "-o", "main"
       },
     },
   },
@@ -196,7 +195,7 @@ static const link_test_t tests [] = {
         "-isysroot", "/sdk",
         "-mmacosx-version-min=13.0",
         "-framework", "Cocoa",
-        "-o", "main"
+        "-Wl,-rpath,@loader_path", "-o", "main"
       },
     },
   },
@@ -212,7 +211,7 @@ static const link_test_t tests [] = {
     .kind = SPN_CC_OUTPUT_EXE,
     .expect = {
       .command = "cc",
-      .args = { "--target=aarch64-macos", "main.o", "-F", "/sdk/System/Library/Frameworks", "-o", "main" },
+      .args = { "--target=aarch64-macos", "main.o", "-F", "/sdk/System/Library/Frameworks", "-Wl,-rpath,@loader_path", "-o", "main" },
       .env = { "ZIG_LIBC=/L" },
     },
   },
@@ -242,7 +241,7 @@ static const link_test_t tests [] = {
     .arg = "-A",
     .expect = {
       .command = "cc",
-      .args = { "-A", "main.o", "-o", "main" },
+      .args = { "-A", "main.o", "-Wl,-rpath,$ORIGIN", "-o", "main" },
     },
   },
   {
@@ -257,7 +256,7 @@ static const link_test_t tests [] = {
     .script = "A.ld",
     .expect = {
       .command = "cc",
-      .args = { "-Wl,-T,A.ld", "main.o", "-o", "main" },
+      .args = { "-Wl,-T,A.ld", "main.o", "-Wl,-rpath,$ORIGIN", "-o", "main" },
     },
   },
   {
@@ -302,7 +301,7 @@ static const link_test_t tests [] = {
     .kind = SPN_CC_OUTPUT_SHARED_LIB,
     .expect = {
       .command = "cc",
-      .args = { "-shared", "main.o", "-o", "main" },
+      .args = { "-shared", "main.o", "-Wl,-rpath,$ORIGIN", "-o", "main" },
     },
   },
   {
@@ -317,7 +316,7 @@ static const link_test_t tests [] = {
     .kind = SPN_CC_OUTPUT_EXE,
     .expect = {
       .command = "cc",
-      .args = { "-static", "main.o", "-o", "main" },
+      .args = { "-static", "main.o", "-Wl,-rpath,$ORIGIN", "-o", "main" },
     },
   },
   {
@@ -331,7 +330,7 @@ static const link_test_t tests [] = {
     .kind = SPN_CC_OUTPUT_EXE,
     .expect = {
       .command = "cc",
-      .args = { "--target=aarch64-macos", "main.o", "-o", "main" },
+      .args = { "--target=aarch64-macos", "main.o", "-Wl,-rpath,@loader_path", "-o", "main" },
     },
   },
   {
@@ -344,7 +343,6 @@ static const link_test_t tests [] = {
     },
     .kind = SPN_CC_OUTPUT_EXE,
     .lib_dir = "deps/lib",
-    .rpath = true,
     .expect = {
       .command = "cc",
       .args = { "main.o", "-Ldeps/lib", "-Wl,-rpath,$ORIGIN", "-o", "main" },
@@ -358,44 +356,9 @@ static const link_test_t tests [] = {
       .os = SPN_OS_MACOS,
     },
     .kind = SPN_CC_OUTPUT_EXE,
-    .rpath = true,
     .expect = {
       .command = "cc",
       .args = { "--target=aarch64-macos", "main.o", "-Wl,-rpath,@loader_path", "-o", "main" },
-    },
-  },
-  {
-    .name = "wasi_rpath_never_renders",
-    .driver = SPN_CC_DRIVER_CLANG,
-    .profile = {
-      .arch = SPN_ARCH_WASM32,
-      .os = SPN_OS_WASI,
-    },
-    .kind = SPN_CC_OUTPUT_REACTOR,
-    .rpath = true,
-    .expect = {
-      .command = "cc",
-      .args = {
-        "--target=wasm32-wasi",
-        "-mexec-model=reactor",
-        "-Wl,--no-entry", "-Wl,--import-symbols",
-        "main.o", "-o", "main"
-      },
-    },
-  },
-  {
-    .name = "freestanding_rpath_never_renders",
-    .driver = SPN_CC_DRIVER_ZIG,
-    .profile = {
-      .arch = SPN_ARCH_ARM64,
-      .os = SPN_OS_FREESTANDING,
-      .abi = SPN_ABI_BARE,
-    },
-    .kind = SPN_CC_OUTPUT_EXE,
-    .rpath = true,
-    .expect = {
-      .command = "cc",
-      .args = { "--target=aarch64-freestanding-none", "-nostartfiles", "-nolibc", "main.o", "-o", "main" },
     },
   },
   {
@@ -427,6 +390,51 @@ static const link_test_t tests [] = {
     },
   },
   {
+    .name = "zig_linux_none_exe",
+    .driver = SPN_CC_DRIVER_ZIG,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_BARE,
+      .linkage = SPN_LIB_KIND_STATIC,
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .expect = {
+      .command = "cc",
+      .args = { "--target=x86_64-linux-none", "-nostartfiles", "-nolibc", "-static", "main.o", "-o", "main" },
+    },
+  },
+  {
+    .name = "clang_linux_none_exe",
+    .driver = SPN_CC_DRIVER_CLANG,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_BARE,
+      .linkage = SPN_LIB_KIND_STATIC,
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .expect = {
+      .command = "cc",
+      .args = { "--target=x86_64-linux-none", "-nostartfiles", "-nolibc", "-static", "main.o", "-o", "main" },
+    },
+  },
+  {
+    .name = "gcc_linux_none_exe",
+    .driver = SPN_CC_DRIVER_GCC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_BARE,
+      .linkage = SPN_LIB_KIND_STATIC,
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .expect = {
+      .command = "cc",
+      .args = { "-nostartfiles", "-nolibc", "-static", "main.o", "-o", "main" },
+    },
+  },
+  {
     .name = "freestanding_shared_lib_unsupported",
     .driver = SPN_CC_DRIVER_ZIG,
     .profile = {
@@ -454,7 +462,7 @@ static const link_test_t tests [] = {
     .system_lib = "m",
     .expect = {
       .command = "cc",
-      .args = { "main.o", "-lP", "-lA", "-lm", "-o", "main" },
+      .args = { "main.o", "-lP", "-lA", "-lm", "-Wl,-rpath,$ORIGIN", "-o", "main" },
     },
   },
   {
@@ -469,7 +477,7 @@ static const link_test_t tests [] = {
     .kind = SPN_CC_OUTPUT_EXE,
     .expect = {
       .command = "cc",
-      .args = { "-fsanitize=address", "main.o", "-o", "main" },
+      .args = { "-fsanitize=address", "main.o", "-Wl,-rpath,$ORIGIN", "-o", "main" },
     },
   },
   {
@@ -491,7 +499,7 @@ static const link_test_t tests [] = {
         "main.o",
         "-Wl,--whole-archive", "libD.a", "-Wl,--no-whole-archive",
         "-lP",
-        "-o", "main"
+        "-Wl,-rpath,$ORIGIN", "-o", "main"
       },
     },
   },
@@ -514,7 +522,7 @@ static const link_test_t tests [] = {
         "main.o",
         "-Wl,-force_load,libD.a",
         "-lP",
-        "-o", "main"
+        "-Wl,-rpath,@loader_path", "-o", "main"
       },
     },
   },
@@ -599,7 +607,7 @@ static const link_test_t tests [] = {
     .subsystem = SPN_WIN_SUBSYSTEM_WINDOWS,
     .expect = {
       .command = "cc",
-      .args = { "main.o", "-o", "main" },
+      .args = { "main.o", "-Wl,-rpath,$ORIGIN", "-o", "main" },
     },
   },
   {
@@ -614,7 +622,7 @@ static const link_test_t tests [] = {
     .kind = SPN_CC_OUTPUT_EXE,
     .expect = {
       .command = "cc",
-      .args = { "--target=x86_64-linux-musl", "main.o", "--sysroot=/S", "-o", "main" },
+      .args = { "--target=x86_64-linux-musl", "main.o", "--sysroot=/S", "-Wl,-rpath,$ORIGIN", "-o", "main" },
     },
   },
   {
@@ -629,7 +637,7 @@ static const link_test_t tests [] = {
     .kind = SPN_CC_OUTPUT_EXE,
     .expect = {
       .command = "cc",
-      .args = { "main.o", "--sysroot=/S", "-o", "main" },
+      .args = { "main.o", "--sysroot=/S", "-Wl,-rpath,$ORIGIN", "-o", "main" },
     },
   },
   {
@@ -640,7 +648,7 @@ static const link_test_t tests [] = {
     .kind = SPN_CC_OUTPUT_EXE,
     .expect = {
       .command = "cc",
-      .args = { "main.o", "-o", "main" },
+      .args = { "main.o", "-Wl,-rpath,$ORIGIN", "-o", "main" },
     },
   },
   {
@@ -654,7 +662,7 @@ static const link_test_t tests [] = {
     .script = "A.ld",
     .expect = {
       .command = "cc",
-      .args = { "-fuse-ld=lld", "-B", "-Wl,-T,A.ld", "-A", "main.o", "-o", "main" },
+      .args = { "-fuse-ld=lld", "-B", "-Wl,-T,A.ld", "-A", "main.o", "-Wl,-rpath,$ORIGIN", "-o", "main" },
     },
   },
   {
@@ -667,7 +675,7 @@ static const link_test_t tests [] = {
     .script = "A.ld",
     .expect = {
       .command = "cc",
-      .args = { "--target=x86_64-linux-gnu", "-fuse-ld=lld", "-Wl,-T,A.ld", "main.o", "-o", "main" },
+      .args = { "--target=x86_64-linux-gnu", "-fuse-ld=lld", "-Wl,-T,A.ld", "main.o", "-Wl,-rpath,$ORIGIN", "-o", "main" },
     },
   },
   {
@@ -678,7 +686,7 @@ static const link_test_t tests [] = {
     .kind = SPN_CC_OUTPUT_EXE,
     .expect = {
       .command = "cc",
-      .args = { "--target=x86_64-linux-gnu", "-A", "main.o", "-o", "main" },
+      .args = { "--target=x86_64-linux-gnu", "-A", "main.o", "-Wl,-rpath,$ORIGIN", "-o", "main" },
     },
   },
   {
@@ -745,7 +753,6 @@ static const link_test_t tests [] = {
     .host = HOST_X64_WINDOWS,
     .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_WINDOWS, .abi = SPN_ABI_MSVC },
     .kind = SPN_CC_OUTPUT_EXE,
-    .rpath = true,
     .expect = {
       .command = "cc",
       .args = { "--target=x86_64-windows-msvc", "main.o", "-o", "main" },
@@ -880,7 +887,6 @@ sp_test_each(render_link, render, link_test_t, tests, .setup = spn_test_ctx_setu
     .lang = SPN_LANG_C,
     .kind = it->kind,
     .min_os = it->min_os,
-    .rpath = it->rpath,
     .subsystem = it->subsystem,
   };
   sp_da_init(mem, link.libs);

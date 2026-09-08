@@ -46,10 +46,10 @@ static spn_triple_t with_abi(spn_triple_t target, spn_abi_t abi) {
   return (spn_triple_t) { target.arch, target.os, abi };
 }
 
-static spn_abi_list_t os_abis(spn_os_t os) {
+static spn_abi_list_t completions(spn_os_t os) {
   spn_abi_list_t list = sp_zero;
   const spn_abi_t* abis = SP_NULLPTR;
-  list.count = spn_os_abis(os, &abis);
+  list.count = spn_os_completions(os, &abis);
   sp_for(it, list.count) {
     list.items[it] = abis[it];
   }
@@ -134,7 +134,7 @@ static spn_err_t emit(spn_err_t kind, spn_toolchain_catalog_t* catalog, spn_tool
 }
 
 static spn_err_t emit_abi(spn_toolchain_catalog_t* catalog, spn_toolchain_query_t query) {
-  spn_abi_list_t abis = os_abis(query.target.os);
+  spn_abi_list_t abis = completions(query.target.os);
   sp_da(spn_abi_t) candidates = sp_da_new(catalog->mem, spn_abi_t);
   sp_for(it, abis.count) {
     sp_da_push(candidates, abis.items[it]);
@@ -195,7 +195,7 @@ static spn_err_t incomplete_named(spn_toolchain_catalog_t* catalog, spn_toolchai
     return emit(SPN_ERR_TOOLCHAIN_UNKNOWN, catalog, query, listing(catalog, query.target), SP_NULLPTR);
   }
 
-  reach_t reached = reach_first(toolchain, catalog, query.target, os_abis(query.target.os));
+  reach_t reached = reach_first(toolchain, catalog, query.target, completions(query.target.os));
   if (reached.err) {
     return emit(reached.err, catalog, query, listing(catalog, query.target), triples(catalog->mem, toolchain->targets));
   }

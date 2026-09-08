@@ -163,6 +163,17 @@ static const test_t tests [] = {
     },
   },
   {
+    .name = "none_defaults_to_static",
+    .overrides = { .abi = SPN_ABI_BARE },
+    .host = PROFILE_HOST_LINUX_GNU,
+    .shared_demand = true,
+    .expect = {
+      .target = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_BARE },
+      .linkage = SPN_LIB_KIND_STATIC,
+      .targeted = true,
+    },
+  },
+  {
     .name = "wasi_defaults_to_static",
     .overrides = { .arch = SPN_ARCH_WASM32, .os = SPN_OS_WASI },
     .host = PROFILE_HOST_LINUX_GNU,

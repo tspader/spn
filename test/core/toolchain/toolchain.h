@@ -12,7 +12,7 @@
 
 #define FIXTURE_MAX_ARGS 2
 #define FIXTURE_MAX_HOSTS 6
-#define FIXTURE_MAX_TARGETS 12
+#define FIXTURE_MAX_TARGETS 14
 #define FIXTURE_MAX_SDKS 2
 
 typedef struct {

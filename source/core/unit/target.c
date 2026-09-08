@@ -399,7 +399,6 @@ static spn_link_plan_t link_plan(spn_target_unit_t* target) {
       .kind = target->kind,
       .min_os = link_plan_min_os(target, closure),
       .subsystem = target->info->windows.subsystem,
-      .rpath = true,
     },
   };
   plan.cc.lang = link_plan_lang(target, plan.libs);
