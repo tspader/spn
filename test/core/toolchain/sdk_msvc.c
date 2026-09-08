@@ -43,16 +43,15 @@ static sp_msvc_version_t msvc_version(const c8* str) {
 sp_test_each(sdk_msvc, from_install, test_t, tests) {
   sp_msvc_sdk_t kits = { .version = msvc_version(it->kits_version), .root = msvc_path(it->kits), .arch = SP_MSVC_ARCH_X64 };
   sp_msvc_vs_t vs = { .version.tools = msvc_version(it->tools_version), .install_path = msvc_path(it->vs), .target = SP_MSVC_ARCH_X64 };
-  spn_sdk_t sdk = spn_sdk_from_msvc(sp_test_arena(t), &kits, &vs, it->arch);
-  sp_must_eq(t, (u32)SPN_SDK_MSVC, (u32)sdk.kind);
-  sp_expect_eq(t, (u32)it->arch, (u32)sdk.msvc.arch);
-  spn_path_t include [] = { sdk.msvc.include.vc, sdk.msvc.include.ucrt, sdk.msvc.include.um, sdk.msvc.include.shared };
+  spn_sdk_msvc_t msvc = spn_sdk_from_msvc(sp_test_arena(t), &kits, &vs, it->arch);
+  sp_expect_eq(t, (u32)it->arch, (u32)msvc.arch);
+  spn_path_t include [] = { msvc.include.vc, msvc.include.ucrt, msvc.include.um, msvc.include.shared };
   sp_carr_for(include, at) {
     if (test_check_path(t, include[at], (test_path_t) { it->expect.include[at] })) {
       return SP_ERR;
     }
   }
-  spn_path_t lib [] = { sdk.msvc.lib.vc, sdk.msvc.lib.ucrt, sdk.msvc.lib.um };
+  spn_path_t lib [] = { msvc.lib.vc, msvc.lib.ucrt, msvc.lib.um };
   sp_carr_for(lib, at) {
     if (test_check_path(t, lib[at], (test_path_t) { it->expect.lib[at] })) {
       return SP_ERR;

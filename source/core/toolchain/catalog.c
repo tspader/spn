@@ -177,7 +177,7 @@ static spn_toolchain_info_t bind_toolchain(spn_toolchain_catalog_t* catalog, con
   };
 }
 
-void spn_toolchain_catalog_init(spn_toolchain_catalog_t* catalog, spn_triple_t host, sp_da(spn_sdk_t) sdks, sp_mem_t mem) {
+void spn_toolchain_catalog_init(spn_toolchain_catalog_t* catalog, spn_triple_t host, spn_sdk_host_t sdks, sp_mem_t mem) {
   catalog->mem = mem;
   catalog->host = host;
   catalog->sdks = sdks;

@@ -86,15 +86,52 @@ static spn_sdk_t fixture_sdk(sp_mem_t mem, fixture_sdk_t sdk) {
   sp_unreachable_return(sp_zero_struct(spn_sdk_t));
 }
 
-static sp_da(spn_sdk_t) fixture_sdks(sp_mem_t mem, const fixture_sdk_t* sdks, u32 max) {
-  sp_da(spn_sdk_t) list = sp_da_new(mem, spn_sdk_t);
+static spn_sdk_host_t fixture_sdks(sp_mem_t mem, const fixture_sdk_t* sdks, u32 max) {
+  spn_sdk_host_t host = { .msvc = sp_da_new(mem, spn_sdk_msvc_t) };
   sp_for(it, max) {
     if (!sdks[it].kind) {
       break;
     }
-    sp_da_push(list, fixture_sdk(mem, sdks[it]));
+    spn_sdk_t sdk = fixture_sdk(mem, sdks[it]);
+    switch (sdk.kind) {
+      case SPN_SDK_MACOS: {
+        host.macos = sdk.root;
+        break;
+      }
+      case SPN_SDK_MSVC: {
+        sp_da_push(host.msvc, sdk.msvc);
+        break;
+      }
+      case SPN_SDK_NONE:
+      case SPN_SDK_SYSROOT: {
+        sp_unreachable_case();
+      }
+    }
   }
-  return list;
+  return host;
+}
+
+typedef struct {
+  spn_sdk_kind_t kind;
+  test_path_t root;
+  test_path_t vc;
+} fixture_sdk_expect_t;
+
+static sp_err_t fixture_check_sdk(sp_test_t* t, spn_sdk_t sdk, fixture_sdk_expect_t expect) {
+  sp_must_eq(t, (u32)expect.kind, (u32)sdk.kind);
+  switch (sdk.kind) {
+    case SPN_SDK_NONE: {
+      return SP_OK;
+    }
+    case SPN_SDK_SYSROOT:
+    case SPN_SDK_MACOS: {
+      return test_check_path(t, sdk.root, expect.root);
+    }
+    case SPN_SDK_MSVC: {
+      return test_check_path(t, sdk.msvc.lib.vc, expect.vc);
+    }
+  }
+  sp_unreachable_return(SP_ERR);
 }
 
 static spn_toolchain_target_t fixture_target(fixture_target_t target) {
@@ -240,7 +277,7 @@ static const spn_toolchain_decl_t* fixture_decl(sp_da(spn_toolchain_decl_t) decl
   return SP_NULLPTR;
 }
 
-static sp_err_t fixture_catalog(sp_test_t* t, spn_toolchain_catalog_t* catalog, const c8* file, spn_triple_t host, sp_da(spn_sdk_t) sdks) {
+static sp_err_t fixture_catalog(sp_test_t* t, spn_toolchain_catalog_t* catalog, const c8* file, spn_triple_t host, spn_sdk_host_t sdks) {
   sp_str_t json = sp_zero;
   if (fixture_read_json(t, file, &json)) {
     return SP_ERR;

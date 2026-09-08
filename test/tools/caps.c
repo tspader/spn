@@ -80,7 +80,7 @@ static bool lane_claims(const spn_toolchain_info_t* info, spn_triple_t target) {
       return true;
     }
   }
-  return spn_toolchain_driver_retargets(info->driver) && spn_sdk_find(catalog.sdks, target).kind != SPN_SDK_NONE;
+  return spn_toolchain_driver_retargets(info->driver) && spn_sdk_from_host(&catalog.sdks, target).kind != SPN_SDK_NONE;
 }
 
 const c8* test_host_triple(void) {

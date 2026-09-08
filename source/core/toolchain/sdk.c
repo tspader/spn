@@ -69,48 +69,50 @@ static spn_path_t absolute(sp_str_t path) {
   return (spn_path_t) { .sub = path };
 }
 
-spn_sdk_t spn_sdk_from_msvc(sp_mem_t mem, const sp_msvc_sdk_t* kits, const sp_msvc_vs_t* vs, spn_arch_t arch) {
+spn_sdk_msvc_t spn_sdk_from_msvc(sp_mem_t mem, const sp_msvc_sdk_t* kits, const sp_msvc_vs_t* vs, spn_arch_t arch) {
   sp_msvc_sdk_paths_t kit = sp_msvc_sdk_render(mem, kits);
   sp_msvc_vs_paths_t tools = sp_msvc_vs_render(mem, vs);
-  return (spn_sdk_t) {
-    .kind = SPN_SDK_MSVC,
-    .msvc = {
-      .arch = arch,
-      .include = {
-        .vc = absolute(tools.include),
-        .ucrt = absolute(kit.include_ucrt),
-        .um = absolute(kit.include_um),
-        .shared = absolute(kit.include_shared),
-      },
-      .lib = {
-        .vc = absolute(tools.lib),
-        .ucrt = absolute(kit.lib_ucrt),
-        .um = absolute(kit.lib_um),
-      },
+  return (spn_sdk_msvc_t) {
+    .arch = arch,
+    .include = {
+      .vc = absolute(tools.include),
+      .ucrt = absolute(kit.include_ucrt),
+      .um = absolute(kit.include_um),
+      .shared = absolute(kit.include_shared),
+    },
+    .lib = {
+      .vc = absolute(tools.lib),
+      .ucrt = absolute(kit.lib_ucrt),
+      .um = absolute(kit.lib_um),
     },
   };
 }
 
-static bool serves(const spn_sdk_t* sdk, spn_triple_t target) {
-  if (sdk->kind != spn_sdk_kind(target)) {
-    return false;
-  }
-  switch (sdk->kind) {
-    case SPN_SDK_MACOS: return true;
-    case SPN_SDK_MSVC: return sdk->msvc.arch == target.arch;
-    case SPN_SDK_NONE:
-    case SPN_SDK_SYSROOT: sp_unreachable_case();
-  }
-  SP_UNREACHABLE_RETURN(false);
-}
-
-spn_sdk_t spn_sdk_find(sp_da(spn_sdk_t) sdks, spn_triple_t target) {
-  sp_da_for(sdks, it) {
-    if (serves(&sdks[it], target)) {
-      return sdks[it];
+static const spn_sdk_msvc_t* msvc_for(const spn_sdk_host_t* host, spn_arch_t arch) {
+  sp_da_for(host->msvc, it) {
+    if (host->msvc[it].arch == arch) {
+      return &host->msvc[it];
     }
   }
-  return sp_zero_struct(spn_sdk_t);
+  return SP_NULLPTR;
+}
+
+spn_sdk_t spn_sdk_from_host(const spn_sdk_host_t* host, spn_triple_t target) {
+  spn_sdk_t none = sp_zero;
+  switch (spn_sdk_kind(target)) {
+    case SPN_SDK_NONE:
+    case SPN_SDK_SYSROOT: {
+      return none;
+    }
+    case SPN_SDK_MACOS: {
+      return spn_path_empty(host->macos) ? none : (spn_sdk_t) { .kind = SPN_SDK_MACOS, .root = host->macos };
+    }
+    case SPN_SDK_MSVC: {
+      const spn_sdk_msvc_t* msvc = msvc_for(host, target.arch);
+      return msvc ? (spn_sdk_t) { .kind = SPN_SDK_MSVC, .msvc = *msvc } : none;
+    }
+  }
+  sp_unreachable_return(none);
 }
 
 static sp_str_t xcrun_sdk(sp_mem_t mem) {
@@ -135,7 +137,7 @@ static sp_msvc_arch_t msvc_arch(spn_arch_t arch) {
   SP_UNREACHABLE_RETURN(SP_MSVC_ARCH_X64);
 }
 
-static void detect_msvc(sp_mem_t mem, sp_da(spn_sdk_t)* sdks) {
+static void detect_msvc(sp_mem_t mem, sp_da(spn_sdk_msvc_t)* msvc) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch_for(mem);
   sp_msvc_t* found = sp_alloc_type(scratch.mem, sp_msvc_t);
   spn_arch_t arches [] = { SPN_ARCH_X64, SPN_ARCH_ARM64 };
@@ -143,30 +145,30 @@ static void detect_msvc(sp_mem_t mem, sp_da(spn_sdk_t)* sdks) {
     if (sp_msvc_find_ex(msvc_arch(arches[it]), found) != SP_MSVC_OK) {
       continue;
     }
-    sp_da_push(*sdks, spn_sdk_from_msvc(mem, &found->sdks[0], &found->installations[0], arches[it]));
+    sp_da_push(*msvc, spn_sdk_from_msvc(mem, &found->sdks[0], &found->installations[0], arches[it]));
   }
   sp_mem_end_scratch(scratch);
 }
 
-sp_da(spn_sdk_t) spn_sdk_detect(sp_mem_t mem, const spn_path_roots_t* roots, sp_env_t* env, spn_triple_t host) {
-  sp_da(spn_sdk_t) sdks = sp_da_new(mem, spn_sdk_t);
+spn_sdk_host_t spn_sdk_detect(sp_mem_t mem, const spn_path_roots_t* roots, sp_env_t* env, spn_triple_t host) {
+  spn_sdk_host_t sdks = { .msvc = sp_da_new(mem, spn_sdk_msvc_t) };
   sp_str_t macos = sp_env_get(env, sp_str_lit("SPN_MACOS_SDK"));
   if (sp_str_empty(macos) && host.os == SPN_OS_MACOS) {
     macos = xcrun_sdk(mem);
   }
   if (!sp_str_empty(macos)) {
-    sp_da_push(sdks, ((spn_sdk_t) { .kind = SPN_SDK_MACOS, .root = spn_path_canonicalize(mem, roots, absolute(macos)) }));
+    sdks.macos = spn_path_canonicalize(mem, roots, absolute(macos));
   }
   if (host.os == SPN_OS_WINDOWS) {
-    detect_msvc(mem, &sdks);
+    detect_msvc(mem, &sdks.msvc);
   }
   return sdks;
 }
 
-spn_sdk_t spn_sdk_resolve(sp_mem_t mem, sp_da(spn_sdk_t) sdks, const spn_toolchain_selection_t* selection) {
+spn_sdk_t spn_sdk_resolve(sp_mem_t mem, const spn_sdk_host_t* host, const spn_toolchain_selection_t* selection) {
   spn_triple_t triple = selection->target.triple;
   if (spn_path_empty(selection->target.sdk)) {
-    return spn_sdk_find(sdks, triple);
+    return spn_sdk_from_host(host, triple);
   }
   return spn_sdk_from_root(mem, spn_sdk_kind(triple), selection->target.sdk, triple.arch);
 }

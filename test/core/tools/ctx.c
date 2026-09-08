@@ -44,7 +44,7 @@ sp_err_t spn_test_builtin_catalog(sp_test_t* t, spn_toolchain_catalog_t* catalog
   if (spn_test_builtin_json(t, &json)) {
     return SP_ERR;
   }
-  spn_toolchain_catalog_init(catalog, host, SP_NULLPTR, sp_test_arena(t));
+  spn_toolchain_catalog_init(catalog, host, sp_zero_struct(spn_sdk_host_t), sp_test_arena(t));
   sp_must_eq(t, (u32)SPN_OK, (u32)spn_toolchain_catalog_load(catalog, json));
   return SP_OK;
 }

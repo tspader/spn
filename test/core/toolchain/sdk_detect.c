@@ -8,7 +8,7 @@ typedef struct {
 } var_t;
 
 typedef struct {
-  fixture_sdk_t sdks [FIXTURE_MAX_SDKS];
+  test_path_t macos;
 } expect_t;
 
 typedef struct {
@@ -19,7 +19,7 @@ typedef struct {
 } test_t;
 
 static const test_t tests [] = {
-  { .name = "macos_env_off_apple", .vars = { { "SPN_MACOS_SDK", "/S" } }, .host = HOST_X64_LINUX, .expect = { .sdks = { { SPN_SDK_MACOS, { "/S" } } } } },
+  { .name = "macos_env_off_apple", .vars = { { "SPN_MACOS_SDK", "/S" } }, .host = HOST_X64_LINUX, .expect = { .macos = { "/S" } } },
   { .name = "empty_env_off_apple_and_windows", .host = HOST_X64_LINUX },
 };
 
@@ -35,15 +35,7 @@ sp_test_each(sdk_detect, env, test_t, tests) {
   }
 
   spn_path_roots_t roots = sp_zero;
-  sp_da(spn_sdk_t) sdks = spn_sdk_detect(mem, &roots, &env, it->host);
-  u32 count = 0;
-  sp_carr_detect_len(it->expect.sdks, count, it->expect.sdks[count].kind);
-  sp_must_eq(t, count, (u32)sp_da_size(sdks));
-  sp_for(at, count) {
-    sp_expect_eq(t, (u32)it->expect.sdks[at].kind, (u32)sdks[at].kind);
-    if (test_check_path(t, sdks[at].root, it->expect.sdks[at].root)) {
-      return SP_ERR;
-    }
-  }
-  return SP_OK;
+  spn_sdk_host_t host = spn_sdk_detect(mem, &roots, &env, it->host);
+  sp_expect_eq(t, 0u, (u32)sp_da_size(host.msvc));
+  return test_check_path(t, host.macos, it->expect.macos);
 }

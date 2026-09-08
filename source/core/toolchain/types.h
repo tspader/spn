@@ -58,6 +58,11 @@ typedef struct {
   };
 } spn_sdk_t;
 
+typedef struct {
+  spn_path_t macos;
+  sp_da(spn_sdk_msvc_t) msvc;
+} spn_sdk_host_t;
+
 typedef enum {
   SPN_PATH_OK,
   SPN_PATH_UNROOTED,
@@ -133,7 +138,7 @@ typedef struct {
 struct spn_toolchain_catalog_t {
   sp_mem_t mem;
   spn_triple_t host;
-  sp_da(spn_sdk_t) sdks;
+  spn_sdk_host_t sdks;
   sp_str_om(spn_toolchain_info_t) entries;
 };
 

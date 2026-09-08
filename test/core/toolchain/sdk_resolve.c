@@ -1,16 +1,10 @@
 #include "toolchain.h"
 
 typedef struct {
-  spn_sdk_kind_t kind;
-  test_path_t root;
-  test_path_t vc;
-} expect_t;
-
-typedef struct {
   const c8* name;
   fixture_target_t target;
   fixture_sdk_t sdks [FIXTURE_MAX_SDKS];
-  expect_t expect;
+  fixture_sdk_expect_t expect;
 } test_t;
 
 static const test_t tests [] = {
@@ -57,19 +51,6 @@ static const test_t tests [] = {
 sp_test_each(sdk_resolve, precedence, test_t, tests) {
   sp_mem_t mem = sp_test_arena(t);
   spn_toolchain_selection_t selection = { .target = fixture_target(it->target) };
-  spn_sdk_t sdk = spn_sdk_resolve(mem, fixture_sdks(mem, it->sdks, FIXTURE_MAX_SDKS), &selection);
-  sp_must_eq(t, (u32)it->expect.kind, (u32)sdk.kind);
-  switch (sdk.kind) {
-    case SPN_SDK_NONE: {
-      return SP_OK;
-    }
-    case SPN_SDK_SYSROOT:
-    case SPN_SDK_MACOS: {
-      return test_check_path(t, sdk.root, it->expect.root);
-    }
-    case SPN_SDK_MSVC: {
-      return test_check_path(t, sdk.msvc.lib.vc, it->expect.vc);
-    }
-  }
-  sp_unreachable_return(SP_ERR);
+  spn_sdk_host_t host = fixture_sdks(mem, it->sdks, FIXTURE_MAX_SDKS);
+  return fixture_check_sdk(t, spn_sdk_resolve(mem, &host, &selection), it->expect);
 }
