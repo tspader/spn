@@ -135,6 +135,8 @@ set(SPN_SOURCES
   core/toolchain/provision.c
   core/toolchain/select.c
   core/toolchain/toolchain.c
+  core/toolchain/sdk.c
+  core/toolchain/libc.c
   core/triple/triple.c
   core/elf/elf.c
   cli/tui/tui.c
