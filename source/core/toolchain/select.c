@@ -68,8 +68,6 @@ static spn_err_t reach(const spn_toolchain_info_t* toolchain, const spn_toolchai
     case SPN_SDK_SYSROOT: return spn_triple_equal(target, catalog->host) ? SPN_OK : SPN_ERR_TOOLCHAIN_SYSROOT;
     case SPN_SDK_MACOS:   return spn_sdk_find(catalog->sdks, target).kind ? SPN_OK : SPN_ERR_TOOLCHAIN_SDK_MACOS;
     case SPN_SDK_MSVC:    return spn_sdk_find(catalog->sdks, target).kind ? SPN_OK : SPN_ERR_TOOLCHAIN_SDK_MSVC;
-    case SPN_SDK_LIBC_MACOS:
-    case SPN_SDK_LIBC_MSVC: sp_unreachable_case();
   }
   sp_unreachable_return(SPN_ERR_TOOLCHAIN_TARGET);
 }

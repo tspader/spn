@@ -19,18 +19,6 @@ sp_err_t expect_args(sp_test_t* t, spn_invocation_t* invocation, render_expect_t
   return SP_OK;
 }
 
-static spn_sdk_t libc_sdk(spn_sdk_t sdk, spn_path_t file) {
-  switch (sdk.kind) {
-    case SPN_SDK_MACOS: return (spn_sdk_t) { .kind = SPN_SDK_LIBC_MACOS, .libc_macos = { .file = file, .root = sdk.root } };
-    case SPN_SDK_MSVC: return (spn_sdk_t) { .kind = SPN_SDK_LIBC_MSVC, .libc_msvc = { .file = file } };
-    case SPN_SDK_NONE:
-    case SPN_SDK_SYSROOT:
-    case SPN_SDK_LIBC_MACOS:
-    case SPN_SDK_LIBC_MSVC: sp_unreachable_case();
-  }
-  sp_unreachable_return(sdk);
-}
-
 spn_profile_info_t test_profile(test_profile_t desc) {
   spn_profile_info_t profile = {
     .arch = desc.arch,
@@ -47,7 +35,7 @@ spn_profile_info_t test_profile(test_profile_t desc) {
     profile.sdk = spn_sdk_from_root(spn.mem, spn_sdk_kind(triple), test_arg_path(desc.sdk), desc.arch);
   }
   if (desc.libc) {
-    profile.sdk = libc_sdk(profile.sdk, test_arg_path(desc.libc));
+    profile.libc = test_arg_path(desc.libc);
   }
   return profile;
 }

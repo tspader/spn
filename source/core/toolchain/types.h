@@ -33,8 +33,6 @@ typedef enum {
   SPN_SDK_SYSROOT,
   SPN_SDK_MACOS,
   SPN_SDK_MSVC,
-  SPN_SDK_LIBC_MACOS,
-  SPN_SDK_LIBC_MSVC,
 } spn_sdk_kind_t;
 
 typedef struct {
@@ -53,21 +51,10 @@ typedef struct {
 } spn_sdk_msvc_t;
 
 typedef struct {
-  spn_path_t file;
-  spn_path_t root;
-} spn_sdk_libc_macos_t;
-
-typedef struct {
-  spn_path_t file;
-} spn_sdk_libc_msvc_t;
-
-typedef struct {
   spn_sdk_kind_t kind;
   union {
     spn_path_t root;
     spn_sdk_msvc_t msvc;
-    spn_sdk_libc_macos_t libc_macos;
-    spn_sdk_libc_msvc_t libc_msvc;
   };
 } spn_sdk_t;
 

@@ -24,8 +24,6 @@ bool spn_sdk_declarable(spn_sdk_kind_t kind) {
     case SPN_SDK_MACOS:
     case SPN_SDK_MSVC: return true;
     case SPN_SDK_NONE: return false;
-    case SPN_SDK_LIBC_MACOS:
-    case SPN_SDK_LIBC_MSVC: sp_unreachable_case();
   }
   SP_UNREACHABLE_RETURN(false);
 }
@@ -60,9 +58,7 @@ spn_sdk_t spn_sdk_from_root(sp_mem_t mem, spn_sdk_kind_t kind, spn_path_t root, 
     case SPN_SDK_MSVC: {
       return (spn_sdk_t) { .kind = kind, .msvc = msvc_layout(mem, root, arch) };
     }
-    case SPN_SDK_NONE:
-    case SPN_SDK_LIBC_MACOS:
-    case SPN_SDK_LIBC_MSVC: {
+    case SPN_SDK_NONE: {
       sp_unreachable_case();
     }
   }
@@ -103,9 +99,7 @@ static bool serves(const spn_sdk_t* sdk, spn_triple_t target) {
     case SPN_SDK_MACOS: return true;
     case SPN_SDK_MSVC: return sdk->msvc.arch == target.arch;
     case SPN_SDK_NONE:
-    case SPN_SDK_SYSROOT:
-    case SPN_SDK_LIBC_MACOS:
-    case SPN_SDK_LIBC_MSVC: sp_unreachable_case();
+    case SPN_SDK_SYSROOT: sp_unreachable_case();
   }
   SP_UNREACHABLE_RETURN(false);
 }
@@ -199,14 +193,6 @@ sp_hash_t spn_sdk_hash(const spn_sdk_t* sdk) {
         spn_path_hash(sdk->msvc.lib.ucrt),
         spn_path_hash(sdk->msvc.lib.um),
       };
-      return sp_hash_combine(parts, sp_carr_len(parts));
-    }
-    case SPN_SDK_LIBC_MACOS: {
-      sp_hash_t parts [] = { (sp_hash_t)sdk->kind, spn_path_hash(sdk->libc_macos.file), spn_path_hash(sdk->libc_macos.root) };
-      return sp_hash_combine(parts, sp_carr_len(parts));
-    }
-    case SPN_SDK_LIBC_MSVC: {
-      sp_hash_t parts [] = { (sp_hash_t)sdk->kind, spn_path_hash(sdk->libc_msvc.file) };
       return sp_hash_combine(parts, sp_carr_len(parts));
     }
   }

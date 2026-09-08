@@ -27,7 +27,7 @@ static spn_err_t finalize_profile(spn_session_t* s, spn_profile_info_t* profile,
   spn_profile_finalize(profile, selection);
   profile->sdk = spn_sdk_resolve(s->mem, s->ctx->catalog.sdks, selection);
   if (spn_toolchain_driver_caps(profile->driver) & SPN_CC_CAP_LIBC_FILE) {
-    spn_try(spn_sdk_to_libc(s->mem, &s->ctx->roots, &profile->sdk));
+    spn_try(spn_libc_write(s->mem, &s->ctx->roots, &profile->sdk, &profile->libc));
   }
   return SPN_OK;
 }
