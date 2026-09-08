@@ -141,8 +141,11 @@ static spn_err_t scan_symbols(sp_mem_t mem, sp_io_seeking_reader_t* elf, const e
   sp_for(it, count) {
     elf_sym_t sym = sp_zero;
     sp_mem_copy(&sym, symbols + it * symtab->sh_entsize, sizeof(sym));
-    if (sym.st_shndx == SPN_ELF_SHN_UNDEF || sym.st_name >= strtab->sh_size) {
+    if (sym.st_shndx == SPN_ELF_SHN_UNDEF) {
       continue;
+    }
+    if (sym.st_name >= strtab->sh_size) {
+      return SPN_ERROR;
     }
     u32 len = 0;
     while (sym.st_name + len < strtab->sh_size && names[sym.st_name + len]) {

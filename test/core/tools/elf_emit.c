@@ -137,6 +137,10 @@ sp_str_t elf_emit(sp_mem_t mem, const elf_spec_t* spec) {
     sp_for(it, num_undefined) {
       put_symbol(&out, spec->undefined[it], 0);
     }
+    if (spec->bad_name) {
+      elf_sym_t bad = { .st_name = (u32)strtab_size, .st_shndx = ELF_SHN_TEXT };
+      sp_mem_copy(bytes + symtab_off + sizeof(elf_sym_t), &bad, sizeof(bad));
+    }
     elf_shdr_t symtab = {
       .sh_type = ELF_SHT_SYMTAB,
       .sh_offset = symtab_off,

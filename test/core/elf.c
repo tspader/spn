@@ -86,6 +86,7 @@ static const defines_t defines_tests [] = {
   { .name = "undefined_ignored", .elf = { .symbols = { "A" }, .undefined = { "B" } }, .prefix = "B" },
   { .name = "no_symbol_table",                                                       .prefix = "B", .expect = { .malformed = true } },
   { .name = "bad_magic",         .elf = { .symbols = { "B" }, .bad_magic = true },    .prefix = "B", .expect = { .malformed = true } },
+  { .name = "name_past_strtab",  .elf = { .symbols = { "B" }, .bad_name = true },     .prefix = "B", .expect = { .malformed = true } },
 };
 
 sp_test_each(elf, defines_prefix, defines_t, defines_tests) {

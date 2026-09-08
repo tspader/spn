@@ -11,6 +11,7 @@ typedef struct {
   const c8* symbols [ELF_EMIT_MAX_SYMBOLS];
   const c8* undefined [ELF_EMIT_MAX_SYMBOLS];
   bool bad_magic;
+  bool bad_name;
   bool elf32;
   bool load_first;
   bool truncated;
