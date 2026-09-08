@@ -1,9 +1,0 @@
-[package]
-name = "p"
-version = "1.0.0"
-
-[[lib]]
-name = "t"
-kinds = ["static"]
-source = ["a.c"]
-when = { simd = "avx2" }

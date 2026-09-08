@@ -167,6 +167,7 @@ sp_test(target, selection_named_script) {
 }
 
 sp_test(target, gated_test_is_not_defined) {
+  return sp_test_skip(t, "target when");
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/target/gated",
     .when = { .host = SPN_OS_LINUX, .target = SPN_TEST_ARCH "-linux-none" },
@@ -180,6 +181,7 @@ sp_test(target, gated_test_is_not_defined) {
 }
 
 sp_test(target, ungated_test_survives_gate) {
+  return sp_test_skip(t, "target when");
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/target/gated",
     .when = { .host = SPN_OS_LINUX, .target = SPN_TEST_ARCH "-linux-none" },

@@ -269,19 +269,6 @@ static void apply_target(apply_ctx_t* ctx, spn_target_info_t* target) {
   apply_gated(ctx, &target->macos.frameworks, target->gated.frameworks);
 }
 
-static void apply_targets(apply_ctx_t* ctx, spn_target_map_t targets) {
-  u32 it = 0;
-  while (it < sp_str_om_size(targets)) {
-    spn_target_info_t* target = sp_str_om_at(targets, it);
-    if (!spn_when_eval(&target->when, ctx->env)) {
-      sp_str_om_remove(targets, target->name);
-      continue;
-    }
-    apply_target(ctx, target);
-    it++;
-  }
-}
-
 void spn_pkg_apply_options(
   sp_mem_t mem,
   spn_pkg_info_t* info,
@@ -295,11 +282,11 @@ void spn_pkg_apply_options(
   info->applied = true;
 
   apply_ctx_t ctx = { .mem = mem, .roots = roots, .trees = trees, .env = env };
-  apply_targets(&ctx, info->libs);
-  apply_targets(&ctx, info->exes);
-  apply_targets(&ctx, info->scripts);
-  apply_targets(&ctx, info->tests);
-  apply_targets(&ctx, info->examples);
+  sp_str_om_for(info->libs, it) apply_target(&ctx, sp_str_om_at(info->libs, it));
+  sp_str_om_for(info->exes, it) apply_target(&ctx, sp_str_om_at(info->exes, it));
+  sp_str_om_for(info->scripts, it) apply_target(&ctx, sp_str_om_at(info->scripts, it));
+  sp_str_om_for(info->tests, it) apply_target(&ctx, sp_str_om_at(info->tests, it));
+  sp_str_om_for(info->examples, it) apply_target(&ctx, sp_str_om_at(info->examples, it));
 
   apply_gated(&ctx, &info->system_deps, info->gated.system_deps);
   apply_gated_paths(&ctx, &info->include, info->gated.include);

@@ -1,8 +1,0 @@
-[package]
-name = "p"
-version = "1.0.0"
-
-[[test]]
-name = "t"
-source = ["a.c"]
-when = { abi = { not = "none" } }

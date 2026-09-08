@@ -81,7 +81,6 @@ struct spn_target_info {
   struct {
     spn_win_subsystem_t subsystem;
   } windows;
-  spn_when_t when;
   struct {
     spn_gated_path_list_t source;
     spn_gated_path_list_t headers;

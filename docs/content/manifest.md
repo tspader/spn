@@ -63,7 +63,6 @@ readme: false
 | `cxx` | [`cxx_options`](#cxx_options) | |
 | `macos` | [`platform_macos`](#platform_macos) | |
 | `windows` | [`platform_windows`](#platform_windows) | |
-| `when` | [`when`](#extern-types) | |
 
 ## toolchain_decl
 
