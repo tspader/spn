@@ -51,15 +51,22 @@ typedef struct {
 } spn_sdk_msvc_t;
 
 typedef struct {
+  spn_path_t root;
+  spn_path_t include;
+  spn_path_t frameworks;
+} spn_sdk_macos_t;
+
+typedef struct {
   spn_sdk_kind_t kind;
   union {
     spn_path_t root;
+    spn_sdk_macos_t macos;
     spn_sdk_msvc_t msvc;
   };
 } spn_sdk_t;
 
 typedef struct {
-  spn_path_t macos;
+  spn_sdk_macos_t macos;
   sp_da(spn_sdk_msvc_t) msvc;
 } spn_sdk_host_t;
 

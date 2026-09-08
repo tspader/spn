@@ -14,9 +14,8 @@ typedef struct {
   spn_path_t kernel32_lib;
 } libc_t;
 
-static libc_t macos_layout(sp_mem_t mem, const spn_sdk_t* sdk) {
-  spn_path_t include = spn_path_join(mem, sdk->root, sp_str_lit("usr/include"));
-  return (libc_t) { .include = include, .sys_include = include };
+static libc_t macos_layout(const spn_sdk_t* sdk) {
+  return (libc_t) { .include = sdk->macos.include, .sys_include = sdk->macos.include };
 }
 
 static libc_t msvc_layout(const spn_sdk_t* sdk) {
@@ -85,7 +84,7 @@ spn_err_t spn_libc_write(sp_mem_t mem, const spn_path_roots_t* roots, const spn_
       return SPN_OK;
     }
     case SPN_SDK_MACOS: {
-      return emit(mem, roots, macos_layout(mem, sdk), file);
+      return emit(mem, roots, macos_layout(sdk), file);
     }
     case SPN_SDK_MSVC: {
       return emit(mem, roots, msvc_layout(sdk), file);

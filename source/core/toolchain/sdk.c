@@ -28,6 +28,14 @@ bool spn_sdk_declarable(spn_sdk_kind_t kind) {
   SP_UNREACHABLE_RETURN(false);
 }
 
+static spn_sdk_macos_t macos_layout(sp_mem_t mem, spn_path_t root) {
+  return (spn_sdk_macos_t) {
+    .root = root,
+    .include = spn_path_join(mem, root, sp_str_lit("usr/include")),
+    .frameworks = spn_path_join(mem, root, sp_str_lit("System/Library/Frameworks")),
+  };
+}
+
 static spn_sdk_msvc_t msvc_layout(sp_mem_t mem, spn_path_t root, spn_arch_t arch) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch_for(mem);
   sp_str_t name = spn_arch_to_str(arch);
@@ -51,9 +59,11 @@ static spn_sdk_msvc_t msvc_layout(sp_mem_t mem, spn_path_t root, spn_arch_t arch
 
 spn_sdk_t spn_sdk_from_root(sp_mem_t mem, spn_sdk_kind_t kind, spn_path_t root, spn_arch_t arch) {
   switch (kind) {
-    case SPN_SDK_SYSROOT:
-    case SPN_SDK_MACOS: {
+    case SPN_SDK_SYSROOT: {
       return (spn_sdk_t) { .kind = kind, .root = root };
+    }
+    case SPN_SDK_MACOS: {
+      return (spn_sdk_t) { .kind = kind, .macos = macos_layout(mem, root) };
     }
     case SPN_SDK_MSVC: {
       return (spn_sdk_t) { .kind = kind, .msvc = msvc_layout(mem, root, arch) };
@@ -105,7 +115,7 @@ spn_sdk_t spn_sdk_from_host(const spn_sdk_host_t* host, spn_triple_t target) {
       return none;
     }
     case SPN_SDK_MACOS: {
-      return spn_path_empty(host->macos) ? none : (spn_sdk_t) { .kind = SPN_SDK_MACOS, .root = host->macos };
+      return spn_path_empty(host->macos.root) ? none : (spn_sdk_t) { .kind = SPN_SDK_MACOS, .macos = host->macos };
     }
     case SPN_SDK_MSVC: {
       const spn_sdk_msvc_t* msvc = msvc_for(host, target.arch);
@@ -157,7 +167,7 @@ spn_sdk_host_t spn_sdk_detect(sp_mem_t mem, const spn_path_roots_t* roots, sp_en
     macos = xcrun_sdk(mem);
   }
   if (!sp_str_empty(macos)) {
-    sdks.macos = spn_path_canonicalize(mem, roots, absolute(macos));
+    sdks.macos = macos_layout(mem, spn_path_canonicalize(mem, roots, absolute(macos)));
   }
   if (host.os == SPN_OS_WINDOWS) {
     detect_msvc(mem, &sdks.msvc);
@@ -178,9 +188,12 @@ sp_hash_t spn_sdk_hash(const spn_sdk_t* sdk) {
     case SPN_SDK_NONE: {
       return 0;
     }
-    case SPN_SDK_SYSROOT:
-    case SPN_SDK_MACOS: {
+    case SPN_SDK_SYSROOT: {
       sp_hash_t parts [] = { (sp_hash_t)sdk->kind, spn_path_hash(sdk->root) };
+      return sp_hash_combine(parts, sp_carr_len(parts));
+    }
+    case SPN_SDK_MACOS: {
+      sp_hash_t parts [] = { (sp_hash_t)sdk->kind, spn_path_hash(sdk->macos.root), spn_path_hash(sdk->macos.include), spn_path_hash(sdk->macos.frameworks) };
       return sp_hash_combine(parts, sp_carr_len(parts));
     }
     case SPN_SDK_MSVC: {

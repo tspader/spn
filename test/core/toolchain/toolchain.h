@@ -95,7 +95,7 @@ static spn_sdk_host_t fixture_sdks(sp_mem_t mem, const fixture_sdk_t* sdks, u32 
     spn_sdk_t sdk = fixture_sdk(mem, sdks[it]);
     switch (sdk.kind) {
       case SPN_SDK_MACOS: {
-        host.macos = sdk.root;
+        host.macos = sdk.macos;
         break;
       }
       case SPN_SDK_MSVC: {
@@ -123,9 +123,11 @@ static sp_err_t fixture_check_sdk(sp_test_t* t, spn_sdk_t sdk, fixture_sdk_expec
     case SPN_SDK_NONE: {
       return SP_OK;
     }
-    case SPN_SDK_SYSROOT:
-    case SPN_SDK_MACOS: {
+    case SPN_SDK_SYSROOT: {
       return test_check_path(t, sdk.root, expect.root);
+    }
+    case SPN_SDK_MACOS: {
+      return test_check_path(t, sdk.macos.root, expect.root);
     }
     case SPN_SDK_MSVC: {
       return test_check_path(t, sdk.msvc.lib.vc, expect.vc);

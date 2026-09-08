@@ -6,7 +6,13 @@ typedef struct {
 } msvc_expect_t;
 
 typedef struct {
+  test_path_t include;
+  test_path_t frameworks;
+} macos_expect_t;
+
+typedef struct {
   test_path_t root;
+  macos_expect_t macos;
   msvc_expect_t msvc;
 } expect_t;
 
@@ -23,9 +29,9 @@ static const test_t tests [] = {
     .expect = { .root = { "/S" } },
   },
   {
-    .name = "macos_keeps_root",
+    .name = "macos_lays_out_headers_and_frameworks",
     .sdk = { SPN_SDK_MACOS, { "/S" } },
-    .expect = { .root = { "/S" } },
+    .expect = { .root = { "/S" }, .macos = { { "/S/usr/include" }, { "/S/System/Library/Frameworks" } } },
   },
   {
     .name = "rooted_root_is_kept",
@@ -85,9 +91,14 @@ sp_test_each(sdk_root, layout, test_t, tests) {
   spn_sdk_t sdk = fixture_sdk(sp_test_arena(t), it->sdk);
   sp_must_eq(t, (u32)it->sdk.kind, (u32)sdk.kind);
   switch (sdk.kind) {
-    case SPN_SDK_SYSROOT:
-    case SPN_SDK_MACOS: {
+    case SPN_SDK_SYSROOT: {
       return test_check_path(t, sdk.root, it->expect.root);
+    }
+    case SPN_SDK_MACOS: {
+      if (test_check_path(t, sdk.macos.root, it->expect.root) || test_check_path(t, sdk.macos.include, it->expect.macos.include)) {
+        return SP_ERR;
+      }
+      return test_check_path(t, sdk.macos.frameworks, it->expect.macos.frameworks);
     }
     case SPN_SDK_MSVC: {
       return check_msvc(t, &sdk.msvc, &it->expect.msvc, it->sdk.arch);

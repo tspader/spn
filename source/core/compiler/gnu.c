@@ -181,7 +181,7 @@ static void add_sdk_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, c
         add_libc(mem, profile, invocation);
       } else {
         spn_cc_push_c(mem, invocation, "-isysroot");
-        spn_cc_push_path(mem, invocation, sdk->root);
+        spn_cc_push_path(mem, invocation, sdk->macos.root);
       }
       break;
     }
@@ -218,10 +218,10 @@ static void add_sdk_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
       if (spn_cc_has(toolchain, SPN_CC_CAP_LIBC_FILE)) {
         add_libc(mem, profile, invocation);
         spn_cc_push_c(mem, invocation, "-F");
-        spn_cc_push_path(mem, invocation, spn_path_join(mem, sdk->root, sp_str_lit("System/Library/Frameworks")));
+        spn_cc_push_path(mem, invocation, sdk->macos.frameworks);
       } else {
         spn_cc_push_c(mem, invocation, "-isysroot");
-        spn_cc_push_path(mem, invocation, sdk->root);
+        spn_cc_push_path(mem, invocation, sdk->macos.root);
       }
       break;
     }
