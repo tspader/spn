@@ -194,7 +194,7 @@ static const support_test_t support_tests [] = {
 
 sp_test_each(catalog, add, add_test_t, add_tests) {
   spn_toolchain_catalog_t catalog = sp_zero;
-  if (fixture_catalog(t, &catalog, it->file, (spn_triple_t) HOST_X64_LINUX)) {
+  if (fixture_catalog(t, &catalog, it->file, (spn_triple_t) HOST_X64_LINUX, SP_NULLPTR)) {
     return SP_ERR;
   }
 
@@ -225,7 +225,7 @@ sp_test_each(catalog, add, add_test_t, add_tests) {
 
 sp_test_each(catalog, targets, targets_test_t, targets_tests) {
   spn_toolchain_catalog_t catalog = sp_zero;
-  if (fixture_catalog(t, &catalog, it->file, it->host)) {
+  if (fixture_catalog(t, &catalog, it->file, it->host, SP_NULLPTR)) {
     return SP_ERR;
   }
 
@@ -239,7 +239,7 @@ sp_test_each(catalog, targets, targets_test_t, targets_tests) {
 
 sp_test_each(catalog, support, support_test_t, support_tests) {
   spn_toolchain_catalog_t catalog = sp_zero;
-  if (fixture_catalog(t, &catalog, it->file, it->host)) {
+  if (fixture_catalog(t, &catalog, it->file, it->host, SP_NULLPTR)) {
     return SP_ERR;
   }
 

@@ -40,7 +40,19 @@ sp_test(platform, win32) {
     .when.os = SPN_OS_WINDOWS,
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
-      { .kind = ACTION_RUN_BIN, .bin.name = "main" },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = exe("main") },
+    },
+  });
+}
+
+sp_test(platform, win32_msvc) {
+  return run_test(t, (test_t) {
+    .project = "test/integration/fixtures/platform/win32",
+    .copy = { "main.c" },
+    .when.target = SPN_TEST_ARCH "-windows-msvc",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", SPN_TEST_ARCH "-windows-msvc" } } },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = target_exe("main", SPN_TEST_ARCH "-windows-msvc") },
     },
   });
 }
@@ -48,7 +60,6 @@ sp_test(platform, win32) {
 sp_test(platform, subsystem) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/platform/subsystem",
-    .when.msvc_todo = true,
     .copy = { "main.c" },
     .when.os = SPN_OS_WINDOWS,
     .actions = {

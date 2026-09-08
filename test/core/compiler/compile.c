@@ -462,6 +462,21 @@ static const compile_test_t tests [] = {
     },
   },
   {
+    .name = "zig_linux_sysroot",
+    .driver = SPN_CC_DRIVER_ZIG,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_MUSL,
+      .standard = SPN_C99,
+      .sdk = "/S",
+    },
+    .expect = {
+      .command = "cc",
+      .args = { "--target=x86_64-linux-musl", "-std=c99", "-c", "--sysroot=/S", "-Werror=return-type", "main.c", "-o", "main.o" },
+    },
+  },
+  {
     .name = "gcc_linux_sysroot",
     .driver = SPN_CC_DRIVER_GCC,
     .profile = {

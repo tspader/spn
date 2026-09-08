@@ -341,6 +341,67 @@
           "abi": "msvc"
         }
       ]
+    },
+    {
+      "name": "clang-xwin",
+      "driver": "clang",
+      "compiler": {
+        "program": "clang"
+      },
+      "archiver": {
+        "program": "llvm-ar"
+      },
+      "cxx": {
+        "program": "clang++"
+      },
+      "linker": "lld",
+      "link_args": [
+        "-fuse-ld=lld"
+      ],
+      "host": {
+        "x86_64-linux": {}
+      },
+      "target": [
+        {
+          "arch": "x86_64",
+          "os": "windows",
+          "abi": "msvc",
+          "sdk": "/opt/xwin"
+        }
+      ]
+    },
+    {
+      "name": "zig-xwin",
+      "driver": "zig",
+      "compiler": {
+        "program": "/opt/zig/zig",
+        "args": [
+          "cc"
+        ]
+      },
+      "archiver": {
+        "program": "/opt/zig/zig",
+        "args": [
+          "ar"
+        ]
+      },
+      "cxx": {
+        "program": "/opt/zig/zig",
+        "args": [
+          "c++"
+        ]
+      },
+      "host": {
+        "x86_64-linux": {}
+      },
+      "target": [
+        {
+          "arch": "x86_64",
+          "os": "windows",
+          "abi": "msvc",
+          "sdk": "/opt/xwin"
+        }
+      ]
     }
   ]
 }

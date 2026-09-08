@@ -14,7 +14,7 @@
 #include "triple/triple.h"
 
 #define render_args_max 20
-#define render_env_max 2
+#define render_env_max 3
 #define rsp_args_max 8
 
 typedef struct {

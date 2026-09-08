@@ -234,12 +234,12 @@ static const spn_toolchain_decl_t* fixture_decl(sp_da(spn_toolchain_decl_t) decl
   return SP_NULLPTR;
 }
 
-static sp_err_t fixture_catalog(sp_test_t* t, spn_toolchain_catalog_t* catalog, const c8* file, spn_triple_t host) {
+static sp_err_t fixture_catalog(sp_test_t* t, spn_toolchain_catalog_t* catalog, const c8* file, spn_triple_t host, sp_da(spn_sdk_t) sdks) {
   sp_str_t json = sp_zero;
   if (fixture_read_json(t, file, &json)) {
     return SP_ERR;
   }
-  spn_toolchain_catalog_init(catalog, host, SP_NULLPTR, sp_test_arena(t));
+  spn_toolchain_catalog_init(catalog, host, sdks, sp_test_arena(t));
   sp_must_eq(t, (u32)SPN_OK, (u32)spn_toolchain_catalog_load(catalog, json));
   return SP_OK;
 }

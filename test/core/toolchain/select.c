@@ -11,7 +11,6 @@
 #define X64_MACOS             { SPN_ARCH_X64, SPN_OS_MACOS }
 #define X64_FREESTANDING      { SPN_ARCH_X64, SPN_OS_FREESTANDING }
 #define ARM_LINUX             { SPN_ARCH_ARM64, SPN_OS_LINUX }
-#define ARM_WINDOWS           { SPN_ARCH_ARM64, SPN_OS_WINDOWS }
 #define ARM_MACOS             { SPN_ARCH_ARM64, SPN_OS_MACOS }
 #define ARM_FREESTANDING      { SPN_ARCH_ARM64, SPN_OS_FREESTANDING }
 #define WASM                  { SPN_ARCH_WASM32, SPN_OS_WASI }
@@ -47,6 +46,7 @@ typedef struct {
   spn_triple_t target;
   spn_abi_t abis [SELECT_MAX_ABIS];
   spn_triple_t host;
+  fixture_sdk_t sdks [FIXTURE_MAX_SDKS];
   expect_t expect;
 } resolve_test_t;
 
@@ -231,7 +231,6 @@ static const complete_test_t complete_tests [] = {
     .targets = { { .triple = TARGET_WIN_MSVC, .sdk = { "/X" } } },
     .checks = {
       { .target = X64_WINDOWS, .abis = { SPN_ABI_MSVC }, .expect = { .triple = TARGET_WIN_MSVC, .sdk = { "/X" } } },
-      { .target = ARM_WINDOWS, .abis = { SPN_ABI_MSVC }, .expect = { .err = SPN_ERR_TOOLCHAIN_SDK_MSVC, .targets = { TARGET_WIN_MSVC } } },
     },
   },
   {
@@ -245,13 +244,12 @@ static const complete_test_t complete_tests [] = {
     },
   },
   {
-    .name = "host_sdk_reaches_msvc_per_arch",
+    .name = "host_sdk_reaches_msvc",
     .driver = SPN_CC_DRIVER_ZIG,
     .targets = { TARGET_WIN_GNU },
     .sdks = { { SPN_SDK_MSVC, { "/X" }, SPN_ARCH_X64 } },
     .checks = {
       { .target = X64_WINDOWS, .abis = { SPN_ABI_MSVC }, .expect = { .triple = TARGET_WIN_MSVC } },
-      { .target = ARM_WINDOWS, .abis = { SPN_ABI_MSVC }, .expect = { .err = SPN_ERR_TOOLCHAIN_SDK_MSVC, .targets = { TARGET_WIN_GNU } } },
     },
   },
   {
@@ -307,6 +305,21 @@ static const resolve_test_t resolve_tests [] = {
     .file = "auto.json",
     .target = WASM,
     .abis = { SPN_ABI_MUSL },
+    .expect = { .err = SPN_ERR_TOOLCHAIN_NONE },
+  },
+  {
+    .name = "auto_reaches_through_host_sdk",
+    .file = "auto.json",
+    .target = ARM_MACOS,
+    .abis = { SPN_ABI_APPLE },
+    .sdks = { { SPN_SDK_MACOS, { "/S" } } },
+    .expect = { .name = "B", .triple = HOST_ARM_MACOS },
+  },
+  {
+    .name = "auto_without_host_sdk_finds_none",
+    .file = "auto.json",
+    .target = ARM_MACOS,
+    .abis = { SPN_ABI_APPLE },
     .expect = { .err = SPN_ERR_TOOLCHAIN_NONE },
   },
   {
@@ -517,7 +530,7 @@ sp_test_each(select, resolve, resolve_test_t, resolve_tests, .setup = spn_test_c
 
   spn_triple_t host = fixture_triple_empty(it->host) ? (spn_triple_t) HOST_X64_LINUX : it->host;
   spn_toolchain_catalog_t catalog = sp_zero;
-  if (fixture_catalog(t, &catalog, it->file, host)) {
+  if (fixture_catalog(t, &catalog, it->file, host, fixture_sdks(mem, it->sdks, FIXTURE_MAX_SDKS))) {
     return SP_ERR;
   }
 

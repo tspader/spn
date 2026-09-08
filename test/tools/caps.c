@@ -7,6 +7,7 @@
 #include "toolchain/catalog.h"
 #include "toolchain/linker.h"
 #include "toolchain/search.h"
+#include "toolchain/toolchain.h"
 #include "triple/triple.h"
 #include "lanes.h"
 
@@ -79,7 +80,7 @@ static bool toolchain_targets(const spn_toolchain_info_t* info, spn_triple_t tar
       return true;
     }
   }
-  return false;
+  return spn_toolchain_driver_retargets(info->driver) && spn_sdk_find(catalog.sdks, target);
 }
 
 const c8* test_host_triple(void) {
@@ -230,7 +231,8 @@ static sp_err_t load_lanes(void* user) {
   }
 
   sp_str_t lanes = read_repo_file(mem, SPN_LANES_TEST);
-  spn_toolchain_catalog_init(&catalog, spn_triple_host(), SP_NULLPTR, mem);
+  sp_env_t env = sp_env_capture(mem);
+  spn_toolchain_catalog_init(&catalog, spn_triple_host(), spn_sdk_detect(mem, &env, spn_triple_host()), mem);
   sp_assert(spn_toolchain_catalog_load(&catalog, read_repo_file(mem, SPN_LANES_BUILTIN)) == SPN_OK);
   sp_assert(spn_toolchain_catalog_load(&catalog, lanes) == SPN_OK);
 

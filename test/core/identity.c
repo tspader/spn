@@ -337,8 +337,10 @@ typedef struct {
   const c8* value;
 } identity_env_t;
 
+#define IDENTITY_TEST_MAX_ENV 2
+
 typedef struct {
-  identity_env_t env [2];
+  identity_env_t env [IDENTITY_TEST_MAX_ENV];
 } identity_compile_t;
 
 typedef struct {
@@ -351,24 +353,30 @@ typedef struct {
 static const identity_compile_test_t compile_tests [] = {
   {
     .name = "identical_env_agrees",
-    .a = { .env = { { "ZIG_LIBC", "L" } } },
-    .b = { .env = { { "ZIG_LIBC", "L" } } },
+    .a = { .env = { { "K", "L" } } },
+    .b = { .env = { { "K", "L" } } },
   },
   {
     .name = "distinct_env_value",
-    .a = { .env = { { "ZIG_LIBC", "L" } } },
-    .b = { .env = { { "ZIG_LIBC", "M" } } },
+    .a = { .env = { { "K", "L" } } },
+    .b = { .env = { { "K", "M" } } },
     .expect = { .distinct = true }
   },
   {
     .name = "distinct_env_key",
-    .a = { .env = { { "LIB", "L" } } },
-    .b = { .env = { { "INCLUDE", "L" } } },
+    .a = { .env = { { "K", "L" } } },
+    .b = { .env = { { "J", "L" } } },
     .expect = { .distinct = true }
   },
   {
     .name = "absent_env",
-    .a = { .env = { { "ZIG_LIBC", "L" } } },
+    .a = { .env = { { "K", "L" } } },
+    .expect = { .distinct = true }
+  },
+  {
+    .name = "reordered_env",
+    .a = { .env = { { "J", "L" }, { "K", "L" } } },
+    .b = { .env = { { "K", "L" }, { "J", "L" } } },
     .expect = { .distinct = true }
   },
 };
