@@ -151,15 +151,30 @@ sp_da(sp_str_t) spn_invocation_args(const spn_path_roots_t* roots, sp_mem_t mem,
   return args;
 }
 
+typedef struct {
+  sp_str_t name;
+  sp_str_t separator;
+} env_key_t;
+
+static env_key_t env_key(spn_env_key_t key) {
+  switch (key) {
+    case SPN_ENV_INCLUDE: return (env_key_t) { sp_str_lit("INCLUDE"), sp_str_lit(";") };
+    case SPN_ENV_LIB: return (env_key_t) { sp_str_lit("LIB"), sp_str_lit(";") };
+    case SPN_ENV_ZIG_LIBC: return (env_key_t) { sp_str_lit("ZIG_LIBC"), sp_str_lit("") };
+  }
+  sp_unreachable_return(sp_zero_struct(env_key_t));
+}
+
 sp_env_var_t spn_invocation_env_var(const spn_path_roots_t* roots, sp_mem_t mem, spn_invocation_env_t env) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch_for(mem);
+  env_key_t key = env_key(env.key);
   sp_da(sp_str_t) values = sp_da_new(scratch.mem, sp_str_t);
   sp_da_for(env.values, it) {
     sp_da_push(values, spn_arg_str(roots, scratch.mem, env.values[it]));
   }
-  sp_str_t value = sp_str_join_n(mem, values, sp_da_size(values), sp_str_lit(";"));
+  sp_str_t value = sp_str_join_n(mem, values, sp_da_size(values), key.separator);
   sp_mem_end_scratch(scratch);
-  return (sp_env_var_t) { .key = env.key, .value = value };
+  return (sp_env_var_t) { .key = key.name, .value = value };
 }
 
 sp_str_t spn_invocation_to_str(sp_mem_t mem, const spn_invocation_t* invocation) {

@@ -333,7 +333,7 @@ sp_test_each(identity, link, identity_link_test_t, link_tests) {
 }
 
 typedef struct {
-  const c8* key;
+  spn_env_key_t key;
   const c8* value;
 } identity_env_t;
 
@@ -353,30 +353,30 @@ typedef struct {
 static const identity_compile_test_t compile_tests [] = {
   {
     .name = "identical_env_agrees",
-    .a = { .env = { { "K", "L" } } },
-    .b = { .env = { { "K", "L" } } },
+    .a = { .env = { { SPN_ENV_LIB, "L" } } },
+    .b = { .env = { { SPN_ENV_LIB, "L" } } },
   },
   {
     .name = "distinct_env_value",
-    .a = { .env = { { "K", "L" } } },
-    .b = { .env = { { "K", "M" } } },
+    .a = { .env = { { SPN_ENV_LIB, "L" } } },
+    .b = { .env = { { SPN_ENV_LIB, "M" } } },
     .expect = { .distinct = true }
   },
   {
     .name = "distinct_env_key",
-    .a = { .env = { { "K", "L" } } },
-    .b = { .env = { { "J", "L" } } },
+    .a = { .env = { { SPN_ENV_LIB, "L" } } },
+    .b = { .env = { { SPN_ENV_INCLUDE, "L" } } },
     .expect = { .distinct = true }
   },
   {
     .name = "absent_env",
-    .a = { .env = { { "K", "L" } } },
+    .a = { .env = { { SPN_ENV_LIB, "L" } } },
     .expect = { .distinct = true }
   },
   {
     .name = "reordered_env",
-    .a = { .env = { { "J", "L" }, { "K", "L" } } },
-    .b = { .env = { { "K", "L" }, { "J", "L" } } },
+    .a = { .env = { { SPN_ENV_INCLUDE, "L" }, { SPN_ENV_LIB, "L" } } },
+    .b = { .env = { { SPN_ENV_LIB, "L" }, { SPN_ENV_INCLUDE, "L" } } },
     .expect = { .distinct = true }
   },
 };
@@ -392,7 +392,7 @@ static spn_dag_digest_t identity_compile_digest(sp_mem_t mem, const identity_com
     .paths.file = { .root = SPN_PATH_ROOT_PROJECT, .sub = sp_str_lit("A.c") },
   };
   sp_carr_for(spec->env, it) {
-    if (!spec->env[it].key) {
+    if (!spec->env[it].value) {
       break;
     }
     spn_cc_push_env(mem, &unit.invocation, spec->env[it].key, spn_arg_path((spn_path_t) { .root = SPN_PATH_ROOT_CACHE, .sub = sp_cstr_as_str(spec->env[it].value) }));

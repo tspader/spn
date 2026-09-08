@@ -6,7 +6,7 @@
 #define INVOCATION_MAX_VALUES 3
 
 typedef struct {
-  const c8* key;
+  spn_env_key_t key;
   const c8* values [INVOCATION_MAX_VALUES];
 } env_t;
 
@@ -23,8 +23,8 @@ typedef struct {
 
 static const test_t tests [] = {
   { .name = "program_and_args", .args = { "-c", "A.c" }, .expect = { .str = "cc -c A.c" } },
-  { .name = "env_precedes_program", .args = { "A.o" }, .env = { { "K", { "/L" } } }, .expect = { .str = "K=/L cc A.o" } },
-  { .name = "list_values_join_with_semicolons", .env = { { "K", { "/A", "/B" } }, { "L", { "/C" } } }, .expect = { .str = "K=/A;/B L=/C cc" } },
+  { .name = "env_precedes_program", .args = { "A.o" }, .env = { { SPN_ENV_ZIG_LIBC, { "/L" } } }, .expect = { .str = "ZIG_LIBC=/L cc A.o" } },
+  { .name = "msvc_lists_join_with_semicolons", .env = { { SPN_ENV_LIB, { "/A", "/B" } }, { SPN_ENV_INCLUDE, { "/C" } } }, .expect = { .str = "LIB=/A;/B INCLUDE=/C cc" } },
 };
 
 sp_test_each(invocation, to_str, test_t, tests, .setup = spn_test_ctx_setup) {
@@ -37,7 +37,7 @@ sp_test_each(invocation, to_str, test_t, tests, .setup = spn_test_ctx_setup) {
     spn_cc_push_c(mem, &invocation, it->args[at]);
   }
   sp_carr_for(it->env, at) {
-    if (!it->env[at].key) {
+    if (!it->env[at].values[0]) {
       break;
     }
     spn_path_t values [INVOCATION_MAX_VALUES] = sp_zero;

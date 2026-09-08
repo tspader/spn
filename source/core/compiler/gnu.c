@@ -163,7 +163,7 @@ void spn_gnu_render_flags(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, con
 
 static void add_libc(sp_mem_t mem, const spn_profile_info_t* profile, spn_invocation_t* invocation) {
   sp_assert(!spn_path_empty(profile->libc));
-  spn_cc_push_env(mem, invocation, "ZIG_LIBC", spn_arg_path(profile->libc));
+  spn_cc_push_env(mem, invocation, SPN_ENV_ZIG_LIBC, spn_arg_path(profile->libc));
 }
 
 static void add_sdk_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, spn_invocation_t* invocation) {
@@ -230,7 +230,7 @@ static void add_sdk_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
         add_libc(mem, profile, invocation);
       } else {
         spn_path_t libs [] = { sdk->msvc.lib.vc, sdk->msvc.lib.ucrt, sdk->msvc.lib.um };
-        spn_cc_push_env_paths(mem, invocation, "LIB", libs, sp_carr_len(libs));
+        spn_cc_push_env_paths(mem, invocation, SPN_ENV_LIB, libs, sp_carr_len(libs));
       }
       break;
     }

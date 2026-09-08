@@ -76,12 +76,12 @@ static void add_sdk_compile(sp_mem_t mem, const spn_sdk_msvc_t* sdk, spn_invocat
   sp_carr_for(includes, it) {
     spn_cc_push_glued(mem, invocation, "/I", includes[it]);
   }
-  spn_cc_push_env_paths(mem, invocation, "INCLUDE", includes, sp_carr_len(includes));
+  spn_cc_push_env_paths(mem, invocation, SPN_ENV_INCLUDE, includes, sp_carr_len(includes));
 }
 
 static void add_sdk_link(sp_mem_t mem, const spn_sdk_msvc_t* sdk, spn_invocation_t* invocation) {
   spn_path_t libs [] = { sdk->lib.vc, sdk->lib.ucrt, sdk->lib.um };
-  spn_cc_push_env_paths(mem, invocation, "LIB", libs, sp_carr_len(libs));
+  spn_cc_push_env_paths(mem, invocation, SPN_ENV_LIB, libs, sp_carr_len(libs));
 }
 
 static void add_launcher(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, spn_lang_t lang, spn_invocation_t* invocation) {

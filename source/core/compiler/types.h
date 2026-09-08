@@ -100,8 +100,14 @@ typedef enum {
   SPN_CC_EXPORTS_WASM,
 } spn_cc_exports_format_t;
 
+typedef enum {
+  SPN_ENV_INCLUDE,
+  SPN_ENV_LIB,
+  SPN_ENV_ZIG_LIBC,
+} spn_env_key_t;
+
 typedef struct {
-  sp_str_t key;
+  spn_env_key_t key;
   sp_da(spn_arg_t) values;
 } spn_invocation_env_t;
 
