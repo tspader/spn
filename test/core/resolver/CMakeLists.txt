@@ -56,6 +56,8 @@ add_executable(resolver
   ${SRC}/target/mutate.c
   ${SRC}/target/select.c
   ${SRC}/toolchain/toolchain.c
+  ${SRC}/toolchain/sdk.c
+  ${UTIL}/sp/sp_msvc.c
   main.c
   ${TEST_TOOLS}/fixture.c
   ${TEST_TOOLS}/toml.c

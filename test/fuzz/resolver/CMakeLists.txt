@@ -53,6 +53,8 @@ add_executable(fuzz_resolver
   ${SRC}/target/mutate.c
   ${SRC}/target/select.c
   ${SRC}/toolchain/toolchain.c
+  ${SRC}/toolchain/sdk.c
+  ${UTIL}/sp/sp_msvc.c
   main.c
   generator.c
   oracles/exhaustive.c
