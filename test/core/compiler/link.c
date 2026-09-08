@@ -159,7 +159,7 @@ static const link_test_t tests [] = {
     .subsystem = SPN_WIN_SUBSYSTEM_WINDOWS,
     .expect = {
       .command = "cc",
-      .args = { "/nologo", "main.o", "/Femain", "/link", "/SUBSYSTEM:WINDOWS" },
+      .args = { "/nologo", "main.o", "/Femain", "/link", "/SUBSYSTEM:WINDOWS", "/ENTRY:mainCRTStartup" },
     },
   },
   {
@@ -201,7 +201,7 @@ static const link_test_t tests [] = {
     },
   },
   {
-    .name = "zig_macos_frameworks_libc",
+    .name = "zig_macos_libc",
     .driver = SPN_CC_DRIVER_ZIG,
     .profile = {
       .arch = SPN_ARCH_ARM64,
@@ -210,16 +210,9 @@ static const link_test_t tests [] = {
       .libc = "/L",
     },
     .kind = SPN_CC_OUTPUT_EXE,
-    .framework = "Cocoa",
     .expect = {
       .command = "cc",
-      .args = {
-        "--target=aarch64-macos",
-        "main.o",
-        "-F", "/sdk/System/Library/Frameworks",
-        "-framework", "Cocoa",
-        "-o", "main"
-      },
+      .args = { "--target=aarch64-macos", "main.o", "-F", "/sdk/System/Library/Frameworks", "-o", "main" },
       .env = { "ZIG_LIBC=/L" },
     },
   },
@@ -596,6 +589,21 @@ static const link_test_t tests [] = {
     },
   },
   {
+    .name = "zig_linux_sysroot",
+    .driver = SPN_CC_DRIVER_ZIG,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_MUSL,
+      .sdk = "/S",
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .expect = {
+      .command = "cc",
+      .args = { "--target=x86_64-linux-musl", "main.o", "--sysroot=/S", "-o", "main" },
+    },
+  },
+  {
     .name = "gcc_linux_sysroot",
     .driver = SPN_CC_DRIVER_GCC,
     .profile = {
@@ -714,7 +722,7 @@ static const link_test_t tests [] = {
     .subsystem = SPN_WIN_SUBSYSTEM_WINDOWS,
     .expect = {
       .command = "cc",
-      .args = { "--target=x86_64-windows-msvc", "-Wl,/SUBSYSTEM:WINDOWS", "main.o", "-o", "main" },
+      .args = { "--target=x86_64-windows-msvc", "-Wl,/SUBSYSTEM:WINDOWS", "-Wl,/ENTRY:mainCRTStartup", "main.o", "-o", "main" },
     },
   },
   {

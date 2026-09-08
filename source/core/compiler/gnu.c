@@ -412,6 +412,7 @@ static void add_subsystem(sp_mem_t mem, spn_ld_dialect_t dialect, spn_invocation
     }
     case SPN_LD_DIALECT_LINK: {
       spn_cc_push_c(mem, invocation, "-Wl,/SUBSYSTEM:WINDOWS");
+      spn_cc_push_c(mem, invocation, "-Wl,/ENTRY:mainCRTStartup");
       break;
     }
     case SPN_LD_DIALECT_DARWIN:
