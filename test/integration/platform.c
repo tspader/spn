@@ -33,6 +33,18 @@ sp_test(platform, frameworks) {
   });
 }
 
+sp_test(platform, win32) {
+  return run_test(t, (test_t) {
+    .project = "test/integration/fixtures/platform/win32",
+    .copy = { "main.c" },
+    .when.os = SPN_OS_WINDOWS,
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_RUN_BIN, .bin.name = "main" },
+    },
+  });
+}
+
 sp_test(platform, subsystem) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/platform/subsystem",

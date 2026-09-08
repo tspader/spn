@@ -10,6 +10,12 @@ sp_err_t expect_args(sp_test_t* t, spn_invocation_t* invocation, render_expect_t
   sp_da(sp_str_t) args = spn_invocation_args(roots, mem, invocation);
   sp_expect_str_eq_c(t, spn_arg_str(roots, mem, invocation->program), expect.command);
   sp_must_strs_eq(t, args, sp_da_size(args), expect.args);
+  sp_da(sp_str_t) env = sp_da_new(mem, sp_str_t);
+  sp_da_for(invocation->env, it) {
+    sp_env_var_t var = spn_invocation_env_var(roots, mem, invocation->env[it]);
+    sp_da_push(env, sp_fmt(mem, "{}={}", sp_fmt_str(var.key), sp_fmt_str(var.value)).value);
+  }
+  sp_must_strs_eq(t, env, sp_da_size(env), expect.env);
   return SP_OK;
 }
 

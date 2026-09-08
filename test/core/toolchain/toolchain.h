@@ -13,6 +13,7 @@
 #define FIXTURE_MAX_ARGS 2
 #define FIXTURE_MAX_HOSTS 6
 #define FIXTURE_MAX_TARGETS 12
+#define FIXTURE_MAX_SDKS 2
 
 typedef struct {
   const c8* name;
@@ -32,6 +33,12 @@ typedef struct {
   spn_triple_t triple;
   test_path_t sdk;
 } fixture_target_t;
+
+typedef struct {
+  spn_sdk_kind_t kind;
+  test_path_t root;
+  spn_arch_t arch;
+} fixture_sdk_t;
 
 typedef struct {
   const c8* name;
@@ -67,6 +74,21 @@ static spn_path_t fixture_path(test_path_t path) {
     return sp_zero_struct(spn_path_t);
   }
   return (spn_path_t) { .root = path.root, .sub = sp_cstr_as_str(path.path) };
+}
+
+static spn_sdk_t fixture_sdk(sp_mem_t mem, fixture_sdk_t sdk) {
+  return spn_sdk_from_root(mem, sdk.kind, fixture_path(sdk.root), sdk.arch);
+}
+
+static sp_da(spn_sdk_t) fixture_sdks(sp_mem_t mem, const fixture_sdk_t* sdks, u32 max) {
+  sp_da(spn_sdk_t) list = sp_da_new(mem, spn_sdk_t);
+  sp_for(it, max) {
+    if (!sdks[it].kind) {
+      break;
+    }
+    sp_da_push(list, fixture_sdk(mem, sdks[it]));
+  }
+  return list;
 }
 
 static spn_toolchain_target_t fixture_target(fixture_target_t target) {

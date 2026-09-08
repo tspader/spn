@@ -194,12 +194,33 @@ static const link_test_t tests [] = {
         "--target=aarch64-macos",
         "main.o",
         "-isysroot", "/sdk",
-        "-F/sdk/System/Library/Frameworks",
-        "-L/sdk/usr/lib",
         "-mmacosx-version-min=13.0",
         "-framework", "Cocoa",
         "-o", "main"
       },
+    },
+  },
+  {
+    .name = "zig_macos_frameworks_libc",
+    .driver = SPN_CC_DRIVER_ZIG,
+    .profile = {
+      .arch = SPN_ARCH_ARM64,
+      .os = SPN_OS_MACOS,
+      .sdk = "/sdk",
+      .libc = "/L",
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .framework = "Cocoa",
+    .expect = {
+      .command = "cc",
+      .args = {
+        "--target=aarch64-macos",
+        "main.o",
+        "-F", "/sdk/System/Library/Frameworks",
+        "-framework", "Cocoa",
+        "-o", "main"
+      },
+      .env = { "ZIG_LIBC=/L" },
     },
   },
   {
@@ -767,6 +788,47 @@ static const link_test_t tests [] = {
     .expect = {
       .command = "cc",
       .args = { "--target=x86_64-windows-msvc", "-fuse-ld=lld", "main.o", "-o", "main" },
+    },
+  },
+  {
+    .name = "clang_msvc_sdk_libs",
+    .driver = SPN_CC_DRIVER_CLANG,
+    .linker = SPN_LD_FAMILY_LLD,
+    .link_args = { "-fuse-ld=lld" },
+    .host = HOST_X64_LINUX,
+    .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_WINDOWS, .abi = SPN_ABI_MSVC, .sdk = "/X" },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .system_lib = "user32",
+    .expect = {
+      .command = "cc",
+      .args = { "--target=x86_64-windows-msvc", "-fuse-ld=lld", "main.o", "-luser32", "-o", "main" },
+      .env = { "LIB=/X/crt/lib/x86_64;/X/sdk/lib/ucrt/x86_64;/X/sdk/lib/um/x86_64" },
+    },
+  },
+  {
+    .name = "zig_msvc_libc_links_off_windows",
+    .driver = SPN_CC_DRIVER_ZIG,
+    .host = HOST_X64_LINUX,
+    .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_WINDOWS, .abi = SPN_ABI_MSVC, .sdk = "/X", .libc = "/L" },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .system_lib = "user32",
+    .expect = {
+      .command = "cc",
+      .args = { "--target=x86_64-windows-msvc", "main.o", "-luser32", "-o", "main" },
+      .env = { "ZIG_LIBC=/L" },
+    },
+  },
+  {
+    .name = "msvc_sdk_libs",
+    .driver = SPN_CC_DRIVER_MSVC,
+    .host = HOST_X64_WINDOWS,
+    .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_WINDOWS, .abi = SPN_ABI_MSVC, .sdk = "/X" },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .system_lib = "user32",
+    .expect = {
+      .command = "cc",
+      .args = { "/nologo", "main.o", "user32.lib", "/Femain" },
+      .env = { "LIB=/X/crt/lib/x86_64;/X/sdk/lib/ucrt/x86_64;/X/sdk/lib/um/x86_64" },
     },
   },
   {

@@ -24,6 +24,7 @@ add_executable(core
   closure/runtime.c
   closure/siblings.c
   compiler/harness.c
+  compiler/invocation.c
   compiler/archive.c
   compiler/compile.c
   compiler/depfile.c
@@ -134,6 +135,13 @@ add_executable(core
   toolchain/program.c
   toolchain/provision.c
   toolchain/sdk.c
+  toolchain/sdk_detect.c
+  toolchain/sdk_hash.c
+  toolchain/sdk_libc.c
+  toolchain/sdk_msvc.c
+  toolchain/sdk_resolve.c
+  toolchain/sdk_root.c
+  toolchain/sdk_serve.c
   toolchain/search.c
   toolchain/select.c
   toolchain/sha256.c
@@ -291,6 +299,13 @@ set_source_files_properties(
   toolchain/probe.c
   toolchain/program.c
   toolchain/sdk.c
+  toolchain/sdk_detect.c
+  toolchain/sdk_hash.c
+  toolchain/sdk_libc.c
+  toolchain/sdk_msvc.c
+  toolchain/sdk_resolve.c
+  toolchain/sdk_root.c
+  toolchain/sdk_serve.c
   toolchain/search.c
   toolchain/provision.c
   toolchain/select.c

@@ -116,7 +116,7 @@ static const targets_test_t targets_tests [] = {
     .expect = { .targets = { TARGET_WIN_GNU } },
   },
   {
-    .name = "artifact_sysroots_root_under_artifact",
+    .name = "artifact_sdks_root_under_artifact",
     .file = "sdk.json",
     .host = HOST_X64_LINUX,
     .toolchain = "A",
@@ -126,12 +126,13 @@ static const targets_test_t targets_tests [] = {
         { .triple = HOST_ARM_MACOS, .sdk = { "aa/S/macos", SPN_PATH_ROOT_TOOLCHAIN } },
         { .triple = TARGET_WASM, .sdk = { "aa/S/wasi", SPN_PATH_ROOT_TOOLCHAIN } },
         { .triple = TARGET_WIN_GNU, .sdk = { "aa/S/windows", SPN_PATH_ROOT_TOOLCHAIN } },
+        { .triple = TARGET_WIN_MSVC, .sdk = { "aa/S/msvc", SPN_PATH_ROOT_TOOLCHAIN } },
         { .triple = HOST_X64_LINUX },
       },
     },
   },
   {
-    .name = "local_sysroots_are_kept",
+    .name = "local_sdks_are_kept",
     .file = "sdk_local.json",
     .host = HOST_X64_LINUX,
     .toolchain = "A",

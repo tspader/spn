@@ -14,6 +14,7 @@
 #include "triple/triple.h"
 
 #define render_args_max 20
+#define render_env_max 2
 #define rsp_args_max 8
 
 typedef struct {
@@ -21,6 +22,7 @@ typedef struct {
   spn_cc_feature_t feature;
   const c8* command;
   const c8* args [render_args_max];
+  const c8* env [render_env_max];
 } render_expect_t;
 
 typedef struct {

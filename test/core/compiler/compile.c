@@ -295,7 +295,79 @@ static const compile_test_t tests [] = {
     .min_os = { 13 },
     .expect = {
       .command = "cc",
-      .args = { "--target=aarch64-macos", "-std=c99", "-c", "-isysroot", "/sdk", "-iframework", "/sdk/System/Library/Frameworks", "-mmacosx-version-min=13.0", "-Werror=return-type", "main.c", "-o", "main.o" },
+      .args = { "--target=aarch64-macos", "-std=c99", "-c", "-isysroot", "/sdk", "-mmacosx-version-min=13.0", "-Werror=return-type", "main.c", "-o", "main.o" },
+    },
+  },
+  {
+    .name = "zig_macos_libc",
+    .driver = SPN_CC_DRIVER_ZIG,
+    .profile = {
+      .arch = SPN_ARCH_ARM64,
+      .os = SPN_OS_MACOS,
+      .abi = SPN_ABI_APPLE,
+      .standard = SPN_C99,
+      .sdk = "/sdk",
+      .libc = "/L",
+    },
+    .expect = {
+      .command = "cc",
+      .args = { "--target=aarch64-macos", "-std=c99", "-c", "-Werror=return-type", "main.c", "-o", "main.o" },
+      .env = { "ZIG_LIBC=/L" },
+    },
+  },
+  {
+    .name = "clang_msvc_sdk",
+    .driver = SPN_CC_DRIVER_CLANG,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_MSVC,
+      .standard = SPN_C99,
+      .sdk = "/X",
+    },
+    .expect = {
+      .command = "cc",
+      .args = {
+        "--target=x86_64-windows-msvc", "-std=c99", "-c",
+        "-nostdlibinc",
+        "-isystem", "/X/crt/include",
+        "-isystem", "/X/sdk/include/ucrt",
+        "-isystem", "/X/sdk/include/um",
+        "-isystem", "/X/sdk/include/shared",
+        "-gno-codeview-command-line", "-Werror=return-type", "main.c", "-Xclang", "-object-file-name=main.o", "-o", "main.o"
+      },
+    },
+  },
+  {
+    .name = "zig_msvc_libc",
+    .driver = SPN_CC_DRIVER_ZIG,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_MSVC,
+      .standard = SPN_C99,
+      .sdk = "/X",
+      .libc = "/L",
+    },
+    .expect = {
+      .command = "cc",
+      .args = { "--target=x86_64-windows-msvc", "-std=c99", "-c", "-gno-codeview-command-line", "-Werror=return-type", "main.c", "-Xclang", "-object-file-name=main.o", "-o", "main.o" },
+      .env = { "ZIG_LIBC=/L" },
+    },
+  },
+  {
+    .name = "msvc_sdk",
+    .driver = SPN_CC_DRIVER_MSVC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_MSVC,
+      .sdk = "/X",
+    },
+    .expect = {
+      .command = "cc",
+      .args = { "/nologo", "/utf-8", "/Brepro", "/c", "/I/X/crt/include", "/I/X/sdk/include/ucrt", "/I/X/sdk/include/um", "/I/X/sdk/include/shared", "/we4715", "/Fomain.o", "main.c" },
+      .env = { "INCLUDE=/X/crt/include;/X/sdk/include/ucrt;/X/sdk/include/um;/X/sdk/include/shared" },
     },
   },
   {

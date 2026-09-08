@@ -193,7 +193,7 @@ static const parse_test_t tests [] = {
     .expect = { .err = SPN_ERROR },
   },
   {
-    .name = "sysroot_per_target",
+    .name = "sdk_per_target",
     .file = "sdk.json",
     .expect = {
       .entries = 1,
@@ -211,6 +211,7 @@ static const parse_test_t tests [] = {
             { .triple = HOST_ARM_MACOS, .sdk = { "S/macos" } },
             { .triple = TARGET_WASM, .sdk = { "S/wasi" } },
             { .triple = TARGET_WIN_GNU, .sdk = { "S/windows" } },
+            { .triple = TARGET_WIN_MSVC, .sdk = { "S/msvc" } },
             { .triple = HOST_X64_LINUX },
           },
         },
@@ -218,17 +219,12 @@ static const parse_test_t tests [] = {
     },
   },
   {
-    .name = "sysroot_on_msvc_target",
-    .file = "sdk_msvc.json",
-    .expect = { .err = SPN_ERROR },
-  },
-  {
-    .name = "sysroot_on_freestanding_target",
+    .name = "sdk_on_freestanding_target",
     .file = "sdk_freestanding.json",
     .expect = { .err = SPN_ERROR },
   },
   {
-    .name = "sysroot_absolute_in_distribution",
+    .name = "sdk_absolute_in_distribution",
     .file = "sdk_absolute.json",
     .expect = { .err = SPN_ERROR },
   },

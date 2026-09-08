@@ -11,6 +11,7 @@
 #define X64_MACOS             { SPN_ARCH_X64, SPN_OS_MACOS }
 #define X64_FREESTANDING      { SPN_ARCH_X64, SPN_OS_FREESTANDING }
 #define ARM_LINUX             { SPN_ARCH_ARM64, SPN_OS_LINUX }
+#define ARM_WINDOWS           { SPN_ARCH_ARM64, SPN_OS_WINDOWS }
 #define ARM_MACOS             { SPN_ARCH_ARM64, SPN_OS_MACOS }
 #define ARM_FREESTANDING      { SPN_ARCH_ARM64, SPN_OS_FREESTANDING }
 #define WASM                  { SPN_ARCH_WASM32, SPN_OS_WASI }
@@ -35,6 +36,7 @@ typedef struct {
   const c8* name;
   spn_cc_driver_t driver;
   fixture_target_t targets [FIXTURE_MAX_TARGETS];
+  fixture_sdk_t sdks [FIXTURE_MAX_SDKS];
   check_t checks [SELECT_MAX_CHECKS];
 } complete_test_t;
 
@@ -221,6 +223,44 @@ static const complete_test_t complete_tests [] = {
       { .target = ARM_LINUX, .abis = { SPN_ABI_GNU }, .expect = { .triple = HOST_ARM_LINUX, .sdk = { "/S" } } },
       { .target = ARM_LINUX, .abis = { SPN_ABI_MUSL }, .expect = { .err = SPN_ERR_TOOLCHAIN_SYSROOT, .targets = { HOST_ARM_LINUX } } },
       { .target = X64_LINUX, .abis = { SPN_ABI_GNU }, .expect = { .triple = HOST_X64_LINUX } },
+    },
+  },
+  {
+    .name = "listed_sdk_reaches_msvc",
+    .driver = SPN_CC_DRIVER_CLANG,
+    .targets = { { .triple = TARGET_WIN_MSVC, .sdk = { "/X" } } },
+    .checks = {
+      { .target = X64_WINDOWS, .abis = { SPN_ABI_MSVC }, .expect = { .triple = TARGET_WIN_MSVC, .sdk = { "/X" } } },
+      { .target = ARM_WINDOWS, .abis = { SPN_ABI_MSVC }, .expect = { .err = SPN_ERR_TOOLCHAIN_SDK_MSVC, .targets = { TARGET_WIN_MSVC } } },
+    },
+  },
+  {
+    .name = "host_sdk_reaches_macos",
+    .driver = SPN_CC_DRIVER_CLANG,
+    .targets = { HOST_X64_LINUX },
+    .sdks = { { SPN_SDK_MACOS, { "/S" } } },
+    .checks = {
+      { .target = ARM_MACOS, .abis = { SPN_ABI_APPLE }, .expect = { .triple = HOST_ARM_MACOS } },
+      { .target = X64_MACOS, .abis = { SPN_ABI_APPLE }, .expect = { .triple = HOST_X64_MACOS } },
+    },
+  },
+  {
+    .name = "host_sdk_reaches_msvc_per_arch",
+    .driver = SPN_CC_DRIVER_ZIG,
+    .targets = { TARGET_WIN_GNU },
+    .sdks = { { SPN_SDK_MSVC, { "/X" }, SPN_ARCH_X64 } },
+    .checks = {
+      { .target = X64_WINDOWS, .abis = { SPN_ABI_MSVC }, .expect = { .triple = TARGET_WIN_MSVC } },
+      { .target = ARM_WINDOWS, .abis = { SPN_ABI_MSVC }, .expect = { .err = SPN_ERR_TOOLCHAIN_SDK_MSVC, .targets = { TARGET_WIN_GNU } } },
+    },
+  },
+  {
+    .name = "fixed_driver_ignores_host_sdk",
+    .driver = SPN_CC_DRIVER_GCC,
+    .targets = { HOST_X64_LINUX },
+    .sdks = { { SPN_SDK_MACOS, { "/S" } } },
+    .checks = {
+      { .target = ARM_MACOS, .abis = { SPN_ABI_APPLE }, .expect = { .err = SPN_ERR_TOOLCHAIN_TARGET, .targets = { HOST_X64_LINUX } } },
     },
   },
 };
@@ -442,7 +482,7 @@ sp_test_each(select, complete, complete_test_t, complete_tests, .setup = spn_tes
   }
 
   spn_toolchain_catalog_t catalog = sp_zero;
-  spn_toolchain_catalog_init(&catalog, (spn_triple_t) HOST_X64_LINUX, SP_NULLPTR, mem);
+  spn_toolchain_catalog_init(&catalog, (spn_triple_t) HOST_X64_LINUX, fixture_sdks(mem, it->sdks, FIXTURE_MAX_SDKS), mem);
   spn_toolchain_catalog_add(&catalog, toolchain);
 
   u32 checks = 0;

@@ -583,19 +583,22 @@ static const test_t tests [] = {
         .driver = SPN_CC_DRIVER_CLANG,
         .url = "https://tc",
         .sha256 = "deadbeef",
-        .targets = { { .triple = { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_GNU }, .sdk = { "S" } } },
+        .targets = {
+          { .triple = { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_GNU }, .sdk = { "S" } },
+          { .triple = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MSVC }, .sdk = { "X" } },
+        },
       },
     },
   },
   {
-    .name = "validate_toolchain_sysroot_forbidden",
-    .manifest = "toolchain_sdk_msvc",
+    .name = "validate_toolchain_sdk_forbidden",
+    .manifest = "toolchain_sdk_freestanding",
     .issues = {
       { SPN_ERR_CODEGEN_INVALID, "toolchain[0].target[0].sdk" }
     },
   },
   {
-    .name = "validate_toolchain_sysroot_malformed",
+    .name = "validate_toolchain_sdk_malformed",
     .manifest = "toolchain_sdk_malformed",
     .issues = {
       { SPN_ERR_CODEGEN_PATH, "toolchain[0].target[0].sdk" }

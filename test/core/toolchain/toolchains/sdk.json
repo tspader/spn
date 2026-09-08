@@ -40,6 +40,12 @@
         },
         {
           "arch": "x86_64",
+          "os": "windows",
+          "abi": "msvc",
+          "sdk": "S/msvc"
+        },
+        {
+          "arch": "x86_64",
           "os": "linux",
           "abi": "gnu"
         }

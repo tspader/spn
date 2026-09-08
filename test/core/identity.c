@@ -1,5 +1,6 @@
 #include "spn_test.h"
 
+#include "compiler/push.h"
 #include "dag/dag.h"
 #include "graph/identity.h"
 #include "paths/paths.h"
@@ -329,4 +330,69 @@ sp_test_each(identity, link, identity_link_test_t, link_tests) {
   sp_try(identity_link_digest(t, mem, &it->a, &a));
   sp_try(identity_link_digest(t, mem, &it->b, &b));
   return identity_expect_distinct(t, a, b, &it->expect);
+}
+
+typedef struct {
+  const c8* key;
+  const c8* value;
+} identity_env_t;
+
+typedef struct {
+  identity_env_t env [2];
+} identity_compile_t;
+
+typedef struct {
+  const c8* name;
+  identity_compile_t a;
+  identity_compile_t b;
+  identity_expect_t expect;
+} identity_compile_test_t;
+
+static const identity_compile_test_t compile_tests [] = {
+  {
+    .name = "identical_env_agrees",
+    .a = { .env = { { "ZIG_LIBC", "L" } } },
+    .b = { .env = { { "ZIG_LIBC", "L" } } },
+  },
+  {
+    .name = "distinct_env_value",
+    .a = { .env = { { "ZIG_LIBC", "L" } } },
+    .b = { .env = { { "ZIG_LIBC", "M" } } },
+    .expect = { .distinct = true }
+  },
+  {
+    .name = "distinct_env_key",
+    .a = { .env = { { "LIB", "L" } } },
+    .b = { .env = { { "INCLUDE", "L" } } },
+    .expect = { .distinct = true }
+  },
+  {
+    .name = "absent_env",
+    .a = { .env = { { "ZIG_LIBC", "L" } } },
+    .expect = { .distinct = true }
+  },
+};
+
+static spn_dag_digest_t identity_compile_digest(sp_mem_t mem, const identity_compile_t* spec) {
+  spn_toolchain_unit_t toolchain = sp_zero;
+  spn_build_unit_t build = { .toolchain = &toolchain };
+  spn_pkg_unit_t pkg = { .build = &build };
+  spn_target_unit_t target = { .pkg = &pkg };
+  spn_compile_unit_t unit = {
+    .target = &target,
+    .invocation = { .program = spn_arg_lit(sp_str_lit("cc")) },
+    .paths.file = { .root = SPN_PATH_ROOT_PROJECT, .sub = sp_str_lit("A.c") },
+  };
+  sp_carr_for(spec->env, it) {
+    if (!spec->env[it].key) {
+      break;
+    }
+    spn_cc_push_env(mem, &unit.invocation, spec->env[it].key, spn_arg_path((spn_path_t) { .root = SPN_PATH_ROOT_CACHE, .sub = sp_cstr_as_str(spec->env[it].value) }));
+  }
+  return spn_build_compile_identity(&unit);
+}
+
+sp_test_each(identity, compile, identity_compile_test_t, compile_tests) {
+  sp_mem_t mem = sp_test_arena(t);
+  return identity_expect_distinct(t, identity_compile_digest(mem, &it->a), identity_compile_digest(mem, &it->b), &it->expect);
 }
