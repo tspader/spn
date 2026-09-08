@@ -74,15 +74,6 @@ static spn_err_t reach(const spn_toolchain_info_t* toolchain, const spn_toolchai
   sp_unreachable_return(SPN_ERR_TOOLCHAIN_TARGET);
 }
 
-static spn_abi_list_t target_abis(spn_triple_t target) {
-  if (target.abi) {
-    spn_abi_list_t list = { .count = 1 };
-    list.items[0] = target.abi;
-    return list;
-  }
-  return os_abis(target.os);
-}
-
 static spn_toolchain_target_t matched(const spn_toolchain_info_t* toolchain, spn_triple_t triple) {
   const spn_toolchain_target_t* entry = listed(toolchain, triple);
   return entry ? *entry : (spn_toolchain_target_t) { .triple = triple };
@@ -96,10 +87,6 @@ static reach_t reach_first(const spn_toolchain_info_t* toolchain, const spn_tool
     }
   }
   return (reach_t) { .err = reach(toolchain, catalog, with_abi(target, abis.items[0])) };
-}
-
-bool spn_toolchain_reaches(const spn_toolchain_catalog_t* catalog, const spn_toolchain_info_t* toolchain, spn_triple_t target) {
-  return reach_first(toolchain, catalog, target, target_abis(target)).err == SPN_OK;
 }
 
 static bool satisfies(const spn_toolchain_info_t* toolchain, const spn_toolchain_catalog_t* catalog, spn_toolchain_query_t query, spn_toolchain_target_t* target) {

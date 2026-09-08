@@ -7,7 +7,6 @@
 #include "toolchain/catalog.h"
 #include "toolchain/linker.h"
 #include "toolchain/search.h"
-#include "toolchain/select.h"
 #include "toolchain/toolchain.h"
 #include "triple/triple.h"
 #include "lanes.h"
@@ -68,8 +67,20 @@ static spn_triple_t when_target(const test_when_t* when) {
   };
 }
 
-static bool toolchain_targets(const spn_toolchain_info_t* info, spn_triple_t target) {
-  return spn_toolchain_reaches(&catalog, info, target);
+static bool triple_agrees(spn_triple_t a, spn_triple_t b) {
+  bool arch = !a.arch || !b.arch || a.arch == b.arch;
+  bool os = !a.os || !b.os || a.os == b.os;
+  bool abi = !a.abi || !b.abi || a.abi == b.abi;
+  return arch && os && abi;
+}
+
+static bool lane_claims(const spn_toolchain_info_t* info, spn_triple_t target) {
+  sp_da_for(info->targets, it) {
+    if (triple_agrees(info->targets[it].triple, target)) {
+      return true;
+    }
+  }
+  return spn_toolchain_driver_retargets(info->driver) && spn_sdk_find(catalog.sdks, target).kind != SPN_SDK_NONE;
 }
 
 const c8* test_host_triple(void) {
@@ -318,7 +329,7 @@ sp_str_t test_when_blocked(test_when_t when) {
       sp_fmt_str(spn_ld_family_to_str(when.linker))).value;
   }
 
-  if (!toolchain_targets(toolchain->info, target)) {
+  if (!lane_claims(toolchain->info, target)) {
     return sp_fmt(mem, "{} can't target {}",
       sp_fmt_cstr(toolchain->name),
       sp_fmt_str(spn_triple_to_str(mem, target))).value;
