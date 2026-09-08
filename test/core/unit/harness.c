@@ -113,7 +113,7 @@ spn_session_t* build_session(sp_mem_t mem, unit_graph_test_t* g) {
     .mode = SPN_MODE_DEBUG,
     .os = g->os ? g->os : SPN_OS_LINUX,
     .arch = SPN_ARCH_X64,
-    .abi = g->os == SPN_OS_MACOS ? SPN_ABI_NONE : SPN_ABI_GNU,
+    .abi = g->abi ? g->abi : (g->os == SPN_OS_MACOS ? SPN_ABI_NONE : SPN_ABI_GNU),
   };
   if (g->sdk) {
     profile.sdk = spn_sdk_from_root(mem, spn_sdk_kind((spn_triple_t) { profile.arch, profile.os, profile.abi }), (spn_path_t) { .sub = sp_cstr_as_str(g->sdk) }, profile.arch);

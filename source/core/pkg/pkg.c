@@ -2,7 +2,6 @@
 #include "macro/macro.h"
 #include "str/str.h"
 #include "pkg/pkg.h"
-#include "toolchain/toolchain.h"
 
 #include "hash/digest/digest.h"
 #include "intern/intern.h"
@@ -34,7 +33,6 @@ sp_hash_t spn_pkg_hash_platform(spn_pkg_info_t* pkg, const spn_profile_info_t* p
 
   switch (profile->os) {
     case SPN_OS_MACOS: {
-      hash = hash_push(hash, spn_sdk_hash(&profile->sdk));
       hash = hash_push(hash, spn_digest_hash(&pkg->macos.min_os, sizeof(pkg->macos.min_os)));
       hash = hash_gated(hash, pkg->gated.frameworks);
       sp_carr_for(maps, mt) {

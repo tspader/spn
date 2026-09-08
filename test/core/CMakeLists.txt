@@ -151,6 +151,7 @@ add_executable(core
   unit/link_plan.c
   unit/objects.c
   unit/paths.c
+  unit/fingerprint.c
   unit/clone.c
   ${CMAKE_SOURCE_DIR}/tools/jtd.c
   ${CMAKE_SOURCE_DIR}/tools/gen/lower.c

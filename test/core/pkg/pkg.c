@@ -36,7 +36,6 @@ typedef enum {
   PKG_EDIT_PLAIN_FRAMEWORK,
   PKG_EDIT_TARGET_FRAMEWORK,
   PKG_EDIT_TARGET_SUBSYSTEM,
-  PKG_EDIT_PROFILE_SDK,
 } pkg_edit_t;
 
 typedef struct {
@@ -64,7 +63,6 @@ static const hash_platform_test_t hash_platform_tests [] = {
   { .name = "ignore_framework_edit_on_windows", .profile = { .os = SPN_OS_WINDOWS }, .edit = PKG_EDIT_MACOS_FRAMEWORK, .expect = { .hashed = true } },
   { .name = "track_windows_subsystem",        .profile = { .os = SPN_OS_WINDOWS }, .edit = PKG_EDIT_TARGET_SUBSYSTEM, .expect = { .hashed = true, .changed = true } },
   { .name = "ignore_subsystem_edit_on_macos", .profile = { .os = SPN_OS_MACOS },   .edit = PKG_EDIT_TARGET_SUBSYSTEM, .expect = { .hashed = true } },
-  { .name = "track_profile_sdk",          .profile = { .os = SPN_OS_MACOS },   .edit = PKG_EDIT_PROFILE_SDK,  .expect = { .hashed = true, .changed = true } },
 };
 
 sp_test_each(pkg, hash_platform, hash_platform_test_t, hash_platform_tests, .setup = spn_test_ctx_setup) {
@@ -102,10 +100,6 @@ sp_test_each(pkg, hash_platform, hash_platform_test_t, hash_platform_tests, .set
     }
     case PKG_EDIT_TARGET_SUBSYSTEM: {
       spn_pkg_get_target(&pkg, "A")->windows.subsystem = SPN_WIN_SUBSYSTEM_CONSOLE;
-      break;
-    }
-    case PKG_EDIT_PROFILE_SDK: {
-      it->profile.sdk = (spn_sdk_t) { .kind = SPN_SDK_MACOS, .root = { .sub = sp_str_lit("/A") } };
       break;
     }
   }

@@ -5,6 +5,7 @@
 #include "session/session.h"
 #include "str/str.h"
 #include "toolchain/linker.h"
+#include "toolchain/sdk.h"
 
 typedef struct {
   sp_hash_t qualified;
@@ -21,6 +22,7 @@ typedef struct {
   spn_arch_t arch;
   spn_os_t os;
   spn_abi_t abi;
+  sp_hash_t sdk;
   sp_hash_t platform;
   struct {
     sp_hash_t name;
@@ -137,6 +139,7 @@ sp_hash_t spn_unit_fingerprint(spn_session_t* session, spn_build_unit_t* build, 
   fingerprint.arch = build->profile.arch;
   fingerprint.os = build->profile.os;
   fingerprint.abi = build->profile.abi;
+  fingerprint.sdk = spn_sdk_hash(&build->profile.sdk);
   fingerprint.platform = spn_pkg_hash_platform(pkg, &build->profile);
   fingerprint.toolchain.name = spn_digest_hash_str(toolchain->name);
   fingerprint.toolchain.cc = hash_arg(toolchain->compiler.program);
