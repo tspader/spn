@@ -8,6 +8,7 @@
 #include "toolchain/provision.h"
 #include "toolchain/linker.h"
 #include "toolchain/sdk.h"
+#include "toolchain/libc.h"
 
 spn_path_check_t         spn_toolchain_path(spn_toolchain_source_t source, spn_path_root_t base, sp_str_t str, spn_path_t* path);
 spn_path_check_t         spn_toolchain_program(spn_toolchain_source_t source, spn_path_root_t base, sp_str_t program, spn_arg_t* arg);

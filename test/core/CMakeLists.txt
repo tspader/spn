@@ -248,6 +248,8 @@ add_executable(core
   ${SRC}/toolchain/select.c
   ${SRC}/toolchain/toolchain.c
   ${SRC}/toolchain/sdk.c
+  ${SRC}/toolchain/libc.c
+  ${UTIL}/sp/sp_msvc.c
   ${SRC}/toolchain/linker.c
   ${SRC}/triple/triple.c
   ${SRC}/elf/elf.c

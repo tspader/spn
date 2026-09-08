@@ -102,7 +102,7 @@ typedef enum {
 
 typedef struct {
   sp_str_t key;
-  spn_arg_t value;
+  sp_da(spn_arg_t) values;
 } spn_invocation_env_t;
 
 typedef struct {

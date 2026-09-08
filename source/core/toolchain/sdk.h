@@ -16,8 +16,5 @@ const spn_sdk_t* spn_sdk_find(sp_da(spn_sdk_t) sdks, spn_triple_t target);
 sp_da(spn_sdk_t) spn_sdk_detect(sp_mem_t mem, sp_env_t* env, spn_triple_t host);
 spn_sdk_t        spn_sdk_resolve(sp_mem_t mem, sp_da(spn_sdk_t) sdks, const spn_toolchain_selection_t* selection);
 sp_hash_t        spn_sdk_hash(const spn_sdk_t* sdk);
-void             spn_sdk_render_libc(sp_io_writer_t* io, const spn_path_roots_t* roots, const spn_sdk_t* sdk);
-spn_path_t       spn_sdk_libc_path(sp_mem_t mem, const spn_path_roots_t* roots, const spn_sdk_t* sdk);
-spn_err_t        spn_sdk_libc_write(sp_mem_t mem, const spn_path_roots_t* roots, const spn_sdk_t* sdk);
 
 #endif

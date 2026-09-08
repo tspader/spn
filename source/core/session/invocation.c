@@ -152,7 +152,14 @@ sp_da(sp_str_t) spn_invocation_args(const spn_path_roots_t* roots, sp_mem_t mem,
 }
 
 sp_env_var_t spn_invocation_env_var(const spn_path_roots_t* roots, sp_mem_t mem, spn_invocation_env_t env) {
-  return (sp_env_var_t) { .key = env.key, .value = spn_arg_str(roots, mem, env.value) };
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch_for(mem);
+  sp_da(sp_str_t) values = sp_da_new(scratch.mem, sp_str_t);
+  sp_da_for(env.values, it) {
+    sp_da_push(values, spn_arg_str(roots, scratch.mem, env.values[it]));
+  }
+  sp_str_t value = sp_str_join_n(mem, values, sp_da_size(values), sp_str_lit(";"));
+  sp_mem_end_scratch(scratch);
+  return (sp_env_var_t) { .key = env.key, .value = value };
 }
 
 sp_str_t spn_invocation_to_str(sp_mem_t mem, const spn_invocation_t* invocation) {

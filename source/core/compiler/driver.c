@@ -59,11 +59,19 @@ void spn_cc_push_args(sp_mem_t mem, spn_invocation_t* invocation, sp_da(spn_arg_
 }
 
 void spn_cc_push_env(sp_mem_t mem, spn_invocation_t* invocation, const c8* key, spn_arg_t value) {
+  spn_invocation_env_t env = { .key = sp_cstr_as_str(key), .values = sp_da_new(mem, spn_arg_t) };
+  sp_da_push(env.values, value);
   if (!invocation->env) sp_da_init(mem, invocation->env);
-  sp_da_push(invocation->env, ((spn_invocation_env_t) { .key = sp_cstr_as_str(key), .value = value }));
+  sp_da_push(invocation->env, env);
 }
 
 void spn_cc_push_env_paths(sp_mem_t mem, spn_invocation_t* invocation, const c8* key, const spn_path_t* paths, u32 count) {
+  spn_invocation_env_t env = { .key = sp_cstr_as_str(key), .values = sp_da_new(mem, spn_arg_t) };
+  sp_for(it, count) {
+    sp_da_push(env.values, spn_arg_path(paths[it]));
+  }
+  if (!invocation->env) sp_da_init(mem, invocation->env);
+  sp_da_push(invocation->env, env);
 }
 
 bool spn_cc_has(const spn_cc_toolchain_t* toolchain, spn_cc_cap_t cap) {
@@ -236,6 +244,7 @@ spn_invocation_t spn_cc_render_compile_command(sp_mem_t mem, const spn_cc_toolch
     .program = base->program,
     .launcher = base->launcher,
     .cwd = base->cwd,
+    .env = base->env,
   };
   sp_da_init(mem, invocation.args);
   sp_da_reserve(invocation.args, sp_da_size(base->args));

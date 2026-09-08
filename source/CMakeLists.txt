@@ -118,6 +118,7 @@ set(SPN_SOURCES
   util/sp/sp_cli.c
   util/sp_elf/sp_elf.c
   util/sp/sp_glob.c
+  util/sp/sp_msvc.c
   util/sp/sp_math.c
   util/sp_template/sp_template.c
   util/str/str.c

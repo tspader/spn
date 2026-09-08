@@ -25,6 +25,7 @@ add_executable(integration
   ${SRC}/toolchain/catalog.c
   ${SRC}/toolchain/toolchain.c
   ${SRC}/toolchain/sdk.c
+  ${UTIL}/sp/sp_msvc.c
   ${SRC}/toolchain/linker.c
   ${SRC}/toolchain/search.c
   ${SRC}/triple/triple.c

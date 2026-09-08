@@ -113,7 +113,7 @@ static void identity_hash_invocation(spn_digest_ctx_t* ctx, const spn_toolchain_
   spn_dag_hash_u64(ctx, sp_da_size(invocation->env));
   sp_da_for(invocation->env, it) {
     spn_dag_hash_str(ctx, invocation->env[it].key);
-    spn_dag_hash_arg(ctx, invocation->env[it].value);
+    spn_dag_hash_args(ctx, invocation->env[it].values);
   }
 }
 
