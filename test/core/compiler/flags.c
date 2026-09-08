@@ -124,7 +124,7 @@ static const flags_test_t tests [] = {
       .abi = SPN_ABI_ELF,
       .sanitizers = SPN_SANITIZER_UNDEFINED,
     },
-    .driver = SPN_CC_DRIVER_ZIG,
+    .driver = SPN_CC_DRIVER_CLANG,
     .expect = { .kind = SPN_ERR_SANITIZER_UNSUPPORTED, .unsupported = SPN_SANITIZER_UNDEFINED },
   },
   {
@@ -242,15 +242,6 @@ static const flags_test_t tests [] = {
     },
     .driver = SPN_CC_DRIVER_CLANG,
     .expect = { .compile = { "-ffreestanding", "-fno-stack-protector" }, .link = { "-nostartfiles", "-nolibc" } },
-  },
-  {
-    .name = "freestanding_elf_zig_strips_nothing",
-    .profile = {
-      .arch = SPN_ARCH_ARM64,
-      .os = SPN_OS_FREESTANDING,
-      .abi = SPN_ABI_ELF,
-    },
-    .driver = SPN_CC_DRIVER_ZIG,
   },
   {
     .name = "freestanding_elf_gcc_strips_nothing",

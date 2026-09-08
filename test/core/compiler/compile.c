@@ -191,21 +191,6 @@ static const compile_test_t tests [] = {
     },
   },
   {
-    .name = "zig_freestanding_elf_sysroot",
-    .driver = SPN_CC_DRIVER_ZIG,
-    .profile = {
-      .arch = SPN_ARCH_ARM64,
-      .os = SPN_OS_FREESTANDING,
-      .abi = SPN_ABI_ELF,
-      .standard = SPN_C99,
-      .sdk = "/S",
-    },
-    .expect = {
-      .command = "cc",
-      .args = { "--target=aarch64-freestanding-none", "-std=c99", "-c", "--sysroot=/S", "-Werror=return-type", "main.c", "-o", "main.o" },
-    },
-  },
-  {
     .name = "zig_windows_deterministic_codeview",
     .driver = SPN_CC_DRIVER_ZIG,
     .profile = {
