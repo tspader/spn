@@ -346,13 +346,13 @@
       "name": "clang-xwin",
       "driver": "clang",
       "compiler": {
-        "program": "clang"
+        "program": "clang-16"
       },
       "archiver": {
-        "program": "llvm-ar"
+        "program": "llvm-ar-16"
       },
       "cxx": {
-        "program": "clang++"
+        "program": "clang++-16"
       },
       "linker": "lld",
       "link_args": [

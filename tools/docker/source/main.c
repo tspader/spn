@@ -120,6 +120,9 @@ static sp_cli_result_t build_image(sp_cli_t* cli, smoke_t* smoke, const variant_
       }
       return fail(cli, smoke, sp_fmt(mem, "failed to provision {} from {}", sp_fmt_cstr(docker->err.artifact.name), sp_fmt_str(docker->err.artifact.url)).value);
     }
+    case DOCKER_PROVISION_ERR_XWIN: {
+      return fail(cli, smoke, sp_fmt(mem, "xwin splat into {} exited with {}\n{}", sp_fmt_str(docker->paths.xwin.splat), sp_fmt_int(docker->err.xwin.status), sp_fmt_str(docker->err.xwin.output)).value);
+    }
   }
 
   switch (docker_render(docker, variant)) {

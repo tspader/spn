@@ -43,6 +43,8 @@ typedef enum {
   LANE_CLANG_SYSROOT,
   LANE_CLANG_CROSS,
   LANE_CLANG_MSVC,
+  LANE_CLANG_XWIN,
+  LANE_ZIG_XWIN,
   LANE_COUNT,
 } lane_t;
 
@@ -52,6 +54,8 @@ typedef enum {
   SYSROOT_WASI,
   SYSROOT_ARM64,
   SYSROOT_WASI_SDK,
+  SYSROOT_XWIN,
+  SYSROOT_ZIG,
 } sysroot_kind_t;
 
 typedef enum {
@@ -59,6 +63,7 @@ typedef enum {
   INSTALL_LINKS,
   INSTALL_DEBS,
   INSTALL_ARTIFACT,
+  INSTALL_XWIN,
 } install_kind_t;
 
 #define SMOKE_MAX_LANES 5
@@ -78,6 +83,11 @@ typedef struct {
 } sysroot_debs_t;
 
 typedef struct {
+  const c8* arch;
+  const c8* variant;
+} sysroot_xwin_t;
+
+typedef struct {
   const c8* name;
   const c8* path;
   const c8* packages [SMOKE_MAX_PACKAGES];
@@ -86,6 +96,7 @@ typedef struct {
     sysroot_link_t links [SMOKE_MAX_LINKS];
     sysroot_debs_t debs;
     lane_t artifact;
+    sysroot_xwin_t xwin;
   };
 } sysroot_t;
 

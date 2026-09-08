@@ -163,6 +163,7 @@ static const lane_program_t lane_programs [] = {
   { "llvm",            SPN_LD_DIALECT_DARWIN, "ld64.lld" },
   { "gcc-lld",         SPN_LD_DIALECT_GNU,    "ld.lld" },
   { "clang-msvc",      SPN_LD_DIALECT_LINK,   "lld-link" },
+  { "clang-xwin",      SPN_LD_DIALECT_LINK,   "lld-link-16" },
   { "clang-mingw",     SPN_LD_DIALECT_GNU,    "x86_64-w64-mingw32-ld" },
   { "clang-mingw-lld", SPN_LD_DIALECT_GNU,    "ld.lld" },
   { "clang-sysroot",   SPN_LD_DIALECT_GNU,    "ld.lld" },

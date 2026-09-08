@@ -66,6 +66,18 @@ const sysroot_t sysroots [] = {
     .kind = INSTALL_ARTIFACT,
     .artifact = LANE_WASI_SDK,
   },
+  [SYSROOT_XWIN] = {
+    .name = "xwin",
+    .path = "/opt/xwin",
+    .kind = INSTALL_XWIN,
+    .xwin = { .arch = "x86_64", .variant = "desktop" },
+  },
+  [SYSROOT_ZIG] = {
+    .name = "zig",
+    .path = "/opt/zig",
+    .kind = INSTALL_ARTIFACT,
+    .artifact = LANE_ZIG,
+  },
 };
 
 static const c8* lane_names [LANE_COUNT] = {
@@ -87,6 +99,8 @@ static const c8* lane_names [LANE_COUNT] = {
   [LANE_CLANG_SYSROOT]   = "clang-sysroot",
   [LANE_CLANG_CROSS]     = "clang-cross",
   [LANE_CLANG_MSVC]      = "clang-msvc",
+  [LANE_CLANG_XWIN]      = "clang-xwin",
+  [LANE_ZIG_XWIN]        = "zig-xwin",
 };
 
 static const compiler_t compilers [] = { COMPILER_GCC, COMPILER_GXX, COMPILER_CLANG };
@@ -168,6 +182,14 @@ const variant_t variants [] = {
     .extra = { "lld", "llvm" },
     .sysroots = { SYSROOT_ARM64 },
     .lanes = { LANE_CLANG_SYSROOT },
+  },
+  {
+    .name = "debian-xwin",
+    .distro = DISTRO_DEBIAN,
+    .check = LANE_CLANG_XWIN,
+    .extra = { "clang-16", "lld-16", "llvm-16" },
+    .sysroots = { SYSROOT_XWIN, SYSROOT_ZIG },
+    .lanes = { LANE_CLANG_XWIN, LANE_ZIG_XWIN },
   },
   {
     .name = "debian-cc-only",

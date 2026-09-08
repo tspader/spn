@@ -157,11 +157,15 @@ docker_init_err_t docker_init(docker_t* docker, sp_mem_t mem, spn_fetch_fn fetch
   docker->paths.lanes = sp_fs_join_path(mem, repo, sp_str_lit(SPN_LANES_TEST));
   docker->paths.config = sp_fs_join_path(mem, docker->paths.dockerfiles, sp_str_lit("config"));
 
+  sp_str_t cache = sp_fs_join_path(mem, sp_fs_get_storage_path(mem), sp_str_lit("spn/cache"));
+  docker->paths.xwin.cache = sp_fs_join_path(mem, cache, sp_str_lit("xwin/cache"));
+  docker->paths.xwin.splat = sp_fs_join_path(mem, cache, sp_str_lit("xwin/splat"));
+
   spn.mem = mem;
   spn.events = spn_event_buffer_new(mem);
   docker->store = (spn_toolchain_store_t) {
     .mem = mem,
-    .dir = sp_fs_join_path(mem, sp_fs_get_storage_path(mem), sp_str_lit("spn/cache/toolchain")),
+    .dir = sp_fs_join_path(mem, cache, sp_str_lit("toolchain")),
     .fetch = fetch,
     .fetch_user_data = user,
   };
@@ -235,20 +239,63 @@ docker_tests_err_t docker_tests_init(docker_t* docker) {
   return DOCKER_TESTS_OK;
 }
 
+static docker_provision_err_t provision_artifact(docker_t* docker, const sysroot_t* sysroot) {
+  spn_artifact_t artifact = sp_zero;
+  docker->err.artifact.name = lane_name(sysroot->artifact);
+  if (!sysroot_artifact(docker, sysroot, &artifact)) {
+    return DOCKER_PROVISION_ERR_ARTIFACT;
+  }
+  docker->err.artifact.url = artifact.url;
+  if (spn_toolchain_provision(&docker->store, sp_cstr_as_str(docker->err.artifact.name), artifact)) {
+    return DOCKER_PROVISION_ERR_FETCH;
+  }
+  return DOCKER_PROVISION_OK;
+}
+
+static sp_ps_config_t xwin_splat(docker_t* docker, const sysroot_t* sysroot) {
+  return (sp_ps_config_t) {
+    .command = sp_str_lit("xwin"),
+    .args = {
+      sp_str_lit("--accept-license"),
+      sp_str_lit("--cache-dir"), docker->paths.xwin.cache,
+      sp_str_lit("--timeout"), sp_str_lit("600"),
+      sp_str_lit("--arch"), sp_cstr_as_str(sysroot->xwin.arch),
+      sp_str_lit("--variant"), sp_cstr_as_str(sysroot->xwin.variant),
+      sp_str_lit("splat"),
+      sp_str_lit("--copy"),
+      sp_str_lit("--output"), docker->paths.xwin.splat,
+    },
+    .io.err = { .mode = SP_PS_IO_MODE_REDIRECT },
+  };
+}
+
+static docker_provision_err_t provision_xwin(docker_t* docker, const sysroot_t* sysroot) {
+  if (sp_fs_is_dir(sp_fs_join_path(docker->mem, docker->paths.xwin.splat, sp_str_lit("crt/include")))) {
+    return DOCKER_PROVISION_OK;
+  }
+  sp_fs_create_dir(docker->paths.xwin.cache);
+  sp_ps_output_t output = sp_ps_run(docker->mem, xwin_splat(docker, sysroot));
+  docker->err.xwin.status = output.status.exit_code;
+  docker->err.xwin.output = sp_str_trim(output.out);
+  return output.status.exit_code ? DOCKER_PROVISION_ERR_XWIN : DOCKER_PROVISION_OK;
+}
+
+static docker_provision_err_t provision(docker_t* docker, const sysroot_t* sysroot) {
+  switch (sysroot->kind) {
+    case INSTALL_PACKAGES:
+    case INSTALL_LINKS:
+    case INSTALL_DEBS:     return DOCKER_PROVISION_OK;
+    case INSTALL_ARTIFACT: return provision_artifact(docker, sysroot);
+    case INSTALL_XWIN:     return provision_xwin(docker, sysroot);
+  }
+  SP_UNREACHABLE_RETURN(DOCKER_PROVISION_OK);
+}
+
 docker_provision_err_t docker_provision(docker_t* docker, const variant_t* variant) {
   sp_carr_for_until(variant->sysroots, it, variant->sysroots[it]) {
-    const sysroot_t* sysroot = &sysroots[variant->sysroots[it]];
-    if (sysroot->kind != INSTALL_ARTIFACT) {
-      continue;
-    }
-    spn_artifact_t artifact = sp_zero;
-    docker->err.artifact.name = lane_name(sysroot->artifact);
-    if (!sysroot_artifact(docker, sysroot, &artifact)) {
-      return DOCKER_PROVISION_ERR_ARTIFACT;
-    }
-    docker->err.artifact.url = artifact.url;
-    if (spn_toolchain_provision(&docker->store, sp_cstr_as_str(docker->err.artifact.name), artifact)) {
-      return DOCKER_PROVISION_ERR_FETCH;
+    docker_provision_err_t err = provision(docker, &sysroots[variant->sysroots[it]]);
+    if (err) {
+      return err;
     }
   }
   return DOCKER_PROVISION_OK;
@@ -272,7 +319,8 @@ docker_render_err_t docker_render(docker_t* docker, const variant_t* variant) {
       case INSTALL_PACKAGES: {
         break;
       }
-      case INSTALL_ARTIFACT: {
+      case INSTALL_ARTIFACT:
+      case INSTALL_XWIN: {
         sp_template_scope_t* artifact = sp_template_push(scope, sp_str_lit("artifacts"));
         sp_template_set(artifact, sp_str_lit("name"), sp_cstr_as_str(sysroot->name));
         sp_template_set(artifact, sp_str_lit("path"), sp_cstr_as_str(sysroot->path));
@@ -304,6 +352,18 @@ const c8* docker_image(docker_t* docker, const variant_t* variant) {
   return cfmt(docker->mem, "spn-smoke-{}", sp_fmt_cstr(variant->name));
 }
 
+static sp_str_t artifact_dir(docker_t* docker, const sysroot_t* sysroot) {
+  spn_artifact_t artifact = sp_zero;
+  bool provisioned = sysroot_artifact(docker, sysroot, &artifact);
+  sp_assert(provisioned);
+  return spn_toolchain_store_path(&docker->store, artifact);
+}
+
+static void context(docker_t* docker, sp_ps_config_t* config, const sysroot_t* sysroot, sp_str_t dir) {
+  arg_c(docker, config, "--build-context");
+  arg(docker, config, sp_fmt(docker->mem, "{}={}", sp_fmt_cstr(sysroot->name), sp_fmt_str(dir)).value);
+}
+
 sp_ps_config_t docker_build(docker_t* docker, const variant_t* variant) {
   sp_ps_config_t config = {
     .command = sp_str_lit("docker"),
@@ -315,14 +375,21 @@ sp_ps_config_t docker_build(docker_t* docker, const variant_t* variant) {
   };
   sp_carr_for_until(variant->sysroots, it, variant->sysroots[it]) {
     const sysroot_t* sysroot = &sysroots[variant->sysroots[it]];
-    if (sysroot->kind != INSTALL_ARTIFACT) {
-      continue;
+    switch (sysroot->kind) {
+      case INSTALL_PACKAGES:
+      case INSTALL_LINKS:
+      case INSTALL_DEBS: {
+        break;
+      }
+      case INSTALL_ARTIFACT: {
+        context(docker, &config, sysroot, artifact_dir(docker, sysroot));
+        break;
+      }
+      case INSTALL_XWIN: {
+        context(docker, &config, sysroot, docker->paths.xwin.splat);
+        break;
+      }
     }
-    spn_artifact_t artifact = sp_zero;
-    bool provisioned = sysroot_artifact(docker, sysroot, &artifact);
-    sp_assert(provisioned);
-    arg_c(docker, &config, "--build-context");
-    arg(docker, &config, sp_fmt(docker->mem, "{}={}", sp_fmt_cstr(sysroot->name), sp_fmt_str(spn_toolchain_store_path(&docker->store, artifact))).value);
   }
   arg(docker, &config, docker->paths.dockerfiles);
   return config;

@@ -29,6 +29,7 @@ typedef enum {
   DOCKER_PROVISION_OK,
   DOCKER_PROVISION_ERR_ARTIFACT,
   DOCKER_PROVISION_ERR_FETCH,
+  DOCKER_PROVISION_ERR_XWIN,
 } docker_provision_err_t;
 
 typedef enum {
@@ -56,6 +57,10 @@ typedef struct {
     sp_str_t builtin;
     sp_str_t lanes;
     sp_str_t config;
+    struct {
+      sp_str_t cache;
+      sp_str_t splat;
+    } xwin;
   } paths;
   const c8* user;
   struct {
@@ -67,6 +72,10 @@ typedef struct {
       const c8* name;
       sp_str_t url;
     } artifact;
+    struct {
+      sp_str_t output;
+      s32 status;
+    } xwin;
     sp_str_t json;
     verify_t verify;
     s32 render;
