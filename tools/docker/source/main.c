@@ -1,4 +1,3 @@
-#define SP_CLI_IMPLEMENTATION
 #include "sp.h"
 #include "sp/sp_cli.h"
 #include "sp/sp_prompt.h"
@@ -20,17 +19,44 @@ static struct {
 
 typedef struct {
   const variant_t* variant;
-  const c8* lane;
-} lane_t;
+  lane_t lane;
+} run_t;
 
 #define try(expr) do { sp_cli_result_t _e = (expr); if (_e) return _e; } while (0)
 #define cfmt(mem, ...) sp_str_to_cstr(mem, sp_fmt(mem, __VA_ARGS__).value)
+
+static spn_err_t fetch(sp_str_t url, sp_str_t dest, void* user) {
+  smoke_t* smoke = user;
+  sp_ps_config_t curl = {
+    .command = sp_str_lit("curl"),
+    .args = { sp_str_lit("-fsSL"), sp_str_lit("-o"), dest, url },
+  };
+  return tail_trace(smoke->mem, smoke->prompt, cfmt(smoke->mem, "curl {}", sp_fmt_str(url)), curl) ? SPN_ERROR : SPN_OK;
+}
+
+static sp_str_t verify_message(sp_mem_t mem, verify_t verify) {
+  switch (verify.kind) {
+    case VERIFY_OK: {
+      break;
+    }
+    case VERIFY_LANE_UNDECLARED: {
+      return sp_fmt(mem, "lane {.cyan} isn't declared in {} or {}", sp_fmt_cstr(lane_name(verify.lane)), sp_fmt_cstr(SPN_LANES_TEST), sp_fmt_cstr(SPN_LANES_BUILTIN)).value;
+    }
+    case VERIFY_LANE_UNLISTED: {
+      return sp_fmt(mem, "{} declares {.cyan}, which lane_t doesn't list", sp_fmt_cstr(SPN_LANES_TEST), sp_fmt_str(verify.name)).value;
+    }
+    case VERIFY_SYSROOT_UNPROVIDED: {
+      return sp_fmt(mem, "{.cyan} hosts {.cyan}, which reads a sysroot at {} that none of its sysroots install", sp_fmt_cstr(verify.variant->name), sp_fmt_cstr(lane_name(verify.lane)), sp_fmt_str(verify.sysroot)).value;
+    }
+  }
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
 
 static sp_cli_result_t init(sp_cli_t* cli, smoke_t* smoke) {
   smoke->mem = sp_mem_os_new();
   sp_mem_t mem = smoke->mem;
 
-  switch (docker_init(&smoke->docker, mem)) {
+  switch (docker_init(&smoke->docker, mem, fetch, smoke)) {
     case DOCKER_INIT_OK: {
       return SP_CLI_OK;
     }
@@ -44,7 +70,13 @@ static sp_cli_result_t init(sp_cli_t* cli, smoke_t* smoke) {
       return sp_cli_set_error(cli, sp_fmt(mem, "failed to load templates from {.cyan}", sp_fmt_str(smoke->docker.paths.templates)).value);
     }
     case DOCKER_INIT_ERR_LANES: {
-      return sp_cli_set_error(cli, sp_fmt(mem, "failed to render lanes from {.cyan}", sp_fmt_str(smoke->docker.paths.lanes)).value);
+      return sp_cli_set_error(cli, sp_fmt(mem, "failed to read lanes from {.cyan}", sp_fmt_str(smoke->docker.err.json)).value);
+    }
+    case DOCKER_INIT_ERR_VERIFY: {
+      return sp_cli_set_error(cli, verify_message(mem, smoke->docker.err.verify));
+    }
+    case DOCKER_INIT_ERR_CONFIG: {
+      return sp_cli_set_error(cli, sp_fmt(mem, "failed to write lanes to {.cyan}", sp_fmt_str(smoke->docker.paths.config)).value);
     }
   }
   SP_UNREACHABLE_RETURN(SP_CLI_ERR);
@@ -73,21 +105,37 @@ static sp_cli_result_t fail(sp_cli_t* cli, smoke_t* smoke, sp_str_t message) {
 
 static sp_cli_result_t build_image(sp_cli_t* cli, smoke_t* smoke, const variant_t* variant) {
   sp_mem_t mem = smoke->mem;
+  docker_t* docker = &smoke->docker;
 
-  switch (docker_render(&smoke->docker, variant)) {
+  switch (docker_provision(docker, variant)) {
+    case DOCKER_PROVISION_OK: {
+      break;
+    }
+    case DOCKER_PROVISION_ERR_ARTIFACT: {
+      return fail(cli, smoke, sp_fmt(mem, "lane {} has no artifact for {}", sp_fmt_cstr(docker->err.artifact.name), sp_fmt_str(docker->host)).value);
+    }
+    case DOCKER_PROVISION_ERR_FETCH: {
+      if (sp_prompt_cancelled(smoke->prompt)) {
+        return fail(cli, smoke, sp_str_lit("cancelled"));
+      }
+      return fail(cli, smoke, sp_fmt(mem, "failed to provision {} from {}", sp_fmt_cstr(docker->err.artifact.name), sp_fmt_str(docker->err.artifact.url)).value);
+    }
+  }
+
+  switch (docker_render(docker, variant)) {
     case DOCKER_RENDER_OK: {
       break;
     }
     case DOCKER_RENDER_ERR_MISSING: {
-      return fail(cli, smoke, sp_fmt(mem, "missing template {}", sp_fmt_str(get_template_name(variant))).value);
+      return fail(cli, smoke, sp_fmt(mem, "missing template {}", sp_fmt_str(variant_template(variant))).value);
     }
     case DOCKER_RENDER_ERR_FAILED: {
-      return fail(cli, smoke, sp_fmt(mem, "failed to render template {} with code {}", sp_fmt_str(get_template_name(variant)), sp_fmt_int(smoke->docker.err.render)).value);
+      return fail(cli, smoke, sp_fmt(mem, "failed to render template {} with code {}", sp_fmt_str(variant_template(variant)), sp_fmt_int(docker->err.render)).value);
     }
   }
 
-  const c8* title = cfmt(mem, "docker build {}", sp_fmt_cstr(docker_image(&smoke->docker, variant)));
-  s32 status = tail_trace(mem, smoke->prompt, title, docker_build(&smoke->docker, variant));
+  const c8* title = cfmt(mem, "docker build {}", sp_fmt_cstr(docker_image(docker, variant)));
+  s32 status = tail_trace(mem, smoke->prompt, title, docker_build(docker, variant));
   if (sp_prompt_cancelled(smoke->prompt)) {
     return fail(cli, smoke, sp_str_lit("cancelled"));
   }
@@ -118,7 +166,7 @@ static sp_cli_result_t run_shell(sp_cli_t* cli) {
   sp_prompt_end(smoke.prompt);
   try(result);
 
-  sp_ps_t ps = sp_ps_create_c(smoke.mem, docker_shell(&smoke.docker, variant));
+  sp_ps_t ps = sp_ps_create(smoke.mem, docker_shell(&smoke.docker, variant));
   if (!ps.os) {
     return sp_cli_set_error_c(cli, "failed to launch docker");
   }
@@ -135,7 +183,7 @@ static sp_cli_result_t check_session(sp_cli_t* cli, smoke_t* smoke, sp_da(const 
     const variant_t* variant = selected[it];
     try(build_image(cli, smoke, variant));
 
-    const c8* title = cfmt(mem, "check {} (--toolchain {})", sp_fmt_cstr(variant->name), sp_fmt_cstr(toolchain_name(variant->toolchain)));
+    const c8* title = cfmt(mem, "check {} (--toolchain {})", sp_fmt_cstr(variant->name), sp_fmt_cstr(lane_name(variant->check)));
     s32 status = tail_trace(mem, smoke->prompt, title, docker_check(&smoke->docker, variant));
     if (sp_prompt_cancelled(smoke->prompt)) {
       return fail(cli, smoke, sp_str_lit("cancelled"));
@@ -168,14 +216,14 @@ static sp_cli_result_t run_check(sp_cli_t* cli) {
     if (!variant) {
       return sp_cli_set_error(cli, sp_fmt(mem, "unknown variant {.cyan}; see smoke list", sp_fmt_cstr(*it)).value);
     }
-    if (variant->toolchain == TOOLCHAIN_NONE) {
+    if (variant->check == LANE_NONE) {
       return sp_cli_set_error(cli, sp_fmt(mem, "{.cyan} has no toolchain to check", sp_fmt_cstr(*it)).value);
     }
     sp_da_push(selected, variant);
   }
   if (sp_da_empty(selected)) {
     sp_for(it, num_variants) {
-      if (variants[it].toolchain != TOOLCHAIN_NONE) {
+      if (variants[it].check != LANE_NONE) {
         sp_da_push(selected, &variants[it]);
       }
     }
@@ -190,61 +238,66 @@ static sp_cli_result_t run_check(sp_cli_t* cli) {
   return result;
 }
 
-static void push_variant_lanes(sp_da(lane_t)* lanes, const variant_t* variant) {
+static void push_variant_lanes(sp_da(run_t)* runs, const variant_t* variant) {
   sp_carr_for_until(variant->lanes, it, variant->lanes[it]) {
-    sp_da_push(*lanes, ((lane_t) { .variant = variant, .lane = variant->lanes[it] }));
+    sp_da_push(*runs, ((run_t) { .variant = variant, .lane = variant->lanes[it] }));
   }
 }
 
-static sp_cli_result_t select_lanes(sp_cli_t* cli, sp_mem_t mem, sp_da(lane_t)* lanes) {
+static sp_cli_result_t select_lanes(sp_cli_t* cli, sp_mem_t mem, sp_da(run_t)* runs) {
   for (const c8** it = cli->rest; *it; it++) {
     const variant_t* variant = variant_find(*it);
     if (variant) {
-      push_variant_lanes(lanes, variant);
+      push_variant_lanes(runs, variant);
       continue;
     }
-    const variant_t* host = variant_hosting(*it);
-    if (!host) {
+    lane_t lane = lane_find(sp_cstr_as_str(*it));
+    if (lane == LANE_NONE) {
       return sp_cli_set_error(cli, sp_fmt(mem, "{.cyan} is neither a variant nor a lane; see smoke list", sp_fmt_cstr(*it)).value);
     }
-    sp_da_push(*lanes, ((lane_t) { .variant = host, .lane = *it }));
+    const variant_t* host = variant_hosting(lane);
+    if (!host) {
+      return sp_cli_set_error(cli, sp_fmt(mem, "no variant hosts {.cyan}; see smoke list", sp_fmt_cstr(*it)).value);
+    }
+    sp_da_push(*runs, ((run_t) { .variant = host, .lane = lane }));
   }
-  if (!sp_da_empty(*lanes)) {
+  if (!sp_da_empty(*runs)) {
     return SP_CLI_OK;
   }
   sp_for(it, num_variants) {
     sp_carr_for_until(variants[it].lanes, lane, variants[it].lanes[lane]) {
       if (variant_hosting(variants[it].lanes[lane]) == &variants[it]) {
-        sp_da_push(*lanes, ((lane_t) { .variant = &variants[it], .lane = variants[it].lanes[lane] }));
+        sp_da_push(*runs, ((run_t) { .variant = &variants[it], .lane = variants[it].lanes[lane] }));
       }
     }
   }
   return SP_CLI_OK;
 }
 
-static sp_cli_result_t test_session(sp_cli_t* cli, smoke_t* smoke, sp_da(lane_t) lanes, const c8* filter) {
+static sp_cli_result_t test_session(sp_cli_t* cli, smoke_t* smoke, sp_da(run_t) runs, const c8* filter) {
   sp_mem_t mem = smoke->mem;
 
   u32 failures = 0;
   const variant_t* built = SP_NULLPTR;
-  sp_da_for(lanes, it) {
-    lane_t lane = lanes[it];
-    if (lane.variant != built) {
-      try(build_image(cli, smoke, lane.variant));
-      built = lane.variant;
+  sp_da_for(runs, it) {
+    run_t run = runs[it];
+    const c8* lane = lane_name(run.lane);
+    if (run.variant != built) {
+      try(build_image(cli, smoke, run.variant));
+      built = run.variant;
     }
 
-    const c8* title = cfmt(mem, "test {} in {}", sp_fmt_cstr(lane.lane), sp_fmt_cstr(lane.variant->name));
-    s32 status = tail_trace(mem, smoke->prompt, title, docker_test(&smoke->docker, lane.variant, lane.lane, filter));
+    const c8* title = cfmt(mem, "test {} in {}", sp_fmt_cstr(lane), sp_fmt_cstr(run.variant->name));
+    s32 status = tail_trace(mem, smoke->prompt, title, docker_test(&smoke->docker, run.variant, run.lane, filter));
     if (sp_prompt_cancelled(smoke->prompt)) {
       return fail(cli, smoke, sp_str_lit("cancelled"));
     }
     if (status) {
       failures++;
-      sp_prompt_error(smoke->prompt, cfmt(mem, "FAIL {} in {}", sp_fmt_cstr(lane.lane), sp_fmt_cstr(lane.variant->name)));
+      sp_prompt_error(smoke->prompt, cfmt(mem, "FAIL {} in {}", sp_fmt_cstr(lane), sp_fmt_cstr(run.variant->name)));
     }
     else {
-      sp_prompt_success(smoke->prompt, cfmt(mem, "PASS {} in {}", sp_fmt_cstr(lane.lane), sp_fmt_cstr(lane.variant->name)));
+      sp_prompt_success(smoke->prompt, cfmt(mem, "PASS {} in {}", sp_fmt_cstr(lane), sp_fmt_cstr(run.variant->name)));
     }
   }
 
@@ -261,8 +314,8 @@ static sp_cli_result_t run_test(sp_cli_t* cli) {
   try(init(cli, &smoke));
   sp_mem_t mem = smoke.mem;
 
-  sp_da(lane_t) lanes = sp_da_new(mem, lane_t);
-  try(select_lanes(cli, mem, &lanes));
+  sp_da(run_t) runs = sp_da_new(mem, run_t);
+  try(select_lanes(cli, mem, &runs));
   switch (docker_tests_init(&smoke.docker)) {
     case DOCKER_TESTS_OK: {
       break;
@@ -279,7 +332,7 @@ static sp_cli_result_t run_test(sp_cli_t* cli) {
   }
 
   try(begin(cli, &smoke));
-  sp_cli_result_t result = test_session(cli, &smoke, lanes, args.filter ? args.filter : "*");
+  sp_cli_result_t result = test_session(cli, &smoke, runs, args.filter ? args.filter : "*");
   sp_prompt_end(smoke.prompt);
   return result;
 }

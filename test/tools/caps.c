@@ -8,15 +8,12 @@
 #include "toolchain/linker.h"
 #include "toolchain/search.h"
 #include "triple/triple.h"
-#include "yyjson.h"
-
-#define SPN_TEST_BUILTINS "source/core/toolchain/toolchains.json"
-#define SPN_TEST_LANES "test/tools/toolchains.json"
+#include "lanes.h"
 
 static sp_test_once_t once;
 static test_toolchain_t cached;
 static spn_toolchain_catalog_t catalog;
-static sp_str_t lanes_toml;
+static sp_str_t toml;
 
 static sp_str_t read_repo_file(sp_mem_t mem, const c8* rel) {
   sp_str_t content = sp_zero;
@@ -225,106 +222,6 @@ static sp_str_t lane_broken(sp_mem_t mem, const spn_toolchain_info_t* info) {
   sp_unreachable_return(sp_str_lit(""));
 }
 
-static void write_str(sp_io_writer_t* io, const c8* key, yyjson_val* value) {
-  sp_fmt_io(io, "{} = \"{}\"\n", sp_fmt_cstr(key), sp_fmt_cstr(yyjson_get_str(value)));
-}
-
-static void write_launcher(sp_io_writer_t* io, const c8* key, yyjson_val* launcher) {
-  sp_fmt_io(io, "{} = \"{}", sp_fmt_cstr(key), sp_fmt_cstr(yyjson_get_str(yyjson_obj_get(launcher, "program"))));
-  size_t idx, max;
-  yyjson_val* arg;
-  yyjson_arr_foreach(yyjson_obj_get(launcher, "args"), idx, max, arg) {
-    sp_fmt_io(io, " {}", sp_fmt_cstr(yyjson_get_str(arg)));
-  }
-  sp_io_write_cstr(io, "\"\n", SP_NULLPTR);
-}
-
-static void write_table(sp_io_writer_t* io, yyjson_val* obj) {
-  sp_io_write_cstr(io, "{", SP_NULLPTR);
-  size_t idx, max;
-  yyjson_val* key;
-  yyjson_val* value;
-  yyjson_obj_foreach(obj, idx, max, key, value) {
-    sp_fmt_io(io, "{} {} = \"{}\"", sp_fmt_cstr(idx ? "," : ""), sp_fmt_cstr(yyjson_get_str(key)), sp_fmt_cstr(yyjson_get_str(value)));
-  }
-  sp_io_write_cstr(io, " }", SP_NULLPTR);
-}
-
-static void write_tables(sp_io_writer_t* io, const c8* name, yyjson_val* obj) {
-  sp_fmt_io(io, "{} = ", sp_fmt_cstr(name));
-  sp_io_write_cstr(io, "{", SP_NULLPTR);
-  size_t idx, max;
-  yyjson_val* key;
-  yyjson_val* value;
-  yyjson_obj_foreach(obj, idx, max, key, value) {
-    sp_fmt_io(io, "{} {} = ", sp_fmt_cstr(idx ? "," : ""), sp_fmt_cstr(yyjson_get_str(key)));
-    write_table(io, value);
-  }
-  sp_io_write_cstr(io, " }\n", SP_NULLPTR);
-}
-
-static void write_str_array(sp_io_writer_t* io, const c8* name, yyjson_val* arr) {
-  sp_fmt_io(io, "{} = [", sp_fmt_cstr(name));
-  size_t idx, max;
-  yyjson_val* value;
-  yyjson_arr_foreach(arr, idx, max, value) {
-    sp_fmt_io(io, "{} \"{}\"", sp_fmt_cstr(idx ? "," : ""), sp_fmt_cstr(yyjson_get_str(value)));
-  }
-  sp_io_write_cstr(io, " ]\n", SP_NULLPTR);
-}
-
-static void write_table_array(sp_io_writer_t* io, const c8* name, yyjson_val* arr) {
-  sp_fmt_io(io, "{} = [", sp_fmt_cstr(name));
-  size_t idx, max;
-  yyjson_val* value;
-  yyjson_arr_foreach(arr, idx, max, value) {
-    sp_io_write_cstr(io, idx ? ", " : " ", SP_NULLPTR);
-    write_table(io, value);
-  }
-  sp_io_write_cstr(io, " ]\n", SP_NULLPTR);
-}
-
-static void write_lane(sp_io_writer_t* io, yyjson_val* toolchain) {
-  sp_io_write_cstr(io, "\n[[toolchain]]\n", SP_NULLPTR);
-  write_str(io, "name", yyjson_obj_get(toolchain, "name"));
-  write_str(io, "driver", yyjson_obj_get(toolchain, "driver"));
-  write_launcher(io, "compiler", yyjson_obj_get(toolchain, "compiler"));
-  write_launcher(io, "archiver", yyjson_obj_get(toolchain, "archiver"));
-  if (yyjson_obj_get(toolchain, "cxx")) {
-    write_launcher(io, "cxx", yyjson_obj_get(toolchain, "cxx"));
-  }
-  if (yyjson_obj_get(toolchain, "linker")) {
-    write_str(io, "linker", yyjson_obj_get(toolchain, "linker"));
-  }
-  if (yyjson_obj_get(toolchain, "link_args")) {
-    write_str_array(io, "link_args", yyjson_obj_get(toolchain, "link_args"));
-  }
-  if (yyjson_obj_get(toolchain, "host")) {
-    write_tables(io, "host", yyjson_obj_get(toolchain, "host"));
-  }
-  if (yyjson_obj_get(toolchain, "target")) {
-    write_table_array(io, "target", yyjson_obj_get(toolchain, "target"));
-  }
-  if (yyjson_obj_get(toolchain, "mirrors")) {
-    write_str(io, "mirrors", yyjson_obj_get(toolchain, "mirrors"));
-  }
-}
-
-static sp_str_t render_lanes(sp_mem_t mem, sp_str_t json) {
-  yyjson_doc* doc = yyjson_read(json.data, json.len, 0);
-  sp_assert(doc);
-
-  sp_io_dyn_mem_writer_t writer = sp_zero;
-  sp_io_dyn_mem_writer_init(mem, &writer);
-  size_t idx, max;
-  yyjson_val* toolchain;
-  yyjson_arr_foreach(yyjson_obj_get(yyjson_doc_get_root(doc), "toolchain"), idx, max, toolchain) {
-    write_lane(&writer.base, toolchain);
-  }
-  yyjson_doc_free(doc);
-  return sp_io_dyn_mem_writer_as_str(&writer);
-}
-
 static sp_err_t load_lanes(void* user) {
   sp_mem_t mem = sp_mem_os_new();
   sp_str_t name = sp_os_env_get(sp_str_lit("SPN_TEST_TOOLCHAIN"));
@@ -332,11 +229,14 @@ static sp_err_t load_lanes(void* user) {
     name = sp_str_lit("zig");
   }
 
-  sp_str_t lanes = read_repo_file(mem, SPN_TEST_LANES);
+  sp_str_t lanes = read_repo_file(mem, SPN_LANES_TEST);
   spn_toolchain_catalog_init(&catalog, spn_triple_host(), mem);
-  sp_assert(spn_toolchain_catalog_load(&catalog, read_repo_file(mem, SPN_TEST_BUILTINS)) == SPN_OK);
+  sp_assert(spn_toolchain_catalog_load(&catalog, read_repo_file(mem, SPN_LANES_BUILTIN)) == SPN_OK);
   sp_assert(spn_toolchain_catalog_load(&catalog, lanes) == SPN_OK);
-  lanes_toml = render_lanes(mem, lanes);
+
+  spn_cg_toolchains_t parsed = sp_zero;
+  sp_assert(spn_toolchains_read(lanes, &parsed, mem));
+  toml = lanes_toml(mem, &parsed);
 
   spn_toolchain_info_t* info = spn_toolchain_catalog_get(&catalog, name);
   if (!info) {
@@ -486,5 +386,5 @@ bool test_when_runs(const test_when_t* when) {
 
 sp_str_t test_lanes_toml(void) {
   sp_test_once(&once, load_lanes, SP_NULLPTR);
-  return lanes_toml;
+  return toml;
 }

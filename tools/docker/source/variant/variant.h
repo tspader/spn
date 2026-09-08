@@ -2,6 +2,7 @@
 #define SMOKE_VARIANT_H
 
 #include "sp.h"
+#include "lanes.h"
 
 typedef enum {
   DISTRO_DEBIAN,
@@ -9,7 +10,7 @@ typedef enum {
   DISTRO_UBUNTU19,
   DISTRO_CENTOS7,
   DISTRO_ALPINE,
-} distro_kind_t;
+} distro_t;
 
 typedef enum {
   SPN_MUSL,
@@ -23,11 +24,27 @@ typedef enum {
 } compiler_t;
 
 typedef enum {
-  TOOLCHAIN_NONE,
-  TOOLCHAIN_GCC,
-  TOOLCHAIN_CLANG,
-  TOOLCHAIN_ZIG,
-} toolchain_t;
+  LANE_NONE,
+  LANE_GCC,
+  LANE_CLANG,
+  LANE_LLVM,
+  LANE_ZIG,
+  LANE_GCC_LLD,
+  LANE_AARCH64_GNU,
+  LANE_MINGW_GNU,
+  LANE_CLANG_MINGW,
+  LANE_CLANG_MINGW_LLD,
+  LANE_CLANG_BARE,
+  LANE_MUSL_GCC,
+  LANE_CLANG_MUSL,
+  LANE_CLANG_WASI,
+  LANE_WASI_SDK,
+  LANE_WASI_SDK_LOCAL,
+  LANE_CLANG_SYSROOT,
+  LANE_CLANG_CROSS,
+  LANE_CLANG_MSVC,
+  LANE_COUNT,
+} lane_t;
 
 typedef enum {
   SYSROOT_NONE,
@@ -41,15 +58,14 @@ typedef enum {
   INSTALL_PACKAGES,
   INSTALL_LINKS,
   INSTALL_DEBS,
-  INSTALL_TARBALL,
+  INSTALL_ARTIFACT,
 } install_kind_t;
-
-typedef struct yyjson_val yyjson_val;
 
 #define SMOKE_MAX_LANES 5
 #define SMOKE_MAX_SYSROOTS 2
 #define SMOKE_MAX_LINKS 2
 #define SMOKE_MAX_DEBS 8
+#define SMOKE_MAX_PACKAGES 4
 
 typedef struct {
   const c8* dir;
@@ -62,44 +78,62 @@ typedef struct {
 } sysroot_debs_t;
 
 typedef struct {
-  const c8* lane;
-} sysroot_tarball_t;
-
-typedef struct {
   const c8* name;
   const c8* path;
-  const c8* packages;
+  const c8* packages [SMOKE_MAX_PACKAGES];
   install_kind_t kind;
   union {
     sysroot_link_t links [SMOKE_MAX_LINKS];
     sysroot_debs_t debs;
-    sysroot_tarball_t tarball;
+    lane_t artifact;
   };
 } sysroot_t;
 
 typedef struct {
   const c8* name;
-  distro_kind_t distro;
-  u32 installed;
-  toolchain_t toolchain;
+  distro_t distro;
+  u32 compilers;
+  lane_t check;
   spn_kind_t spn;
-  const c8* extra;
+  const c8* extra [SMOKE_MAX_PACKAGES];
   sysroot_kind_t sysroots [SMOKE_MAX_SYSROOTS];
-  const c8* lanes [SMOKE_MAX_LANES];
+  lane_t lanes [SMOKE_MAX_LANES];
 } variant_t;
+
+typedef enum {
+  VERIFY_OK,
+  VERIFY_LANE_UNDECLARED,
+  VERIFY_LANE_UNLISTED,
+  VERIFY_SYSROOT_UNPROVIDED,
+} verify_kind_t;
+
+typedef struct {
+  verify_kind_t kind;
+  const variant_t* variant;
+  lane_t lane;
+  sp_str_t name;
+  sp_str_t sysroot;
+} verify_t;
 
 extern const variant_t variants [];
 extern const u32 num_variants;
+extern const sysroot_t sysroots [];
 
-const variant_t* variant_find(const c8* name);
-const variant_t* variant_hosting(const c8* lane);
-bool             variant_hosts(const variant_t* variant, const c8* lane);
-sp_str_t get_template_name(const variant_t* variant);
-const c8* toolchain_name(toolchain_t toolchain);
-const c8* variant_seed(const variant_t* variant);
-yyjson_val* lane_find(yyjson_val* lanes, const c8* name);
-sp_str_t get_variant_packages(sp_mem_t mem, const variant_t* variant);
-sp_str_t get_variant_setup(sp_mem_t mem, const variant_t* variant, yyjson_val* lanes);
-sp_str_t variant_summary(sp_mem_t mem, const variant_t* variant);
+const c8*                 lane_name(lane_t lane);
+lane_t                    lane_find(sp_str_t name);
+const spn_cg_toolchain_t* lane_decl(lane_t lane, const spn_cg_toolchains_t* builtin, const spn_cg_toolchains_t* lanes);
+verify_t                  lanes_verify(const spn_cg_toolchains_t* builtin, const spn_cg_toolchains_t* lanes);
+
+sp_str_t                  sysroot_links_setup(sp_mem_t mem, const sysroot_t* sysroot);
+sp_str_t                  sysroot_debs_setup(sp_mem_t mem, const sysroot_t* sysroot);
+
+const variant_t*          variant_find(const c8* name);
+const variant_t*          variant_hosting(lane_t lane);
+bool                      variant_hosts(const variant_t* variant, lane_t lane);
+lane_t                    variant_seed(const variant_t* variant);
+sp_str_t                  variant_template(const variant_t* variant);
+sp_str_t                  variant_packages(sp_mem_t mem, const variant_t* variant);
+sp_str_t                  variant_summary(sp_mem_t mem, const variant_t* variant);
+verify_t                  variant_verify(const variant_t* variant, const spn_cg_toolchains_t* builtin, const spn_cg_toolchains_t* lanes);
 
 #endif

@@ -11,13 +11,13 @@ exactly the way `~/.config/spn/spn.toml` would declare it.
 
 ```
 SPN_TEST_TOOLCHAIN=gcc-lld build/debug/test/integration   # natively
-tools/docker/build/debug/smoke test gcc-lld               # in the container that hosts it
-tools/docker/build/debug/smoke test debian-llvm           # every lane that image hosts
-tools/docker/build/debug/smoke test                       # every lane once
-tools/docker/build/debug/smoke list                       # images and the lanes they host
+build/debug/smoke test gcc-lld               # in the container that hosts it
+build/debug/smoke test debian-llvm           # every lane that image hosts
+build/debug/smoke test                       # every lane once
+build/debug/smoke list                       # images and the lanes they host
 ```
 
-Build the container tool once with `spn build` in `tools/docker`. It mounts this
+`spn build` at the repo root builds the container tool alongside spn. It mounts this
 checkout, its git dir, and the toolchain caches into the image and runs
 `build/debug/test/integration` there as your user, so run `spn build` and
 `spn build --test integration` first.
@@ -69,7 +69,8 @@ declared as data in `tools/docker/source/variant/variant.c`: `debian-musl`
 links Debian's musl headers and libs under `/sysroot/musl`, `debian-sysroot`
 unpacks the arm64 libc and libgcc debs under `/sysroot/arm64`, and
 `debian-wasi` names `/usr` because Debian's wasi-libc is already laid out as
-one, and `debian-wasi-sdk` unpacks the wasi-sdk tarball under `/opt/wasi-sdk`
+one, and `debian-wasi-sdk` copies the wasi-sdk tree the tool provisions into
+spn's toolchain store to `/opt/wasi-sdk`
 for `wasi-sdk-local`. `wasi-sdk` names the same tarball as a hosted artifact,
 so its `share/wasi-sysroot` is joined onto the artifact root by spn; that lane
 is the artifact-relative sysroot coverage. `musl-gcc` and `clang-cross` list

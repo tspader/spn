@@ -121,6 +121,28 @@ name = "docs"
 source = ["tools/gen/docs.c", "tools/jtd.c"]
 include = ["tools"]
 
+[[script]]
+name = "smoke"
+source = [
+  "tools/docker/source/main.c",
+  "tools/docker/source/docker/docker.c",
+  "tools/docker/source/tail/tail.c",
+  "tools/docker/source/variant/variant.c",
+  "test/tools/lanes.c",
+]
+include = ["include", "source/core", "source/util", "source/core/codegen/gen", "test/tools", "tools/docker/source"]
+deps = ["spn"]
+
+[[script]]
+name = "smoke-shell"
+source = ["tools/docker/source/container/shell.c"]
+include = ["tools/docker/source"]
+
+[[script]]
+name = "smoke-check"
+source = ["tools/docker/source/container/check.c"]
+include = ["tools/docker/source"]
+
 [[test]]
 name = "core"
 source = [
@@ -403,6 +425,7 @@ source = [
   "test/tools/caps.c",
   "test/tools/env.c",
   "test/tools/fixture.c",
+  "test/tools/lanes.c",
   "test/tools/toml.c",
 ]
 include = ["include", "source/core", "source/util", "source/core/codegen/gen", "source/core/external", "test/integration/tools", "test/tools"]
@@ -445,6 +468,7 @@ source = [
   "test/tools/caps.c",
   "test/tools/env.c",
   "test/tools/fixture.c",
+  "test/tools/lanes.c",
   "test/tools/toml.c",
 ]
 include = ["include", "source/core", "source/util", "source/core/codegen/gen", "source/core/external", "test/render", "test/tools"]

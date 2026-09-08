@@ -1,4 +1,4 @@
-#define SP_IMPLEMENTATION
+#define SP_PROMPT_IMPLEMENTATION
 #include "tail.h"
 
 #define TAIL_ROWS 8
@@ -190,14 +190,14 @@ static void render(sp_prompt_ctx_t* ctx) {
   sp_prompt_line(ctx, sp_str_lit(""));
 }
 
-s32 tail_trace(sp_mem_t mem, sp_prompt_ctx_t* prompt, const c8* title, sp_ps_config_cstr_t config) {
+s32 tail_trace(sp_mem_t mem, sp_prompt_ctx_t* prompt, const c8* title, sp_ps_config_t config) {
   config.io.out = (sp_ps_io_out_config_t) { .mode = SP_PS_IO_MODE_CREATE };
   config.io.err = (sp_ps_io_out_config_t) { .mode = SP_PS_IO_MODE_REDIRECT };
 
   tail_t tail = sp_zero;
   tail.title = title;
   tail.status = -1;
-  tail.ps = sp_ps_create_c(mem, config);
+  tail.ps = sp_ps_create(mem, config);
   if (!tail.ps.os) {
     return -1;
   }

@@ -1,10 +1,11 @@
 #include "docker.h"
 
 #include "container/container.h"
-#include "yyjson.h"
-
-#define SP_TEMPLATE_IMPLEMENTATION
-#include "../../../gen/sp_template.h"
+#include "ctx/types.h"
+#include "enum/enum.h"
+#include "event/event.h"
+#include "toolchain/provision.h"
+#include "triple/triple.h"
 
 #define cfmt(mem, ...) sp_str_to_cstr(mem, sp_fmt(mem, __VA_ARGS__).value)
 
@@ -35,17 +36,34 @@ static const c8* spn_hint(spn_kind_t kind) {
   SP_UNREACHABLE_RETURN("");
 }
 
-static sp_str_t get_manifest_path(docker_t* docker, const variant_t* variant) {
+static sp_str_t host_key(sp_mem_t mem) {
+  spn_triple_t host = spn_triple_host();
+  return sp_fmt(mem, "{}-{}", sp_fmt_str(spn_arch_to_str(host.arch)), sp_fmt_str(spn_os_to_str(host.os))).value;
+}
+
+static sp_str_t manifest_path(docker_t* docker, const variant_t* variant) {
   sp_str_t file = sp_fmt(docker->mem, "{}.dockerfile", sp_fmt_cstr(variant->name)).value;
   return sp_fs_join_path(docker->mem, docker->paths.dockerfiles, file);
 }
 
-static const c8* bind(docker_t* docker, sp_str_t host, const c8* guest) {
-  return cfmt(docker->mem, "{}:{}:ro", sp_fmt_str(host), sp_fmt_cstr(guest));
+static void arg(docker_t* docker, sp_ps_config_t* config, sp_str_t value) {
+  sp_ps_config_add_arg(docker->mem, config, value);
 }
 
-static const c8* mirror(docker_t* docker, sp_str_t path) {
-  return cfmt(docker->mem, "{}:{}", sp_fmt_str(path), sp_fmt_str(path));
+static void arg_c(docker_t* docker, sp_ps_config_t* config, const c8* value) {
+  arg(docker, config, sp_cstr_as_str(value));
+}
+
+static sp_str_t bind(docker_t* docker, sp_str_t host, const c8* guest) {
+  return sp_fmt(docker->mem, "{}:{}:ro", sp_fmt_str(host), sp_fmt_cstr(guest)).value;
+}
+
+static sp_str_t mirror(docker_t* docker, sp_str_t path) {
+  return sp_fmt(docker->mem, "{}:{}", sp_fmt_str(path), sp_fmt_str(path)).value;
+}
+
+static sp_str_t cache(docker_t* docker, const variant_t* variant) {
+  return sp_fmt(docker->mem, "{}:{}", sp_fmt_cstr(docker_image(docker, variant)), sp_fmt_cstr(CONTAINER_CACHE)).value;
 }
 
 static sp_ps_output_t git_common_dir(sp_mem_t mem, sp_str_t repo) {
@@ -71,146 +89,60 @@ static bool missing(docker_t* docker, sp_str_t path, const c8* hint) {
   return true;
 }
 
-static const c8* cache(docker_t* docker, const variant_t* variant) {
-  return cfmt(docker->mem, "{}:{}", sp_fmt_cstr(docker_image(docker, variant)), sp_fmt_cstr(CONTAINER_CACHE));
-}
-
-static void write_str(sp_io_writer_t* io, const c8* key, yyjson_val* value) {
-  sp_fmt_io(io, "{} = \"{}\"\n", sp_fmt_cstr(key), sp_fmt_cstr(yyjson_get_str(value)));
-}
-
-static void write_launcher(sp_io_writer_t* io, const c8* key, yyjson_val* launcher) {
-  sp_fmt_io(io, "{} = \"{}", sp_fmt_cstr(key), sp_fmt_cstr(yyjson_get_str(yyjson_obj_get(launcher, "program"))));
-  size_t idx, max;
-  yyjson_val* arg;
-  yyjson_arr_foreach(yyjson_obj_get(launcher, "args"), idx, max, arg) {
-    sp_fmt_io(io, " {}", sp_fmt_cstr(yyjson_get_str(arg)));
-  }
-  sp_io_write_cstr(io, "\"\n", SP_NULLPTR);
-}
-
-static void write_table(sp_io_writer_t* io, yyjson_val* obj) {
-  sp_io_write_cstr(io, "{", SP_NULLPTR);
-  size_t idx, max;
-  yyjson_val* key;
-  yyjson_val* value;
-  yyjson_obj_foreach(obj, idx, max, key, value) {
-    sp_fmt_io(io, "{} {} = \"{}\"", sp_fmt_cstr(idx ? "," : ""), sp_fmt_cstr(yyjson_get_str(key)), sp_fmt_cstr(yyjson_get_str(value)));
-  }
-  sp_io_write_cstr(io, " }", SP_NULLPTR);
-}
-
-static void write_tables(sp_io_writer_t* io, const c8* name, yyjson_val* obj) {
-  sp_fmt_io(io, "{} = ", sp_fmt_cstr(name));
-  sp_io_write_cstr(io, "{", SP_NULLPTR);
-  size_t idx, max;
-  yyjson_val* key;
-  yyjson_val* value;
-  yyjson_obj_foreach(obj, idx, max, key, value) {
-    sp_fmt_io(io, "{} {} = ", sp_fmt_cstr(idx ? "," : ""), sp_fmt_cstr(yyjson_get_str(key)));
-    write_table(io, value);
-  }
-  sp_io_write_cstr(io, " }\n", SP_NULLPTR);
-}
-
-static void write_str_array(sp_io_writer_t* io, const c8* name, yyjson_val* arr) {
-  sp_fmt_io(io, "{} = [", sp_fmt_cstr(name));
-  size_t idx, max;
-  yyjson_val* value;
-  yyjson_arr_foreach(arr, idx, max, value) {
-    sp_fmt_io(io, "{} \"{}\"", sp_fmt_cstr(idx ? "," : ""), sp_fmt_cstr(yyjson_get_str(value)));
-  }
-  sp_io_write_cstr(io, " ]\n", SP_NULLPTR);
-}
-
-static void write_table_array(sp_io_writer_t* io, const c8* name, yyjson_val* arr) {
-  sp_fmt_io(io, "{} = [", sp_fmt_cstr(name));
-  size_t idx, max;
-  yyjson_val* value;
-  yyjson_arr_foreach(arr, idx, max, value) {
-    sp_io_write_cstr(io, idx ? ", " : " ", SP_NULLPTR);
-    write_table(io, value);
-  }
-  sp_io_write_cstr(io, " ]\n", SP_NULLPTR);
-}
-
-static void write_lane(sp_io_writer_t* io, yyjson_val* toolchain) {
-  sp_io_write_cstr(io, "\n[[toolchain]]\n", SP_NULLPTR);
-  write_str(io, "name", yyjson_obj_get(toolchain, "name"));
-  write_str(io, "driver", yyjson_obj_get(toolchain, "driver"));
-  write_launcher(io, "compiler", yyjson_obj_get(toolchain, "compiler"));
-  write_launcher(io, "archiver", yyjson_obj_get(toolchain, "archiver"));
-  if (yyjson_obj_get(toolchain, "cxx")) {
-    write_launcher(io, "cxx", yyjson_obj_get(toolchain, "cxx"));
-  }
-  if (yyjson_obj_get(toolchain, "linker")) {
-    write_str(io, "linker", yyjson_obj_get(toolchain, "linker"));
-  }
-  if (yyjson_obj_get(toolchain, "link_args")) {
-    write_str_array(io, "link_args", yyjson_obj_get(toolchain, "link_args"));
-  }
-  if (yyjson_obj_get(toolchain, "host")) {
-    write_tables(io, "host", yyjson_obj_get(toolchain, "host"));
-  }
-  if (yyjson_obj_get(toolchain, "target")) {
-    write_table_array(io, "target", yyjson_obj_get(toolchain, "target"));
-  }
-  if (yyjson_obj_get(toolchain, "mirrors")) {
-    write_str(io, "mirrors", yyjson_obj_get(toolchain, "mirrors"));
-  }
-}
-
-static bool load_lanes(docker_t* docker) {
+static bool read_lanes(docker_t* docker, sp_str_t path, spn_cg_toolchains_t* out) {
   sp_str_t json = sp_zero;
-  if (sp_io_read_file(docker->mem, docker->paths.lanes, &json)) {
+  if (sp_io_read_file(docker->mem, path, &json) || !spn_toolchains_read(json, out, docker->mem)) {
+    docker->err.json = path;
     return false;
   }
-  yyjson_doc* doc = yyjson_read(json.data, json.len, 0);
-  if (!doc) {
+  return true;
+}
+
+static bool sysroot_artifact(docker_t* docker, const sysroot_t* sysroot, spn_artifact_t* out) {
+  const spn_cg_toolchain_t* lane = lane_decl(sysroot->artifact, &docker->builtin, &docker->lanes);
+  const spn_cg_artifact_t* artifact = lane_artifact(lane, docker->host);
+  if (!artifact || sp_str_empty(artifact->url)) {
     return false;
   }
-  docker->lanes = yyjson_obj_get(yyjson_doc_get_root(doc), "toolchain");
-  return docker->lanes != SP_NULLPTR;
-}
-
-static bool render_lanes(docker_t* docker) {
-  sp_mem_t mem = docker->mem;
-
-  sp_io_dyn_mem_writer_t writer = sp_zero;
-  sp_io_dyn_mem_writer_init(mem, &writer);
-  size_t idx, max;
-  yyjson_val* toolchain;
-  yyjson_arr_foreach(docker->lanes, idx, max, toolchain) {
-    write_lane(&writer.base, toolchain);
-  }
-
-  sp_str_t config = sp_fs_join_path(mem, docker->paths.config, sp_str_lit("spn/spn.toml"));
-  sp_fs_create_dir(sp_fs_parent_path(config));
-  return !sp_fs_create_file_str(config, sp_io_dyn_mem_writer_as_str(&writer));
-}
-
-static sp_ps_config_cstr_t launch(docker_t* docker, const variant_t* variant, const c8* option, const c8* command, const c8* argument) {
-  return (sp_ps_config_cstr_t) {
-    .command = "docker",
-    .args = {
-      "run",
-      "--rm",
-      option,
-      "-e", "SPN_CONFIG_DIR=" CONTAINER_CONFIG_DIR,
-      "-v", bind(docker, spn_dir(docker, variant->spn), CONTAINER_SPN_DIR),
-      "-v", bind(docker, docker->paths.tools, CONTAINER_TOOL_DIR),
-      "-v", bind(docker, docker->paths.config, CONTAINER_CONFIG_DIR),
-      "-v", cache(docker, variant),
-      "-w", CONTAINER_WORK,
-      docker_image(docker, variant),
-      command,
-      argument,
-    },
+  *out = (spn_artifact_t) {
+    .url = artifact->url,
+    .sha256 = artifact->sha256,
+    .mirror_list = lane->mirrors,
   };
+  return true;
 }
 
-docker_init_err_t docker_init(docker_t* docker, sp_mem_t mem) {
+static bool render_config(docker_t* docker) {
+  sp_str_t config = sp_fs_join_path(docker->mem, docker->paths.config, sp_str_lit("spn/spn.toml"));
+  sp_fs_create_dir(sp_fs_parent_path(config));
+  return !sp_fs_create_file_str(config, lanes_toml(docker->mem, &docker->lanes));
+}
+
+static sp_ps_config_t launch(docker_t* docker, const variant_t* variant, const c8* option, const c8* command) {
+  sp_ps_config_t config = {
+    .command = sp_str_lit("docker"),
+    .args = { sp_str_lit("run"), sp_str_lit("--rm"), sp_cstr_as_str(option) },
+  };
+  arg_c(docker, &config, "-e");
+  arg_c(docker, &config, "SPN_CONFIG_DIR=" CONTAINER_CONFIG_DIR);
+  arg_c(docker, &config, "-v");
+  arg(docker, &config, bind(docker, spn_dir(docker, variant->spn), CONTAINER_SPN_DIR));
+  arg_c(docker, &config, "-v");
+  arg(docker, &config, bind(docker, docker->paths.tools, CONTAINER_TOOL_DIR));
+  arg_c(docker, &config, "-v");
+  arg(docker, &config, bind(docker, docker->paths.config, CONTAINER_CONFIG_DIR));
+  arg_c(docker, &config, "-v");
+  arg(docker, &config, cache(docker, variant));
+  arg_c(docker, &config, "-w");
+  arg_c(docker, &config, CONTAINER_WORK);
+  arg_c(docker, &config, docker_image(docker, variant));
+  arg_c(docker, &config, command);
+  return config;
+}
+
+docker_init_err_t docker_init(docker_t* docker, sp_mem_t mem, spn_fetch_fn fetch, void* user) {
   docker->mem = mem;
+  docker->host = host_key(mem);
 
   sp_str_t repo = find_repo(mem);
   if (sp_str_empty(repo)) {
@@ -218,18 +150,25 @@ docker_init_err_t docker_init(docker_t* docker, sp_mem_t mem) {
   }
 
   docker->paths.repo = repo;
-  docker->paths.tools = sp_fs_join_path(mem, repo, sp_str_lit("tools/docker/build/debug"));
+  docker->paths.tools = sp_fs_join_path(mem, repo, sp_str_lit("build/debug"));
   docker->paths.dockerfiles = sp_fs_join_path(mem, repo, sp_str_lit("build/smoke"));
   docker->paths.templates = sp_fs_join_path(mem, repo, sp_str_lit("tools/docker/templates"));
-  docker->paths.lanes = sp_fs_join_path(mem, repo, sp_str_lit("test/tools/toolchains.json"));
+  docker->paths.builtin = sp_fs_join_path(mem, repo, sp_str_lit(SPN_LANES_BUILTIN));
+  docker->paths.lanes = sp_fs_join_path(mem, repo, sp_str_lit(SPN_LANES_TEST));
   docker->paths.config = sp_fs_join_path(mem, docker->paths.dockerfiles, sp_str_lit("config"));
 
-  const c8* tools [] = { "shell", "check" };
+  spn.mem = mem;
+  spn.events = spn_event_buffer_new(mem);
+  docker->store = (spn_toolchain_store_t) {
+    .mem = mem,
+    .dir = sp_fs_join_path(mem, sp_fs_get_storage_path(mem), sp_str_lit("spn/cache/toolchain")),
+    .fetch = fetch,
+    .fetch_user_data = user,
+  };
+
+  const c8* tools [] = { CONTAINER_SHELL_BIN, CONTAINER_CHECK_BIN };
   sp_carr_for(tools, it) {
-    sp_str_t path = sp_fs_join_path(mem, docker->paths.tools, sp_cstr_as_str(tools[it]));
-    if (!sp_fs_is_file(path)) {
-      docker->err.binary.path = path;
-      docker->err.binary.hint = "spn build in tools/docker";
+    if (missing(docker, sp_fs_join_path(mem, docker->paths.tools, sp_cstr_as_str(tools[it])), "spn build --script")) {
       return DOCKER_INIT_ERR_BINARY;
     }
   }
@@ -239,21 +178,30 @@ docker_init_err_t docker_init(docker_t* docker, sp_mem_t mem) {
     return DOCKER_INIT_ERR_TEMPLATES;
   }
 
-  sp_fs_create_dir(docker->paths.dockerfiles);
-  if (!load_lanes(docker) || !render_lanes(docker)) {
+  if (!read_lanes(docker, docker->paths.builtin, &docker->builtin) || !read_lanes(docker, docker->paths.lanes, &docker->lanes)) {
     return DOCKER_INIT_ERR_LANES;
+  }
+
+  docker->err.verify = lanes_verify(&docker->builtin, &docker->lanes);
+  if (docker->err.verify.kind) {
+    return DOCKER_INIT_ERR_VERIFY;
+  }
+  sp_for(it, num_variants) {
+    docker->err.verify = variant_verify(&variants[it], &docker->builtin, &docker->lanes);
+    if (docker->err.verify.kind) {
+      return DOCKER_INIT_ERR_VERIFY;
+    }
+  }
+
+  sp_fs_create_dir(docker->paths.dockerfiles);
+  if (!render_config(docker)) {
+    return DOCKER_INIT_ERR_CONFIG;
   }
   return DOCKER_INIT_OK;
 }
 
 bool docker_require(docker_t* docker, const variant_t* variant) {
-  sp_str_t path = sp_fs_join_path(docker->mem, spn_dir(docker, variant->spn), sp_str_lit("spn"));
-  if (sp_fs_is_file(path)) {
-    return true;
-  }
-  docker->err.binary.path = path;
-  docker->err.binary.hint = spn_hint(variant->spn);
-  return false;
+  return !missing(docker, sp_fs_join_path(docker->mem, spn_dir(docker, variant->spn), sp_str_lit("spn")), spn_hint(variant->spn));
 }
 
 docker_tests_err_t docker_tests_init(docker_t* docker) {
@@ -274,9 +222,8 @@ docker_tests_err_t docker_tests_init(docker_t* docker) {
 
   docker->paths.home = sp_os_env_get(sp_str_lit("HOME"));
   docker->paths.tests = sp_fs_join_path(mem, docker->paths.repo, sp_str_lit("build/debug/test/integration"));
-  docker->paths.toolchains = sp_fs_join_path(mem, sp_fs_get_storage_path(mem), sp_str_lit("spn/cache/toolchain"));
   docker->paths.zig = sp_fs_join_path(mem, docker->paths.home, sp_str_lit(".cache/zig"));
-  sp_fs_create_dir(docker->paths.toolchains);
+  sp_fs_create_dir(docker->store.dir);
   sp_fs_create_dir(docker->paths.zig);
 
   if (missing(docker, sp_fs_join_path(mem, spn_dir(docker, SPN_MUSL), sp_str_lit("spn")), spn_hint(SPN_MUSL))) {
@@ -288,17 +235,59 @@ docker_tests_err_t docker_tests_init(docker_t* docker) {
   return DOCKER_TESTS_OK;
 }
 
+docker_provision_err_t docker_provision(docker_t* docker, const variant_t* variant) {
+  sp_carr_for_until(variant->sysroots, it, variant->sysroots[it]) {
+    const sysroot_t* sysroot = &sysroots[variant->sysroots[it]];
+    if (sysroot->kind != INSTALL_ARTIFACT) {
+      continue;
+    }
+    spn_artifact_t artifact = sp_zero;
+    docker->err.artifact.name = lane_name(sysroot->artifact);
+    if (!sysroot_artifact(docker, sysroot, &artifact)) {
+      return DOCKER_PROVISION_ERR_ARTIFACT;
+    }
+    docker->err.artifact.url = artifact.url;
+    if (spn_toolchain_provision(&docker->store, sp_cstr_as_str(docker->err.artifact.name), artifact)) {
+      return DOCKER_PROVISION_ERR_FETCH;
+    }
+  }
+  return DOCKER_PROVISION_OK;
+}
+
 docker_render_err_t docker_render(docker_t* docker, const variant_t* variant) {
   sp_mem_t mem = docker->mem;
 
   sp_str_t source = sp_zero;
-  if (!sp_template_get(docker->templates, get_template_name(variant), &source)) {
+  if (!sp_template_get(docker->templates, variant_template(variant), &source)) {
     return DOCKER_RENDER_ERR_MISSING;
   }
 
   sp_template_scope_t* scope = sp_template_scope_create(mem);
-  sp_template_set(scope, sp_str_lit("packages"), get_variant_packages(mem, variant));
-  sp_template_set(scope, sp_str_lit("setup"), get_variant_setup(mem, variant, docker->lanes));
+  sp_template_set(scope, sp_str_lit("packages"), variant_packages(mem, variant));
+  sp_template_list(scope, sp_str_lit("artifacts"));
+  sp_template_list(scope, sp_str_lit("setups"));
+  sp_carr_for_until(variant->sysroots, it, variant->sysroots[it]) {
+    const sysroot_t* sysroot = &sysroots[variant->sysroots[it]];
+    switch (sysroot->kind) {
+      case INSTALL_PACKAGES: {
+        break;
+      }
+      case INSTALL_ARTIFACT: {
+        sp_template_scope_t* artifact = sp_template_push(scope, sp_str_lit("artifacts"));
+        sp_template_set(artifact, sp_str_lit("name"), sp_cstr_as_str(sysroot->name));
+        sp_template_set(artifact, sp_str_lit("path"), sp_cstr_as_str(sysroot->path));
+        break;
+      }
+      case INSTALL_LINKS: {
+        sp_template_set(sp_template_push(scope, sp_str_lit("setups")), sp_str_lit("steps"), sysroot_links_setup(mem, sysroot));
+        break;
+      }
+      case INSTALL_DEBS: {
+        sp_template_set(sp_template_push(scope, sp_str_lit("setups")), sp_str_lit("steps"), sysroot_debs_setup(mem, sysroot));
+        break;
+      }
+    }
+  }
 
   sp_io_dyn_mem_writer_t writer = sp_zero;
   sp_io_dyn_mem_writer_init(mem, &writer);
@@ -307,8 +296,7 @@ docker_render_err_t docker_render(docker_t* docker, const variant_t* variant) {
     return DOCKER_RENDER_ERR_FAILED;
   }
 
-  sp_str_t manifest = get_manifest_path(docker, variant);
-  sp_fs_create_file_str(manifest, sp_io_dyn_mem_writer_as_str(&writer));
+  sp_fs_create_file_str(manifest_path(docker, variant), sp_io_dyn_mem_writer_as_str(&writer));
   return DOCKER_RENDER_OK;
 }
 
@@ -316,67 +304,89 @@ const c8* docker_image(docker_t* docker, const variant_t* variant) {
   return cfmt(docker->mem, "spn-smoke-{}", sp_fmt_cstr(variant->name));
 }
 
-sp_ps_config_cstr_t docker_build(docker_t* docker, const variant_t* variant) {
-  sp_mem_t mem = docker->mem;
-  return (sp_ps_config_cstr_t) {
-    .command = "docker",
+sp_ps_config_t docker_build(docker_t* docker, const variant_t* variant) {
+  sp_ps_config_t config = {
+    .command = sp_str_lit("docker"),
     .args = {
-      "build",
-      "-t", docker_image(docker, variant),
-      "-f", sp_str_to_cstr(mem, get_manifest_path(docker, variant)),
-      sp_str_to_cstr(mem, docker->paths.dockerfiles),
+      sp_str_lit("build"),
+      sp_str_lit("-t"), sp_cstr_as_str(docker_image(docker, variant)),
+      sp_str_lit("-f"), manifest_path(docker, variant),
     },
   };
-}
-
-sp_ps_config_cstr_t docker_check(docker_t* docker, const variant_t* variant) {
-  return launch(docker, variant, "--init", CONTAINER_CHECK, toolchain_name(variant->toolchain));
-}
-
-static const c8* seed_profile(docker_t* docker, const variant_t* variant) {
-  const c8* seed = variant_seed(variant);
-  if (!seed) {
-    return SP_NULLPTR;
+  sp_carr_for_until(variant->sysroots, it, variant->sysroots[it]) {
+    const sysroot_t* sysroot = &sysroots[variant->sysroots[it]];
+    if (sysroot->kind != INSTALL_ARTIFACT) {
+      continue;
+    }
+    spn_artifact_t artifact = sp_zero;
+    bool provisioned = sysroot_artifact(docker, sysroot, &artifact);
+    sp_assert(provisioned);
+    arg_c(docker, &config, "--build-context");
+    arg(docker, &config, sp_fmt(docker->mem, "{}={}", sp_fmt_cstr(sysroot->name), sp_fmt_str(spn_toolchain_store_path(&docker->store, artifact))).value);
   }
+  arg(docker, &config, docker->paths.dockerfiles);
+  return config;
+}
 
+sp_ps_config_t docker_check(docker_t* docker, const variant_t* variant) {
+  sp_ps_config_t config = launch(docker, variant, "--init", CONTAINER_CHECK);
+  arg_c(docker, &config, lane_name(variant->check));
+  return config;
+}
+
+static sp_str_t seed_profile(docker_t* docker, lane_t seed) {
   sp_io_dyn_mem_writer_t writer = sp_zero;
   sp_io_dyn_mem_writer_init(docker->mem, &writer);
-  sp_fmt_io(&writer.base, "toolchain = \"{}\"\n", sp_fmt_cstr(seed));
+  sp_fmt_io(&writer.base, "toolchain = \"{}\"\n", sp_fmt_cstr(lane_name(seed)));
 
-  yyjson_val* target = yyjson_arr_get_first(yyjson_obj_get(lane_find(docker->lanes, seed), "target"));
-  if (target) {
-    write_str(&writer.base, "arch", yyjson_obj_get(target, "arch"));
-    write_str(&writer.base, "os", yyjson_obj_get(target, "os"));
-    if (yyjson_obj_get(target, "abi")) {
-      write_str(&writer.base, "abi", yyjson_obj_get(target, "abi"));
+  const spn_cg_toolchain_t* lane = lanes_find(&docker->lanes, sp_cstr_as_str(lane_name(seed)));
+  if (lane && !sp_da_empty(lane->target)) {
+    const spn_cg_toolchain_target_t* target = &lane->target[0];
+    if (!sp_opt_is_null(target->arch)) {
+      sp_fmt_io(&writer.base, "arch = \"{}\"\n", sp_fmt_str(spn_arch_to_str(sp_opt_get(target->arch))));
+    }
+    if (!sp_opt_is_null(target->os)) {
+      sp_fmt_io(&writer.base, "os = \"{}\"\n", sp_fmt_str(spn_os_to_str(sp_opt_get(target->os))));
+    }
+    if (!sp_opt_is_null(target->abi)) {
+      sp_fmt_io(&writer.base, "abi = \"{}\"\n", sp_fmt_str(spn_abi_to_str(sp_opt_get(target->abi))));
     }
   }
-  return sp_str_to_cstr(docker->mem, sp_io_dyn_mem_writer_as_str(&writer));
+  return sp_io_dyn_mem_writer_as_str(&writer);
 }
 
-sp_ps_config_cstr_t docker_shell(docker_t* docker, const variant_t* variant) {
-  return launch(docker, variant, "-it", CONTAINER_SHELL, seed_profile(docker, variant));
+sp_ps_config_t docker_shell(docker_t* docker, const variant_t* variant) {
+  sp_ps_config_t config = launch(docker, variant, "-it", CONTAINER_SHELL);
+  lane_t seed = variant_seed(variant);
+  if (seed != LANE_NONE) {
+    arg(docker, &config, seed_profile(docker, seed));
+  }
+  return config;
 }
 
-sp_ps_config_cstr_t docker_test(docker_t* docker, const variant_t* variant, const c8* lane, const c8* filter) {
+sp_ps_config_t docker_test(docker_t* docker, const variant_t* variant, lane_t lane, const c8* filter) {
   sp_mem_t mem = docker->mem;
-  return (sp_ps_config_cstr_t) {
-    .command = "docker",
-    .args = {
-      "run",
-      "--rm",
-      "--init",
-      "--user", docker->user,
-      "-e", cfmt(mem, "HOME={}", sp_fmt_str(docker->paths.home)),
-      "-e", cfmt(mem, "SPN_TEST_TOOLCHAIN={}", sp_fmt_cstr(lane)),
-      "-v", mirror(docker, docker->paths.repo),
-      "-v", mirror(docker, docker->paths.git),
-      "-v", mirror(docker, docker->paths.toolchains),
-      "-v", mirror(docker, docker->paths.zig),
-      "-w", sp_str_to_cstr(mem, docker->paths.repo),
-      docker_image(docker, variant),
-      sp_str_to_cstr(mem, docker->paths.tests),
-      "--filter", filter,
-    },
+  sp_ps_config_t config = {
+    .command = sp_str_lit("docker"),
+    .args = { sp_str_lit("run"), sp_str_lit("--rm"), sp_str_lit("--init"), sp_str_lit("--user"), sp_cstr_as_str(docker->user) },
   };
+  arg_c(docker, &config, "-e");
+  arg(docker, &config, sp_fmt(mem, "HOME={}", sp_fmt_str(docker->paths.home)).value);
+  arg_c(docker, &config, "-e");
+  arg(docker, &config, sp_fmt(mem, "SPN_TEST_TOOLCHAIN={}", sp_fmt_cstr(lane_name(lane))).value);
+  arg_c(docker, &config, "-v");
+  arg(docker, &config, mirror(docker, docker->paths.repo));
+  arg_c(docker, &config, "-v");
+  arg(docker, &config, mirror(docker, docker->paths.git));
+  arg_c(docker, &config, "-v");
+  arg(docker, &config, mirror(docker, docker->store.dir));
+  arg_c(docker, &config, "-v");
+  arg(docker, &config, mirror(docker, docker->paths.zig));
+  arg_c(docker, &config, "-w");
+  arg(docker, &config, docker->paths.repo);
+  arg_c(docker, &config, docker_image(docker, variant));
+  arg(docker, &config, docker->paths.tests);
+  arg_c(docker, &config, "--filter");
+  arg_c(docker, &config, filter);
+  return config;
 }

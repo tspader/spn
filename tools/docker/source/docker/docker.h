@@ -2,11 +2,11 @@
 #define SMOKE_DOCKER_H
 
 #include "sp.h"
+#include "sp_template/sp_template.h"
+#include "toolchain/types.h"
 
+#include "lanes.h"
 #include "variant/variant.h"
-
-typedef struct sp_template_registry sp_template_registry_t;
-typedef struct yyjson_val yyjson_val;
 
 typedef enum {
   DOCKER_INIT_OK,
@@ -14,6 +14,8 @@ typedef enum {
   DOCKER_INIT_ERR_BINARY,
   DOCKER_INIT_ERR_TEMPLATES,
   DOCKER_INIT_ERR_LANES,
+  DOCKER_INIT_ERR_VERIFY,
+  DOCKER_INIT_ERR_CONFIG,
 } docker_init_err_t;
 
 typedef enum {
@@ -24,6 +26,12 @@ typedef enum {
 } docker_tests_err_t;
 
 typedef enum {
+  DOCKER_PROVISION_OK,
+  DOCKER_PROVISION_ERR_ARTIFACT,
+  DOCKER_PROVISION_ERR_FETCH,
+} docker_provision_err_t;
+
+typedef enum {
   DOCKER_RENDER_OK,
   DOCKER_RENDER_ERR_MISSING,
   DOCKER_RENDER_ERR_FAILED,
@@ -32,17 +40,20 @@ typedef enum {
 typedef struct {
   sp_mem_t mem;
   sp_template_registry_t* templates;
-  yyjson_val* lanes;
+  spn_cg_toolchains_t builtin;
+  spn_cg_toolchains_t lanes;
+  spn_toolchain_store_t store;
+  sp_str_t host;
   struct {
     sp_str_t repo;
     sp_str_t git;
     sp_str_t tools;
     sp_str_t tests;
-    sp_str_t toolchains;
     sp_str_t zig;
     sp_str_t home;
     sp_str_t dockerfiles;
     sp_str_t templates;
+    sp_str_t builtin;
     sp_str_t lanes;
     sp_str_t config;
   } paths;
@@ -52,18 +63,25 @@ typedef struct {
       sp_str_t path;
       const c8* hint;
     } binary;
+    struct {
+      const c8* name;
+      sp_str_t url;
+    } artifact;
+    sp_str_t json;
+    verify_t verify;
     s32 render;
   } err;
 } docker_t;
 
-docker_init_err_t docker_init(docker_t* docker, sp_mem_t mem);
-docker_tests_err_t docker_tests_init(docker_t* docker);
-bool docker_require(docker_t* docker, const variant_t* variant);
-docker_render_err_t docker_render(docker_t* docker, const variant_t* variant);
-const c8* docker_image(docker_t* docker, const variant_t* variant);
-sp_ps_config_cstr_t docker_build(docker_t* docker, const variant_t* variant);
-sp_ps_config_cstr_t docker_check(docker_t* docker, const variant_t* variant);
-sp_ps_config_cstr_t docker_shell(docker_t* docker, const variant_t* variant);
-sp_ps_config_cstr_t docker_test(docker_t* docker, const variant_t* variant, const c8* lane, const c8* filter);
+docker_init_err_t      docker_init(docker_t* docker, sp_mem_t mem, spn_fetch_fn fetch, void* user);
+docker_tests_err_t     docker_tests_init(docker_t* docker);
+bool                   docker_require(docker_t* docker, const variant_t* variant);
+docker_provision_err_t docker_provision(docker_t* docker, const variant_t* variant);
+docker_render_err_t    docker_render(docker_t* docker, const variant_t* variant);
+const c8*              docker_image(docker_t* docker, const variant_t* variant);
+sp_ps_config_t         docker_build(docker_t* docker, const variant_t* variant);
+sp_ps_config_t         docker_check(docker_t* docker, const variant_t* variant);
+sp_ps_config_t         docker_shell(docker_t* docker, const variant_t* variant);
+sp_ps_config_t         docker_test(docker_t* docker, const variant_t* variant, lane_t lane, const c8* filter);
 
 #endif
