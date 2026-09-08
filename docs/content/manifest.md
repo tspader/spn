@@ -70,7 +70,7 @@ readme: false
 |---|---|
 | `name` | `string` |
 | `compiler` | `string` |
-| `linker` | [`linkers`](#linkers) |
+| `linker` | `gnu` \| `lld` \| `ld64` \| `msvc` |
 | `link_args` | array of `string` |
 | `archiver` | `string` |
 | `driver` | `gcc` \| `clang` \| `msvc` \| `zig` |
@@ -209,16 +209,6 @@ readme: false
 | Field | Type |
 |---|---|
 | `subsystem` | `console` \| `windows` |
-
-## linkers
-
-| Field | Type |
-|---|---|
-| `elf` | `gnu` \| `lld` \| `ld64` \| `msvc` |
-| `mingw` | `gnu` \| `lld` \| `ld64` \| `msvc` |
-| `msvc` | `gnu` \| `lld` \| `ld64` \| `msvc` |
-| `macho` | `gnu` \| `lld` \| `ld64` \| `msvc` |
-| `wasm` | `gnu` \| `lld` \| `ld64` \| `msvc` |
 
 ## artifact
 

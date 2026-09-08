@@ -28,13 +28,7 @@ static const parse_test_t tests [] = {
           .compiler = { .path = "A", .args = { "cc" } },
           .cxx = { .path = "A", .args = { "c++" } },
           .archiver = { .path = "A", .args = { "ar" } },
-          .linkers = {
-            [SPN_LD_FLAVOR_ELF] = SPN_LD_FAMILY_LLD,
-            [SPN_LD_FLAVOR_MINGW] = SPN_LD_FAMILY_GNU,
-            [SPN_LD_FLAVOR_MSVC] = SPN_LD_FAMILY_MSVC,
-            [SPN_LD_FLAVOR_MACHO] = SPN_LD_FAMILY_LD64,
-            [SPN_LD_FLAVOR_WASM] = SPN_LD_FAMILY_LLD,
-          },
+          .linker = SPN_LD_FAMILY_LLD,
           .link_args = { "-fuse-ld=lld" },
           .hosts = {
             {
@@ -71,7 +65,6 @@ static const parse_test_t tests [] = {
           .compiler = { .name = "cc" },
           .cxx = { .name = "" },
           .archiver = { .name = "ar" },
-          .linkers = FAMILIES_NATIVE,
         },
       },
     },
@@ -157,7 +150,7 @@ static const parse_test_t tests [] = {
     .expect = { .err = SPN_ERROR },
   },
   {
-    .name = "linker_per_flavor",
+    .name = "linker_lld",
     .file = "linkers.json",
     .expect = {
       .entries = 1,
@@ -167,7 +160,7 @@ static const parse_test_t tests [] = {
           .driver = SPN_CC_DRIVER_CLANG,
           .compiler = { .name = "A" },
           .archiver = { .name = "llvm-ar" },
-          .linkers = FAMILIES_LLD,
+          .linker = SPN_LD_FAMILY_LLD,
           .targets = {
             { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU },
             TARGET_WIN_GNU,

@@ -9,13 +9,7 @@
       "archiver": {
         "program": "llvm-ar"
       },
-      "linker": {
-        "elf": "lld",
-        "mingw": "lld",
-        "msvc": "lld",
-        "macho": "lld",
-        "wasm": "lld"
-      },
+      "linker": "lld",
       "target": [
         {
           "arch": "x86_64",

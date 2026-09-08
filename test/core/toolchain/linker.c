@@ -3,177 +3,110 @@
 typedef struct {
   const c8* name;
   spn_triple_t target;
-  spn_ld_flavor_t expect;
-} flavor_t;
+  spn_ld_dialect_t expect;
+} dialect_t;
 
-static const flavor_t flavor_tests [] = {
-  { "linux_gnu",    HOST_X64_LINUX,      SPN_LD_FLAVOR_ELF },
-  { "linux_musl",   HOST_X64_LINUX_MUSL, SPN_LD_FLAVOR_ELF },
-  { "freestanding", TARGET_X64_BARE,     SPN_LD_FLAVOR_ELF },
-  { "windows_gnu",  TARGET_WIN_GNU,      SPN_LD_FLAVOR_MINGW },
-  { "windows_msvc", TARGET_WIN_MSVC,   SPN_LD_FLAVOR_MSVC },
-  { "macos",        HOST_ARM_MACOS,      SPN_LD_FLAVOR_MACHO },
-  { "wasi",         TARGET_WASM,         SPN_LD_FLAVOR_WASM },
+static const dialect_t dialect_tests [] = {
+  { "linux_gnu",    HOST_X64_LINUX,      SPN_LD_DIALECT_GNU },
+  { "linux_musl",   HOST_X64_LINUX_MUSL, SPN_LD_DIALECT_GNU },
+  { "freestanding", TARGET_X64_BARE,     SPN_LD_DIALECT_GNU },
+  { "windows_gnu",  TARGET_WIN_GNU,      SPN_LD_DIALECT_GNU },
+  { "windows_msvc", TARGET_WIN_MSVC,     SPN_LD_DIALECT_LINK },
+  { "macos",        HOST_ARM_MACOS,      SPN_LD_DIALECT_DARWIN },
+  { "wasi",         TARGET_WASM,         SPN_LD_DIALECT_WASM },
 };
 
-sp_test_each(linker, flavor, flavor_t, flavor_tests) {
-  sp_expect_eq(t, (u32)it->expect, (u32)spn_ld_flavor(it->target));
+sp_test_each(linker, dialect, dialect_t, dialect_tests) {
+  sp_expect_eq(t, (u32)it->expect, (u32)spn_ld_dialect(it->target));
   return SP_OK;
 }
 
 typedef struct {
   const c8* name;
-  spn_ld_flavor_t flavor;
+  spn_ld_dialect_t dialect;
   bool expect;
 } static_t;
 
 static const static_t static_tests [] = {
-  { "elf",   SPN_LD_FLAVOR_ELF,   true },
-  { "mingw", SPN_LD_FLAVOR_MINGW, true },
-  { "msvc",  SPN_LD_FLAVOR_MSVC,  false },
-  { "macho", SPN_LD_FLAVOR_MACHO, false },
-  { "wasm",  SPN_LD_FLAVOR_WASM,  false },
+  { "gnu",    SPN_LD_DIALECT_GNU,    true },
+  { "link",   SPN_LD_DIALECT_LINK,   false },
+  { "darwin", SPN_LD_DIALECT_DARWIN, false },
+  { "wasm",   SPN_LD_DIALECT_WASM,   false },
 };
 
 sp_test_each(linker, static, static_t, static_tests) {
-  sp_expect_eq(t, it->expect, spn_ld_static(it->flavor));
+  sp_expect_eq(t, it->expect, spn_ld_static(it->dialect));
   return SP_OK;
 }
 
 typedef struct {
   const c8* name;
   spn_ld_family_t family;
-  spn_ld_flavor_t flavor;
+  spn_format_t format;
   bool expect;
 } scripts_t;
 
 static const scripts_t scripts_tests [] = {
-  { "gnu_elf",    SPN_LD_FAMILY_GNU,  SPN_LD_FLAVOR_ELF,   true },
-  { "gnu_mingw",  SPN_LD_FAMILY_GNU,  SPN_LD_FLAVOR_MINGW, true },
-  { "lld_elf",    SPN_LD_FAMILY_LLD,  SPN_LD_FLAVOR_ELF,   true },
-  { "lld_mingw",  SPN_LD_FAMILY_LLD,  SPN_LD_FLAVOR_MINGW, false },
-  { "lld_msvc",   SPN_LD_FAMILY_LLD,  SPN_LD_FLAVOR_MSVC,  false },
-  { "lld_macho",  SPN_LD_FAMILY_LLD,  SPN_LD_FLAVOR_MACHO, false },
-  { "lld_wasm",   SPN_LD_FAMILY_LLD,  SPN_LD_FLAVOR_WASM,  false },
-  { "ld64_macho", SPN_LD_FAMILY_LD64, SPN_LD_FLAVOR_MACHO, false },
-  { "msvc_msvc",  SPN_LD_FAMILY_MSVC, SPN_LD_FLAVOR_MSVC,  false },
+  { "gnu_elf",    SPN_LD_FAMILY_GNU,  SPN_FORMAT_ELF,   true },
+  { "gnu_coff",   SPN_LD_FAMILY_GNU,  SPN_FORMAT_COFF,  true },
+  { "lld_elf",    SPN_LD_FAMILY_LLD,  SPN_FORMAT_ELF,   true },
+  { "lld_coff",   SPN_LD_FAMILY_LLD,  SPN_FORMAT_COFF,  false },
+  { "lld_macho",  SPN_LD_FAMILY_LLD,  SPN_FORMAT_MACHO, false },
+  { "lld_wasm",   SPN_LD_FAMILY_LLD,  SPN_FORMAT_WASM,  false },
+  { "ld64_macho", SPN_LD_FAMILY_LD64, SPN_FORMAT_MACHO, false },
+  { "msvc_coff",  SPN_LD_FAMILY_MSVC, SPN_FORMAT_COFF,  false },
 };
 
 sp_test_each(linker, scripts, scripts_t, scripts_tests) {
-  sp_expect_eq(t, it->expect, spn_ld_scripts(it->family, it->flavor));
+  sp_expect_eq(t, it->expect, spn_ld_scripts(it->family, it->format));
   return SP_OK;
 }
 
 typedef struct {
-  spn_ld_family_t linkers [SPN_LD_FLAVOR_COUNT];
-  spn_ld_flavor_t rejected [SPN_LD_FLAVOR_COUNT];
-  u32 num_rejected;
-} resolve_expect_t;
+  const c8* name;
+  spn_cc_driver_t driver;
+  spn_ld_family_t declared;
+  bool expect;
+} accepts_t;
+
+static const accepts_t accepts_tests [] = {
+  { "nothing_declared",       SPN_CC_DRIVER_GCC,   SPN_LD_FAMILY_NONE, true },
+  { "gcc_declares_lld",       SPN_CC_DRIVER_GCC,   SPN_LD_FAMILY_LLD,  true },
+  { "clang_declares_lld",     SPN_CC_DRIVER_CLANG, SPN_LD_FAMILY_LLD,  true },
+  { "zig_rejects_lld",        SPN_CC_DRIVER_ZIG,   SPN_LD_FAMILY_LLD,  false },
+  { "msvc_rejects_lld",       SPN_CC_DRIVER_MSVC,  SPN_LD_FAMILY_LLD,  false },
+  { "native_is_not_declared", SPN_CC_DRIVER_GCC,   SPN_LD_FAMILY_GNU,  false },
+  { "foreign_is_rejected",    SPN_CC_DRIVER_CLANG, SPN_LD_FAMILY_LD64, false },
+};
+
+sp_test_each(linker, accepts, accepts_t, accepts_tests) {
+  sp_expect_eq(t, it->expect, spn_ld_accepts(it->driver, it->declared));
+  return SP_OK;
+}
 
 typedef struct {
   const c8* name;
   spn_cc_driver_t driver;
-  spn_cg_linkers_t declared;
-  resolve_expect_t expect;
-} resolve_t;
+  spn_ld_family_t linker;
+  spn_triple_t target;
+  spn_ld_family_t expect;
+} family_t;
 
-static const resolve_t resolve_tests [] = {
-  {
-    .name = "zig_is_lld_everywhere",
-    .driver = SPN_CC_DRIVER_ZIG,
-    .expect = { .linkers = FAMILIES_LLD },
-  },
-  {
-    .name = "msvc_is_native",
-    .driver = SPN_CC_DRIVER_MSVC,
-    .expect = { .linkers = FAMILIES_NATIVE },
-  },
-  {
-    .name = "gcc_defaults_to_native",
-    .driver = SPN_CC_DRIVER_GCC,
-    .expect = { .linkers = FAMILIES_NATIVE },
-  },
-  {
-    .name = "clang_defaults_to_native",
-    .driver = SPN_CC_DRIVER_CLANG,
-    .expect = { .linkers = FAMILIES_NATIVE },
-  },
-  {
-    .name = "owning_driver_rejects_every_declared_slot",
-    .driver = SPN_CC_DRIVER_ZIG,
-    .declared = { .elf = sp_opt_some(SPN_LD_FAMILY_LLD), .macho = sp_opt_some(SPN_LD_FAMILY_LLD) },
-    .expect = {
-      .linkers = FAMILIES_LLD,
-      .rejected = { SPN_LD_FLAVOR_ELF, SPN_LD_FLAVOR_MACHO },
-      .num_rejected = 2,
-    },
-  },
-  {
-    .name = "declared_native_family_is_accepted",
-    .driver = SPN_CC_DRIVER_GCC,
-    .declared = { .elf = sp_opt_some(SPN_LD_FAMILY_GNU) },
-    .expect = { .linkers = FAMILIES_NATIVE },
-  },
-  {
-    .name = "declared_slot_overrides_its_default_only",
-    .driver = SPN_CC_DRIVER_GCC,
-    .declared = { .elf = sp_opt_some(SPN_LD_FAMILY_LLD) },
-    .expect = {
-      .linkers = {
-        [SPN_LD_FLAVOR_ELF] = SPN_LD_FAMILY_LLD,
-        [SPN_LD_FLAVOR_MINGW] = SPN_LD_FAMILY_GNU,
-        [SPN_LD_FLAVOR_MSVC] = SPN_LD_FAMILY_MSVC,
-        [SPN_LD_FLAVOR_MACHO] = SPN_LD_FAMILY_LD64,
-        [SPN_LD_FLAVOR_WASM] = SPN_LD_FAMILY_LLD,
-      },
-    },
-  },
-  {
-    .name = "foreign_dialect_is_rejected",
-    .driver = SPN_CC_DRIVER_GCC,
-    .declared = { .macho = sp_opt_some(SPN_LD_FAMILY_GNU) },
-    .expect = {
-      .linkers = FAMILIES_NATIVE,
-      .rejected = { SPN_LD_FLAVOR_MACHO },
-      .num_rejected = 1,
-    },
-  },
-  {
-    .name = "unproducible_flavor_is_rejected",
-    .driver = SPN_CC_DRIVER_GCC,
-    .declared = { .msvc = sp_opt_some(SPN_LD_FAMILY_LLD) },
-    .expect = {
-      .linkers = FAMILIES_NATIVE,
-      .rejected = { SPN_LD_FLAVOR_MSVC },
-      .num_rejected = 1,
-    },
-  },
-  {
-    .name = "clang_swaps_every_slot_to_lld",
-    .driver = SPN_CC_DRIVER_CLANG,
-    .declared = {
-      .elf = sp_opt_some(SPN_LD_FAMILY_LLD),
-      .mingw = sp_opt_some(SPN_LD_FAMILY_LLD),
-      .msvc = sp_opt_some(SPN_LD_FAMILY_LLD),
-      .macho = sp_opt_some(SPN_LD_FAMILY_LLD),
-      .wasm = sp_opt_some(SPN_LD_FAMILY_LLD),
-    },
-    .expect = { .linkers = FAMILIES_LLD },
-  },
+static const family_t family_tests [] = {
+  { "gcc_linux",         SPN_CC_DRIVER_GCC,   SPN_LD_FAMILY_NONE, HOST_X64_LINUX,  SPN_LD_FAMILY_GNU },
+  { "gcc_mingw",         SPN_CC_DRIVER_GCC,   SPN_LD_FAMILY_NONE, TARGET_WIN_GNU,  SPN_LD_FAMILY_GNU },
+  { "gcc_macos",         SPN_CC_DRIVER_GCC,   SPN_LD_FAMILY_NONE, HOST_ARM_MACOS,  SPN_LD_FAMILY_LD64 },
+  { "clang_msvc",        SPN_CC_DRIVER_CLANG, SPN_LD_FAMILY_NONE, TARGET_WIN_MSVC, SPN_LD_FAMILY_MSVC },
+  { "clang_wasi",        SPN_CC_DRIVER_CLANG, SPN_LD_FAMILY_NONE, TARGET_WASM,     SPN_LD_FAMILY_LLD },
+  { "msvc_msvc",         SPN_CC_DRIVER_MSVC,  SPN_LD_FAMILY_NONE, TARGET_WIN_MSVC, SPN_LD_FAMILY_MSVC },
+  { "zig_linux",         SPN_CC_DRIVER_ZIG,   SPN_LD_FAMILY_NONE, HOST_X64_LINUX,  SPN_LD_FAMILY_LLD },
+  { "zig_macos",         SPN_CC_DRIVER_ZIG,   SPN_LD_FAMILY_NONE, HOST_ARM_MACOS,  SPN_LD_FAMILY_LLD },
+  { "gcc_lld_linux",     SPN_CC_DRIVER_GCC,   SPN_LD_FAMILY_LLD,  HOST_X64_LINUX,  SPN_LD_FAMILY_LLD },
+  { "clang_lld_msvc",    SPN_CC_DRIVER_CLANG, SPN_LD_FAMILY_LLD,  TARGET_WIN_MSVC, SPN_LD_FAMILY_LLD },
+  { "clang_lld_macos",   SPN_CC_DRIVER_CLANG, SPN_LD_FAMILY_LLD,  HOST_ARM_MACOS,  SPN_LD_FAMILY_LLD },
 };
 
-sp_test_each(linker, resolve, resolve_t, resolve_tests) {
-  spn_toolchain_linkers_t linkers = sp_zero;
-  spn_ld_issues_t issues = spn_ld_resolve(it->driver, &it->declared, &linkers);
-
-  sp_must_eq(t, it->expect.num_rejected, issues.count);
-  sp_for(at, issues.count) {
-    sp_expect_eq(t, (u32)it->expect.rejected[at], (u32)issues.items[at]);
-  }
-  sp_for(flavor, SPN_LD_FLAVOR_COUNT) {
-    sp_test_kv(t, "flavor", spn_ld_flavor_to_str((spn_ld_flavor_t)flavor));
-    sp_expect_eq(t, (u32)it->expect.linkers[flavor], (u32)linkers.families[flavor]);
-  }
-  sp_test_kv_clear(t, SP_NULLPTR);
+sp_test_each(linker, family, family_t, family_tests) {
+  sp_expect_eq(t, (u32)it->expect, (u32)spn_ld_family(it->driver, it->linker, it->target));
   return SP_OK;
 }

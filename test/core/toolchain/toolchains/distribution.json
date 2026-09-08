@@ -22,9 +22,7 @@
           "c++"
         ]
       },
-      "linker": {
-        "elf": "lld"
-      },
+      "linker": "lld",
       "mirrors": "https://example.com/mirrors.txt",
       "host": {
         "x86_64-linux": {

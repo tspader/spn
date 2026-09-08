@@ -353,15 +353,12 @@ static void lower_targets(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, s
   lower_collection(ctx, cg->example, &out->examples, SPN_TARGET_KIND_EXAMPLE);
 }
 
-static spn_toolchain_linkers_t lower_linkers(spn_toml_loader_t* ctx, const spn_cg_linkers_t* cg, spn_cc_driver_t driver) {
-  spn_toolchain_linkers_t linkers = sp_zero;
-  spn_ld_issues_t issues = spn_ld_resolve(driver, cg, &linkers);
-  spn_toml_loader_push_key(ctx, "linker");
-  sp_for(it, issues.count) {
-    spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, sp_str_to_cstr(ctx->mem, spn_ld_flavor_to_str(issues.items[it])));
+static spn_ld_family_t lower_linker(spn_toml_loader_t* ctx, spn_ld_family_t declared, spn_cc_driver_t driver) {
+  if (!spn_ld_accepts(driver, declared)) {
+    spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "linker");
+    return SPN_LD_FAMILY_NONE;
   }
-  spn_toml_loader_pop(ctx);
-  return linkers;
+  return declared;
 }
 
 static sp_da(spn_toolchain_target_t) lower_toolchain_targets(spn_toml_loader_t* ctx, spn_cc_driver_t driver, spn_toolchain_source_t source, spn_path_root_t base, sp_da(spn_cg_toolchain_target_t) cg) {
@@ -377,9 +374,9 @@ static sp_da(spn_toolchain_target_t) lower_toolchain_targets(spn_toml_loader_t* 
       spn_toml_loader_pop(ctx);
       continue;
     }
-    if (!spn_toolchain_driver_produces(driver, spn_ld_flavor(target.triple))) {
+    if (!spn_toolchain_driver_composes(driver, spn_ld_dialect(target.triple))) {
       spn_toml_loader_push_index(ctx, it);
-      spn_toml_loader_issue_at(ctx, SPN_ERR_CODEGEN_INVALID, spn_ld_flavor_to_str(spn_ld_flavor(target.triple)));
+      spn_toml_loader_issue_at(ctx, SPN_ERR_CODEGEN_INVALID, spn_triple_to_str(ctx->mem, target.triple));
       spn_toml_loader_pop(ctx);
       continue;
     }
@@ -499,7 +496,7 @@ spn_toolchain_decl_t spn_toolchain_lower(spn_toml_loader_t* ctx, u32 at, spn_pat
   toolchain.cxx = lower_launcher(ctx, "cxx", toolchain.source, base, decl->cxx);
   toolchain.archiver = lower_launcher(ctx, "archiver", toolchain.source, base, decl->archiver);
   if (toolchain.driver) {
-    toolchain.linkers = lower_linkers(ctx, &decl->linker, toolchain.driver);
+    toolchain.linker = lower_linker(ctx, sp_opt_is_null(decl->linker) ? SPN_LD_FAMILY_NONE : sp_opt_get(decl->linker), toolchain.driver);
     toolchain.targets = lower_toolchain_targets(ctx, toolchain.driver, toolchain.source, base, decl->target);
   }
 

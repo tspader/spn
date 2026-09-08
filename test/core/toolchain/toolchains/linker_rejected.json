@@ -9,10 +9,7 @@
       "archiver": {
         "program": "ar"
       },
-      "linker": {
-        "msvc": "msvc",
-        "macho": "gnu"
-      }
+      "linker": "gnu"
     }
   ]
 }

@@ -56,7 +56,7 @@ static spn_cc_toolchain_t cc_toolchain(spn_toolchain_info_t* toolchain, spn_tool
     .compiler = compiler,
     .cxx = cxx,
     .archiver = archiver,
-    .linkers = toolchain->linkers,
+    .linker = toolchain->linker,
     .link_args = toolchain->link_args,
     .archiver_driver = toolchain->driver == SPN_CC_DRIVER_MSVC ? SPN_AR_DRIVER_MSVC : SPN_AR_DRIVER_GNU,
   };

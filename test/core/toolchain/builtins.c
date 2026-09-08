@@ -14,7 +14,6 @@ static const test_t tests [] = {
       .compiler = { .path = "zig", .args = { "cc" } },
       .cxx = { .path = "zig", .args = { "c++" } },
       .archiver = { .path = "zig", .args = { "ar" } },
-      .linkers = FAMILIES_LLD,
       .hosts = {
         { .triple = { SPN_ARCH_X64, SPN_OS_LINUX }, .url = "https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz" },
         { .triple = { SPN_ARCH_ARM64, SPN_OS_LINUX }, .url = "https://ziglang.org/download/0.16.0/zig-aarch64-linux-0.16.0.tar.xz" },
@@ -45,7 +44,6 @@ static const test_t tests [] = {
       .compiler = { .name = "cl" },
       .cxx = { .name = "cl" },
       .archiver = { .name = "lib" },
-      .linkers = FAMILIES_NATIVE,
       .hosts = {
         { .triple = { SPN_ARCH_X64, SPN_OS_WINDOWS } },
         { .triple = { SPN_ARCH_ARM64, SPN_OS_WINDOWS } },
@@ -63,7 +61,6 @@ static const test_t tests [] = {
       .compiler = { .name = "clang" },
       .cxx = { .name = "clang++" },
       .archiver = { .name = "ar" },
-      .linkers = FAMILIES_NATIVE,
       .hosts = {
         { .triple = { SPN_ARCH_X64, SPN_OS_LINUX } },
         { .triple = { SPN_ARCH_ARM64, SPN_OS_LINUX } },
@@ -79,13 +76,7 @@ static const test_t tests [] = {
       .compiler = { .name = "clang" },
       .cxx = { .name = "clang++" },
       .archiver = { .name = "llvm-ar" },
-      .linkers = {
-        [SPN_LD_FLAVOR_ELF] = SPN_LD_FAMILY_LLD,
-        [SPN_LD_FLAVOR_MINGW] = SPN_LD_FAMILY_GNU,
-        [SPN_LD_FLAVOR_MSVC] = SPN_LD_FAMILY_MSVC,
-        [SPN_LD_FLAVOR_MACHO] = SPN_LD_FAMILY_LLD,
-        [SPN_LD_FLAVOR_WASM] = SPN_LD_FAMILY_LLD,
-      },
+      .linker = SPN_LD_FAMILY_LLD,
       .link_args = { "-fuse-ld=lld" },
       .hosts = {
         { .triple = { SPN_ARCH_X64, SPN_OS_LINUX } },
@@ -102,7 +93,6 @@ static const test_t tests [] = {
       .compiler = { .name = "gcc" },
       .cxx = { .name = "g++" },
       .archiver = { .name = "ar" },
-      .linkers = FAMILIES_NATIVE,
     },
   },
 };

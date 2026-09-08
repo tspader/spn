@@ -10,6 +10,7 @@
 #include "intern/intern.h"
 #include "graph/build.h"
 #include "paths/paths.h"
+#include "triple/triple.h"
 #include "unit/package.h"
 #include "unit/unit.h"
 
@@ -33,7 +34,7 @@ s32 spn_embed_write(spn_target_unit_t* unit, spn_path_t object, spn_path_t heade
   sp_tm_timer_t timer = sp_tm_start_timer();
 
   spn_cc_embed_ctx_t embedder = sp_zero;
-  spn_cc_embed_ctx_init(&embedder, spn.mem, unit->pkg->build->profile.os, unit->pkg->build->profile.arch);
+  spn_cc_embed_ctx_init(&embedder, spn.mem, spn_os_format(unit->pkg->build->profile.os), unit->pkg->build->profile.arch);
 
   sp_da_for(info->embed, it) {
     spn_embed_t embed = info->embed[it];

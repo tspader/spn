@@ -161,7 +161,7 @@ spn_err_t spn_cc_validate_profile(const spn_cc_toolchain_t* toolchain, const spn
 
   // @spader Not totally sure about this
   spn_sanitizer_set_t ubsan = profile->sanitizers & ~SPN_SANITIZER_UNDEFINED;
-  bool renders_static = profile->linkage == SPN_LIB_KIND_STATIC && spn_ld_static(spn_ld_flavor(target));
+  bool renders_static = profile->linkage == SPN_LIB_KIND_STATIC && spn_ld_static(spn_ld_dialect(target));
   if (ubsan && renders_static) {
     return spn_err_emit(&spn, (spn_err_union_t) {
       .kind = SPN_ERR_SANITIZER_STATIC,
@@ -267,15 +267,14 @@ spn_err_t spn_cc_validate_link(const spn_cc_toolchain_t* toolchain, spn_triple_t
     return feature_unsupported(toolchain, profile, SPN_CC_FEATURE_FRAMEWORKS);
   }
   spn_triple_t target = { profile->arch, profile->os, profile->abi };
-  spn_ld_flavor_t flavor = spn_ld_flavor(target);
-  spn_ld_family_t family = spn_ld_family(&toolchain->linkers, target);
-  if (!sp_da_empty(link->scripts) && !spn_ld_scripts(family, flavor)) {
+  spn_ld_family_t family = spn_ld_family(toolchain->driver, toolchain->linker, target);
+  if (!sp_da_empty(link->scripts) && !spn_ld_scripts(family, spn_os_format(profile->os))) {
     return feature_unsupported(toolchain, profile, SPN_CC_FEATURE_LINKER_SCRIPT);
   }
   if (family == SPN_LD_FAMILY_MSVC && host.os != SPN_OS_WINDOWS) {
     return link_refused(SPN_ERR_TOOLCHAIN_MSVC_LINKER_HOST, toolchain, host, profile);
   }
-  if (flavor == SPN_LD_FLAVOR_MSVC && toolchain->driver == SPN_CC_DRIVER_ZIG) {
+  if (spn_ld_dialect(target) == SPN_LD_DIALECT_LINK && toolchain->driver == SPN_CC_DRIVER_ZIG) {
     return link_refused(SPN_ERR_TOOLCHAIN_ZIG_MSVC_SDK, toolchain, host, profile);
   }
   return SPN_OK;
@@ -326,19 +325,18 @@ spn_err_t spn_cc_render_archive(sp_mem_t mem, const spn_cc_toolchain_t* toolchai
   SP_UNREACHABLE_RETURN(SPN_ERROR);
 }
 
-spn_cc_exports_format_t spn_cc_exports_format(spn_cc_output_kind_t kind, spn_ld_flavor_t flavor) {
+spn_cc_exports_format_t spn_cc_exports_format(spn_cc_output_kind_t kind, spn_format_t format) {
   switch (kind) {
     case SPN_CC_OUTPUT_REACTOR: {
       return SPN_CC_EXPORTS_WASM;
     }
     case SPN_CC_OUTPUT_SHARED_LIB: {
-      switch (flavor) {
-        case SPN_LD_FLAVOR_MACHO: return SPN_CC_EXPORTS_SYMBOL_LIST;
-        case SPN_LD_FLAVOR_MINGW:
-        case SPN_LD_FLAVOR_MSVC: return SPN_CC_EXPORTS_DEF;
-        case SPN_LD_FLAVOR_ELF:
-        case SPN_LD_FLAVOR_WASM: return SPN_CC_EXPORTS_VERSION_SCRIPT;
-        case SPN_LD_FLAVOR_COUNT: sp_unreachable_case();
+      switch (format) {
+        case SPN_FORMAT_MACHO: return SPN_CC_EXPORTS_SYMBOL_LIST;
+        case SPN_FORMAT_COFF: return SPN_CC_EXPORTS_DEF;
+        case SPN_FORMAT_ELF:
+        case SPN_FORMAT_WASM: return SPN_CC_EXPORTS_VERSION_SCRIPT;
+        case SPN_FORMAT_COUNT: sp_unreachable_case();
       }
       SP_UNREACHABLE_RETURN(SPN_CC_EXPORTS_VERSION_SCRIPT);
     }

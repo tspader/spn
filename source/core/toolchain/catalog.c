@@ -22,7 +22,7 @@ static spn_err_t load_target(const spn_cg_toolchain_target_t* in, spn_cc_driver_
   if (spn_triple_entry(partial, &target->triple) != SPN_TRIPLE_ENTRY_OK) {
     return SPN_ERROR;
   }
-  if (!spn_toolchain_driver_produces(driver, spn_ld_flavor(target->triple))) {
+  if (!spn_toolchain_driver_composes(driver, spn_ld_dialect(target->triple))) {
     return SPN_ERROR;
   }
   if (sp_str_empty(in->sysroot)) {
@@ -51,7 +51,8 @@ spn_err_t spn_toolchain_decls_parse(sp_mem_t mem, sp_str_t json, sp_da(spn_toolc
     decl.name = t->name;
     decl.version = t->version;
     decl.driver = t->driver;
-    if (spn_ld_resolve(decl.driver, &t->linker, &decl.linkers).count) {
+    decl.linker = sp_opt_is_null(t->linker) ? SPN_LD_FAMILY_NONE : sp_opt_get(t->linker);
+    if (!spn_ld_accepts(decl.driver, decl.linker)) {
       return SPN_ERROR;
     }
     decl.link_args = t->link_args;
@@ -97,12 +98,11 @@ static sp_da(spn_toolchain_target_t) default_targets(spn_toolchain_catalog_t* ca
   host.abi = host.abi ? host.abi : spn_default_abi(decl->driver, host.os);
 
   sp_da(spn_toolchain_target_t) targets = sp_da_new(catalog->mem, spn_toolchain_target_t);
-  spn_ld_flavor_t flavor = spn_ld_flavor(host);
-  if (!spn_toolchain_driver_produces(decl->driver, flavor)) {
+  if (!spn_toolchain_driver_composes(decl->driver, spn_ld_dialect(host))) {
     return targets;
   }
   sp_da_push(targets, ((spn_toolchain_target_t) { .triple = host }));
-  if (flavor == SPN_LD_FLAVOR_ELF && !spn_toolchain_driver_retargets(decl->driver)) {
+  if (spn_os_format(host.os) == SPN_FORMAT_ELF && !spn_toolchain_driver_retargets(decl->driver)) {
     sp_da_push(targets, ((spn_toolchain_target_t) { .triple = { host.arch, SPN_OS_FREESTANDING, SPN_ABI_BARE } }));
   }
   return targets;
@@ -170,7 +170,7 @@ static spn_toolchain_info_t bind_toolchain(spn_toolchain_catalog_t* catalog, con
     .compiler = decl->compiler,
     .cxx = decl->cxx,
     .archiver = decl->archiver,
-    .linkers = decl->linkers,
+    .linker = decl->linker,
     .link_args = decl->link_args,
     .targets = sp_da_empty(decl->targets) ? default_targets(catalog, decl) : declared_targets(catalog, decl->targets, support),
     .support = support,

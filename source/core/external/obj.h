@@ -7,14 +7,8 @@
 #include "macho/macho.h"
 #include "spn/core.h"
 
-typedef enum {
-  SPN_OBJ_COFF,
-  SPN_OBJ_ELF,
-  SPN_OBJ_MACHO,
-} spn_obj_kind_t;
-
 typedef struct {
-  spn_obj_kind_t kind;
+  spn_format_t kind;
   union {
     struct { sp_coff_t* coff; sp_coff_section_t* section; } coff;
     struct { sp_elf_t* elf; u32 rodata; } elf;
@@ -22,8 +16,7 @@ typedef struct {
   };
 } spn_obj_builder_t;
 
-spn_obj_kind_t spn_obj_get_native_format();
-void           spn_obj_init(spn_obj_builder_t* obj, sp_mem_t mem, spn_obj_kind_t kind, spn_arch_t arch);
+void           spn_obj_init(spn_obj_builder_t* obj, sp_mem_t mem, spn_format_t kind, spn_arch_t arch);
 void           spn_obj_add_symbol(spn_obj_builder_t* obj, sp_str_t name, const void* data, u64 size);
 spn_err_t      spn_obj_write(spn_obj_builder_t* obj, sp_str_t path);
 

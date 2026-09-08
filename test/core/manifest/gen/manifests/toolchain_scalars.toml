@@ -6,7 +6,7 @@ version = "1.0.0"
 name = "gcc"
 mirrors = "https://mirrors.example.com"
 compiler = "gcc"
-linker = { elf = "lld" }
+linker = "lld"
 archiver = "ar"
 driver = "gcc"
 

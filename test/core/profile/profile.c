@@ -419,13 +419,13 @@ typedef struct {
 } finalize_test_t;
 
 static const finalize_test_t finalize_tests [] = {
-  { .name = "gnu_is_shared",   .abi = SPN_ABI_GNU,   .expect = { .linkage = SPN_LIB_KIND_SHARED } },
-  { .name = "musl_is_static",  .abi = SPN_ABI_MUSL,  .expect = { .linkage = SPN_LIB_KIND_STATIC } },
-  { .name = "msvc_is_shared",  .abi = SPN_ABI_MSVC,  .expect = { .linkage = SPN_LIB_KIND_SHARED } },
-  { .name = "apple_is_shared", .abi = SPN_ABI_APPLE, .expect = { .linkage = SPN_LIB_KIND_SHARED } },
-  { .name = "bare_is_static",  .abi = SPN_ABI_BARE,  .expect = { .linkage = SPN_LIB_KIND_STATIC } },
-  { .name = "records_driver",  .abi = SPN_ABI_GNU,   .driver = SPN_CC_DRIVER_ZIG, .expect = { .linkage = SPN_LIB_KIND_SHARED, .driver = SPN_CC_DRIVER_ZIG } },
-  { .name = "records_linker",  .abi = SPN_ABI_GNU,   .linker = SPN_LD_FAMILY_LLD, .expect = { .linkage = SPN_LIB_KIND_SHARED, .linker = SPN_LD_FAMILY_LLD } },
+  { .name = "gnu_is_shared",   .abi = SPN_ABI_GNU,   .driver = SPN_CC_DRIVER_GCC, .expect = { .linkage = SPN_LIB_KIND_SHARED, .driver = SPN_CC_DRIVER_GCC, .linker = SPN_LD_FAMILY_GNU } },
+  { .name = "musl_is_static",  .abi = SPN_ABI_MUSL,  .driver = SPN_CC_DRIVER_GCC, .expect = { .linkage = SPN_LIB_KIND_STATIC, .driver = SPN_CC_DRIVER_GCC, .linker = SPN_LD_FAMILY_GNU } },
+  { .name = "msvc_is_shared",  .abi = SPN_ABI_MSVC,  .driver = SPN_CC_DRIVER_GCC, .expect = { .linkage = SPN_LIB_KIND_SHARED, .driver = SPN_CC_DRIVER_GCC, .linker = SPN_LD_FAMILY_GNU } },
+  { .name = "apple_is_shared", .abi = SPN_ABI_APPLE, .driver = SPN_CC_DRIVER_GCC, .expect = { .linkage = SPN_LIB_KIND_SHARED, .driver = SPN_CC_DRIVER_GCC, .linker = SPN_LD_FAMILY_GNU } },
+  { .name = "bare_is_static",  .abi = SPN_ABI_BARE,  .driver = SPN_CC_DRIVER_GCC, .expect = { .linkage = SPN_LIB_KIND_STATIC, .driver = SPN_CC_DRIVER_GCC, .linker = SPN_LD_FAMILY_GNU } },
+  { .name = "records_driver",  .abi = SPN_ABI_GNU,   .driver = SPN_CC_DRIVER_ZIG, .expect = { .linkage = SPN_LIB_KIND_SHARED, .driver = SPN_CC_DRIVER_ZIG, .linker = SPN_LD_FAMILY_LLD } },
+  { .name = "records_linker",  .abi = SPN_ABI_GNU,   .driver = SPN_CC_DRIVER_GCC, .linker = SPN_LD_FAMILY_LLD, .expect = { .linkage = SPN_LIB_KIND_SHARED, .driver = SPN_CC_DRIVER_GCC, .linker = SPN_LD_FAMILY_LLD } },
 };
 
 static spn_profile_info_t desc_to_info(const profile_desc_t* d) {
@@ -487,7 +487,7 @@ sp_test_each(profile, resolve, test_t, tests, .setup = spn_test_ctx_setup) {
     sp_expect_str_eq(t, toolchain.name, result.toolchain.name);
   }
 
-  spn_toolchain_info_t info = sp_zero;
+  spn_toolchain_info_t info = { .driver = SPN_CC_DRIVER_ZIG };
   spn_toolchain_selection_t selection = { .toolchain = &info, .target.triple = { result.arch, result.os, it->abi ? it->abi : result.abi } };
   spn_profile_finalize(&result, &selection);
   sp_expect_eq(t, (u32)it->expect.linkage, (u32)result.linkage);
@@ -519,7 +519,7 @@ sp_test_each(profile, query, query_test_t, query_tests) {
 
 sp_test_each(profile, finalize, finalize_test_t, finalize_tests) {
   spn_profile_info_t profile = sp_zero;
-  spn_toolchain_info_t info = { .driver = it->driver, .linkers.families = { [SPN_LD_FLAVOR_ELF] = it->linker } };
+  spn_toolchain_info_t info = { .driver = it->driver, .linker = it->linker };
   spn_toolchain_selection_t selection = { .toolchain = &info, .target.triple = { SPN_ARCH_X64, SPN_OS_LINUX, it->abi } };
   spn_profile_finalize(&profile, &selection);
   sp_expect_eq(t, (u32)it->expect.linkage, (u32)profile.linkage);

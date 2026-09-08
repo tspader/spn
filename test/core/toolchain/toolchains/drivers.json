@@ -19,9 +19,7 @@
       "archiver": {
         "program": "ar"
       },
-      "linker": {
-        "elf": "lld"
-      },
+      "linker": "lld",
       "link_args": [
         "-fuse-ld=lld"
       ]

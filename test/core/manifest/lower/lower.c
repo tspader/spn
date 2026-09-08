@@ -8,7 +8,6 @@
 #include "profile/types.h"
 #include "index/types.h"
 #include "arg.h"
-#include "linkers.h"
 #include "toolchain/types.h"
 #include "toml/loader.h"
 #include "semver/compare.h"
@@ -90,7 +89,7 @@ typedef struct {
   test_arg_t cxx;
   const c8* cxx_args [8];
   spn_cc_driver_t driver;
-  spn_ld_family_t linkers [SPN_LD_FLAVOR_COUNT];
+  spn_ld_family_t linker;
   const c8* link_args [2];
   spn_triple_t hosts [2];
   toolchain_target_t targets [5];
@@ -497,8 +496,7 @@ static const test_t tests [] = {
     .name = "validate_toolchain_linker_rejected",
     .manifest = "toolchain_linker_rejected",
     .issues = {
-      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].linker.msvc" },
-      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].linker.macho" },
+      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].linker" },
     }
   },
   {
@@ -509,7 +507,7 @@ static const test_t tests [] = {
     }
   },
   {
-    .name = "toolchain_linker_per_flavor",
+    .name = "toolchain_linker_lld",
     .manifest = "toolchain_linkers",
     .toolchains = {
       {
@@ -517,32 +515,13 @@ static const test_t tests [] = {
         .compiler = { .name = "clang" },
         .archiver = { .name = "llvm-ar" },
         .driver = SPN_CC_DRIVER_CLANG,
-        .linkers = FAMILIES_LLD,
+        .linker = SPN_LD_FAMILY_LLD,
         .targets = {
           { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU },
           { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU },
           { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MSVC },
           { SPN_ARCH_ARM64, SPN_OS_MACOS, SPN_ABI_APPLE },
           { SPN_ARCH_WASM32, SPN_OS_WASI, SPN_ABI_MUSL },
-        },
-      },
-    },
-  },
-  {
-    .name = "toolchain_linker_override_keeps_other_defaults",
-    .manifest = "toolchain_linker_override",
-    .toolchains = {
-      {
-        .name = "custom",
-        .compiler = { .name = "gcc" },
-        .archiver = { .name = "ar" },
-        .driver = SPN_CC_DRIVER_GCC,
-        .linkers = {
-          [SPN_LD_FLAVOR_ELF] = SPN_LD_FAMILY_LLD,
-          [SPN_LD_FLAVOR_MINGW] = SPN_LD_FAMILY_GNU,
-          [SPN_LD_FLAVOR_MSVC] = SPN_LD_FAMILY_MSVC,
-          [SPN_LD_FLAVOR_MACHO] = SPN_LD_FAMILY_LD64,
-          [SPN_LD_FLAVOR_WASM] = SPN_LD_FAMILY_LLD,
         },
       },
     },
@@ -556,7 +535,6 @@ static const test_t tests [] = {
         .compiler = { .name = "gcc" },
         .archiver = { .name = "ar" },
         .driver = SPN_CC_DRIVER_GCC,
-        .linkers = FAMILIES_NATIVE,
         .link_args = { "-fuse-ld=mold", "-A" },
       },
     },
@@ -819,13 +797,7 @@ static const test_t tests [] = {
         .args = { "cc", "-target", "x86_64-linux-gnu" },
         .archiver = { .path = "ar" },
         .driver = SPN_CC_DRIVER_CLANG,
-        .linkers = {
-          [SPN_LD_FLAVOR_ELF] = SPN_LD_FAMILY_GNU,
-          [SPN_LD_FLAVOR_MINGW] = SPN_LD_FAMILY_GNU,
-          [SPN_LD_FLAVOR_MSVC] = SPN_LD_FAMILY_MSVC,
-          [SPN_LD_FLAVOR_MACHO] = SPN_LD_FAMILY_LLD,
-          [SPN_LD_FLAVOR_WASM] = SPN_LD_FAMILY_LLD,
-        },
+        .linker = SPN_LD_FAMILY_LLD,
         .targets = { { SPN_ARCH_ARM64, SPN_OS_MACOS, SPN_ABI_APPLE } },
       },
     },
@@ -1488,11 +1460,7 @@ sp_test_each(lower, cases, test_t, tests) {
     if (expected.mirrors)  sp_expect_str_eq_c(t, tc->hosts[0].artifact.mirror_list, expected.mirrors);
     if (test_check_arg(t, tc->compiler.program, expected.compiler)) return SP_ERR;
     if (test_check_arg(t, tc->archiver.program, expected.archiver)) return SP_ERR;
-    if (test_families_expected(expected.linkers)) {
-      sp_for(flavor, SPN_LD_FLAVOR_COUNT) {
-        sp_expect_eq(t, (u32)expected.linkers[flavor], (u32)tc->linkers.families[flavor]);
-      }
-    }
+    sp_expect_eq(t, (u32)expected.linker, (u32)tc->linker);
     sp_must_strs_eq(t, tc->link_args, sp_da_size(tc->link_args), expected.link_args);
     if (test_check_arg(t, tc->cxx.program, expected.cxx)) return SP_ERR;
     if (expected.driver)   sp_expect_eq(t, (u32)expected.driver, (u32)tc->driver);

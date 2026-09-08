@@ -261,96 +261,106 @@ spn_err_t spn_gnu_parse_depfile(sp_mem_t mem, sp_str_t content, sp_da(sp_str_t)*
   return parser.err ? SPN_ERROR : SPN_OK;
 }
 
-static void add_exports(sp_mem_t mem, spn_ld_flavor_t flavor, spn_path_t exports, spn_invocation_t* invocation) {
-  switch (flavor) {
-    case SPN_LD_FLAVOR_ELF: {
-      spn_cc_push_glued(mem, invocation, "-Wl,--version-script,", exports);
+static void add_def(sp_mem_t mem, spn_ld_dialect_t dialect, spn_path_t def, spn_invocation_t* invocation) {
+  switch (dialect) {
+    case SPN_LD_DIALECT_GNU: {
+      spn_cc_push_path(mem, invocation, def);
       break;
     }
-    case SPN_LD_FLAVOR_MINGW: {
-      spn_cc_push_path(mem, invocation, exports);
+    case SPN_LD_DIALECT_LINK: {
+      spn_cc_push_glued(mem, invocation, "-Wl,/DEF:", def);
       break;
     }
-    case SPN_LD_FLAVOR_MSVC: {
-      spn_cc_push_glued(mem, invocation, "-Wl,/DEF:", exports);
-      break;
-    }
-    case SPN_LD_FLAVOR_MACHO: {
-      spn_cc_push_glued(mem, invocation, "-Wl,-exported_symbols_list,", exports);
-      break;
-    }
-    case SPN_LD_FLAVOR_WASM:
-    case SPN_LD_FLAVOR_COUNT: {
+    case SPN_LD_DIALECT_DARWIN:
+    case SPN_LD_DIALECT_WASM:
+    case SPN_LD_DIALECT_COUNT: {
       sp_unreachable_case();
     }
   }
 }
 
-static void add_whole_archives(sp_mem_t mem, spn_ld_flavor_t flavor, sp_da(spn_path_t) archives, spn_invocation_t* invocation) {
-  switch (flavor) {
-    case SPN_LD_FLAVOR_ELF:
-    case SPN_LD_FLAVOR_MINGW:
-    case SPN_LD_FLAVOR_WASM: {
+static void add_exports(sp_mem_t mem, spn_format_t format, spn_ld_dialect_t dialect, spn_path_t exports, spn_invocation_t* invocation) {
+  switch (format) {
+    case SPN_FORMAT_ELF: {
+      spn_cc_push_glued(mem, invocation, "-Wl,--version-script,", exports);
+      break;
+    }
+    case SPN_FORMAT_COFF: {
+      add_def(mem, dialect, exports, invocation);
+      break;
+    }
+    case SPN_FORMAT_MACHO: {
+      spn_cc_push_glued(mem, invocation, "-Wl,-exported_symbols_list,", exports);
+      break;
+    }
+    case SPN_FORMAT_WASM:
+    case SPN_FORMAT_COUNT: {
+      sp_unreachable_case();
+    }
+  }
+}
+
+static void add_whole_archives(sp_mem_t mem, spn_ld_dialect_t dialect, sp_da(spn_path_t) archives, spn_invocation_t* invocation) {
+  switch (dialect) {
+    case SPN_LD_DIALECT_GNU:
+    case SPN_LD_DIALECT_WASM: {
       spn_cc_push_c(mem, invocation, "-Wl,--whole-archive");
       spn_cc_push_paths(mem, invocation, archives);
       spn_cc_push_c(mem, invocation, "-Wl,--no-whole-archive");
       break;
     }
-    case SPN_LD_FLAVOR_MSVC: {
+    case SPN_LD_DIALECT_LINK: {
       sp_da_for(archives, it) {
         spn_cc_push_glued(mem, invocation, "-Wl,/WHOLEARCHIVE:", archives[it]);
       }
       break;
     }
-    case SPN_LD_FLAVOR_MACHO: {
+    case SPN_LD_DIALECT_DARWIN: {
       sp_da_for(archives, it) {
         spn_cc_push_glued(mem, invocation, "-Wl,-force_load,", archives[it]);
       }
       break;
     }
-    case SPN_LD_FLAVOR_COUNT: {
+    case SPN_LD_DIALECT_COUNT: {
       sp_unreachable_case();
     }
   }
 }
 
-static void add_subsystem(sp_mem_t mem, spn_ld_flavor_t flavor, spn_invocation_t* invocation) {
-  switch (flavor) {
-    case SPN_LD_FLAVOR_MINGW: {
+static void add_subsystem(sp_mem_t mem, spn_ld_dialect_t dialect, spn_invocation_t* invocation) {
+  switch (dialect) {
+    case SPN_LD_DIALECT_GNU: {
       spn_cc_push_c(mem, invocation, "-Wl,--subsystem,windows");
       break;
     }
-    case SPN_LD_FLAVOR_MSVC: {
+    case SPN_LD_DIALECT_LINK: {
       spn_cc_push_c(mem, invocation, "-Wl,/SUBSYSTEM:WINDOWS");
       break;
     }
-    case SPN_LD_FLAVOR_ELF:
-    case SPN_LD_FLAVOR_MACHO:
-    case SPN_LD_FLAVOR_WASM: {
-      break;
-    }
-    case SPN_LD_FLAVOR_COUNT: {
+    case SPN_LD_DIALECT_DARWIN:
+    case SPN_LD_DIALECT_WASM:
+    case SPN_LD_DIALECT_COUNT: {
       sp_unreachable_case();
     }
   }
 }
 
-static void add_rpath(sp_mem_t mem, spn_ld_flavor_t flavor, spn_invocation_t* invocation) {
-  switch (flavor) {
-    case SPN_LD_FLAVOR_ELF: {
+static void add_rpath(sp_mem_t mem, spn_os_t os, spn_invocation_t* invocation) {
+  switch (os) {
+    case SPN_OS_LINUX: {
       spn_cc_push_c(mem, invocation, "-Wl,-rpath,$ORIGIN");
       break;
     }
-    case SPN_LD_FLAVOR_MACHO: {
+    case SPN_OS_MACOS: {
       spn_cc_push_c(mem, invocation, "-Wl,-rpath,@loader_path");
       break;
     }
-    case SPN_LD_FLAVOR_MINGW:
-    case SPN_LD_FLAVOR_MSVC:
-    case SPN_LD_FLAVOR_WASM: {
+    case SPN_OS_WINDOWS:
+    case SPN_OS_WASI:
+    case SPN_OS_FREESTANDING: {
       break;
     }
-    case SPN_LD_FLAVOR_COUNT: {
+    case SPN_OS_NONE: {
       sp_unreachable_case();
     }
   }
@@ -358,7 +368,8 @@ static void add_rpath(sp_mem_t mem, spn_ld_flavor_t flavor, spn_invocation_t* in
 
 void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_link_t* link, const spn_cc_link_files_t* files, spn_invocation_t* invocation) {
   spn_triple_t triple = profile_triple(profile);
-  spn_ld_flavor_t flavor = spn_ld_flavor(triple);
+  spn_format_t format = spn_os_format(profile->os);
+  spn_ld_dialect_t dialect = spn_ld_dialect(triple);
 
   add_launcher(mem, toolchain, profile, link->lang, invocation);
   spn_cc_push_strs(mem, invocation, toolchain->link_args);
@@ -379,20 +390,20 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
     }
     case SPN_CC_OUTPUT_SHARED_LIB: {
       spn_cc_push_c(mem, invocation, "-shared");
-      if (flavor == SPN_LD_FLAVOR_MACHO) {
+      if (format == SPN_FORMAT_MACHO) {
         spn_cc_push_fmt(mem, invocation, "-Wl,-install_name,@rpath/{}", sp_fmt_str(sp_fs_get_name(files->output.sub)));
       }
       if (!spn_path_empty(files->exports.path)) {
-        add_exports(mem, flavor, files->exports.path, invocation);
+        add_exports(mem, format, dialect, files->exports.path, invocation);
       }
       break;
     }
     case SPN_CC_OUTPUT_EXE: {
-      if (profile->linkage == SPN_LIB_KIND_STATIC && spn_ld_static(flavor)) {
+      if (profile->linkage == SPN_LIB_KIND_STATIC && spn_ld_static(dialect)) {
         spn_cc_push_c(mem, invocation, "-static");
       }
-      if (link->subsystem == SPN_WIN_SUBSYSTEM_WINDOWS) {
-        add_subsystem(mem, flavor, invocation);
+      if (link->subsystem == SPN_WIN_SUBSYSTEM_WINDOWS && format == SPN_FORMAT_COFF) {
+        add_subsystem(mem, dialect, invocation);
       }
       break;
     }
@@ -407,7 +418,7 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
   spn_cc_push_strs(mem, invocation, link->args);
   spn_cc_push_paths(mem, invocation, files->objects);
   if (!sp_da_empty(files->whole_archives)) {
-    add_whole_archives(mem, flavor, files->whole_archives, invocation);
+    add_whole_archives(mem, dialect, files->whole_archives, invocation);
   }
   sp_da_for(link->lib_dirs, it) {
     spn_cc_push_glued(mem, invocation, "-L", link->lib_dirs[it]);
@@ -449,8 +460,8 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
       spn_cc_push_str(mem, invocation, link->frameworks[it]);
     }
   }
-  if (link->rpath && spn_os_dynamic(profile->os)) {
-    add_rpath(mem, flavor, invocation);
+  if (link->rpath) {
+    add_rpath(mem, profile->os, invocation);
   }
   spn_cc_push_c(mem, invocation, "-o");
   spn_cc_push_path(mem, invocation, files->output);

@@ -27,7 +27,7 @@ static spn_triple_t get_target_triple(spn_target_unit_t* target) {
 }
 
 spn_cc_exports_format_t spn_target_exports_format(spn_target_unit_t* target) {
-  return spn_cc_exports_format(target->kind, spn_ld_flavor(get_target_triple(target)));
+  return spn_cc_exports_format(target->kind, spn_os_format(target->pkg->build->profile.os));
 }
 
 spn_path_t spn_target_exports_path(sp_mem_t mem, spn_target_unit_t* target) {

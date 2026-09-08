@@ -24,8 +24,8 @@ checkout, its git dir, and the toolchain caches into the image and runs
 
 A lane must work. If its toolchain's programs aren't on PATH, or it doesn't
 support this host, the binary exits before running anything. A lane whose
-`link_args` name a linker lists that binary per output format in
-`test/tools/caps.c`, and the check covers the formats the lane's targets reach
+`link_args` name a linker lists that binary per linker dialect in
+`test/tools/caps.c`, and the check covers the dialects the lane's targets reach
 on this host. Skips are for cases, never for lanes.
 
 ## gating
@@ -39,9 +39,9 @@ and skips with a reason otherwise.
   only what its container proves: builtins claim the host (and, for `gcc` on
   Linux, the host's bare metal triple), and a test-only cross lane lists its
   target explicitly.
-- `.linker = SPN_LD_FAMILY_LLD`: only where the lane's declared family for the
-  target's output format is that one. Cases about what a family accepts gate on
-  this, never on a lane or driver name.
+- `.linker = SPN_LD_FAMILY_LLD`: only where the lane's linker family for the
+  target is that one. Cases about what a family accepts gate on this, never on
+  a lane or driver name.
 - `.cxx`: only where the lane declares a C++ compiler. `musl-gcc`, `clang-musl`
   and `clang-bare` have none, since Debian ships no C++ runtime for those
   targets.
@@ -77,9 +77,10 @@ parse as a version, so both clang mingw lanes name it with `-L`.
 
 ## what a lane proves
 
-A lane declares its driver, the linker family per output format, and the raw
-`link_args` that make the family true. spn renders nothing to choose a linker;
-it emits `-T` and `--exclude-libs` only where the declared family honors them.
+A lane declares its driver, `linker = "lld"` when its linker is lld, and the
+raw `link_args` that make that true; anything else links with the native
+linker of each target's dialect. spn renders nothing to choose a linker; it
+emits `-T` only where the resolved family honors it.
 The `linker.*` cases check that per family: a script sets the entry point for
 gnu and lld on elf (`script_sets_entry` in the lanes that claim bare metal,
 `cross_script_sets_entry` in `aarch64-gnu`) and for gnu on mingw
@@ -91,21 +92,21 @@ proves the `linker` fact matches the family the lane declares.
 | lane          | driver  | linker family              | link_args                          | hosted by                                     |
 |---------------|---------|----------------------------|------------------------------------|-----------------------------------------------|
 | `zig`         | zig     | lld (fixed)                |                                    | any host, `debian-zig`, `alpine-zig`          |
-| `gcc`         | gcc     | gnu (elf, mingw), ld64     |                                    | `debian-gcc`, `debian-llvm`, `alpine`, ...    |
-| `gcc-lld`     | gcc     | lld on elf                 | `-fuse-ld=lld`                     | `debian-gcc`, `debian-llvm`                   |
-| `clang`       | clang   | gnu (elf, mingw), ld64     |                                    | `debian-clang`, `debian-llvm`, `alpine-clang`, macOS |
-| `llvm`        | clang   | lld on elf and macho       | `-fuse-ld=lld`                     | `debian-llvm`, macOS with Homebrew llvm       |
+| `gcc`         | gcc     | native                     |                                    | `debian-gcc`, `debian-llvm`, `alpine`, ...    |
+| `gcc-lld`     | gcc     | lld                        | `-fuse-ld=lld`                     | `debian-gcc`, `debian-llvm`                   |
+| `clang`       | clang   | native                     |                                    | `debian-clang`, `debian-llvm`, `alpine-clang`, macOS |
+| `llvm`        | clang   | lld                        | `-fuse-ld=lld`                     | `debian-llvm`, macOS with Homebrew llvm       |
 | `msvc`        | msvc    | msvc (fixed)               |                                    | Windows dev shell                             |
-| `clang-msvc`  | clang   | lld on msvc                | `-fuse-ld=lld`                     | Windows with LLVM                             |
+| `clang-msvc`  | clang   | lld                        | `-fuse-ld=lld`                     | Windows with LLVM                             |
 | `aarch64-gnu` | gcc     | gnu                        |                                    | `debian-cross`                                |
 | `mingw-gnu`   | gcc     | gnu                        |                                    | `debian-mingw`                                |
-| `clang-mingw` | clang   | gnu on mingw               | `--ld-path=x86_64-w64-mingw32-ld -L<libgcc>` | `debian-mingw-clang`                |
-| `clang-mingw-lld` | clang | lld on mingw            | `-fuse-ld=lld -L<libgcc>`          | `debian-mingw-clang`                          |
-| `clang-bare`  | clang   | gnu on elf, via gcc        |                                    | `debian-llvm`                                 |
+| `clang-mingw` | clang   | native (gnu)               | `--ld-path=x86_64-w64-mingw32-ld -L<libgcc>` | `debian-mingw-clang`                |
+| `clang-mingw-lld` | clang | lld                     | `-fuse-ld=lld -L<libgcc>`          | `debian-mingw-clang`                          |
+| `clang-bare`  | clang   | native (gnu, via gcc)      |                                    | `debian-llvm`                                 |
 | `musl-gcc`    | gcc     | gnu                        |                                    | `debian-musl`                                 |
 | `clang-musl`  | clang   | gnu                        | `-rtlib=compiler-rt -unwindlib=none` | `debian-musl`, host gnu and sysroot musl    |
 | `clang-wasi`  | clang   | lld (wasm)                 |                                    | `debian-wasi`                                 |
-| `clang-sysroot` | clang | lld on elf                 | `-fuse-ld=lld`                     | `debian-sysroot`                              |
+| `clang-sysroot` | clang | lld                        | `-fuse-ld=lld`                     | `debian-sysroot`                              |
 | `clang-cross` | clang   | gnu                        |                                    | `debian-cross`                                |
 
 The cross lanes (`aarch64-gnu`, `mingw-gnu`, `clang-mingw`, `clang-mingw-lld`,

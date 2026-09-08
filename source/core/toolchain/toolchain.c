@@ -137,10 +137,10 @@ spn_abi_t spn_default_abi(spn_cc_driver_t driver, spn_os_t os) {
   SP_UNREACHABLE_RETURN(SPN_ABI_NONE);
 }
 
-bool spn_toolchain_driver_produces(spn_cc_driver_t driver, spn_ld_flavor_t flavor) {
+bool spn_toolchain_driver_composes(spn_cc_driver_t driver, spn_ld_dialect_t dialect) {
   switch (driver) {
-    case SPN_CC_DRIVER_GCC: return flavor == SPN_LD_FLAVOR_ELF || flavor == SPN_LD_FLAVOR_MINGW || flavor == SPN_LD_FLAVOR_MACHO;
-    case SPN_CC_DRIVER_MSVC: return flavor == SPN_LD_FLAVOR_MSVC;
+    case SPN_CC_DRIVER_GCC: return dialect == SPN_LD_DIALECT_GNU || dialect == SPN_LD_DIALECT_DARWIN;
+    case SPN_CC_DRIVER_MSVC: return dialect == SPN_LD_DIALECT_LINK;
     case SPN_CC_DRIVER_CLANG:
     case SPN_CC_DRIVER_ZIG: return true;
     case SPN_CC_DRIVER_NONE: sp_unreachable_case();

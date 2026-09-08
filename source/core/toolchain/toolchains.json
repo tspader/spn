@@ -167,10 +167,7 @@
       "cxx": {
         "program": "clang++"
       },
-      "linker": {
-        "elf": "lld",
-        "macho": "lld"
-      },
+      "linker": "lld",
       "link_args": [
         "-fuse-ld=lld"
       ],

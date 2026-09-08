@@ -151,6 +151,25 @@ sp_test_each(triple, exe_file_name, exe_file_name_t, exe_file_name_tests) {
 }
 
 
+typedef struct {
+  const c8* name;
+  spn_os_t os;
+  spn_format_t expect;
+} format_t;
+
+static const format_t format_tests [] = {
+  { "linux",        SPN_OS_LINUX,        SPN_FORMAT_ELF },
+  { "freestanding", SPN_OS_FREESTANDING, SPN_FORMAT_ELF },
+  { "windows",      SPN_OS_WINDOWS,      SPN_FORMAT_COFF },
+  { "macos",        SPN_OS_MACOS,        SPN_FORMAT_MACHO },
+  { "wasi",         SPN_OS_WASI,         SPN_FORMAT_WASM },
+};
+
+sp_test_each(triple, format, format_t, format_tests) {
+  sp_expect_eq(t, (u32)it->expect, (u32)spn_os_format(it->os));
+  return SP_OK;
+}
+
 sp_test(triple, host) {
   spn_triple_t host = spn_triple_host();
   sp_expect_ne(t, host.arch, SPN_ARCH_NONE);

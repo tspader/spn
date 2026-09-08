@@ -8,10 +8,4 @@ compiler = "clang"
 archiver = "llvm-ar"
 driver = "clang"
 link_args = ["-fuse-ld=lld"]
-
-[toolchain.linker]
-elf = "lld"
-mingw = "gnu"
-msvc = "msvc"
-macho = "ld64"
-wasm = "lld"
+linker = "lld"

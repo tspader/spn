@@ -144,9 +144,7 @@ static void write_lane(sp_io_writer_t* io, yyjson_val* toolchain) {
     write_launcher(io, "cxx", yyjson_obj_get(toolchain, "cxx"));
   }
   if (yyjson_obj_get(toolchain, "linker")) {
-    sp_io_write_cstr(io, "linker = ", SP_NULLPTR);
-    write_table(io, yyjson_obj_get(toolchain, "linker"));
-    sp_io_write_cstr(io, "\n", SP_NULLPTR);
+    write_str(io, "linker", yyjson_obj_get(toolchain, "linker"));
   }
   if (yyjson_obj_get(toolchain, "link_args")) {
     write_str_array(io, "link_args", yyjson_obj_get(toolchain, "link_args"));

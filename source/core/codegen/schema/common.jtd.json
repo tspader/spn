@@ -35,21 +35,11 @@
       }
     },
 
-    "linkers": {
-      "optionalProperties": {
-        "elf": { "ref": "ld_family" },
-        "mingw": { "ref": "ld_family" },
-        "msvc": { "ref": "ld_family" },
-        "macho": { "ref": "ld_family" },
-        "wasm": { "ref": "ld_family" }
-      }
-    },
-
     "toolchain_decl": {
       "optionalProperties": {
         "name": { "type": "string" },
         "compiler": { "type": "string" },
-        "linker": { "ref": "linkers" },
+        "linker": { "ref": "ld_family" },
         "link_args": { "elements": { "type": "string" } },
         "archiver": { "type": "string" },
         "driver": { "ref": "cc_driver" },

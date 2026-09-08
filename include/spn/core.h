@@ -67,6 +67,14 @@ typedef enum {
   SPN_LD_FAMILY_MSVC,
 } spn_ld_family_t;
 
+typedef enum {
+  SPN_FORMAT_ELF,
+  SPN_FORMAT_COFF,
+  SPN_FORMAT_MACHO,
+  SPN_FORMAT_WASM,
+  SPN_FORMAT_COUNT,
+} spn_format_t;
+
 typedef struct {
   u16 major;
   u16 minor;

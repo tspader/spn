@@ -20,13 +20,12 @@ typedef enum {
 typedef u32 spn_cc_cap_set_t;
 
 typedef enum {
-  SPN_LD_FLAVOR_ELF,
-  SPN_LD_FLAVOR_MINGW,
-  SPN_LD_FLAVOR_MSVC,
-  SPN_LD_FLAVOR_MACHO,
-  SPN_LD_FLAVOR_WASM,
-  SPN_LD_FLAVOR_COUNT,
-} spn_ld_flavor_t;
+  SPN_LD_DIALECT_GNU,
+  SPN_LD_DIALECT_LINK,
+  SPN_LD_DIALECT_DARWIN,
+  SPN_LD_DIALECT_WASM,
+  SPN_LD_DIALECT_COUNT,
+} spn_ld_dialect_t;
 
 typedef enum {
   SPN_SDK_NONE,
@@ -34,15 +33,6 @@ typedef enum {
   SPN_SDK_MACOS,
   SPN_SDK_MSVC,
 } spn_sdk_kind_t;
-
-typedef struct {
-  spn_ld_family_t families [SPN_LD_FLAVOR_COUNT];
-} spn_toolchain_linkers_t;
-
-typedef struct {
-  spn_ld_flavor_t items [SPN_LD_FLAVOR_COUNT];
-  u32 count;
-} spn_ld_issues_t;
 
 typedef enum {
   SPN_PATH_OK,
@@ -95,7 +85,7 @@ typedef struct {
   spn_toolchain_launcher_t compiler;
   spn_toolchain_launcher_t cxx;
   spn_toolchain_launcher_t archiver;
-  spn_toolchain_linkers_t linkers;
+  spn_ld_family_t linker;
   sp_da(sp_str_t) link_args;
   spn_toolchain_source_t source;
   sp_da(spn_toolchain_host_t) hosts;
@@ -109,7 +99,7 @@ typedef struct {
   spn_toolchain_launcher_t compiler;
   spn_toolchain_launcher_t cxx;
   spn_toolchain_launcher_t archiver;
-  spn_toolchain_linkers_t linkers;
+  spn_ld_family_t linker;
   sp_da(sp_str_t) link_args;
   sp_da(spn_toolchain_target_t) targets;
   spn_toolchain_support_t support;

@@ -142,7 +142,7 @@ sp_hash_t spn_unit_fingerprint(spn_session_t* session, spn_build_unit_t* build, 
   fingerprint.toolchain.cc = hash_arg(toolchain->compiler.program);
   fingerprint.toolchain.ar = hash_arg(toolchain->archiver.program);
   fingerprint.toolchain.cxx = hash_arg(toolchain->cxx.program);
-  fingerprint.toolchain.ld = spn_ld_family(&toolchain->linkers, target);
+  fingerprint.toolchain.ld = spn_ld_family(toolchain->driver, toolchain->linker, target);
   fingerprint.toolchain.link_args = hash_strs(toolchain->link_args);
   fingerprint.toolchain.identity = build->toolchain->identity;
   if (toolchain->support.kind == SPN_TOOLCHAIN_SUPPORT_ARTIFACT) {

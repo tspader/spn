@@ -7,7 +7,7 @@ name = "L"
 driver = "gcc"
 compiler = "gcc"
 archiver = "ar"
-linker = { elf = "lld" }
+linker = "lld"
 link_args = ["-fuse-ld=lld"]
 
 [[bin]]

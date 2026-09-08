@@ -161,6 +161,18 @@ static bool os_has_abi(spn_os_t os, spn_abi_t abi) {
   return false;
 }
 
+spn_format_t spn_os_format(spn_os_t os) {
+  switch (os) {
+    case SPN_OS_LINUX:
+    case SPN_OS_FREESTANDING: return SPN_FORMAT_ELF;
+    case SPN_OS_WINDOWS: return SPN_FORMAT_COFF;
+    case SPN_OS_MACOS: return SPN_FORMAT_MACHO;
+    case SPN_OS_WASI: return SPN_FORMAT_WASM;
+    case SPN_OS_NONE: sp_unreachable_case();
+  }
+  SP_UNREACHABLE_RETURN(SPN_FORMAT_ELF);
+}
+
 bool spn_os_dynamic(spn_os_t os) {
   switch (os) {
     case SPN_OS_LINUX:

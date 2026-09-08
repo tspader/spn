@@ -7,13 +7,7 @@
     {
       "name": "llvm",
       "compiler": "clang",
-      "linker": {
-        "elf": "lld",
-        "mingw": "gnu",
-        "msvc": "msvc",
-        "macho": "ld64",
-        "wasm": "lld"
-      },
+      "linker": "lld",
       "link_args": [
         "-fuse-ld=lld"
       ],

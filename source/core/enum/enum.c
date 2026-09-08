@@ -137,14 +137,24 @@ sp_str_t spn_ld_family_to_str(spn_ld_family_t family) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
-sp_str_t spn_ld_flavor_to_str(spn_ld_flavor_t flavor) {
-  switch (flavor) {
-    case SPN_LD_FLAVOR_ELF:   return sp_str_lit("elf");
-    case SPN_LD_FLAVOR_MINGW: return sp_str_lit("mingw");
-    case SPN_LD_FLAVOR_MSVC:  return sp_str_lit("msvc");
-    case SPN_LD_FLAVOR_MACHO: return sp_str_lit("macho");
-    case SPN_LD_FLAVOR_WASM:  return sp_str_lit("wasm");
-    case SPN_LD_FLAVOR_COUNT: sp_unreachable_case();
+sp_str_t spn_ld_dialect_to_str(spn_ld_dialect_t dialect) {
+  switch (dialect) {
+    case SPN_LD_DIALECT_GNU:    return sp_str_lit("gnu");
+    case SPN_LD_DIALECT_LINK:   return sp_str_lit("link");
+    case SPN_LD_DIALECT_DARWIN: return sp_str_lit("darwin");
+    case SPN_LD_DIALECT_WASM:   return sp_str_lit("wasm");
+    case SPN_LD_DIALECT_COUNT:  sp_unreachable_case();
+  }
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
+sp_str_t spn_format_to_str(spn_format_t format) {
+  switch (format) {
+    case SPN_FORMAT_ELF:   return sp_str_lit("elf");
+    case SPN_FORMAT_COFF:  return sp_str_lit("coff");
+    case SPN_FORMAT_MACHO: return sp_str_lit("macho");
+    case SPN_FORMAT_WASM:  return sp_str_lit("wasm");
+    case SPN_FORMAT_COUNT: sp_unreachable_case();
   }
 
   SP_UNREACHABLE_RETURN(sp_str_lit(""));

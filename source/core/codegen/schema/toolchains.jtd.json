@@ -19,7 +19,7 @@
       "optionalProperties": {
         "version":  { "type": "string" },
         "cxx":      { "ref": "launcher" },
-        "linker":   { "ref": "linkers" },
+        "linker":   { "ref": "ld_family" },
         "link_args": { "elements": { "type": "string" } },
         "host":     { "values": { "ref": "artifact" } },
         "target":   { "elements": { "ref": "toolchain_target" } },

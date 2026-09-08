@@ -12,9 +12,7 @@
       "cxx": {
         "program": "g++"
       },
-      "linker": {
-        "elf": "lld"
-      },
+      "linker": "lld",
       "link_args": [
         "-fuse-ld=lld"
       ],
@@ -195,9 +193,7 @@
       "archiver": {
         "program": "llvm-ar"
       },
-      "linker": {
-        "elf": "lld"
-      },
+      "linker": "lld",
       "link_args": [
         "-fuse-ld=lld"
       ],
@@ -245,9 +241,7 @@
       "cxx": {
         "program": "clang++"
       },
-      "linker": {
-        "mingw": "lld"
-      },
+      "linker": "lld",
       "link_args": [
         "-fuse-ld=lld",
         "-L/usr/lib/gcc/x86_64-w64-mingw32/12-win32"
@@ -276,9 +270,7 @@
       "cxx": {
         "program": "clang++"
       },
-      "linker": {
-        "msvc": "lld"
-      },
+      "linker": "lld",
       "link_args": [
         "-fuse-ld=lld"
       ],

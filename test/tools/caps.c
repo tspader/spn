@@ -149,24 +149,24 @@ static bool installed(sp_mem_t mem, sp_str_t program) {
 
 typedef struct {
   const c8* lane;
-  spn_ld_flavor_t flavor;
+  spn_ld_dialect_t dialect;
   const c8* program;
 } lane_program_t;
 
 static const lane_program_t lane_programs [] = {
-  { "llvm",            SPN_LD_FLAVOR_ELF,   "ld.lld" },
-  { "llvm",            SPN_LD_FLAVOR_MACHO, "ld64.lld" },
-  { "gcc-lld",         SPN_LD_FLAVOR_ELF,   "ld.lld" },
-  { "clang-msvc",      SPN_LD_FLAVOR_MSVC,  "lld-link" },
-  { "clang-mingw",     SPN_LD_FLAVOR_MINGW, "x86_64-w64-mingw32-ld" },
-  { "clang-mingw-lld", SPN_LD_FLAVOR_MINGW, "ld.lld" },
-  { "clang-sysroot",   SPN_LD_FLAVOR_ELF,   "ld.lld" },
-  { "clang-wasi",      SPN_LD_FLAVOR_WASM,  "wasm-ld" },
+  { "llvm",            SPN_LD_DIALECT_GNU,    "ld.lld" },
+  { "llvm",            SPN_LD_DIALECT_DARWIN, "ld64.lld" },
+  { "gcc-lld",         SPN_LD_DIALECT_GNU,    "ld.lld" },
+  { "clang-msvc",      SPN_LD_DIALECT_LINK,   "lld-link" },
+  { "clang-mingw",     SPN_LD_DIALECT_GNU,    "x86_64-w64-mingw32-ld" },
+  { "clang-mingw-lld", SPN_LD_DIALECT_GNU,    "ld.lld" },
+  { "clang-sysroot",   SPN_LD_DIALECT_GNU,    "ld.lld" },
+  { "clang-wasi",      SPN_LD_DIALECT_WASM,   "wasm-ld" },
 };
 
-static bool links_flavor(const spn_toolchain_info_t* info, spn_ld_flavor_t flavor) {
+static bool links_dialect(const spn_toolchain_info_t* info, spn_ld_dialect_t dialect) {
   sp_da_for(info->targets, it) {
-    if (spn_ld_flavor(info->targets[it].triple) == flavor) {
+    if (spn_ld_dialect(info->targets[it].triple) == dialect) {
       return true;
     }
   }
@@ -176,7 +176,7 @@ static bool links_flavor(const spn_toolchain_info_t* info, spn_ld_flavor_t flavo
 static sp_str_t missing_lane_program(sp_mem_t mem, const spn_toolchain_info_t* info) {
   sp_carr_for(lane_programs, it) {
     const lane_program_t* row = &lane_programs[it];
-    if (!sp_str_equal_cstr(info->name, row->lane) || !links_flavor(info, row->flavor)) {
+    if (!sp_str_equal_cstr(info->name, row->lane) || !links_dialect(info, row->dialect)) {
       continue;
     }
     if (!installed(mem, sp_cstr_as_str(row->program))) {
@@ -287,9 +287,7 @@ static void write_lane(sp_io_writer_t* io, yyjson_val* toolchain) {
     write_launcher(io, "cxx", yyjson_obj_get(toolchain, "cxx"));
   }
   if (yyjson_obj_get(toolchain, "linker")) {
-    sp_io_write_cstr(io, "linker = ", SP_NULLPTR);
-    write_table(io, yyjson_obj_get(toolchain, "linker"));
-    sp_io_write_cstr(io, "\n", SP_NULLPTR);
+    write_str(io, "linker", yyjson_obj_get(toolchain, "linker"));
   }
   if (yyjson_obj_get(toolchain, "link_args")) {
     write_str_array(io, "link_args", yyjson_obj_get(toolchain, "link_args"));
@@ -411,7 +409,7 @@ sp_str_t test_when_blocked(test_when_t when) {
       sp_fmt_str(spn_cc_driver_to_str(when.driver))).value;
   }
 
-  spn_ld_family_t family = toolchain->info->linkers.families[spn_ld_flavor(target)];
+  spn_ld_family_t family = spn_ld_family(toolchain->info->driver, toolchain->info->linker, target);
   if (when.linker && when.linker != family) {
     return sp_fmt(mem, "{} links {} with {}, test needs {}",
       sp_fmt_cstr(toolchain->name),
