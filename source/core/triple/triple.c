@@ -209,25 +209,6 @@ spn_format_t spn_os_format(spn_os_t os) {
   SP_UNREACHABLE_RETURN(SPN_FORMAT_ELF);
 }
 
-bool spn_triple_pic(spn_triple_t triple) {
-  if (triple.abi == SPN_ABI_BARE) {
-    return false;
-  }
-  switch (triple.os) {
-    case SPN_OS_LINUX:
-    case SPN_OS_MACOS: {
-      return true;
-    }
-    case SPN_OS_WINDOWS:
-    case SPN_OS_WASI:
-    case SPN_OS_FREESTANDING:
-    case SPN_OS_NONE: {
-      return false;
-    }
-  }
-  SP_UNREACHABLE_RETURN(false);
-}
-
 bool spn_triple_dynamic(spn_triple_t triple) {
   if (triple.abi == SPN_ABI_BARE) {
     return false;
@@ -245,6 +226,10 @@ bool spn_triple_dynamic(spn_triple_t triple) {
     }
   }
   SP_UNREACHABLE_RETURN(false);
+}
+
+bool spn_triple_pic(spn_triple_t triple) {
+  return spn_triple_dynamic(triple) && spn_os_format(triple.os) != SPN_FORMAT_COFF;
 }
 
 spn_triple_entry_t spn_triple_entry(spn_triple_t partial, spn_triple_t* full) {

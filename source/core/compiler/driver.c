@@ -115,6 +115,9 @@ spn_err_t spn_cc_parse_depfile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain
 }
 
 spn_sanitizer_set_t get_supported_sanitizers(const spn_cc_toolchain_t* toolchain, spn_triple_t target) {
+  if (target.abi == SPN_ABI_BARE) {
+    return 0;
+  }
   switch (toolchain->driver) {
     case SPN_CC_DRIVER_GCC: return spn_gcc_supported_sanitizers(target);
     case SPN_CC_DRIVER_CLANG: return spn_clang_supported_sanitizers(target);

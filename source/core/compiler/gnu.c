@@ -99,9 +99,6 @@ static sp_str_t render_target(sp_mem_t mem, const spn_cc_toolchain_t* toolchain,
 }
 
 spn_sanitizer_set_t spn_gcc_supported_sanitizers(spn_triple_t target) {
-  if (target.abi == SPN_ABI_BARE) {
-    return 0;
-  }
   switch (target.os) {
     case SPN_OS_WASI:
     case SPN_OS_FREESTANDING:
@@ -114,9 +111,6 @@ spn_sanitizer_set_t spn_gcc_supported_sanitizers(spn_triple_t target) {
 }
 
 spn_sanitizer_set_t spn_clang_supported_sanitizers(spn_triple_t target) {
-  if (target.abi == SPN_ABI_BARE) {
-    return 0;
-  }
   switch (target.os) {
     case SPN_OS_WASI:
     case SPN_OS_FREESTANDING: return 0;
@@ -129,9 +123,6 @@ spn_sanitizer_set_t spn_clang_supported_sanitizers(spn_triple_t target) {
 }
 
 spn_sanitizer_set_t spn_zig_supported_sanitizers(spn_triple_t target) {
-  if (target.abi == SPN_ABI_BARE) {
-    return 0;
-  }
   switch (target.os) {
     case SPN_OS_WASI:
     case SPN_OS_FREESTANDING: return 0;
