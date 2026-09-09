@@ -1,0 +1,26 @@
+diff --git a/sp/sp_test.h b/sp/sp_test.h
+index 76dc24c..2d2235f 100644
+--- a/sp/sp_test.h
++++ b/sp/sp_test.h
+@@ -1510,10 +1510,6 @@ static void sp_test_teardown(sp_test_t* t) {
+     t->tracking_heap = SP_NULLPTR;
+   }
+ 
+-  if (!sp_str_empty(t->dir) && sp_fs_exists(t->dir)) {
+-    sp_fs_remove_dir(t->dir);
+-  }
+-
+   if (t->scratch) {
+     sp_mem_arena_destroy(t->scratch);
+     t->scratch = SP_NULLPTR;
+@@ -2042,10 +2038,6 @@ s32 sp_test_main(s32 argc, const c8** argv, const sp_test_entry_t* entries) {
+   }
+   sp_io_flush(&runner->out.base);
+ 
+-  if (sp_fs_exists(runner->dir_root)) {
+-    sp_fs_remove_dir(runner->dir_root);
+-  }
+-
+   sp_mutex_destroy(&runner->mutex);
+   sp_mem_arena_destroy(arena);
+   return failed ? 1 : 0;

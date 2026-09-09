@@ -4,7 +4,7 @@
 typedef struct {
   const c8* name;
   spn_cc_driver_t driver;
-  spn_ld_family_t linker;
+  bool lld;
   const c8* link_args [2];
   spn_triple_t host;
   test_profile_t profile;
@@ -659,7 +659,7 @@ static const link_test_t tests [] = {
   {
     .name = "family_alone_renders_nothing",
     .driver = SPN_CC_DRIVER_GCC,
-    .linker = SPN_LD_FAMILY_LLD,
+    .lld = true,
     .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_LINUX, .abi = SPN_ABI_GNU },
     .kind = SPN_CC_OUTPUT_EXE,
     .expect = {
@@ -670,7 +670,7 @@ static const link_test_t tests [] = {
   {
     .name = "toolchain_link_args_precede_target_args",
     .driver = SPN_CC_DRIVER_GCC,
-    .linker = SPN_LD_FAMILY_LLD,
+    .lld = true,
     .link_args = { "-fuse-ld=lld", "-B" },
     .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_LINUX, .abi = SPN_ABI_GNU },
     .kind = SPN_CC_OUTPUT_EXE,
@@ -684,7 +684,7 @@ static const link_test_t tests [] = {
   {
     .name = "clang_toolchain_link_args_follow_target_triple",
     .driver = SPN_CC_DRIVER_CLANG,
-    .linker = SPN_LD_FAMILY_LLD,
+    .lld = true,
     .link_args = { "-fuse-ld=lld" },
     .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_LINUX, .abi = SPN_ABI_GNU },
     .kind = SPN_CC_OUTPUT_EXE,
@@ -825,7 +825,7 @@ static const link_test_t tests [] = {
   {
     .name = "lld_links_msvc_off_windows",
     .driver = SPN_CC_DRIVER_CLANG,
-    .linker = SPN_LD_FAMILY_LLD,
+    .lld = true,
     .link_args = { "-fuse-ld=lld" },
     .host = HOST_X64_LINUX,
     .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_WINDOWS, .abi = SPN_ABI_MSVC },
@@ -838,7 +838,7 @@ static const link_test_t tests [] = {
   {
     .name = "clang_msvc_sdk_libs",
     .driver = SPN_CC_DRIVER_CLANG,
-    .linker = SPN_LD_FAMILY_LLD,
+    .lld = true,
     .link_args = { "-fuse-ld=lld" },
     .host = HOST_X64_LINUX,
     .profile = { .arch = SPN_ARCH_X64, .os = SPN_OS_WINDOWS, .abi = SPN_ABI_MSVC, .sdk = "/X" },
@@ -952,7 +952,7 @@ sp_test_each(render_link, render, link_test_t, tests, .setup = spn_test_ctx_setu
   }
 
   spn_profile_info_t profile = test_profile(it->profile);
-  profile.linker = spn_ld_family(it->driver, it->linker, triple);
+  profile.linker = it->lld ? SPN_LD_FAMILY_LLD : spn_ld_native(it->driver, triple);
   spn_invocation_t invocation = sp_zero;
   spn_err_t err = spn_cc_render_link(mem, &toolchain, it->host, &profile, &link, &files, &invocation);
   sp_expect_eq(t, err, it->expect.err);

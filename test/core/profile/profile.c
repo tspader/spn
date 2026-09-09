@@ -450,7 +450,7 @@ typedef struct {
   const c8* name;
   spn_triple_t target;
   spn_cc_driver_t driver;
-  spn_ld_family_t linker;
+  bool lld;
   finalize_expect_t expect;
 } finalize_test_t;
 
@@ -462,7 +462,7 @@ static const finalize_test_t finalize_tests [] = {
   { .name = "bare_is_static",  .target = { SPN_ARCH_X64, SPN_OS_FREESTANDING, SPN_ABI_BARE },  .driver = SPN_CC_DRIVER_GCC,   .expect = { .linkage = SPN_LIB_KIND_STATIC, .driver = SPN_CC_DRIVER_GCC,   .linker = SPN_LD_FAMILY_GNU } },
   { .name = "elf_is_static",   .target = { SPN_ARCH_ARM64, SPN_OS_FREESTANDING, SPN_ABI_ELF }, .driver = SPN_CC_DRIVER_GCC,   .expect = { .linkage = SPN_LIB_KIND_STATIC, .driver = SPN_CC_DRIVER_GCC,   .linker = SPN_LD_FAMILY_GNU } },
   { .name = "records_driver",  .target = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU },          .driver = SPN_CC_DRIVER_ZIG,   .expect = { .linkage = SPN_LIB_KIND_SHARED, .driver = SPN_CC_DRIVER_ZIG,   .linker = SPN_LD_FAMILY_LLD } },
-  { .name = "records_linker",  .target = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU },          .driver = SPN_CC_DRIVER_GCC,   .linker = SPN_LD_FAMILY_LLD, .expect = { .linkage = SPN_LIB_KIND_SHARED, .driver = SPN_CC_DRIVER_GCC, .linker = SPN_LD_FAMILY_LLD } },
+  { .name = "records_linker",  .target = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU },          .driver = SPN_CC_DRIVER_GCC,   .lld = true, .expect = { .linkage = SPN_LIB_KIND_SHARED, .driver = SPN_CC_DRIVER_GCC, .linker = SPN_LD_FAMILY_LLD } },
 };
 
 static spn_profile_info_t desc_to_info(const profile_desc_t* d) {
@@ -559,7 +559,7 @@ sp_test_each(profile, query, query_test_t, query_tests) {
 
 sp_test_each(profile, finalize, finalize_test_t, finalize_tests) {
   spn_profile_info_t profile = sp_zero;
-  spn_toolchain_info_t info = { .driver = it->driver, .linker = it->linker };
+  spn_toolchain_info_t info = { .driver = it->driver, .lld = it->lld };
   spn_toolchain_selection_t selection = { .toolchain = &info, .row.triple = it->target };
   spn_profile_finalize(&profile, &selection);
   sp_expect_eq(t, (u32)it->expect.linkage, (u32)profile.linkage);

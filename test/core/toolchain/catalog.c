@@ -36,7 +36,7 @@ typedef struct {
 typedef struct {
   const c8* name;
   spn_cc_driver_t driver;
-  spn_ld_family_t linker;
+  bool lld;
   spn_triple_t host;
   fixture_sdks_t sdks;
   fixture_target_t targets [FIXTURE_MAX_TARGETS];
@@ -262,7 +262,7 @@ static const bind_test_t bind_tests [] = {
   {
     .name = "coff_host_targets_no_bare",
     .driver = SPN_CC_DRIVER_CLANG,
-    .linker = SPN_LD_FAMILY_LLD,
+    .lld = true,
     .host = HOST_X64_WINDOWS,
     .targets = { { .triple = TARGET_WIN_GNU, .sdk_toolchain = true } },
     .expect = { .rows = { { TARGET_WIN_GNU } } },
@@ -270,7 +270,7 @@ static const bind_test_t bind_tests [] = {
   {
     .name = "lld_does_not_retarget_gcc",
     .driver = SPN_CC_DRIVER_GCC,
-    .linker = SPN_LD_FAMILY_LLD,
+    .lld = true,
     .host = HOST_X64_LINUX,
     .expect = { .rows = { { HOST_X64_LINUX, .sanitizers = SAN_GCC_LINUX }, { TARGET_X64_BARE }, { TARGET_X64_LINUX_NONE } } },
   },
@@ -374,7 +374,7 @@ sp_test_each(catalog, bind, bind_test_t, bind_tests) {
   sp_mem_t mem = sp_test_arena(t);
   spn_toolchain_decl_t toolchain = fixture_local_toolchain("A", (fixture_launcher_t) { .name = "cc" });
   toolchain.driver = it->driver;
-  toolchain.linker = it->linker;
+  toolchain.lld = it->lld;
   toolchain.targets = sp_da_new(mem, spn_toolchain_target_t);
   sp_carr_for(it->targets, at) {
     if (fixture_target_empty(it->targets[at])) {

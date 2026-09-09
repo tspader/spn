@@ -91,7 +91,7 @@ typedef struct {
   test_arg_t cxx;
   const c8* cxx_args [8];
   spn_cc_driver_t driver;
-  spn_ld_family_t linker;
+  bool lld;
   const c8* link_args [2];
   spn_triple_t hosts [2];
   toolchain_target_t targets [5];
@@ -517,7 +517,7 @@ static const test_t tests [] = {
         .compiler = { .name = "clang" },
         .archiver = { .name = "llvm-ar" },
         .driver = SPN_CC_DRIVER_CLANG,
-        .linker = SPN_LD_FAMILY_LLD,
+        .lld = true,
         .targets = {
           { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU },
           { .triple = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU }, .sdk_toolchain = true },
@@ -852,7 +852,7 @@ static const test_t tests [] = {
         .args = { "cc", "-target", "x86_64-linux-gnu" },
         .archiver = { .path = "ar" },
         .driver = SPN_CC_DRIVER_CLANG,
-        .linker = SPN_LD_FAMILY_LLD,
+        .lld = true,
         .targets = { { SPN_ARCH_ARM64, SPN_OS_MACOS, SPN_ABI_APPLE } },
       },
     },
@@ -1522,7 +1522,7 @@ sp_test_each(lower, cases, test_t, tests) {
     if (expected.mirrors)  sp_expect_str_eq_c(t, tc->hosts[0].artifact.mirror_list, expected.mirrors);
     if (test_check_arg(t, tc->compiler.program, expected.compiler)) return SP_ERR;
     if (test_check_arg(t, tc->archiver.program, expected.archiver)) return SP_ERR;
-    sp_expect_eq(t, (u32)expected.linker, (u32)tc->linker);
+    sp_expect_eq(t, expected.lld, tc->lld);
     sp_must_strs_eq(t, tc->link_args, sp_da_size(tc->link_args), expected.link_args);
     if (test_check_arg(t, tc->cxx.program, expected.cxx)) return SP_ERR;
     if (expected.driver)   sp_expect_eq(t, (u32)expected.driver, (u32)tc->driver);

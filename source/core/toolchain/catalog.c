@@ -49,10 +49,11 @@ spn_err_t spn_toolchain_decls_parse(sp_mem_t mem, sp_str_t json, sp_da(spn_toolc
     decl.name = t->name;
     decl.version = t->version;
     decl.driver = t->driver;
-    decl.linker = sp_opt_is_null(t->linker) ? SPN_LD_FAMILY_NONE : sp_opt_get(t->linker);
-    if (!spn_ld_accepts(decl.driver, decl.linker)) {
+    spn_ld_family_t linker = sp_opt_is_null(t->linker) ? SPN_LD_FAMILY_NONE : sp_opt_get(t->linker);
+    if (!spn_ld_accepts(decl.driver, linker)) {
       return SPN_ERROR;
     }
+    decl.lld = linker == SPN_LD_FAMILY_LLD;
     decl.link_args = t->link_args;
 
     decl.hosts = sp_da_new(mem, spn_toolchain_host_t);
@@ -251,7 +252,7 @@ static spn_toolchain_info_t bind_toolchain(spn_toolchain_catalog_t* catalog, con
     .compiler = decl->compiler,
     .cxx = decl->cxx,
     .archiver = decl->archiver,
-    .linker = decl->linker,
+    .lld = decl->lld,
     .link_args = decl->link_args,
     .rows = bind_rows(catalog, decl, support),
     .support = support,

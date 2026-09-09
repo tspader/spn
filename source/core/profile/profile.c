@@ -177,7 +177,7 @@ spn_toolchain_query_t spn_profile_query(const spn_profile_info_t* profile, spn_t
 void spn_profile_finalize(spn_profile_info_t* profile, const spn_toolchain_selection_t* selection) {
   profile->abi = selection->row.triple.abi;
   profile->driver = selection->toolchain->driver;
-  profile->linker = spn_ld_family(selection->toolchain->driver, selection->toolchain->linker, selection->row.triple);
+  profile->linker = selection->toolchain->lld ? SPN_LD_FAMILY_LLD : spn_ld_native(selection->toolchain->driver, selection->row.triple);
   profile->sdk = selection->row.sdk;
   if (!profile->linkage) {
     profile->linkage = spn_abi_linkage(profile->abi);

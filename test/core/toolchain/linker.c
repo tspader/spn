@@ -87,26 +87,22 @@ sp_test_each(linker, accepts, accepts_t, accepts_tests) {
 typedef struct {
   const c8* name;
   spn_cc_driver_t driver;
-  spn_ld_family_t linker;
   spn_triple_t target;
   spn_ld_family_t expect;
-} family_t;
+} native_t;
 
-static const family_t family_tests [] = {
-  { "gcc_linux",         SPN_CC_DRIVER_GCC,   SPN_LD_FAMILY_NONE, HOST_X64_LINUX,  SPN_LD_FAMILY_GNU },
-  { "gcc_mingw",         SPN_CC_DRIVER_GCC,   SPN_LD_FAMILY_NONE, TARGET_WIN_GNU,  SPN_LD_FAMILY_GNU },
-  { "gcc_macos",         SPN_CC_DRIVER_GCC,   SPN_LD_FAMILY_NONE, HOST_ARM_MACOS,  SPN_LD_FAMILY_LD64 },
-  { "clang_msvc",        SPN_CC_DRIVER_CLANG, SPN_LD_FAMILY_NONE, TARGET_WIN_MSVC, SPN_LD_FAMILY_MSVC },
-  { "clang_wasi",        SPN_CC_DRIVER_CLANG, SPN_LD_FAMILY_NONE, TARGET_WASM,     SPN_LD_FAMILY_LLD },
-  { "msvc_msvc",         SPN_CC_DRIVER_MSVC,  SPN_LD_FAMILY_NONE, TARGET_WIN_MSVC, SPN_LD_FAMILY_MSVC },
-  { "zig_linux",         SPN_CC_DRIVER_ZIG,   SPN_LD_FAMILY_NONE, HOST_X64_LINUX,  SPN_LD_FAMILY_LLD },
-  { "zig_macos",         SPN_CC_DRIVER_ZIG,   SPN_LD_FAMILY_NONE, HOST_ARM_MACOS,  SPN_LD_FAMILY_LLD },
-  { "gcc_lld_linux",     SPN_CC_DRIVER_GCC,   SPN_LD_FAMILY_LLD,  HOST_X64_LINUX,  SPN_LD_FAMILY_LLD },
-  { "clang_lld_msvc",    SPN_CC_DRIVER_CLANG, SPN_LD_FAMILY_LLD,  TARGET_WIN_MSVC, SPN_LD_FAMILY_LLD },
-  { "clang_lld_macos",   SPN_CC_DRIVER_CLANG, SPN_LD_FAMILY_LLD,  HOST_ARM_MACOS,  SPN_LD_FAMILY_LLD },
+static const native_t native_tests [] = {
+  { "gcc_linux",   SPN_CC_DRIVER_GCC,   HOST_X64_LINUX,  SPN_LD_FAMILY_GNU },
+  { "gcc_mingw",   SPN_CC_DRIVER_GCC,   TARGET_WIN_GNU,  SPN_LD_FAMILY_GNU },
+  { "gcc_macos",   SPN_CC_DRIVER_GCC,   HOST_ARM_MACOS,  SPN_LD_FAMILY_LD64 },
+  { "clang_msvc",  SPN_CC_DRIVER_CLANG, TARGET_WIN_MSVC, SPN_LD_FAMILY_MSVC },
+  { "clang_wasi",  SPN_CC_DRIVER_CLANG, TARGET_WASM,     SPN_LD_FAMILY_LLD },
+  { "msvc_msvc",   SPN_CC_DRIVER_MSVC,  TARGET_WIN_MSVC, SPN_LD_FAMILY_MSVC },
+  { "zig_linux",   SPN_CC_DRIVER_ZIG,   HOST_X64_LINUX,  SPN_LD_FAMILY_LLD },
+  { "zig_macos",   SPN_CC_DRIVER_ZIG,   HOST_ARM_MACOS,  SPN_LD_FAMILY_LLD },
 };
 
-sp_test_each(linker, family, family_t, family_tests) {
-  sp_expect_eq(t, (u32)it->expect, (u32)spn_ld_family(it->driver, it->linker, it->target));
+sp_test_each(linker, native, native_t, native_tests) {
+  sp_expect_eq(t, (u32)it->expect, (u32)spn_ld_native(it->driver, it->target));
   return SP_OK;
 }

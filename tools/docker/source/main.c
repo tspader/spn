@@ -31,7 +31,8 @@ static spn_err_t fetch(sp_str_t url, sp_str_t dest, void* user) {
     .command = sp_str_lit("curl"),
     .args = { sp_str_lit("-fsSL"), sp_str_lit("-o"), dest, url },
   };
-  return tail_trace(smoke->mem, smoke->prompt, cfmt(smoke->mem, "curl {}", sp_fmt_str(url)), curl) ? SPN_ERROR : SPN_OK;
+  sp_str_t log = docker_log(&smoke->docker, cfmt(smoke->mem, "fetch-{}", sp_fmt_str(sp_fs_get_name(dest))));
+  return tail_trace(smoke->mem, smoke->prompt, cfmt(smoke->mem, "curl {}", sp_fmt_str(url)), log, curl) ? SPN_ERROR : SPN_OK;
 }
 
 static sp_str_t verify_message(sp_mem_t mem, verify_t verify) {
@@ -138,7 +139,7 @@ static sp_cli_result_t build_image(sp_cli_t* cli, smoke_t* smoke, const variant_
   }
 
   const c8* title = cfmt(mem, "docker build {}", sp_fmt_cstr(docker_image(docker, variant)));
-  s32 status = tail_trace(mem, smoke->prompt, title, docker_build(docker, variant));
+  s32 status = tail_trace(mem, smoke->prompt, title, docker_log(docker, cfmt(mem, "build-{}", sp_fmt_cstr(variant->name))), docker_build(docker, variant));
   if (sp_prompt_cancelled(smoke->prompt)) {
     return fail(cli, smoke, sp_str_lit("cancelled"));
   }
@@ -187,13 +188,14 @@ static sp_cli_result_t check_session(sp_cli_t* cli, smoke_t* smoke, sp_da(const 
     try(build_image(cli, smoke, variant));
 
     const c8* title = cfmt(mem, "check {} (--toolchain {})", sp_fmt_cstr(variant->name), sp_fmt_cstr(lane_name(variant->check)));
-    s32 status = tail_trace(mem, smoke->prompt, title, docker_check(&smoke->docker, variant));
+    sp_str_t log = docker_log(&smoke->docker, cfmt(mem, "check-{}", sp_fmt_cstr(variant->name)));
+    s32 status = tail_trace(mem, smoke->prompt, title, log, docker_check(&smoke->docker, variant));
     if (sp_prompt_cancelled(smoke->prompt)) {
       return fail(cli, smoke, sp_str_lit("cancelled"));
     }
     if (status) {
       failures++;
-      sp_prompt_error(smoke->prompt, cfmt(mem, "FAIL {}", sp_fmt_cstr(variant->name)));
+      sp_prompt_error(smoke->prompt, cfmt(mem, "FAIL {} ({})", sp_fmt_cstr(variant->name), sp_fmt_str(log)));
     }
     else {
       sp_prompt_success(smoke->prompt, cfmt(mem, "PASS {}", sp_fmt_cstr(variant->name)));
@@ -291,13 +293,14 @@ static sp_cli_result_t test_session(sp_cli_t* cli, smoke_t* smoke, sp_da(run_t) 
     }
 
     const c8* title = cfmt(mem, "test {} in {}", sp_fmt_cstr(lane), sp_fmt_cstr(run.variant->name));
-    s32 status = tail_trace(mem, smoke->prompt, title, docker_test(&smoke->docker, run.variant, run.lane, filter));
+    sp_str_t log = docker_log(&smoke->docker, cfmt(mem, "test-{}-{}", sp_fmt_cstr(lane), sp_fmt_cstr(run.variant->name)));
+    s32 status = tail_trace(mem, smoke->prompt, title, log, docker_test(&smoke->docker, run.variant, run.lane, filter));
     if (sp_prompt_cancelled(smoke->prompt)) {
       return fail(cli, smoke, sp_str_lit("cancelled"));
     }
     if (status) {
       failures++;
-      sp_prompt_error(smoke->prompt, cfmt(mem, "FAIL {} in {}", sp_fmt_cstr(lane), sp_fmt_cstr(run.variant->name)));
+      sp_prompt_error(smoke->prompt, cfmt(mem, "FAIL {} in {} ({})", sp_fmt_cstr(lane), sp_fmt_cstr(run.variant->name), sp_fmt_str(log)));
     }
     else {
       sp_prompt_success(smoke->prompt, cfmt(mem, "PASS {} in {}", sp_fmt_cstr(lane), sp_fmt_cstr(run.variant->name)));

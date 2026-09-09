@@ -28,7 +28,7 @@ static const parse_test_t tests [] = {
           .compiler = { .path = "A", .args = { "cc" } },
           .cxx = { .path = "A", .args = { "c++" } },
           .archiver = { .path = "A", .args = { "ar" } },
-          .linker = SPN_LD_FAMILY_LLD,
+          .lld = true,
           .link_args = { "-fuse-ld=lld" },
           .hosts = {
             {
@@ -160,7 +160,7 @@ static const parse_test_t tests [] = {
           .driver = SPN_CC_DRIVER_CLANG,
           .compiler = { .name = "A" },
           .archiver = { .name = "llvm-ar" },
-          .linker = SPN_LD_FAMILY_LLD,
+          .lld = true,
           .targets = {
             { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU },
             { .triple = TARGET_WIN_GNU, .sdk_toolchain = true },

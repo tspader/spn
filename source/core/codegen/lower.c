@@ -359,12 +359,12 @@ static void lower_targets(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, s
   lower_collection(ctx, cg->example, &out->examples, SPN_TARGET_KIND_EXAMPLE);
 }
 
-static spn_ld_family_t lower_linker(spn_toml_loader_t* ctx, spn_ld_family_t declared, spn_cc_driver_t driver) {
+static bool lower_linker(spn_toml_loader_t* ctx, spn_ld_family_t declared, spn_cc_driver_t driver) {
   if (!spn_ld_accepts(driver, declared)) {
     spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "linker");
-    return SPN_LD_FAMILY_NONE;
+    return false;
   }
-  return declared;
+  return declared == SPN_LD_FAMILY_LLD;
 }
 
 static sp_da(spn_toolchain_target_t) lower_toolchain_targets(spn_toml_loader_t* ctx, spn_cc_driver_t driver, spn_toolchain_source_t source, spn_path_root_t base, sp_da(spn_cg_toolchain_target_t) cg) {
@@ -500,7 +500,7 @@ spn_toolchain_decl_t spn_toolchain_lower(spn_toml_loader_t* ctx, u32 at, spn_pat
   toolchain.cxx = lower_launcher(ctx, "cxx", toolchain.source, base, decl->cxx);
   toolchain.archiver = lower_launcher(ctx, "archiver", toolchain.source, base, decl->archiver);
   if (toolchain.driver) {
-    toolchain.linker = lower_linker(ctx, sp_opt_is_null(decl->linker) ? SPN_LD_FAMILY_NONE : sp_opt_get(decl->linker), toolchain.driver);
+    toolchain.lld = lower_linker(ctx, sp_opt_is_null(decl->linker) ? SPN_LD_FAMILY_NONE : sp_opt_get(decl->linker), toolchain.driver);
     toolchain.targets = lower_toolchain_targets(ctx, toolchain.driver, toolchain.source, base, decl->target);
     if (sp_da_empty(decl->target)) {
       spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, "target");

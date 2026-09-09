@@ -43,6 +43,7 @@ typedef struct {
   sp_template_registry_t* templates;
   spn_cg_toolchains_t builtin;
   spn_cg_toolchains_t lanes;
+  spn_toolchain_catalog_t catalog;
   spn_toolchain_store_t store;
   sp_str_t host;
   struct {
@@ -57,6 +58,7 @@ typedef struct {
     sp_str_t builtin;
     sp_str_t lanes;
     sp_str_t config;
+    sp_str_t logs;
     struct {
       sp_str_t cache;
       sp_str_t splat;
@@ -92,5 +94,6 @@ sp_ps_config_t         docker_build(docker_t* docker, const variant_t* variant);
 sp_ps_config_t         docker_check(docker_t* docker, const variant_t* variant);
 sp_ps_config_t         docker_shell(docker_t* docker, const variant_t* variant);
 sp_ps_config_t         docker_test(docker_t* docker, const variant_t* variant, lane_t lane, const c8* filter);
+sp_str_t               docker_log(docker_t* docker, const c8* name);
 
 #endif

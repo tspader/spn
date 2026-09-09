@@ -38,7 +38,7 @@ typedef struct {
 typedef struct {
   const c8* name;
   spn_cc_driver_t driver;
-  spn_ld_family_t linker;
+  bool lld;
   fixture_target_t targets [FIXTURE_MAX_TARGETS];
   fixture_sdks_t sdks;
   check_t checks [SELECT_MAX_CHECKS];
@@ -166,7 +166,7 @@ static const complete_test_t complete_tests [] = {
   {
     .name = "lld_does_not_reach_other_arches_bare",
     .driver = SPN_CC_DRIVER_CLANG,
-    .linker = SPN_LD_FAMILY_LLD,
+    .lld = true,
     .targets = { HOST_X64_LINUX },
     .checks = {
       { .target = ARM_FREESTANDING, .abis = { SPN_ABI_BARE }, .expect = { .err = SPN_ERR_TOOLCHAIN_TARGET, .targets = { HOST_X64_LINUX, TARGET_X64_BARE, TARGET_X64_LINUX_NONE } } },
@@ -584,7 +584,7 @@ sp_test_each(select, complete, complete_test_t, complete_tests, .setup = spn_tes
 
   spn_toolchain_decl_t toolchain = fixture_local_toolchain("A", (fixture_launcher_t) { .name = "cc" });
   toolchain.driver = it->driver;
-  toolchain.linker = it->linker;
+  toolchain.lld = it->lld;
   u32 declared = 0;
   sp_carr_detect_len(it->targets, declared, !fixture_target_empty(it->targets[declared]));
   if (declared) {

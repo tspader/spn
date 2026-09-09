@@ -4,6 +4,7 @@
 #include "ctx/types.h"
 #include "enum/enum.h"
 #include "event/event.h"
+#include "toolchain/catalog.h"
 #include "toolchain/provision.h"
 #include "triple/triple.h"
 
@@ -91,7 +92,7 @@ static bool missing(docker_t* docker, sp_str_t path, const c8* hint) {
 
 static bool read_lanes(docker_t* docker, sp_str_t path, spn_cg_toolchains_t* out) {
   sp_str_t json = sp_zero;
-  if (sp_io_read_file(docker->mem, path, &json) || !spn_toolchains_read(json, out, docker->mem)) {
+  if (sp_io_read_file(docker->mem, path, &json) || !spn_toolchains_read(json, out, docker->mem) || spn_toolchain_catalog_load(&docker->catalog, json)) {
     docker->err.json = path;
     return false;
   }
@@ -115,7 +116,7 @@ static bool sysroot_artifact(docker_t* docker, const sysroot_t* sysroot, spn_art
 static bool render_config(docker_t* docker) {
   sp_str_t config = sp_fs_join_path(docker->mem, docker->paths.config, sp_str_lit("spn/spn.toml"));
   sp_fs_create_dir(sp_fs_parent_path(config));
-  return !sp_fs_create_file_str(config, lanes_toml(docker->mem, &docker->lanes));
+  return !sp_fs_create_file_str(config, lanes_toml(docker->mem, &docker->catalog, &docker->lanes));
 }
 
 static sp_ps_config_t launch(docker_t* docker, const variant_t* variant, const c8* option, const c8* command) {
@@ -156,6 +157,7 @@ docker_init_err_t docker_init(docker_t* docker, sp_mem_t mem, spn_fetch_fn fetch
   docker->paths.builtin = sp_fs_join_path(mem, repo, sp_str_lit(SPN_LANES_BUILTIN));
   docker->paths.lanes = sp_fs_join_path(mem, repo, sp_str_lit(SPN_LANES_TEST));
   docker->paths.config = sp_fs_join_path(mem, docker->paths.dockerfiles, sp_str_lit("config"));
+  docker->paths.logs = sp_fs_join_path(mem, docker->paths.dockerfiles, sp_str_lit("logs"));
 
   sp_str_t cache = sp_fs_join_path(mem, sp_fs_get_storage_path(mem), sp_str_lit("spn/cache"));
   docker->paths.xwin.cache = sp_fs_join_path(mem, cache, sp_str_lit("xwin/cache"));
@@ -182,6 +184,7 @@ docker_init_err_t docker_init(docker_t* docker, sp_mem_t mem, spn_fetch_fn fetch
     return DOCKER_INIT_ERR_TEMPLATES;
   }
 
+  spn_toolchain_catalog_init(&docker->catalog, spn_triple_host(), sp_zero_struct(spn_sdk_host_t), mem);
   if (!read_lanes(docker, docker->paths.builtin, &docker->builtin) || !read_lanes(docker, docker->paths.lanes, &docker->lanes)) {
     return DOCKER_INIT_ERR_LANES;
   }
@@ -456,4 +459,8 @@ sp_ps_config_t docker_test(docker_t* docker, const variant_t* variant, lane_t la
   arg_c(docker, &config, "--filter");
   arg_c(docker, &config, filter);
   return config;
+}
+
+sp_str_t docker_log(docker_t* docker, const c8* name) {
+  return sp_fs_join_path(docker->mem, docker->paths.logs, sp_fmt(docker->mem, "{}.log", sp_fmt_cstr(name)).value);
 }

@@ -114,7 +114,7 @@ spn_session_t* build_session(sp_mem_t mem, unit_graph_test_t* g) {
     .arch = SPN_ARCH_X64,
     .abi = g->abi ? g->abi : (g->os == SPN_OS_MACOS ? SPN_ABI_NONE : SPN_ABI_GNU),
   };
-  profile.linker = spn_ld_family(profile.driver, SPN_LD_FAMILY_NONE, (spn_triple_t) { profile.arch, profile.os, profile.abi });
+  profile.linker = spn_ld_native(profile.driver, (spn_triple_t) { profile.arch, profile.os, profile.abi });
   if (g->sdk) {
     profile.sdk = spn_sdk_at(mem, (spn_triple_t) { profile.arch, profile.os, profile.abi }, (spn_path_t) { .sub = sp_cstr_as_str(g->sdk) });
   }

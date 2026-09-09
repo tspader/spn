@@ -8,6 +8,7 @@ typedef struct {
   const c8* title;
   sp_ps_t ps;
   sp_io_reader_t* reader;
+  sp_io_file_writer_t log;
   s32 status;
   u32 frame;
   struct {
@@ -63,6 +64,7 @@ static void drain(tail_t* tail) {
     if (!bytes) {
       return;
     }
+    sp_io_write_str(&tail->log.base, sp_str(buffer, sp_cast(u32, bytes)), SP_NULLPTR);
     ingest(tail, sp_str(buffer, sp_cast(u32, bytes)));
   }
 }
@@ -190,15 +192,20 @@ static void render(sp_prompt_ctx_t* ctx) {
   sp_prompt_line(ctx, sp_str_lit(""));
 }
 
-s32 tail_trace(sp_mem_t mem, sp_prompt_ctx_t* prompt, const c8* title, sp_ps_config_t config) {
+s32 tail_trace(sp_mem_t mem, sp_prompt_ctx_t* prompt, const c8* title, sp_str_t log, sp_ps_config_t config) {
   config.io.out = (sp_ps_io_out_config_t) { .mode = SP_PS_IO_MODE_CREATE };
   config.io.err = (sp_ps_io_out_config_t) { .mode = SP_PS_IO_MODE_REDIRECT };
 
   tail_t tail = sp_zero;
   tail.title = title;
   tail.status = -1;
+  sp_fs_create_dir(sp_fs_parent_path(log));
+  if (sp_io_file_writer_from_path(&tail.log, log)) {
+    return -1;
+  }
   tail.ps = sp_ps_create(mem, config);
   if (!tail.ps.os) {
+    sp_io_file_writer_close(&tail.log);
     return -1;
   }
   tail.reader = sp_ps_io_out(&tail.ps);
@@ -215,5 +222,6 @@ s32 tail_trace(sp_mem_t mem, sp_prompt_ctx_t* prompt, const c8* title, sp_ps_con
     sp_ps_wait(&tail.ps);
   }
   sp_ps_free(&tail.ps);
+  sp_io_file_writer_close(&tail.log);
   return tail.status;
 }

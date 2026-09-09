@@ -247,18 +247,21 @@ static const c8* select_reason(spn_err_t err) {
   }
 }
 
-static spn_err_t lane_selects(sp_mem_t mem, const test_when_t* when, spn_triple_t target, spn_toolchain_selection_t* selection) {
+static spn_err_t lane_selects(sp_mem_t mem, const test_when_t* when, spn_triple_t target, spn_profile_info_t* profile, spn_toolchain_selection_t* selection) {
   const c8* named = test_lane_toolchain_arg();
-  spn_profile_info_t profile = {
+  *profile = (spn_profile_info_t) {
     .toolchain = spn_toolchain_ref_from_str(sp_cstr_as_str(named ? named : "auto")),
     .arch = target.arch,
     .os = target.os,
     .abi = when->target ? target.abi : SPN_ABI_NONE,
     .sanitizers = when->sanitize,
   };
-  spn_toolchain_query_t query = spn_profile_query(&profile, spn_triple_host());
+  spn_toolchain_query_t query = spn_profile_query(profile, spn_triple_host());
   spn_err_t err = query.abis.count ? spn_toolchain_select(&catalog, query, selection) : spn_toolchain_incomplete(&catalog, query);
   spn_event_buffer_drain(mem, spn.events);
+  if (!err) {
+    spn_profile_finalize(profile, selection);
+  }
   return err;
 }
 
@@ -321,17 +324,9 @@ sp_str_t test_when_blocked(test_when_t when) {
       sp_fmt_str(spn_cc_driver_to_str(when.driver))).value;
   }
 
-  spn_ld_family_t family = spn_ld_family(toolchain->info->driver, toolchain->info->linker, target);
-  if (when.linker && when.linker != family) {
-    return sp_fmt(mem, "{} links {} with {}, test needs {}",
-      sp_fmt_cstr(toolchain->name),
-      sp_fmt_str(spn_triple_to_str(mem, target)),
-      sp_fmt_str(spn_ld_family_to_str(family)),
-      sp_fmt_str(spn_ld_family_to_str(when.linker))).value;
-  }
-
+  spn_profile_info_t profile = sp_zero;
   spn_toolchain_selection_t selection = sp_zero;
-  spn_err_t select = lane_selects(mem, &when, target, &selection);
+  spn_err_t select = lane_selects(mem, &when, target, &profile, &selection);
   if (select) {
     sp_str_t request = when.sanitize ? sp_fmt(mem, " with sanitize={}", sp_fmt_str(spn_sanitizer_set_to_str(mem, when.sanitize))).value : sp_str_lit("");
     return sp_fmt(mem, "{} can't build {}{}: {}",
@@ -339,6 +334,13 @@ sp_str_t test_when_blocked(test_when_t when) {
       sp_fmt_str(spn_triple_to_str(mem, target)),
       sp_fmt_str(request),
       sp_fmt_cstr(select_reason(select))).value;
+  }
+  if (when.linker && when.linker != profile.linker) {
+    return sp_fmt(mem, "{} links {} with {}, test needs {}",
+      sp_fmt_cstr(toolchain->name),
+      sp_fmt_str(spn_triple_to_str(mem, target)),
+      sp_fmt_str(spn_ld_family_to_str(profile.linker)),
+      sp_fmt_str(spn_ld_family_to_str(when.linker))).value;
   }
   sp_str_t broken = lane_broken(mem, selection.toolchain);
   if (!sp_str_empty(broken)) {

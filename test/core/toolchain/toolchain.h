@@ -79,7 +79,7 @@ typedef struct {
   fixture_launcher_t compiler;
   fixture_launcher_t cxx;
   fixture_launcher_t archiver;
-  spn_ld_family_t linker;
+  bool lld;
   const c8* link_args [FIXTURE_MAX_ARGS];
   fixture_host_t hosts [FIXTURE_MAX_HOSTS];
   fixture_target_t targets [FIXTURE_MAX_TARGETS];
@@ -267,7 +267,7 @@ static sp_err_t fixture_check_decl(sp_test_t* t, const spn_toolchain_decl_t* dec
     sp_expect_str_eq_c(t, decl->version, expect.version);
   }
   sp_expect_eq(t, (u32)expect.driver, (u32)decl->driver);
-  sp_expect_eq(t, (u32)expect.linker, (u32)decl->linker);
+  sp_expect_eq(t, expect.lld, decl->lld);
   if (fixture_check_launchers(t, decl->compiler, decl->cxx, decl->archiver, expect)) {
     return SP_ERR;
   }
@@ -298,7 +298,7 @@ static sp_err_t fixture_check_entry(sp_test_t* t, spn_toolchain_info_t* info, fi
     sp_expect_str_eq_c(t, info->version, expect.version);
   }
   sp_expect_eq(t, (u32)expect.driver, (u32)info->driver);
-  sp_expect_eq(t, (u32)expect.linker, (u32)info->linker);
+  sp_expect_eq(t, expect.lld, info->lld);
   if (fixture_check_launchers(t, info->compiler, info->cxx, info->archiver, expect)) {
     return SP_ERR;
   }
