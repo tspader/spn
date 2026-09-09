@@ -2,11 +2,6 @@
 #include "sp.h"
 #include "sp/sp_cli.h"
 
-// Pins the sha256 of every hosted artifact in a [[toolchain]] file. Each
-// artifact line is `<host> = { url = "...", sha256 = "..." }` under a
-// [toolchain.host] table; the tarball is fetched, verified against the
-// vendor's signature, hashed, and the digest written back in place.
-
 typedef struct {
   const c8* manifest;
   const c8* mirror;

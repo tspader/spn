@@ -102,8 +102,6 @@ static bool target_has_fields(const spn_cg_toolchain_target_t* cg) {
   return !sp_opt_is_null(cg->arch) || !sp_opt_is_null(cg->os) || !sp_opt_is_null(cg->abi) || !sp_str_empty(cg->sdk) || !sp_da_empty(cg->sanitizers);
 }
 
-// "host" names the rows the driver derives on the machine spn runs on. It
-// carries nothing else, and it appears at most once.
 static bool lower_host_row(spn_toml_loader_t* ctx, const spn_cg_toolchain_target_t* cg, bool* host_row) {
   if (!sp_str_equal_cstr(cg->kind, "host") || target_has_fields(cg) || *host_row) {
     spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "kind");

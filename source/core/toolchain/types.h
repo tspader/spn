@@ -105,7 +105,6 @@ typedef struct {
   spn_artifact_t artifact;
 } spn_toolchain_host_t;
 
-// A declared row. An empty sdk means the target's kind decides at bind.
 typedef struct {
   spn_triple_t triple;
   spn_path_t sdk;
@@ -146,7 +145,6 @@ typedef struct {
   sp_da(sp_str_t) link_args;
   spn_toolchain_source_t source;
   sp_da(spn_toolchain_host_t) hosts;
-  // The listed rows, and whether "host" is among them. No list means "host".
   sp_da(spn_toolchain_target_t) targets;
   bool host_row;
 } spn_toolchain_decl_t;

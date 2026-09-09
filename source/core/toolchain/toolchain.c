@@ -61,8 +61,6 @@ spn_path_check_t spn_toolchain_path(spn_toolchain_source_t source, spn_path_root
   SP_UNREACHABLE_RETURN(SPN_PATH_MALFORMED);
 }
 
-// An sdk may live outside the artifact: an absolute path is a host path on
-// any source. Programs stay strict, since a distribution ships its own.
 spn_path_check_t spn_toolchain_sdk_path(spn_toolchain_source_t source, spn_path_root_t base, sp_str_t str, spn_path_t* path) {
   if (spn_path_normal(str) && sp_fs_is_absolute(str)) {
     *path = (spn_path_t) { .sub = str };
@@ -218,8 +216,6 @@ spn_abi_t spn_default_abi(spn_cc_driver_t driver, spn_os_t os) {
     case SPN_OS_FREESTANDING: return SPN_ABI_NONE;
     case SPN_OS_MACOS: return SPN_ABI_APPLE;
     case SPN_OS_WASI: return SPN_ABI_MUSL;
-    // gcc on Windows is always mingw and cl is always msvc. clang's default
-    // target is a fact about the install, so it has none here.
     case SPN_OS_WINDOWS: {
       switch (driver) {
         case SPN_CC_DRIVER_GCC:

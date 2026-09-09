@@ -234,9 +234,6 @@ static spn_err_t open_ctx(spn_ctx_t* ctx, spn_open_request_t request) {
   return SPN_OK;
 }
 
-// The builtin catalog is a [[toolchain]] file in the user dialect, embedded
-// in the binary. It goes through the config loader like any other and must
-// lower without issues.
 static void load_builtins(spn_ctx_t* ctx) {
   spn_cg_config_t config = sp_zero;
   spn_toml_loader_t loader = sp_zero;

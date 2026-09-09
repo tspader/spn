@@ -122,10 +122,6 @@ spn_sdk_t spn_sdk_from_host(const spn_sdk_host_t* host, spn_triple_t target) {
   sp_unreachable_return(none);
 }
 
-// What a row with no sdk binds to. Sysroot kinds pass nothing, since the
-// toolchain that lists the row brings its runtime. macOS takes the host SDK
-// when there is one and builds without it otherwise. MSVC takes the host SDK
-// and is dropped without one: nothing ships that CRT.
 bool spn_sdk_default(const spn_sdk_host_t* sdks, spn_triple_t target, spn_sdk_t* sdk) {
   *sdk = spn_sdk_from_host(sdks, target);
   switch (spn_sdk_kind(target)) {

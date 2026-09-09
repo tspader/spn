@@ -24,7 +24,6 @@ bool lanes_read(sp_mem_t mem, sp_str_t path, lanes_t* out, sp_str_t* issues) {
   return true;
 }
 
-// The reader records an issue under the entry's path, `toolchain[N]...`.
 static bool issue_in_entry(const spn_codegen_issue_t* issue, u32 at) {
   sp_str_t prefix = sp_str_lit("toolchain[");
   if (!sp_str_starts_with(issue->path, prefix)) {
@@ -56,8 +55,6 @@ sp_str_t lanes_lower(const lanes_t* lanes, u32 at, spn_path_root_t base, spn_too
   return sp_da_empty(loader.issues) ? sp_str_lit("") : spn_codegen_issues_message(lanes->mem, loader.issues);
 }
 
-// Blocks start at a line that is exactly the array header; a block owns
-// everything up to the next one, its [toolchain.host] subtable included.
 static bool is_header(sp_str_t line) {
   return sp_str_equal_cstr(sp_str_trim(line), "[[toolchain]]");
 }

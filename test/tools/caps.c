@@ -218,8 +218,6 @@ static sp_err_t load_lanes(void* user) {
     spn_toolchain_catalog_add(&catalog, decl);
   }
 
-  // An entry spn refuses is one red lane, not a broken file: the run aborts
-  // only if that entry is the lane under test.
   sp_str_t broken = sp_str_lit("");
   sp_da_for(lanes.config.toolchain, it) {
     spn_toolchain_decl_t decl = sp_zero;

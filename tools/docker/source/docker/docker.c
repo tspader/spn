@@ -98,9 +98,6 @@ static bool read_lanes(docker_t* docker, sp_str_t path, lanes_t* out) {
   return true;
 }
 
-// Every entry is lowered on its own. A builtin that fails is a bug in spn.
-// A test lane that fails is a red lane: it stays out of the catalog and the
-// config, and running it reports the issues instead of starting docker.
 static void bind_lanes(docker_t* docker) {
   sp_da_for(docker->builtin.config.toolchain, it) {
     spn_toolchain_decl_t decl = sp_zero;
@@ -138,8 +135,6 @@ static bool sysroot_artifact(docker_t* docker, const sysroot_t* sysroot, spn_art
   return true;
 }
 
-// The container's user config is the test lanes that lower, verbatim. The
-// builtins are already in spn.
 static bool render_config(docker_t* docker) {
   sp_io_dyn_mem_writer_t w = sp_zero;
   sp_io_dyn_mem_writer_init(docker->mem, &w);

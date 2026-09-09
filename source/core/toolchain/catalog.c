@@ -19,7 +19,6 @@ static void push_row(sp_da(spn_toolchain_row_t)* rows, spn_toolchain_row_t row) 
   }
 }
 
-// A relative sdk lives inside the artifact; an absolute one is a host path.
 static spn_path_t sdk_root(spn_toolchain_catalog_t* catalog, spn_toolchain_support_t support, spn_path_t sdk) {
   switch (support.kind) {
     case SPN_TOOLCHAIN_SUPPORT_ARTIFACT: return sp_fs_is_absolute(sdk.sub) ? sdk : spn_path_join(catalog->mem, spn_toolchain_artifact_root(support.artifact), sdk.sub);
@@ -45,8 +44,6 @@ static spn_toolchain_target_t stock(spn_cc_driver_t driver, spn_triple_t triple)
   };
 }
 
-// The machine's own triple. A host with no abi takes the driver's default,
-// and a driver with no default on that host has no stock row.
 static void push_stock(sp_da(spn_toolchain_row_t)* rows, spn_toolchain_catalog_t* catalog, const spn_toolchain_decl_t* decl) {
   spn_triple_t host = catalog->host;
   host.abi = host.abi ? host.abi : spn_default_abi(decl->driver, host.os);
@@ -60,9 +57,6 @@ static void push_stock(sp_da(spn_toolchain_row_t)* rows, spn_toolchain_catalog_t
   }
 }
 
-// Every hosted target the machine serves an SDK for. A row on the host's own
-// os is built with the runtimes the toolchain ships for that os, so it keeps
-// the stock sanitizers; a foreign os gets none.
 static void push_hosted(sp_da(spn_toolchain_row_t)* rows, spn_toolchain_catalog_t* catalog, spn_cc_driver_t driver) {
   static const spn_os_t hosted [] = { SPN_OS_LINUX, SPN_OS_MACOS, SPN_OS_WINDOWS };
   sp_carr_for(hosted, os) {
@@ -92,8 +86,6 @@ static void push_bare(sp_da(spn_toolchain_row_t)* rows, spn_cc_driver_t driver, 
   push_row(rows, (spn_toolchain_row_t) { .triple = { host.arch, SPN_OS_LINUX, SPN_ABI_BARE } });
 }
 
-// Listed rows bind as written. "host" then adds what the driver does on this
-// machine, for every triple the list did not already claim.
 static sp_da(spn_toolchain_row_t) bind_rows(spn_toolchain_catalog_t* catalog, const spn_toolchain_decl_t* decl, spn_toolchain_support_t support) {
   sp_da(spn_toolchain_row_t) rows = sp_da_new(catalog->mem, spn_toolchain_row_t);
   sp_da_for(decl->targets, it) {

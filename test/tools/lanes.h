@@ -9,10 +9,6 @@
 #define SPN_LANES_BUILTIN "source/core/toolchain/toolchains.toml"
 #define SPN_LANES_TEST "test/tools/lanes.toml"
 
-// A [[toolchain]] file as both consumers of the lanes see it: the parsed
-// entries, and the text they came from so one entry can be handed to spn
-// verbatim. Entries are lowered one at a time so an entry that spn refuses
-// is one red lane rather than a broken file.
 typedef struct {
   sp_mem_t mem;
   sp_intern_t* intern;
