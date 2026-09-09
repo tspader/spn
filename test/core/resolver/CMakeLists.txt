@@ -16,6 +16,7 @@ add_executable(resolver
   ${SRC}/codegen/options.c
   ${SRC}/codegen/when.c
   ${SRC}/codegen/lower.c
+  ${SRC}/codegen/toolchain.c
   ${SRC}/git/key.c
   ${SRC}/git/url.c
   ${SRC}/git/patch.c
@@ -24,7 +25,6 @@ add_executable(resolver
   ${SRC}/when/when.c
   ${SRC}/toolchain/catalog.c
   ${SRC}/toolchain/linker.c
-  ${SRC}/codegen/gen/toolchains.gen.c
   ${SRC}/codegen/gen/config.gen.c
   ${SRC}/codegen/gen/errors.gen.c
   ${SRC}/codegen/gen/events.gen.c

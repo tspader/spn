@@ -141,6 +141,7 @@ add_executable(core
   toolchain/sdk_msvc.c
   toolchain/sdk_root.c
   toolchain/sdk_serve.c
+  toolchain/sdk_wasi.c
   toolchain/search.c
   toolchain/select.c
   toolchain/sha256.c
@@ -159,6 +160,7 @@ add_executable(core
   ${SRC}/codegen/loader.c
   ${SRC}/codegen/json.c
   ${SRC}/codegen/lower.c
+  ${SRC}/codegen/toolchain.c
   ${SRC}/codegen/options.c
   ${SRC}/codegen/when.c
   ${SRC}/codegen/gen/config.gen.c
@@ -167,7 +169,6 @@ add_executable(core
   ${SRC}/codegen/gen/manifest.gen.c
   ${SRC}/codegen/gen/release.gen.c
   ${SRC}/codegen/gen/source_deps.gen.c
-  ${SRC}/codegen/gen/toolchains.gen.c
   ${SRC}/compiler/driver.c
   ${SRC}/compiler/exports.c
   ${SRC}/compiler/gnu.c
@@ -307,6 +308,7 @@ set_source_files_properties(
   toolchain/sdk_msvc.c
   toolchain/sdk_root.c
   toolchain/sdk_serve.c
+  toolchain/sdk_wasi.c
   toolchain/search.c
   toolchain/provision.c
   toolchain/select.c

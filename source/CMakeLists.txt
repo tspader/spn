@@ -22,6 +22,7 @@ set(SPN_SOURCES
   core/codegen/loader.c
   core/codegen/json.c
   core/codegen/lower.c
+  core/codegen/toolchain.c
   core/codegen/options.c
   core/codegen/when.c
   core/compiler/driver.c
@@ -157,7 +158,6 @@ add_executable(spn ${SPN_SOURCES}
   ${SRC}/codegen/gen/manifest.gen.c
   ${SRC}/codegen/gen/release.gen.c
   ${SRC}/codegen/gen/source_deps.gen.c
-  ${SRC}/codegen/gen/toolchains.gen.c
   ${SRC}/codegen/gen/abi.gen.c
   )
 target_include_directories(spn PRIVATE

@@ -7,9 +7,10 @@ add_executable(render
   ${SRC}/codegen/gen/errors.gen.c
   ${SRC}/codegen/gen/events.gen.c
   ${SRC}/codegen/gen/source_deps.gen.c
-  ${SRC}/codegen/gen/toolchains.gen.c
   ${SRC}/codegen/json.c
   ${SRC}/codegen/loader.c
+  ${SRC}/codegen/toolchain.c
+  ${SRC}/codegen/gen/config.gen.c
   ${SRC}/core/core.c
   ${UTIL}/io/io.c
   ${SRC}/ctx/ctx.c
