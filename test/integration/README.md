@@ -2,12 +2,18 @@
 
 A lane is a toolchain the whole integration suite runs under. `SPN_TEST_TOOLCHAIN`
 names it; unset means `zig`. A lane is either a builtin from
-`source/core/toolchain/toolchains.json` (`zig`, `gcc`, `clang`, `llvm`, `msvc`)
-or a test-only toolchain from `test/tools/toolchains.json` (`gcc-lld`,
-`aarch64-gnu`, `mingw-gnu`, `clang-mingw`, `clang-msvc`). Both files use the
-builtin catalog schema. The harness renders the test-only entries into every
-fixture's user config as `[[toolchain]]` blocks, so spn sees a lane toolchain
-exactly the way `~/.config/spn/spn.toml` would declare it.
+`source/core/toolchain/toolchains.toml` (`zig`, `gcc`, `clang`, `llvm`, `msvc`)
+or a test-only toolchain from `test/tools/lanes.toml` (`gcc-lld`,
+`aarch64-gnu`, `mingw-gnu`, `clang-mingw`, `clang-msvc`, ...). Both files are
+`[[toolchain]]` entries in the dialect a user writes in `~/.config/spn/spn.toml`,
+and the harness copies the selected lane's entry verbatim into every fixture's
+user config, so spn sees a lane toolchain exactly as a user would declare it.
+
+Entries are lowered one at a time. An entry spn refuses is a red lane: the
+harness aborts with its issues only when that entry is the lane under test,
+and the container tool reports it as `FAIL` without starting docker. A pending
+lane can sit in `lanes.toml` under its own name until the change that makes it
+load lands.
 
 ```
 SPN_TEST_TOOLCHAIN=gcc-lld build/debug/test/integration   # natively
@@ -64,7 +70,7 @@ config, so the lane catalog survives.
 
 ## sysroots
 
-A lane target that names a `sysroot` points at a tree its container assembles,
+A lane target that names an `sdk` points at a tree its container assembles,
 declared as data in `tools/docker/source/variant/variant.c`: `debian-musl`
 links Debian's musl headers and libs under `/sysroot/musl`, `debian-sysroot`
 unpacks the arm64 libc and libgcc debs under `/sysroot/arm64`, and

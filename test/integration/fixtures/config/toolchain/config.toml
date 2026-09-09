@@ -1,6 +1,5 @@
 [[toolchain]]
 name = "T"
 driver = "zig"
-target = [{ @HOST@ }]
 compiler = "/Q"
 archiver = "/Q"

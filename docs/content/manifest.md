@@ -69,6 +69,7 @@ readme: false
 | Field | Type |
 |---|---|
 | `name` | `string` |
+| `version` | `string` |
 | `compiler` | `string` |
 | `linker` | `gnu` \| `lld` \| `ld64` \| `msvc` |
 | `link_args` | array of `string` |

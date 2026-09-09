@@ -41,8 +41,9 @@ typedef enum {
 typedef struct {
   sp_mem_t mem;
   sp_template_registry_t* templates;
-  spn_cg_toolchains_t builtin;
-  spn_cg_toolchains_t lanes;
+  lanes_t builtin;
+  lanes_t lanes;
+  sp_str_t issues [LANE_COUNT];
   spn_toolchain_catalog_t catalog;
   spn_toolchain_store_t store;
   sp_str_t host;
@@ -78,7 +79,10 @@ typedef struct {
       sp_str_t output;
       s32 status;
     } xwin;
-    sp_str_t json;
+    struct {
+      sp_str_t path;
+      sp_str_t issues;
+    } lanes;
     verify_t verify;
     s32 render;
   } err;
@@ -95,5 +99,6 @@ sp_ps_config_t         docker_check(docker_t* docker, const variant_t* variant);
 sp_ps_config_t         docker_shell(docker_t* docker, const variant_t* variant);
 sp_ps_config_t         docker_test(docker_t* docker, const variant_t* variant, lane_t lane, const c8* filter);
 sp_str_t               docker_log(docker_t* docker, const c8* name);
+sp_str_t               docker_lane_issues(docker_t* docker, lane_t lane);
 
 #endif

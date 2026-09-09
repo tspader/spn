@@ -1,0 +1,10 @@
+[[toolchain]]
+name = "A"
+driver = "clang"
+compiler = "A"
+archiver = "A"
+target = [
+  { arch = "x86_64", os = "linux", abi = "gnu", sanitizers = ["address", "undefined"] },
+  { arch = "wasm32", os = "wasi", abi = "musl", sdk = "toolchain" },
+  { arch = "x86_64", os = "windows", abi = "gnu", sdk = "toolchain" }
+]

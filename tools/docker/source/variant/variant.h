@@ -46,10 +46,10 @@ typedef enum {
   LANE_CLANG_XWIN,
   LANE_ZIG_XWIN,
   LANE_ZIG_LOCAL,
-  // LANE_WASI_SDK_ABS,
+  LANE_WASI_SDK_ABS,
   LANE_ARM_GNU_LINUX,
   LANE_ARM_GNU_ELF,
-  // LANE_ARM_GNU_SYSROOT,
+  LANE_ARM_GNU_SYSROOT,
   LANE_W64DEVKIT,
   LANE_CLANG64,
   LANE_OSXCROSS,
@@ -140,8 +140,8 @@ extern const sysroot_t sysroots [];
 
 const c8*                 lane_name(lane_t lane);
 lane_t                    lane_find(sp_str_t name);
-const spn_cg_toolchain_t* lane_decl(lane_t lane, const spn_cg_toolchains_t* builtin, const spn_cg_toolchains_t* lanes);
-verify_t                  lanes_verify(const spn_cg_toolchains_t* builtin, const spn_cg_toolchains_t* lanes);
+const spn_cg_toolchain_decl_t* lane_decl(lane_t lane, const lanes_t* builtin, const lanes_t* lanes);
+verify_t                       lanes_verify(const lanes_t* builtin, const lanes_t* lanes);
 
 sp_str_t                  sysroot_links_setup(sp_mem_t mem, const sysroot_t* sysroot);
 sp_str_t                  sysroot_debs_setup(sp_mem_t mem, const sysroot_t* sysroot);
@@ -153,6 +153,6 @@ lane_t                    variant_seed(const variant_t* variant);
 sp_str_t                  variant_template(const variant_t* variant);
 sp_str_t                  variant_packages(sp_mem_t mem, const variant_t* variant);
 sp_str_t                  variant_summary(sp_mem_t mem, const variant_t* variant);
-verify_t                  variant_verify(const variant_t* variant, const spn_cg_toolchains_t* builtin, const spn_cg_toolchains_t* lanes);
+verify_t                  variant_verify(const variant_t* variant, const lanes_t* builtin, const lanes_t* lanes);
 
 #endif

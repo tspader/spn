@@ -234,6 +234,20 @@ static spn_err_t open_ctx(spn_ctx_t* ctx, spn_open_request_t request) {
   return SPN_OK;
 }
 
+// The builtin catalog is a [[toolchain]] file in the user dialect, embedded
+// in the binary. It goes through the config loader like any other and must
+// lower without issues.
+static void load_builtins(spn_ctx_t* ctx) {
+  spn_cg_config_t config = sp_zero;
+  spn_toml_loader_t loader = sp_zero;
+  spn_toml_loader_init(&loader, ctx->mem, ctx->intern);
+  spn_toolchains_parse(&loader, sp_str((const c8*)toolchains_toml, toolchains_toml_size), &config);
+  sp_da_for(config.toolchain, it) {
+    spn_toolchain_catalog_add(&ctx->catalog, spn_toolchain_lower(&loader, it, SPN_PATH_ROOT_NONE, &config.toolchain[it]));
+  }
+  sp_assert(sp_da_empty(loader.issues));
+}
+
 spn_ctx_t* spn_ctx_new(spn_wake_fn_t wake, void* wake_data) {
   sp_assert(!spn.arena);
   spn_ctx_t* ctx = &spn;
@@ -273,9 +287,8 @@ spn_ctx_t* spn_ctx_new(spn_wake_fn_t wake, void* wake_data) {
   spn_path_roots_set(&ctx->roots, ctx->heap, SPN_PATH_ROOT_RUNTIME, ctx->paths.runtime);
   ctx->paths.toolchain = spn_path_roots_set(&ctx->roots, ctx->heap, SPN_PATH_ROOT_TOOLCHAIN, env_or(ctx, "SPN_TOOLCHAIN_DIR", join_path(ctx, ctx->paths.caches.dir, "toolchain")));
 
-  sp_str_t builtins = sp_str((const c8*)toolchains_json, toolchains_json_size);
   spn_toolchain_catalog_init(&ctx->catalog, ctx->host, spn_sdk_detect(ctx->heap, &ctx->roots, ctx->env, ctx->host), ctx->heap);
-  sp_assert(spn_toolchain_catalog_load(&ctx->catalog, builtins) == SPN_OK);
+  load_builtins(ctx);
   ctx->roots.pinned = spn_path_pinned_roots();
 
   spn_op_thread_start(ctx);

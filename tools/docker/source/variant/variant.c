@@ -102,10 +102,10 @@ static const c8* lane_names [LANE_COUNT] = {
   [LANE_CLANG_XWIN]      = "clang-xwin",
   [LANE_ZIG_XWIN]         = "zig-xwin",
   [LANE_ZIG_LOCAL]        = "zig-local",
-  // [LANE_WASI_SDK_ABS]     = "wasi-sdk-abs",
+  [LANE_WASI_SDK_ABS]     = "wasi-sdk-abs",
   [LANE_ARM_GNU_LINUX]    = "arm-gnu-linux",
   [LANE_ARM_GNU_ELF]      = "arm-gnu-elf",
-  // [LANE_ARM_GNU_SYSROOT]  = "arm-gnu-sysroot",
+  [LANE_ARM_GNU_SYSROOT]  = "arm-gnu-sysroot",
   [LANE_W64DEVKIT]        = "w64devkit",
   [LANE_CLANG64]          = "clang64",
   [LANE_OSXCROSS]         = "osxcross",
@@ -180,7 +180,7 @@ const variant_t variants [] = {
     .name = "debian-wasi-sdk",
     .distro = DISTRO_DEBIAN,
     .sysroots = { SYSROOT_WASI_SDK },
-    .lanes = { LANE_WASI_SDK, LANE_WASI_SDK_LOCAL /*, LANE_WASI_SDK_ABS */ },
+    .lanes = { LANE_WASI_SDK, LANE_WASI_SDK_LOCAL, LANE_WASI_SDK_ABS },
   },
   {
     .name = "debian-sysroot",
@@ -203,7 +203,7 @@ const variant_t variants [] = {
     .name = "debian-arm",
     .distro = DISTRO_DEBIAN,
     .sysroots = { SYSROOT_ARM64 },
-    .lanes = { LANE_ARM_GNU_LINUX, LANE_ARM_GNU_ELF /*, LANE_ARM_GNU_SYSROOT */ },
+    .lanes = { LANE_ARM_GNU_LINUX, LANE_ARM_GNU_ELF, LANE_ARM_GNU_SYSROOT },
   },
   {
     .name = "debian-cc-only",
@@ -349,20 +349,20 @@ lane_t lane_find(sp_str_t name) {
   return LANE_NONE;
 }
 
-const spn_cg_toolchain_t* lane_decl(lane_t lane, const spn_cg_toolchains_t* builtin, const spn_cg_toolchains_t* lanes) {
+const spn_cg_toolchain_decl_t* lane_decl(lane_t lane, const lanes_t* builtin, const lanes_t* lanes) {
   sp_str_t name = sp_cstr_as_str(lane_name(lane));
-  const spn_cg_toolchain_t* decl = lanes_find(lanes, name);
+  const spn_cg_toolchain_decl_t* decl = lanes_find(lanes, name);
   return decl ? decl : lanes_find(builtin, name);
 }
 
-verify_t lanes_verify(const spn_cg_toolchains_t* builtin, const spn_cg_toolchains_t* lanes) {
+verify_t lanes_verify(const lanes_t* builtin, const lanes_t* lanes) {
   for (u32 it = LANE_NONE + 1; it < LANE_COUNT; it++) {
     if (!lane_decl((lane_t)it, builtin, lanes)) {
       return (verify_t) { .kind = VERIFY_LANE_UNDECLARED, .lane = (lane_t)it };
     }
   }
-  sp_om_for(lanes->toolchain, it) {
-    sp_str_t name = sp_om_at(lanes->toolchain, it)->name;
+  sp_da_for(lanes->config.toolchain, it) {
+    sp_str_t name = lanes->config.toolchain[it].name;
     if (lane_find(name) == LANE_NONE) {
       return (verify_t) { .kind = VERIFY_LANE_UNLISTED, .name = name };
     }
@@ -494,9 +494,9 @@ static bool provides(const variant_t* variant, sp_str_t sysroot) {
   return false;
 }
 
-verify_t variant_verify(const variant_t* variant, const spn_cg_toolchains_t* builtin, const spn_cg_toolchains_t* lanes) {
+verify_t variant_verify(const variant_t* variant, const lanes_t* builtin, const lanes_t* lanes) {
   sp_carr_for_until(variant->lanes, it, variant->lanes[it]) {
-    const spn_cg_toolchain_t* lane = lane_decl(variant->lanes[it], builtin, lanes);
+    const spn_cg_toolchain_decl_t* lane = lane_decl(variant->lanes[it], builtin, lanes);
     sp_assert(lane);
     sp_da_for(lane->target, target) {
       sp_str_t sysroot = lane->target[target].sdk;

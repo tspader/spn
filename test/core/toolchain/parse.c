@@ -17,7 +17,7 @@ typedef struct {
 static const parse_test_t tests [] = {
   {
     .name = "distribution",
-    .file = "distribution.json",
+    .file = "distribution.toml",
     .expect = {
       .entries = 1,
       .toolchains = {
@@ -54,7 +54,7 @@ static const parse_test_t tests [] = {
   },
   {
     .name = "local",
-    .file = "local.json",
+    .file = "local.toml",
     .expect = {
       .entries = 1,
       .toolchains = {
@@ -71,7 +71,7 @@ static const parse_test_t tests [] = {
   },
   {
     .name = "host_restricted_local",
-    .file = "restricted.json",
+    .file = "restricted.toml",
     .expect = {
       .entries = 2,
       .toolchains = {
@@ -98,7 +98,7 @@ static const parse_test_t tests [] = {
   },
   {
     .name = "multiple_toolchains",
-    .file = "multiple.json",
+    .file = "multiple.toml",
     .expect = {
       .entries = 2,
       .toolchains = {
@@ -117,7 +117,7 @@ static const parse_test_t tests [] = {
   },
   {
     .name = "empty_document",
-    .file = "empty.json",
+    .file = "empty.toml",
     .expect = {
       .toolchains = {
         { .name = "A", .absent = true },
@@ -125,33 +125,33 @@ static const parse_test_t tests [] = {
     },
   },
   {
-    .name = "malformed_json",
-    .file = "malformed.json",
+    .name = "malformed_toml",
+    .file = "malformed.toml",
     .expect = { .err = SPN_ERROR },
   },
   {
     .name = "invalid_host_key",
-    .file = "bad_host.json",
+    .file = "bad_host.toml",
     .expect = { .err = SPN_ERROR },
   },
   {
     .name = "mixed_hosts",
-    .file = "mixed.json",
+    .file = "mixed.toml",
     .expect = { .err = SPN_ERROR },
   },
   {
     .name = "linker_rejected",
-    .file = "linker_rejected.json",
+    .file = "linker_rejected.toml",
     .expect = { .err = SPN_ERROR },
   },
   {
     .name = "target_beyond_driver",
-    .file = "bad_target_driver.json",
+    .file = "bad_target_driver.toml",
     .expect = { .err = SPN_ERROR },
   },
   {
     .name = "linker_lld",
-    .file = "linkers.json",
+    .file = "linkers.toml",
     .expect = {
       .entries = 1,
       .toolchains = {
@@ -174,7 +174,7 @@ static const parse_test_t tests [] = {
   },
   {
     .name = "program_absolute",
-    .file = "program_absolute.json",
+    .file = "program_absolute.toml",
     .expect = {
       .entries = 1,
       .toolchains = {
@@ -189,12 +189,12 @@ static const parse_test_t tests [] = {
   },
   {
     .name = "program_relative",
-    .file = "program_relative.json",
+    .file = "program_relative.toml",
     .expect = { .err = SPN_ERROR },
   },
   {
     .name = "sdk_per_target",
-    .file = "sdk.json",
+    .file = "sdk.toml",
     .expect = {
       .entries = 1,
       .toolchains = {
@@ -220,12 +220,12 @@ static const parse_test_t tests [] = {
   },
   {
     .name = "sdk_on_none_target",
-    .file = "sdk_none.json",
+    .file = "sdk_none.toml",
     .expect = { .err = SPN_ERROR },
   },
   {
     .name = "sdk_on_elf_target",
-    .file = "sdk_elf.json",
+    .file = "sdk_elf.toml",
     .expect = {
       .entries = 1,
       .toolchains = {
@@ -243,12 +243,12 @@ static const parse_test_t tests [] = {
   },
   {
     .name = "sdk_absolute_in_distribution",
-    .file = "sdk_absolute.json",
+    .file = "sdk_absolute.toml",
     .expect = { .err = SPN_ERROR },
   },
   {
     .name = "sanitizers_and_toolchain_sdk",
-    .file = "caps.json",
+    .file = "caps.toml",
     .expect = {
       .entries = 1,
       .toolchains = {
@@ -268,22 +268,22 @@ static const parse_test_t tests [] = {
   },
   {
     .name = "sanitizers_on_none_target",
-    .file = "sanitizers_none.json",
+    .file = "sanitizers_none.toml",
     .expect = { .err = SPN_ERROR },
   },
   {
     .name = "sdk_required_off_host",
-    .file = "sdk_required.json",
+    .file = "sdk_required.toml",
     .expect = { .err = SPN_ERROR },
   },
 };
 
 sp_test_each(parse, decls, parse_test_t, tests) {
-  sp_str_t json = sp_zero;
-  if (fixture_read_json(t, it->file, &json)) return SP_ERR;
-
   sp_da(spn_toolchain_decl_t) decls = SP_NULLPTR;
-  sp_must_eq(t, (u32)it->expect.err, (u32)spn_toolchain_decls_parse(sp_test_arena(t), json, &decls));
+  sp_da(spn_codegen_issue_t) issues = SP_NULLPTR;
+  if (fixture_decls(t, it->file, &decls, &issues)) return SP_ERR;
+
+  sp_must_eq(t, it->expect.err != SPN_OK, !sp_da_empty(issues));
   if (it->expect.err) {
     return SP_OK;
   }

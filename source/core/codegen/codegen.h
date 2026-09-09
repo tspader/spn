@@ -46,6 +46,7 @@ bool spn_codegen_os_version_present(const spn_os_version_t* in);
 
 const c8* spn_codegen_err_name(spn_err_t code);
 toml_table_t* spn_codegen_parse(spn_toml_loader_t* t, sp_str_t path);
+toml_table_t* spn_codegen_parse_str(spn_toml_loader_t* t, sp_str_t content);
 
 typedef struct {
   sp_io_writer_t base;
@@ -66,6 +67,7 @@ void spn_codegen_json_s32(sp_io_writer_t* out, s32 value);
 void spn_codegen_json_str_array(sp_io_writer_t* out, sp_da(sp_str_t) values);
 void spn_codegen_json_issues(sp_io_writer_t* out, sp_da(spn_codegen_issue_t) issues);
 sp_str_t spn_codegen_issues_to_str(sp_mem_t mem, sp_da(spn_codegen_issue_t) issues);
+sp_str_t spn_codegen_issues_message(sp_mem_t mem, sp_da(spn_codegen_issue_t) issues);
 
 
 #endif

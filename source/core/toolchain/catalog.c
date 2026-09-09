@@ -2,95 +2,7 @@
 
 #include "paths/paths.h"
 #include "toolchain/toolchain.h"
-#include "toolchains.gen.h"
 #include "triple/triple.h"
-
-static spn_err_t load_launcher(const spn_cg_launcher_t* in, spn_toolchain_source_t source, spn_toolchain_launcher_t* launcher) {
-  launcher->args = in->args;
-  if (spn_toolchain_program(source, SPN_PATH_ROOT_NONE, in->program, &launcher->program) != SPN_PATH_OK) {
-    return SPN_ERROR;
-  }
-  return SPN_OK;
-}
-
-static spn_err_t load_target(const spn_cg_toolchain_target_t* in, spn_cc_driver_t driver, spn_toolchain_source_t source, spn_toolchain_target_t* target) {
-  spn_triple_t partial = {
-    .arch = sp_opt_is_null(in->arch) ? SPN_ARCH_NONE : sp_opt_get(in->arch),
-    .os = sp_opt_is_null(in->os) ? SPN_OS_NONE : sp_opt_get(in->os),
-    .abi = sp_opt_is_null(in->abi) ? SPN_ABI_NONE : sp_opt_get(in->abi),
-  };
-  if (spn_triple_entry(partial, &target->triple) != SPN_TRIPLE_ENTRY_OK) {
-    return SPN_ERROR;
-  }
-  if (!spn_toolchain_driver_composes(driver, spn_ld_dialect(target->triple))) {
-    return SPN_ERROR;
-  }
-  switch (spn_toolchain_target_caps(in, target)) {
-    case SPN_TARGET_CAPS_OK: return SPN_OK;
-    case SPN_TARGET_CAPS_SDK_PATH: return spn_toolchain_path(source, SPN_PATH_ROOT_NONE, in->sdk, &target->sdk) == SPN_PATH_OK ? SPN_OK : SPN_ERROR;
-    case SPN_TARGET_CAPS_SANITIZERS_FORBIDDEN:
-    case SPN_TARGET_CAPS_SDK_FORBIDDEN:
-    case SPN_TARGET_CAPS_SDK_REQUIRED: return SPN_ERROR;
-  }
-  SP_UNREACHABLE_RETURN(SPN_ERROR);
-}
-
-spn_err_t spn_toolchain_decls_parse(sp_mem_t mem, sp_str_t json, sp_da(spn_toolchain_decl_t)* decls) {
-  spn_cg_toolchains_t root = sp_zero;
-  if (!spn_toolchains_read(json, &root, mem)) {
-    return SPN_ERROR;
-  }
-
-  *decls = sp_da_new(mem, spn_toolchain_decl_t);
-  sp_om_for(root.toolchain, it) {
-    const spn_cg_toolchain_t* t = sp_om_at(root.toolchain, it);
-
-    spn_toolchain_decl_t decl = sp_zero;
-    decl.name = t->name;
-    decl.version = t->version;
-    decl.driver = t->driver;
-    spn_ld_family_t linker = sp_opt_is_null(t->linker) ? SPN_LD_FAMILY_NONE : sp_opt_get(t->linker);
-    if (!spn_ld_accepts(decl.driver, linker)) {
-      return SPN_ERROR;
-    }
-    decl.lld = linker == SPN_LD_FAMILY_LLD;
-    decl.link_args = t->link_args;
-
-    decl.hosts = sp_da_new(mem, spn_toolchain_host_t);
-    sp_da_for(t->host, it) {
-      spn_triple_t host = sp_zero;
-      if (spn_triple_parse_host(t->host[it].key, &host)) {
-        return SPN_ERROR;
-      }
-      sp_da_push(decl.hosts, ((spn_toolchain_host_t) {
-        .triple = host,
-        .artifact = {
-          .url = t->host[it].value.url,
-          .sha256 = t->host[it].value.sha256,
-          .mirror_list = t->mirrors,
-        },
-      }));
-    }
-    decl.source = spn_toolchain_source(decl.hosts);
-    if (decl.source == SPN_TOOLCHAIN_SOURCE_MIXED) {
-      return SPN_ERROR;
-    }
-    spn_try(load_launcher(&t->compiler, decl.source, &decl.compiler));
-    spn_try(load_launcher(&t->archiver, decl.source, &decl.archiver));
-    spn_try(load_launcher(&t->cxx, decl.source, &decl.cxx));
-
-    decl.targets = sp_da_new(mem, spn_toolchain_target_t);
-    sp_da_for(t->target, it) {
-      spn_toolchain_target_t target = sp_zero;
-      spn_try(load_target(&t->target[it], decl.driver, decl.source, &target));
-      sp_da_push(decl.targets, target);
-    }
-
-    sp_da_push(*decls, decl);
-  }
-
-  return SPN_OK;
-}
 
 static bool has_row(sp_da(spn_toolchain_row_t) rows, spn_triple_t triple) {
   sp_da_for(rows, it) {
@@ -261,15 +173,6 @@ void spn_toolchain_catalog_init(spn_toolchain_catalog_t* catalog, spn_triple_t h
   catalog->host = host;
   catalog->sdks = sdks;
   sp_str_om_init(catalog->entries);
-}
-
-spn_err_t spn_toolchain_catalog_load(spn_toolchain_catalog_t* catalog, sp_str_t json) {
-  sp_da(spn_toolchain_decl_t) decls = SP_NULLPTR;
-  spn_try(spn_toolchain_decls_parse(catalog->mem, json, &decls));
-  sp_da_for(decls, it) {
-    spn_toolchain_catalog_add(catalog, decls[it]);
-  }
-  return SPN_OK;
 }
 
 void spn_toolchain_catalog_add(spn_toolchain_catalog_t* catalog, spn_toolchain_decl_t decl) {

@@ -17,12 +17,20 @@
 static sp_test_once_t once;
 static test_toolchain_t cached;
 static spn_toolchain_catalog_t catalog;
+static lanes_t builtin;
+static lanes_t lanes;
 static sp_str_t toml;
 
-static sp_str_t read_repo_file(sp_mem_t mem, const c8* rel) {
-  sp_str_t content = sp_zero;
-  sp_assert(!sp_io_read_file(mem, test_repo_path(mem, sp_cstr_as_str(rel)), &content));
-  return content;
+static void read_lanes(sp_mem_t mem, const c8* rel, lanes_t* out) {
+  sp_str_t issues = sp_zero;
+  if (!lanes_read(mem, test_repo_path(mem, sp_cstr_as_str(rel)), out, &issues)) {
+    sp_log("{.red}: {}", sp_fmt_cstr(rel), sp_fmt_str(issues));
+    sp_sys_exit(1);
+  }
+}
+
+static bool declared(sp_str_t name) {
+  return lanes_find(&lanes, name) || lanes_find(&builtin, name);
 }
 
 static bool targets(const spn_toolchain_info_t* info, spn_triple_t triple) {
@@ -197,27 +205,49 @@ static sp_err_t load_lanes(void* user) {
 
   spn.mem = mem;
   spn.events = spn_event_buffer_new(mem);
-  sp_str_t lanes = read_repo_file(mem, SPN_LANES_TEST);
+  read_lanes(mem, SPN_LANES_BUILTIN, &builtin);
+  read_lanes(mem, SPN_LANES_TEST, &lanes);
   sp_env_t env = sp_env_capture(mem);
   spn_path_roots_t roots = sp_zero;
   spn_toolchain_catalog_init(&catalog, spn_triple_host(), spn_sdk_detect(mem, &roots, &env, spn_triple_host()), mem);
-  sp_assert(spn_toolchain_catalog_load(&catalog, read_repo_file(mem, SPN_LANES_BUILTIN)) == SPN_OK);
-  sp_assert(spn_toolchain_catalog_load(&catalog, lanes) == SPN_OK);
 
-  spn_cg_toolchains_t parsed = sp_zero;
-  sp_assert(spn_toolchains_read(lanes, &parsed, mem));
-  toml = lanes_toml(mem, &catalog, &parsed);
+  sp_da_for(builtin.config.toolchain, it) {
+    spn_toolchain_decl_t decl = sp_zero;
+    sp_str_t issues = lanes_lower(&builtin, it, SPN_PATH_ROOT_NONE, &decl);
+    sp_assert(sp_str_empty(issues));
+    spn_toolchain_catalog_add(&catalog, decl);
+  }
+
+  // An entry spn refuses is one red lane, not a broken file: the run aborts
+  // only if that entry is the lane under test.
+  sp_str_t broken = sp_str_lit("");
+  sp_da_for(lanes.config.toolchain, it) {
+    spn_toolchain_decl_t decl = sp_zero;
+    sp_str_t issues = lanes_lower(&lanes, it, SPN_PATH_ROOT_NONE, &decl);
+    if (!sp_str_empty(issues)) {
+      if (sp_str_equal(decl.name, name)) {
+        broken = issues;
+      }
+      continue;
+    }
+    spn_toolchain_catalog_add(&catalog, decl);
+  }
+  if (!sp_str_empty(broken)) {
+    sp_log("lane {.red} is broken: {}", sp_fmt_str(name), sp_fmt_str(broken));
+    sp_sys_exit(1);
+  }
 
   spn_toolchain_info_t* info = spn_toolchain_catalog_get(&catalog, name);
   if (!info) {
     sp_log("unknown lane {.red}", sp_fmt_str(name));
     sp_sys_exit(1);
   }
-  sp_str_t broken = lane_broken(mem, info);
+  broken = lane_broken(mem, info);
   if (!sp_str_empty(broken)) {
     sp_log("lane {.red} is broken: {}", sp_fmt_str(name), sp_fmt_str(broken));
     sp_sys_exit(1);
   }
+  toml = lanes_text(&lanes, name);
   cached = (test_toolchain_t) { .name = sp_str_to_cstr(mem, info->name), .info = info };
   return SP_OK;
 }
@@ -265,17 +295,17 @@ static spn_err_t lane_selects(sp_mem_t mem, const test_when_t* when, spn_triple_
   return err;
 }
 
-static sp_str_t not_in_lanes(sp_mem_t mem, const test_toolchain_t* toolchain, const c8* const* lanes, u32 count) {
+static sp_str_t not_in_lanes(sp_mem_t mem, const test_toolchain_t* toolchain, const c8* const* names, u32 count) {
   sp_for(it, count) {
-    if (!spn_toolchain_catalog_get(&catalog, sp_cstr_as_str(lanes[it]))) {
-      sp_log("unknown lane {.red}", sp_fmt_cstr(lanes[it]));
+    if (!declared(sp_cstr_as_str(names[it]))) {
+      sp_log("unknown lane {.red}", sp_fmt_cstr(names[it]));
       sp_sys_exit(1);
     }
-    if (sp_cstr_equal(lanes[it], toolchain->name)) {
+    if (sp_cstr_equal(names[it], toolchain->name)) {
       return sp_str_lit("");
     }
   }
-  return sp_fmt(mem, "not in lane {}", sp_fmt_str(sp_str_join_cstr_n(mem, lanes, count, sp_str_lit(", ")))).value;
+  return sp_fmt(mem, "not in lane {}", sp_fmt_str(sp_str_join_cstr_n(mem, names, count, sp_str_lit(", ")))).value;
 }
 
 sp_str_t test_when_blocked(test_when_t when) {

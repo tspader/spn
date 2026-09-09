@@ -5,11 +5,13 @@ static bool builtins_is_sha256(sp_str_t str) {
 }
 
 static sp_err_t builtins_decls(sp_test_t* t, sp_da(spn_toolchain_decl_t)* decls) {
-  sp_str_t json = sp_zero;
-  if (spn_test_builtin_json(t, &json)) {
+  sp_str_t toml = sp_zero;
+  if (spn_test_builtin_toml(t, &toml)) {
     return SP_ERR;
   }
-  sp_must_eq(t, (u32)SPN_OK, (u32)spn_toolchain_decls_parse(sp_test_arena(t), json, decls));
+  sp_da(spn_codegen_issue_t) issues = SP_NULLPTR;
+  spn_test_lower_toolchains(t, toml, SPN_PATH_ROOT_NONE, decls, &issues);
+  sp_must(t, sp_da_empty(issues));
   return SP_OK;
 }
 

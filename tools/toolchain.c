@@ -1,7 +1,11 @@
 #define SP_IMPLEMENTATION
 #include "sp.h"
 #include "sp/sp_cli.h"
-#include "yyjson.h"
+
+// Pins the sha256 of every hosted artifact in a [[toolchain]] file. Each
+// artifact line is `<host> = { url = "...", sha256 = "..." }` under a
+// [toolchain.host] table; the tarball is fetched, verified against the
+// vendor's signature, hashed, and the digest written back in place.
 
 typedef struct {
   const c8* manifest;
@@ -11,6 +15,42 @@ typedef struct {
 #define ZIG_PUBLIC_KEY "RWSGOq2NVecA2UPNdBUZykf1CCb147pkmdtYxgb3Ti+JO/wCYvhbAb/U"
 
 #define try(expr) do { sp_cli_result_t _e = (expr); if (_e) return _e; } while (0)
+
+typedef struct {
+  sp_str_t host;
+  sp_str_t url;
+  sp_str_t sha256;
+} artifact_line_t;
+
+static sp_str_t quoted_after(sp_str_t line, const c8* key) {
+  s32 at = sp_str_find(line, sp_cstr_as_str(key));
+  if (at < 0) {
+    return sp_str_lit("");
+  }
+  sp_str_t rest = sp_str_suffix(line, line.len - (u32)at - (u32)sp_cstr_len(key));
+  s32 end = sp_str_find_c8(rest, '"');
+  return end < 0 ? sp_str_lit("") : sp_str_prefix(rest, (u32)end);
+}
+
+static bool parse_artifact(sp_str_t line, artifact_line_t* out) {
+  sp_str_t trimmed = sp_str_trim(line);
+  s32 eq = sp_str_find(trimmed, sp_str_lit(" = {"));
+  if (eq < 0) {
+    return false;
+  }
+  out->host = sp_str_prefix(trimmed, (u32)eq);
+  out->url = quoted_after(trimmed, "url = \"");
+  out->sha256 = quoted_after(trimmed, "sha256 = \"");
+  return !sp_str_empty(out->url);
+}
+
+static sp_str_t with_sha256(sp_mem_t mem, sp_str_t line, sp_str_t hash) {
+  s32 at = sp_str_find(line, sp_str_lit("sha256 = \""));
+  sp_str_t head = sp_str_prefix(line, (u32)at + (u32)sp_cstr_len("sha256 = \""));
+  sp_str_t rest = sp_str_suffix(line, line.len - head.len);
+  s32 end = sp_str_find_c8(rest, '"');
+  return sp_fmt(mem, "{}{}{}", sp_fmt_str(head), sp_fmt_str(hash), sp_fmt_str(sp_str_suffix(rest, rest.len - (u32)end))).value;
+}
 
 sp_cli_result_t fetch(sp_cli_t* cli, sp_mem_t mem, sp_str_t url, sp_str_t out) {
   if (sp_fs_exists(out)) return SP_CLI_OK;
@@ -29,20 +69,18 @@ sp_cli_result_t fetch(sp_cli_t* cli, sp_mem_t mem, sp_str_t url, sp_str_t out) {
   return SP_CLI_OK;
 }
 
-sp_cli_result_t pin(sp_cli_t* cli, sp_mem_t mem, sp_str_t work, sp_str_t mirror, yyjson_mut_doc* doc, sp_str_t hostkey, yyjson_mut_val* dist) {
-  sp_str_t url = sp_str_view(yyjson_mut_get_str(yyjson_mut_obj_get(dist, "url")));
-  sp_str_t filename = sp_fs_get_name(url);
+sp_cli_result_t pin(sp_cli_t* cli, sp_mem_t mem, sp_str_t work, sp_str_t mirror, artifact_line_t artifact, sp_str_t* hash) {
+  sp_str_t filename = sp_fs_get_name(artifact.url);
 
   sp_str_t tarball = sp_fs_join_path(mem, work, filename);
   sp_str_t sig = sp_fmt(mem, "{}.minisig", sp_fmt_str(tarball)).value;
 
-  sp_str_t src = sp_str_empty(mirror) ? url : sp_fmt(mem, "{}/{}", sp_fmt_str(mirror), sp_fmt_str(filename)).value;
+  sp_str_t src = sp_str_empty(mirror) ? artifact.url : sp_fmt(mem, "{}/{}", sp_fmt_str(mirror), sp_fmt_str(filename)).value;
   sp_str_t src_sig = sp_fmt(mem, "{}.minisig", sp_fmt_str(src)).value;
 
-  sp_log("{.cyan}: fetching {}", sp_fmt_str(hostkey), sp_fmt_str(filename));
+  sp_log("{.cyan}: fetching {}", sp_fmt_str(artifact.host), sp_fmt_str(filename));
   try(fetch(cli, mem, src, tarball));
   try(fetch(cli, mem, src_sig, sig));
-
 
   sp_ps_output_t verify = sp_ps_run_c(mem, (sp_ps_config_cstr_t) {
     .command = "minisign",
@@ -69,17 +107,8 @@ sp_cli_result_t pin(sp_cli_t* cli, sp_mem_t mem, sp_str_t work, sp_str_t mirror,
   if (digest.status.exit_code) {
     return sp_cli_set_error(cli, sp_fmt(mem, "sha256sum failed for {}", sp_fmt_str(filename)).value);
   }
-  sp_str_t hash = sp_str_sub(sp_str_trim(digest.out), 0, 64);
-  const c8* hash_cstr = sp_str_to_cstr(mem, hash);
-
-  yyjson_mut_val* sha = yyjson_mut_obj_get(dist, "sha256");
-  if (sha) {
-    yyjson_mut_set_strn(sha, hash_cstr, 64);
-  } else {
-    yyjson_mut_obj_add_strcpy(doc, dist, "sha256", hash_cstr);
-  }
-
-  sp_log("{.cyan}: {.green}", sp_fmt_str(hostkey), sp_fmt_str(hash));
+  *hash = sp_str_sub(sp_str_trim(digest.out), 0, 64);
+  sp_log("{.cyan}: {.green}", sp_fmt_str(artifact.host), sp_fmt_str(*hash));
   return SP_CLI_OK;
 }
 
@@ -97,32 +126,28 @@ static sp_cli_result_t run(sp_cli_t* cli) {
     return sp_cli_set_error(cli, sp_fmt(mem, "failed to read {.cyan}", sp_fmt_str(manifest_path)).value);
   }
 
-  yyjson_doc* idoc = yyjson_read(content.data, content.len, 0);
-  if (!idoc) {
-    return sp_cli_set_error(cli, sp_fmt(mem, "invalid JSON in {.cyan}", sp_fmt_str(manifest_path)).value);
-  }
-  yyjson_mut_doc* doc = yyjson_doc_mut_copy(idoc, SP_NULLPTR);
-  yyjson_mut_val* root = yyjson_mut_doc_get_root(doc);
-
-  yyjson_mut_val* toolchains = yyjson_mut_obj_get(root, "toolchain");
-  size_t ti, tn;
-  yyjson_mut_val* tc;
-  yyjson_mut_arr_foreach(toolchains, ti, tn, tc) {
-    sp_str_t name = sp_str_view(yyjson_mut_get_str(yyjson_mut_obj_get(tc, "name")));
-    sp_str_t version = sp_str_view(yyjson_mut_get_str(yyjson_mut_obj_get(tc, "version")));
-    sp_log("{.yellow} {}", sp_fmt_str(name), sp_fmt_str(version));
-
-    yyjson_mut_val* host = yyjson_mut_obj_get(tc, "host");
-    size_t hi, hn;
-    yyjson_mut_val* key;
-    yyjson_mut_val* dist;
-    yyjson_mut_obj_foreach(host, hi, hn, key, dist) {
-      sp_str_t hostkey = sp_str_view(yyjson_mut_get_str(key));
-      try(pin(cli, mem, work, mirror, doc, hostkey, dist));
+  sp_da(sp_str_t) lines = sp_str_split_c8(mem, content, '\n');
+  bool hosts = false;
+  sp_da_for(lines, it) {
+    sp_str_t trimmed = sp_str_trim(lines[it]);
+    if (sp_str_starts_with(trimmed, sp_str_lit("name = \""))) {
+      sp_log("{.yellow}", sp_fmt_str(quoted_after(trimmed, "name = \"")));
     }
+    if (sp_str_starts_with(trimmed, sp_str_lit("["))) {
+      hosts = sp_str_equal_cstr(trimmed, "[toolchain.host]");
+      continue;
+    }
+    artifact_line_t artifact = sp_zero;
+    if (!hosts || !parse_artifact(lines[it], &artifact)) {
+      continue;
+    }
+    sp_str_t hash = sp_zero;
+    try(pin(cli, mem, work, mirror, artifact, &hash));
+    lines[it] = with_sha256(mem, lines[it], hash);
   }
 
-  if (!yyjson_mut_write_file(a->manifest, doc, YYJSON_WRITE_PRETTY_TWO_SPACES, SP_NULLPTR, SP_NULLPTR)) {
+  sp_str_t out = sp_str_join_n(mem, lines, (u32)sp_da_size(lines), sp_str_lit("\n"));
+  if (sp_fs_create_file_str(manifest_path, out)) {
     return sp_cli_set_error(cli, sp_fmt(mem, "failed to write {.cyan}", sp_fmt_str(manifest_path)).value);
   }
 
@@ -135,7 +160,7 @@ s32 main(s32 num_args, const c8** args) {
 
   sp_cli_cmd_t root = {
     .name = "toolchain",
-    .summary = "Verify toolchain tarballs (minisign) and pin their sha256 into a toolchains.json manifest",
+    .summary = "Verify toolchain tarballs (minisign) and pin their sha256 into a [[toolchain]] file",
     .opts = {
       {
         .name = "mirror",
@@ -149,7 +174,7 @@ s32 main(s32 num_args, const c8** args) {
       {
         .name = "manifest",
         .arity = SP_CLI_ARG_REQUIRED,
-        .summary = "path to toolchains.json",
+        .summary = "path to toolchains.toml",
         .ptr = &parsed.manifest
       },
     },

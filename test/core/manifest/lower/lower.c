@@ -636,10 +636,15 @@ static const test_t tests [] = {
     },
   },
   {
-    .name = "validate_toolchain_target_required",
+    .name = "toolchain_without_target_derives",
     .manifest = "toolchain_no_target",
-    .issues = {
-      { SPN_ERR_CODEGEN_MISSING_KEY, "toolchain[0].target" }
+    .toolchains = {
+      {
+        .name = "T",
+        .compiler = { .name = "clang" },
+        .archiver = { .name = "ar" },
+        .driver = SPN_CC_DRIVER_CLANG,
+      },
     },
   },
   {

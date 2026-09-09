@@ -98,6 +98,20 @@ host = { x86_64-linux = {} }
 target = [{ arch = "wasm32", os = "wasi", abi = "musl", sdk = "/usr" }]
 
 [[toolchain]]
+name = "clang-msvc"
+driver = "clang"
+compiler = "clang"
+archiver = "llvm-ar"
+cxx = "clang++"
+linker = "lld"
+link_args = ["-fuse-ld=lld"]
+host = { x86_64-windows = {}, aarch64-windows = {} }
+target = [
+  { arch = "x86_64",  os = "windows", abi = "msvc", sanitizers = ["address"] },
+  { arch = "aarch64", os = "windows", abi = "msvc" },
+]
+
+[[toolchain]]
 name = "clang-xwin"
 driver = "clang"
 compiler = "clang-16"

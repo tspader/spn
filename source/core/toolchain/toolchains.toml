@@ -1,0 +1,70 @@
+[[toolchain]]
+name = "zig"
+version = "0.16.0"
+driver = "zig"
+compiler = "zig cc"
+archiver = "zig ar"
+cxx = "zig c++"
+mirrors = "https://ziglang.org/download/community-mirrors.txt"
+target = [
+  { arch = "wasm32",  os = "wasi",         abi = "musl",  sdk = "toolchain" },
+  { arch = "x86_64",  os = "linux",        abi = "gnu",   sdk = "toolchain", sanitizers = ["undefined", "thread"] },
+  { arch = "x86_64",  os = "linux",        abi = "musl",  sdk = "toolchain", sanitizers = ["undefined", "thread"] },
+  { arch = "aarch64", os = "linux",        abi = "gnu",   sdk = "toolchain", sanitizers = ["undefined", "thread"] },
+  { arch = "aarch64", os = "linux",        abi = "musl",  sdk = "toolchain", sanitizers = ["undefined", "thread"] },
+  { arch = "x86_64",  os = "macos",        abi = "apple", sdk = "toolchain", sanitizers = ["undefined", "thread"] },
+  { arch = "aarch64", os = "macos",        abi = "apple", sdk = "toolchain", sanitizers = ["undefined", "thread"] },
+  { arch = "x86_64",  os = "windows",      abi = "gnu",   sdk = "toolchain", sanitizers = ["undefined"] },
+  { arch = "aarch64", os = "windows",      abi = "gnu",   sdk = "toolchain", sanitizers = ["undefined"] },
+  { arch = "x86_64",  os = "windows",      abi = "msvc",                     sanitizers = ["undefined"] },
+  { arch = "aarch64", os = "windows",      abi = "msvc",                     sanitizers = ["undefined"] },
+  { arch = "x86_64",  os = "freestanding", abi = "none" },
+  { arch = "aarch64", os = "freestanding", abi = "none" },
+  { arch = "x86_64",  os = "linux",        abi = "none" },
+  { arch = "aarch64", os = "linux",        abi = "none" },
+]
+
+[toolchain.host]
+x86_64-linux = { url = "https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz", sha256 = "70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00" }
+aarch64-linux = { url = "https://ziglang.org/download/0.16.0/zig-aarch64-linux-0.16.0.tar.xz", sha256 = "ea4b09bfb22ec6f6c6ceac57ab63efb6b46e17ab08d21f69f3a48b38e1534f17" }
+x86_64-macos = { url = "https://ziglang.org/download/0.16.0/zig-x86_64-macos-0.16.0.tar.xz", sha256 = "0387557ed1877bc6a2e1802c8391953baddba76081876301c522f52977b52ba7" }
+aarch64-macos = { url = "https://ziglang.org/download/0.16.0/zig-aarch64-macos-0.16.0.tar.xz", sha256 = "b23d70deaa879b5c2d486ed3316f7eaa53e84acf6fc9cc747de152450d401489" }
+x86_64-windows = { url = "https://ziglang.org/download/0.16.0/zig-x86_64-windows-0.16.0.zip", sha256 = "68659eb5f1e4eb1437a722f1dd889c5a322c9954607f5edcf337bc3684a75a7e" }
+aarch64-windows = { url = "https://ziglang.org/download/0.16.0/zig-aarch64-windows-0.16.0.zip", sha256 = "aee38316ee4111717900f45dd3130145c39289e105541d737eb8c5ed653c78ef" }
+
+[[toolchain]]
+name = "msvc"
+driver = "msvc"
+compiler = "cl"
+archiver = "lib"
+cxx = "cl"
+host = { x86_64-windows = {}, aarch64-windows = {} }
+target = [
+  { arch = "x86_64",  os = "windows", abi = "msvc", sanitizers = ["address"] },
+  { arch = "aarch64", os = "windows", abi = "msvc" },
+]
+
+[[toolchain]]
+name = "clang"
+driver = "clang"
+compiler = "clang"
+archiver = "ar"
+cxx = "clang++"
+host = { x86_64-linux = {}, aarch64-linux = {}, x86_64-macos = {}, aarch64-macos = {} }
+
+[[toolchain]]
+name = "llvm"
+driver = "clang"
+compiler = "clang"
+archiver = "llvm-ar"
+cxx = "clang++"
+linker = "lld"
+link_args = ["-fuse-ld=lld"]
+host = { x86_64-linux = {}, aarch64-linux = {}, x86_64-macos = {}, aarch64-macos = {} }
+
+[[toolchain]]
+name = "gcc"
+driver = "gcc"
+compiler = "gcc"
+archiver = "ar"
+cxx = "g++"

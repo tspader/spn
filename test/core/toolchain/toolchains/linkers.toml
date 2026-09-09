@@ -1,0 +1,13 @@
+[[toolchain]]
+name = "A"
+driver = "clang"
+compiler = "A"
+archiver = "llvm-ar"
+linker = "lld"
+target = [
+  { arch = "x86_64", os = "linux", abi = "gnu" },
+  { arch = "x86_64", os = "windows", abi = "gnu", sdk = "toolchain" },
+  { arch = "x86_64", os = "windows", abi = "msvc" },
+  { arch = "aarch64", os = "macos", abi = "apple" },
+  { arch = "wasm32", os = "wasi", sdk = "toolchain" }
+]

@@ -90,17 +90,42 @@ static bool missing(docker_t* docker, sp_str_t path, const c8* hint) {
   return true;
 }
 
-static bool read_lanes(docker_t* docker, sp_str_t path, spn_cg_toolchains_t* out) {
-  sp_str_t json = sp_zero;
-  if (sp_io_read_file(docker->mem, path, &json) || !spn_toolchains_read(json, out, docker->mem) || spn_toolchain_catalog_load(&docker->catalog, json)) {
-    docker->err.json = path;
+static bool read_lanes(docker_t* docker, sp_str_t path, lanes_t* out) {
+  if (!lanes_read(docker->mem, path, out, &docker->err.lanes.issues)) {
+    docker->err.lanes.path = path;
     return false;
   }
   return true;
 }
 
+// Every entry is lowered on its own. A builtin that fails is a bug in spn.
+// A test lane that fails is a red lane: it stays out of the catalog and the
+// config, and running it reports the issues instead of starting docker.
+static void bind_lanes(docker_t* docker) {
+  sp_da_for(docker->builtin.config.toolchain, it) {
+    spn_toolchain_decl_t decl = sp_zero;
+    sp_str_t issues = lanes_lower(&docker->builtin, it, SPN_PATH_ROOT_NONE, &decl);
+    sp_assert(sp_str_empty(issues));
+    spn_toolchain_catalog_add(&docker->catalog, decl);
+  }
+  sp_da_for(docker->lanes.config.toolchain, it) {
+    spn_toolchain_decl_t decl = sp_zero;
+    sp_str_t issues = lanes_lower(&docker->lanes, it, SPN_PATH_ROOT_NONE, &decl);
+    lane_t lane = lane_find(decl.name);
+    if (!sp_str_empty(issues)) {
+      docker->issues[lane] = issues;
+      continue;
+    }
+    spn_toolchain_catalog_add(&docker->catalog, decl);
+  }
+}
+
+sp_str_t docker_lane_issues(docker_t* docker, lane_t lane) {
+  return docker->issues[lane];
+}
+
 static bool sysroot_artifact(docker_t* docker, const sysroot_t* sysroot, spn_artifact_t* out) {
-  const spn_cg_toolchain_t* lane = lane_decl(sysroot->artifact, &docker->builtin, &docker->lanes);
+  const spn_cg_toolchain_decl_t* lane = lane_decl(sysroot->artifact, &docker->builtin, &docker->lanes);
   const spn_cg_artifact_t* artifact = lane_artifact(lane, docker->host);
   if (!artifact || sp_str_empty(artifact->url)) {
     return false;
@@ -113,10 +138,22 @@ static bool sysroot_artifact(docker_t* docker, const sysroot_t* sysroot, spn_art
   return true;
 }
 
+// The container's user config is the test lanes that lower, verbatim. The
+// builtins are already in spn.
 static bool render_config(docker_t* docker) {
+  sp_io_dyn_mem_writer_t w = sp_zero;
+  sp_io_dyn_mem_writer_init(docker->mem, &w);
+  sp_da_for(docker->lanes.config.toolchain, it) {
+    sp_str_t name = docker->lanes.config.toolchain[it].name;
+    if (!sp_str_empty(docker->issues[lane_find(name)])) {
+      continue;
+    }
+    sp_io_write_str(&w.base, lanes_text(&docker->lanes, name), SP_NULLPTR);
+    sp_io_write_cstr(&w.base, "\n\n", SP_NULLPTR);
+  }
   sp_str_t config = sp_fs_join_path(docker->mem, docker->paths.config, sp_str_lit("spn/spn.toml"));
   sp_fs_create_dir(sp_fs_parent_path(config));
-  return !sp_fs_create_file_str(config, lanes_toml(docker->mem, &docker->catalog, &docker->lanes));
+  return !sp_fs_create_file_str(config, sp_io_dyn_mem_writer_as_str(&w));
 }
 
 static sp_ps_config_t launch(docker_t* docker, const variant_t* variant, const c8* option, const c8* command) {
@@ -199,6 +236,7 @@ docker_init_err_t docker_init(docker_t* docker, sp_mem_t mem, spn_fetch_fn fetch
       return DOCKER_INIT_ERR_VERIFY;
     }
   }
+  bind_lanes(docker);
 
   sp_fs_create_dir(docker->paths.dockerfiles);
   if (!render_config(docker)) {
@@ -409,7 +447,7 @@ static sp_str_t seed_profile(docker_t* docker, lane_t seed) {
   sp_io_dyn_mem_writer_init(docker->mem, &writer);
   sp_fmt_io(&writer.base, "toolchain = \"{}\"\n", sp_fmt_cstr(lane_name(seed)));
 
-  const spn_cg_toolchain_t* lane = lanes_find(&docker->lanes, sp_cstr_as_str(lane_name(seed)));
+  const spn_cg_toolchain_decl_t* lane = lanes_find(&docker->lanes, sp_cstr_as_str(lane_name(seed)));
   if (lane && !sp_da_empty(lane->target)) {
     const spn_cg_toolchain_target_t* target = &lane->target[0];
     if (!sp_opt_is_null(target->arch)) {

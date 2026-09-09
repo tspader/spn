@@ -309,11 +309,19 @@ static sp_err_t fixture_check_entry(sp_test_t* t, spn_toolchain_info_t* info, fi
   return fixture_check_expected_rows(t, info->rows, expect.rows);
 }
 
-static sp_err_t fixture_read_json(sp_test_t* t, const c8* file, sp_str_t* json) {
+static sp_err_t fixture_read_toml(sp_test_t* t, const c8* file, sp_str_t* toml) {
   sp_mem_t mem = sp_test_arena(t);
   sp_str_t path = sp_fs_join_path(mem, sp_str_lit(TOOLCHAINS_DIR), sp_cstr_as_str(file));
-  sp_must_ok(t, sp_io_read_file(mem, path, json));
+  sp_must_ok(t, sp_io_read_file(mem, path, toml));
   return SP_OK;
+}
+
+static sp_err_t fixture_decls(sp_test_t* t, const c8* file, sp_da(spn_toolchain_decl_t)* decls, sp_da(spn_codegen_issue_t)* issues) {
+  sp_str_t toml = sp_zero;
+  if (fixture_read_toml(t, file, &toml)) {
+    return SP_ERR;
+  }
+  return spn_test_lower_toolchains(t, toml, SPN_PATH_ROOT_NONE, decls, issues);
 }
 
 static const spn_toolchain_decl_t* fixture_decl(sp_da(spn_toolchain_decl_t) decls, const c8* name) {
@@ -326,12 +334,16 @@ static const spn_toolchain_decl_t* fixture_decl(sp_da(spn_toolchain_decl_t) decl
 }
 
 static sp_err_t fixture_catalog(sp_test_t* t, spn_toolchain_catalog_t* catalog, const c8* file, spn_triple_t host, spn_sdk_host_t sdks) {
-  sp_str_t json = sp_zero;
-  if (fixture_read_json(t, file, &json)) {
+  sp_da(spn_toolchain_decl_t) decls = SP_NULLPTR;
+  sp_da(spn_codegen_issue_t) issues = SP_NULLPTR;
+  if (fixture_decls(t, file, &decls, &issues)) {
     return SP_ERR;
   }
+  sp_must(t, sp_da_empty(issues));
   spn_toolchain_catalog_init(catalog, host, sdks, sp_test_arena(t));
-  sp_must_eq(t, (u32)SPN_OK, (u32)spn_toolchain_catalog_load(catalog, json));
+  sp_da_for(decls, it) {
+    spn_toolchain_catalog_add(catalog, decls[it]);
+  }
   return SP_OK;
 }
 

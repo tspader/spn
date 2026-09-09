@@ -1,0 +1,16 @@
+[[toolchain]]
+name = "A"
+driver = "gcc"
+compiler = "A"
+archiver = "ar"
+target = [{ arch = "x86_64", os = "linux", abi = "gnu" }]
+
+[[toolchain]]
+name = "B"
+driver = "gcc"
+compiler = "B"
+archiver = "ar"
+target = [
+  { arch = "x86_64", os = "linux", abi = "musl", sdk = "toolchain" },
+  { arch = "x86_64", os = "linux", abi = "gnu" }
+]

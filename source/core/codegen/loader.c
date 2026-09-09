@@ -325,6 +325,17 @@ toml_table_t* spn_codegen_parse(spn_toml_loader_t* ctx, sp_str_t path) {
   return table;
 }
 
+toml_table_t* spn_codegen_parse_str(spn_toml_loader_t* ctx, sp_str_t content) {
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  c8 diag [1024] = {0};
+  toml_table_t* table = toml_parse(sp_str_to_cstr(scratch.mem, content), diag, SP_CARR_LEN(diag));
+  sp_mem_end_scratch(scratch);
+  if (!table) {
+    spn_toml_loader_issue_at(ctx, SPN_ERR_CODEGEN_PARSE, sp_str_copy(ctx->mem, sp_cstr_as_str(diag)));
+  }
+  return table;
+}
+
 void spn_codegen_json_issues(sp_io_writer_t* out, sp_da(spn_codegen_issue_t) issues) {
   sp_io_write_c8(out, '{');
   bool first = true;
