@@ -45,7 +45,6 @@ yyjson = "0.14.0"
 files = [
   "tools/patches/sp-test-num-cpus.patch",
   "tools/patches/sp-prompt-external-wake.patch",
-  "tools/patches/sp-test-keep-dirs.patch",
 ]
 
 [patch.wamr]

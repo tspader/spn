@@ -78,7 +78,7 @@ sp_test(profile, default_is_musl_static) {
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build" } },
       { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_INIT_BUILD_GRAPH, .key = "target", .value = SPN_TEST_ARCH "-linux-musl" } },
-      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_INIT_BUILD_GRAPH, .key = "toolchain", .value = "zig" } },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_INIT_BUILD_GRAPH, .key = "toolchain", .value = test_toolchain()->name } },
     },
   });
 }
@@ -139,7 +139,7 @@ sp_test(profile, cross_target_macos) {
       .exists = { target_exe("main", "aarch64-macos-apple") },
       .events = {
         { .event = SPN_EVENT_INIT_BUILD_GRAPH, .key = "target", .value = "aarch64-macos-apple" },
-        { .event = SPN_EVENT_INIT_BUILD_GRAPH, .key = "toolchain", .value = "zig" },
+        { .event = SPN_EVENT_INIT_BUILD_GRAPH, .key = "toolchain", .value = test_toolchain()->name },
       },
     },
   });

@@ -1,0 +1,260 @@
+[[toolchain]]
+name = "gcc-lld"
+driver = "gcc"
+compiler = "gcc"
+archiver = "ar"
+cxx = "g++"
+linker = "lld"
+link_args = ["-fuse-ld=lld"]
+host = { x86_64-linux = {}, aarch64-linux = {} }
+
+[[toolchain]]
+name = "aarch64-gnu"
+driver = "gcc"
+compiler = "aarch64-linux-gnu-gcc"
+archiver = "aarch64-linux-gnu-ar"
+host = { x86_64-linux = {} }
+target = [{ arch = "aarch64", os = "freestanding", abi = "none" }]
+
+[[toolchain]]
+name = "mingw-gnu"
+driver = "gcc"
+compiler = "x86_64-w64-mingw32-gcc"
+archiver = "x86_64-w64-mingw32-ar"
+cxx = "x86_64-w64-mingw32-g++"
+host = { x86_64-linux = {}, aarch64-linux = {} }
+target = [{ arch = "x86_64", os = "windows", abi = "gnu" }]
+
+[[toolchain]]
+name = "musl-gcc"
+driver = "gcc"
+compiler = "musl-gcc"
+archiver = "ar"
+host = { x86_64-linux = {} }
+target = [{ arch = "x86_64", os = "linux", abi = "musl" }]
+
+[[toolchain]]
+name = "clang-mingw"
+driver = "clang"
+compiler = "clang"
+archiver = "x86_64-w64-mingw32-ar"
+cxx = "clang++"
+link_args = ["--ld-path=x86_64-w64-mingw32-ld", "-L/usr/lib/gcc/x86_64-w64-mingw32/12-win32"]
+host = { x86_64-linux = {}, aarch64-linux = {} }
+target = [{ arch = "x86_64", os = "windows", abi = "gnu" }]
+
+[[toolchain]]
+name = "clang-mingw-lld"
+driver = "clang"
+compiler = "clang"
+archiver = "x86_64-w64-mingw32-ar"
+cxx = "clang++"
+linker = "lld"
+link_args = ["-fuse-ld=lld", "-L/usr/lib/gcc/x86_64-w64-mingw32/12-win32"]
+host = { x86_64-linux = {}, aarch64-linux = {} }
+target = [{ arch = "x86_64", os = "windows", abi = "gnu" }]
+
+[[toolchain]]
+name = "clang-cross"
+driver = "clang"
+compiler = "clang"
+archiver = "aarch64-linux-gnu-ar"
+host = { x86_64-linux = {} }
+target = [{ arch = "aarch64", os = "linux", abi = "gnu" }]
+
+[[toolchain]]
+name = "clang-bare"
+driver = "clang"
+compiler = "clang"
+archiver = "ar"
+host = { x86_64-linux = {} }
+target = ["host", { arch = "x86_64", os = "freestanding", abi = "none" }]
+
+[[toolchain]]
+name = "clang-musl"
+driver = "clang"
+compiler = "clang"
+archiver = "ar"
+link_args = ["-rtlib=compiler-rt", "-unwindlib=none"]
+host = { x86_64-linux = {} }
+target = ["host", { arch = "x86_64", os = "linux", abi = "musl", sdk = "/sysroot/musl" }]
+
+[[toolchain]]
+name = "clang-sysroot"
+driver = "clang"
+compiler = "clang"
+archiver = "llvm-ar"
+linker = "lld"
+link_args = ["-fuse-ld=lld"]
+host = { x86_64-linux = {} }
+target = ["host", { arch = "aarch64", os = "linux", abi = "gnu", sdk = "/sysroot/arm64" }]
+
+[[toolchain]]
+name = "clang-wasi"
+driver = "clang"
+compiler = "clang"
+archiver = "llvm-ar"
+host = { x86_64-linux = {} }
+target = [{ arch = "wasm32", os = "wasi", abi = "musl", sdk = "/usr" }]
+
+[[toolchain]]
+name = "clang-xwin"
+driver = "clang"
+compiler = "clang-16"
+archiver = "llvm-ar-16"
+cxx = "clang++-16"
+linker = "lld"
+link_args = ["-fuse-ld=lld"]
+host = { x86_64-linux = {} }
+target = [{ arch = "x86_64", os = "windows", abi = "msvc", sdk = "/opt/xwin" }]
+
+[[toolchain]]
+name = "zig-local"
+driver = "zig"
+compiler = "/opt/zig/zig cc"
+archiver = "/opt/zig/zig ar"
+cxx = "/opt/zig/zig c++"
+host = { x86_64-linux = {} }
+target = [
+  { arch = "wasm32",  os = "wasi",         abi = "musl" },
+  { arch = "x86_64",  os = "linux",        abi = "gnu",   sanitizers = ["undefined", "thread"] },
+  { arch = "x86_64",  os = "linux",        abi = "musl",  sanitizers = ["undefined", "thread"] },
+  { arch = "aarch64", os = "linux",        abi = "gnu",   sanitizers = ["undefined", "thread"] },
+  { arch = "aarch64", os = "linux",        abi = "musl",  sanitizers = ["undefined", "thread"] },
+  { arch = "x86_64",  os = "macos",        abi = "apple", sanitizers = ["undefined", "thread"] },
+  { arch = "aarch64", os = "macos",        abi = "apple", sanitizers = ["undefined", "thread"] },
+  { arch = "x86_64",  os = "windows",      abi = "gnu",   sanitizers = ["undefined"] },
+  { arch = "aarch64", os = "windows",      abi = "gnu",   sanitizers = ["undefined"] },
+  { arch = "x86_64",  os = "windows",      abi = "msvc",  sanitizers = ["undefined"] },
+  { arch = "aarch64", os = "windows",      abi = "msvc",  sanitizers = ["undefined"] },
+  { arch = "x86_64",  os = "freestanding", abi = "none" },
+  { arch = "aarch64", os = "freestanding", abi = "none" },
+  { arch = "x86_64",  os = "linux",        abi = "none" },
+  { arch = "aarch64", os = "linux",        abi = "none" },
+]
+
+[[toolchain]]
+name = "zig-xwin"
+version = "0.16.0"
+driver = "zig"
+compiler = "zig cc"
+archiver = "zig ar"
+cxx = "zig c++"
+mirrors = "https://ziglang.org/download/community-mirrors.txt"
+target = [{ arch = "x86_64", os = "windows", abi = "msvc", sdk = "/opt/xwin", sanitizers = ["undefined"] }]
+
+[toolchain.host]
+x86_64-linux = { url = "https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz", sha256 = "70e49664a74374b48b51e6f3fdfbf437f6395d42509050588bd49abe52ba3d00" }
+aarch64-linux = { url = "https://ziglang.org/download/0.16.0/zig-aarch64-linux-0.16.0.tar.xz", sha256 = "ea4b09bfb22ec6f6c6ceac57ab63efb6b46e17ab08d21f69f3a48b38e1534f17" }
+
+[[toolchain]]
+name = "wasi-sdk"
+version = "34"
+driver = "clang"
+compiler = "bin/clang"
+archiver = "bin/llvm-ar"
+cxx = "bin/clang++"
+target = [{ arch = "wasm32", os = "wasi", abi = "musl", sdk = "share/wasi-sysroot" }]
+
+[toolchain.host]
+x86_64-linux = { url = "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-34/wasi-sdk-34.0-x86_64-linux.tar.gz", sha256 = "b761e3a0721dbae9c09a0059e5fdb2bf917d1b4a8a7b430fb3b5aafb0984b2c4" }
+aarch64-linux = { url = "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-34/wasi-sdk-34.0-arm64-linux.tar.gz", sha256 = "f7e243dff54d60bcc576e94d6166b69f410f2500ae4a9ceef34315be10e77971" }
+x86_64-macos = { url = "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-34/wasi-sdk-34.0-x86_64-macos.tar.gz", sha256 = "87d27fa8adc68dee59bfbf2e22a6d34ef717c34d6bf1d8af2a56fc929d9ce0eb" }
+aarch64-macos = { url = "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-34/wasi-sdk-34.0-arm64-macos.tar.gz", sha256 = "9c59398106b417f8f14913380fdf0097a8cc0ff4af9eb3ce0065a859e88d49e9" }
+x86_64-windows = { url = "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-34/wasi-sdk-34.0-x86_64-windows.tar.gz", sha256 = "cccb5c323a9b34f0349a9b09e8804a0a7632c68c3310f4b5f437ed57d7e71d8f" }
+
+[[toolchain]]
+name = "wasi-sdk-local"
+driver = "clang"
+compiler = "/opt/wasi-sdk/bin/clang"
+archiver = "/opt/wasi-sdk/bin/llvm-ar"
+cxx = "/opt/wasi-sdk/bin/clang++"
+host = { x86_64-linux = {} }
+target = [{ arch = "wasm32", os = "wasi", abi = "musl", sdk = "/opt/wasi-sdk/share/wasi-sysroot" }]
+
+[[toolchain]]
+name = "wasi-sdk-abs"
+version = "34"
+driver = "clang"
+compiler = "bin/clang"
+archiver = "bin/llvm-ar"
+cxx = "bin/clang++"
+target = [{ arch = "wasm32", os = "wasi", abi = "musl", sdk = "/opt/wasi-sdk/share/wasi-sysroot" }]
+
+[toolchain.host]
+x86_64-linux = { url = "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-34/wasi-sdk-34.0-x86_64-linux.tar.gz", sha256 = "b761e3a0721dbae9c09a0059e5fdb2bf917d1b4a8a7b430fb3b5aafb0984b2c4" }
+
+[[toolchain]]
+name = "arm-gnu-linux"
+version = "14.2.rel1"
+driver = "gcc"
+compiler = "bin/aarch64-none-linux-gnu-gcc"
+archiver = "bin/aarch64-none-linux-gnu-ar"
+cxx = "bin/aarch64-none-linux-gnu-g++"
+target = [{ arch = "aarch64", os = "linux", abi = "gnu" }]
+
+[toolchain.host]
+x86_64-linux = { url = "https://developer.arm.com/-/media/Files/downloads/gnu/14.2.rel1/binrel/arm-gnu-toolchain-14.2.rel1-x86_64-aarch64-none-linux-gnu.tar.xz", sha256 = "47aeefc02b0ee39f6d4d1812110952975542d365872a7474b5306924bca4faa1" }
+aarch64-linux = { url = "https://developer.arm.com/-/media/Files/downloads/gnu/14.2.rel1/binrel/arm-gnu-toolchain-14.2.rel1-aarch64-aarch64-none-linux-gnu.tar.xz", sha256 = "299c56db1644c135670afabbf801b97a42e5ef6069d73157ab869458cbda2096" }
+x86_64-windows = { url = "https://developer.arm.com/-/media/Files/downloads/gnu/14.2.rel1/binrel/arm-gnu-toolchain-14.2.rel1-mingw-w64-x86_64-aarch64-none-linux-gnu.zip", sha256 = "9428b2039923916418ec7037025be8cec3202926d65db9452519977834ad2a89" }
+
+[[toolchain]]
+name = "arm-gnu-elf"
+version = "14.2.rel1"
+driver = "gcc"
+compiler = "bin/aarch64-none-elf-gcc"
+archiver = "bin/aarch64-none-elf-ar"
+cxx = "bin/aarch64-none-elf-g++"
+target = [{ arch = "aarch64", os = "freestanding", abi = "elf" }]
+
+[toolchain.host]
+x86_64-linux = { url = "https://developer.arm.com/-/media/Files/downloads/gnu/14.2.rel1/binrel/arm-gnu-toolchain-14.2.rel1-x86_64-aarch64-none-elf.tar.xz", sha256 = "eb54c4727440d03199a6af9a6d021e77f45410cad39effce4e5a1c10a88b7f04" }
+aarch64-linux = { url = "https://developer.arm.com/-/media/Files/downloads/gnu/14.2.rel1/binrel/arm-gnu-toolchain-14.2.rel1-aarch64-aarch64-none-elf.tar.xz", sha256 = "c4f0daab43f78e0d56ec2bdad76b98a0223ce12ce7fc51a6ce82f9cc6c6dfba0" }
+x86_64-macos = { url = "https://developer.arm.com/-/media/Files/downloads/gnu/14.2.rel1/binrel/arm-gnu-toolchain-14.2.rel1-darwin-x86_64-aarch64-none-elf.tar.xz", sha256 = "c02735606d69ed000cc8fae2c1467e489e1325c14a7874f553c42f7ef193fc21" }
+aarch64-macos = { url = "https://developer.arm.com/-/media/Files/downloads/gnu/14.2.rel1/binrel/arm-gnu-toolchain-14.2.rel1-darwin-arm64-aarch64-none-elf.tar.xz", sha256 = "fc111bb4bb4871e521e3c8a89bd0af51cddfd00fe3f526f4faa09398b7c613f5" }
+x86_64-windows = { url = "https://developer.arm.com/-/media/Files/downloads/gnu/14.2.rel1/binrel/arm-gnu-toolchain-14.2.rel1-mingw-w64-x86_64-aarch64-none-elf.zip", sha256 = "8c395a36849877d2f005fb1ac8c3611206f2f7930f15adfe95a21dd7969ca001" }
+
+[[toolchain]]
+name = "arm-gnu-sysroot"
+version = "14.2.rel1"
+driver = "gcc"
+compiler = "bin/aarch64-none-linux-gnu-gcc"
+archiver = "bin/aarch64-none-linux-gnu-ar"
+cxx = "bin/aarch64-none-linux-gnu-g++"
+target = [{ arch = "aarch64", os = "linux", abi = "gnu", sdk = "/sysroot/arm64" }]
+
+[toolchain.host]
+x86_64-linux = { url = "https://developer.arm.com/-/media/Files/downloads/gnu/14.2.rel1/binrel/arm-gnu-toolchain-14.2.rel1-x86_64-aarch64-none-linux-gnu.tar.xz", sha256 = "47aeefc02b0ee39f6d4d1812110952975542d365872a7474b5306924bca4faa1" }
+
+[[toolchain]]
+name = "w64devkit"
+version = "1.23.0"
+driver = "gcc"
+compiler = "bin/gcc"
+archiver = "bin/ar"
+cxx = "bin/g++"
+target = [{ arch = "x86_64", os = "windows", abi = "gnu" }]
+
+[toolchain.host]
+x86_64-windows = { url = "https://github.com/skeeto/w64devkit/releases/download/v1.23.0/w64devkit-1.23.0.zip", sha256 = "5c7dce6762be3e0dba648a9317790444c0e2f1ef3e677315c115727d7a549539" }
+
+[[toolchain]]
+name = "clang64"
+driver = "clang"
+compiler = "clang"
+archiver = "llvm-ar"
+cxx = "clang++"
+linker = "lld"
+link_args = ["-fuse-ld=lld"]
+host = { x86_64-windows = {} }
+target = [{ arch = "x86_64", os = "windows", abi = "gnu" }]
+
+[[toolchain]]
+name = "osxcross"
+driver = "clang"
+compiler = "clang"
+archiver = "llvm-ar"
+linker = "lld"
+link_args = ["-fuse-ld=lld"]
+host = { x86_64-linux = {}, aarch64-linux = {} }
+target = [{ arch = "aarch64", os = "macos", abi = "apple", sdk = "/opt/MacOSX15.sdk" }]

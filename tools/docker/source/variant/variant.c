@@ -100,7 +100,15 @@ static const c8* lane_names [LANE_COUNT] = {
   [LANE_CLANG_CROSS]     = "clang-cross",
   [LANE_CLANG_MSVC]      = "clang-msvc",
   [LANE_CLANG_XWIN]      = "clang-xwin",
-  [LANE_ZIG_XWIN]        = "zig-xwin",
+  [LANE_ZIG_XWIN]         = "zig-xwin",
+  [LANE_ZIG_LOCAL]        = "zig-local",
+  // [LANE_WASI_SDK_ABS]     = "wasi-sdk-abs",
+  [LANE_ARM_GNU_LINUX]    = "arm-gnu-linux",
+  [LANE_ARM_GNU_ELF]      = "arm-gnu-elf",
+  // [LANE_ARM_GNU_SYSROOT]  = "arm-gnu-sysroot",
+  [LANE_W64DEVKIT]        = "w64devkit",
+  [LANE_CLANG64]          = "clang64",
+  [LANE_OSXCROSS]         = "osxcross",
 };
 
 static const compiler_t compilers [] = { COMPILER_GCC, COMPILER_GXX, COMPILER_CLANG };
@@ -172,7 +180,7 @@ const variant_t variants [] = {
     .name = "debian-wasi-sdk",
     .distro = DISTRO_DEBIAN,
     .sysroots = { SYSROOT_WASI_SDK },
-    .lanes = { LANE_WASI_SDK, LANE_WASI_SDK_LOCAL },
+    .lanes = { LANE_WASI_SDK, LANE_WASI_SDK_LOCAL /*, LANE_WASI_SDK_ABS */ },
   },
   {
     .name = "debian-sysroot",
@@ -189,7 +197,13 @@ const variant_t variants [] = {
     .check = LANE_CLANG_XWIN,
     .extra = { "clang-16", "lld-16", "llvm-16" },
     .sysroots = { SYSROOT_XWIN, SYSROOT_ZIG },
-    .lanes = { LANE_CLANG_XWIN, LANE_ZIG_XWIN },
+    .lanes = { LANE_CLANG_XWIN, LANE_ZIG_XWIN, LANE_ZIG_LOCAL },
+  },
+  {
+    .name = "debian-arm",
+    .distro = DISTRO_DEBIAN,
+    .sysroots = { SYSROOT_ARM64 },
+    .lanes = { LANE_ARM_GNU_LINUX, LANE_ARM_GNU_ELF /*, LANE_ARM_GNU_SYSROOT */ },
   },
   {
     .name = "debian-cc-only",

@@ -94,7 +94,7 @@ const c8* test_target_alternate(void) {
 }
 
 static bool toolchain_enforces_exports(const test_toolchain_t* toolchain, spn_triple_t target) {
-  if (sp_cstr_equal(toolchain->name, "zig") && target.os == SPN_OS_MACOS) {
+  if (toolchain->info->driver == SPN_CC_DRIVER_ZIG && target.os == SPN_OS_MACOS) {
     return false;
   }
   return true;
