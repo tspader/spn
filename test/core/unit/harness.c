@@ -84,7 +84,6 @@ static spn_build_unit_t* add_build(spn_session_t* s, spn_build_id_t id, const c8
     .compiler = info->compiler,
     .cxx = info->cxx,
     .archiver = info->archiver,
-    .linker = info->linker,
     .archiver_driver = SPN_AR_DRIVER_GNU,
   };
   build->toolchain = toolchain;
@@ -115,10 +114,9 @@ spn_session_t* build_session(sp_mem_t mem, unit_graph_test_t* g) {
     .arch = SPN_ARCH_X64,
     .abi = g->abi ? g->abi : (g->os == SPN_OS_MACOS ? SPN_ABI_NONE : SPN_ABI_GNU),
   };
+  profile.linker = spn_ld_family(profile.driver, SPN_LD_FAMILY_NONE, (spn_triple_t) { profile.arch, profile.os, profile.abi });
   if (g->sdk) {
-    spn_sdk_host_t host = sp_zero;
-    spn_toolchain_selection_t selection = { .target = { .triple = { profile.arch, profile.os, profile.abi }, .sdk_source = SPN_SDK_SOURCE_PATH, .sdk = { .sub = sp_cstr_as_str(g->sdk) } } };
-    profile.sdk = spn_sdk_resolve(mem, &host, &selection);
+    profile.sdk = spn_sdk_at(mem, (spn_triple_t) { profile.arch, profile.os, profile.abi }, (spn_path_t) { .sub = sp_cstr_as_str(g->sdk) });
   }
 
   s->units.target = add_build(s, 1, "/build/debug", profile);

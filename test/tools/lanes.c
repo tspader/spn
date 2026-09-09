@@ -92,19 +92,17 @@ static void write_target(sp_io_writer_t* io, const spn_cg_toolchain_target_t* ta
   sp_io_write_cstr(io, " }", SP_NULLPTR);
 }
 
-static void write_bound_target(sp_io_writer_t* io, const spn_toolchain_target_t* target) {
+static void write_row(sp_io_writer_t* io, const spn_toolchain_row_t* row) {
   bool first = true;
   sp_io_write_cstr(io, "{", SP_NULLPTR);
-  write_field(io, &first, "arch", spn_arch_to_str(target->triple.arch));
-  write_field(io, &first, "os", spn_os_to_str(target->triple.os));
-  write_field(io, &first, "abi", spn_abi_to_str(target->triple.abi));
-  switch (target->sdk_source) {
-    case SPN_SDK_SOURCE_HOST: break;
-    case SPN_SDK_SOURCE_TOOLCHAIN: write_field(io, &first, "sdk", sp_str_lit("toolchain")); break;
-    case SPN_SDK_SOURCE_PATH: sp_unreachable_case();
+  write_field(io, &first, "arch", spn_arch_to_str(row->triple.arch));
+  write_field(io, &first, "os", spn_os_to_str(row->triple.os));
+  write_field(io, &first, "abi", spn_abi_to_str(row->triple.abi));
+  if (!spn_sdk_host_reachable(row->triple)) {
+    write_field(io, &first, "sdk", sp_str_lit("toolchain"));
   }
-  if (target->sanitizers) {
-    write_sanitizer_field(io, &first, target->sanitizers);
+  if (row->sanitizers) {
+    write_sanitizer_field(io, &first, row->sanitizers);
   }
   sp_io_write_cstr(io, " }", SP_NULLPTR);
 }
@@ -139,11 +137,11 @@ static void write_lane(sp_io_writer_t* io, const spn_cg_toolchain_t* lane, const
       write_target(io, &lane->target[it]);
     }
     sp_io_write_cstr(io, " ]\n", SP_NULLPTR);
-  } else if (info && !sp_da_empty(info->targets)) {
+  } else if (info && !sp_da_empty(info->rows)) {
     sp_io_write_cstr(io, "target = [", SP_NULLPTR);
-    sp_da_for(info->targets, it) {
+    sp_da_for(info->rows, it) {
       sp_io_write_cstr(io, it ? ", " : " ", SP_NULLPTR);
-      write_bound_target(io, &info->targets[it]);
+      write_row(io, &info->rows[it]);
     }
     sp_io_write_cstr(io, " ]\n", SP_NULLPTR);
   }

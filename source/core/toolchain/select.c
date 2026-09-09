@@ -8,7 +8,7 @@
 
 typedef struct {
   spn_err_t err;
-  spn_toolchain_target_t target;
+  spn_toolchain_row_t row;
   spn_sanitizer_set_t unsupported;
 } reach_t;
 
@@ -16,19 +16,19 @@ static bool usable(const spn_toolchain_info_t* toolchain) {
   return toolchain->support.kind != SPN_TOOLCHAIN_SUPPORT_NONE;
 }
 
-static const spn_toolchain_target_t* listed(const spn_toolchain_info_t* toolchain, spn_triple_t triple) {
-  sp_da_for(toolchain->targets, it) {
-    if (spn_triple_equal(toolchain->targets[it].triple, triple)) {
-      return &toolchain->targets[it];
+static const spn_toolchain_row_t* listed(const spn_toolchain_info_t* toolchain, spn_triple_t triple) {
+  sp_da_for(toolchain->rows, it) {
+    if (spn_triple_equal(toolchain->rows[it].triple, triple)) {
+      return &toolchain->rows[it];
     }
   }
   return SP_NULLPTR;
 }
 
-static sp_da(spn_triple_t) triples(sp_mem_t mem, sp_da(spn_toolchain_target_t) targets) {
+static sp_da(spn_triple_t) triples(sp_mem_t mem, sp_da(spn_toolchain_row_t) rows) {
   sp_da(spn_triple_t) out = sp_da_new(mem, spn_triple_t);
-  sp_da_for(targets, it) {
-    sp_da_push(out, targets[it].triple);
+  sp_da_for(rows, it) {
+    sp_da_push(out, rows[it].triple);
   }
   return out;
 }
@@ -57,58 +57,48 @@ static bool lists_completion(const spn_toolchain_info_t* toolchain, spn_triple_t
   return false;
 }
 
-static spn_err_t reach(const spn_toolchain_info_t* toolchain, const spn_toolchain_catalog_t* catalog, spn_triple_t target) {
-  const spn_toolchain_target_t* entry = listed(toolchain, target);
-  if (!entry && !spn_toolchain_driver_retargets(toolchain->driver)) {
-    return SPN_ERR_TOOLCHAIN_TARGET;
-  }
-  if (entry && entry->sdk_source != SPN_SDK_SOURCE_HOST) {
-    return SPN_OK;
-  }
-  bool served = spn_sdk_from_host(&catalog->sdks, target).kind != SPN_SDK_NONE;
-  switch (spn_sdk_kind(target)) {
-    case SPN_SDK_NONE:    return SPN_OK;
-    case SPN_SDK_SYSROOT: return spn_triple_equal(target, catalog->host) ? SPN_OK : SPN_ERR_TOOLCHAIN_SYSROOT;
-    case SPN_SDK_MACOS:   return served ? SPN_OK : SPN_ERR_TOOLCHAIN_SDK_MACOS;
-    case SPN_SDK_MSVC:    return served ? SPN_OK : SPN_ERR_TOOLCHAIN_SDK_MSVC;
-  }
-  sp_unreachable_return(SPN_ERR_TOOLCHAIN_TARGET);
-}
-
-static spn_toolchain_target_t matched(const spn_toolchain_info_t* toolchain, spn_triple_t triple) {
-  const spn_toolchain_target_t* entry = listed(toolchain, triple);
-  return entry ? *entry : (spn_toolchain_target_t) { .triple = triple };
-}
-
-static reach_t supports(spn_toolchain_target_t row, spn_toolchain_query_t query) {
+static reach_t supports(spn_toolchain_row_t row, spn_toolchain_query_t query) {
   spn_sanitizer_set_t missing = query.sanitizers & ~row.sanitizers;
   if (missing) {
-    return (reach_t) { .err = SPN_ERR_SANITIZER_UNSUPPORTED, .target = row, .unsupported = missing };
+    return (reach_t) { .err = SPN_ERR_SANITIZER_UNSUPPORTED, .row = row, .unsupported = missing };
   }
   spn_sanitizer_set_t heavy = query.sanitizers & ~SPN_SANITIZER_UNDEFINED;
   spn_linkage_t linkage = query.linkage ? query.linkage : spn_abi_linkage(row.triple.abi);
   if (heavy && linkage == SPN_LIB_KIND_STATIC && spn_ld_static(spn_ld_dialect(row.triple))) {
-    return (reach_t) { .err = SPN_ERR_SANITIZER_STATIC, .target = row, .unsupported = heavy };
+    return (reach_t) { .err = SPN_ERR_SANITIZER_STATIC, .row = row, .unsupported = heavy };
   }
-  return (reach_t) { .target = row };
+  return (reach_t) { .row = row };
 }
 
-static reach_t attempt(const spn_toolchain_info_t* toolchain, const spn_toolchain_catalog_t* catalog, spn_toolchain_query_t query, spn_triple_t candidate) {
-  spn_err_t err = reach(toolchain, catalog, candidate);
-  if (err) {
-    return (reach_t) { .err = err };
+static reach_t attempt(const spn_toolchain_info_t* toolchain, spn_toolchain_query_t query, spn_triple_t candidate) {
+  const spn_toolchain_row_t* row = listed(toolchain, candidate);
+  if (!row) {
+    return (reach_t) { .err = SPN_ERR_TOOLCHAIN_TARGET, .row = { .triple = candidate } };
   }
-  return supports(matched(toolchain, candidate), query);
+  return supports(*row, query);
+}
+
+static spn_err_t refusal(spn_cc_driver_t driver, spn_triple_t target) {
+  if (!spn_toolchain_driver_retargets(driver)) {
+    return SPN_ERR_TOOLCHAIN_TARGET;
+  }
+  switch (spn_sdk_kind(target)) {
+    case SPN_SDK_NONE: return SPN_ERR_TOOLCHAIN_TARGET;
+    case SPN_SDK_SYSROOT: return SPN_ERR_TOOLCHAIN_SYSROOT;
+    case SPN_SDK_MACOS: return SPN_ERR_TOOLCHAIN_SDK_MACOS;
+    case SPN_SDK_MSVC: return SPN_ERR_TOOLCHAIN_SDK_MSVC;
+  }
+  sp_unreachable_return(SPN_ERR_TOOLCHAIN_TARGET);
 }
 
 static bool reached_target(reach_t reached) {
   return reached.err == SPN_ERR_SANITIZER_UNSUPPORTED || reached.err == SPN_ERR_SANITIZER_STATIC;
 }
 
-static reach_t reach_first(const spn_toolchain_info_t* toolchain, const spn_toolchain_catalog_t* catalog, spn_toolchain_query_t query, spn_abi_list_t abis) {
+static reach_t reach_first(const spn_toolchain_info_t* toolchain, spn_toolchain_query_t query, spn_abi_list_t abis) {
   reach_t furthest = sp_zero;
   sp_for(it, abis.count) {
-    reach_t reached = attempt(toolchain, catalog, query, with_abi(query.target, abis.items[it]));
+    reach_t reached = attempt(toolchain, query, with_abi(query.target, abis.items[it]));
     if (!reached.err) {
       return reached;
     }
@@ -119,12 +109,12 @@ static reach_t reach_first(const spn_toolchain_info_t* toolchain, const spn_tool
   return furthest;
 }
 
-static bool satisfies(const spn_toolchain_info_t* toolchain, const spn_toolchain_catalog_t* catalog, spn_toolchain_query_t query, spn_toolchain_target_t* target) {
+static bool satisfies(const spn_toolchain_info_t* toolchain, spn_toolchain_query_t query, spn_toolchain_row_t* row) {
   if (!usable(toolchain)) {
     return false;
   }
-  reach_t reached = reach_first(toolchain, catalog, query, query.abis);
-  *target = reached.target;
+  reach_t reached = reach_first(toolchain, query, query.abis);
+  *row = reached.row;
   return reached.err == SPN_OK;
 }
 
@@ -132,8 +122,8 @@ static sp_da(sp_str_t) satisfying(spn_toolchain_catalog_t* catalog, spn_toolchai
   sp_da(sp_str_t) names = sp_da_new(catalog->mem, sp_str_t);
   sp_om_for(catalog->entries, it) {
     spn_toolchain_info_t* entry = sp_om_at(catalog->entries, it);
-    spn_toolchain_target_t target = sp_zero;
-    if (satisfies(entry, catalog, query, &target)) {
+    spn_toolchain_row_t row = sp_zero;
+    if (satisfies(entry, query, &row)) {
       sp_da_push(names, entry->name);
     }
   }
@@ -173,16 +163,20 @@ static spn_err_t emit_reach(spn_toolchain_catalog_t* catalog, spn_toolchain_quer
         .kind = reached.err,
         .sanitizer = {
           .toolchain = toolchain->name,
-          .target = reached.target.triple,
+          .target = reached.row.triple,
           .unsupported = reached.unsupported,
-          .supported = reached.target.sanitizers,
+          .supported = reached.row.sanitizers,
         },
       });
     }
+    case SPN_ERR_TOOLCHAIN_TARGET: {
+      return emit(refusal(toolchain->driver, reached.row.triple), catalog, query, candidates, triples(catalog->mem, toolchain->rows));
+    }
     default: {
-      return emit(reached.err, catalog, query, candidates, triples(catalog->mem, toolchain->targets));
+      sp_unreachable_case();
     }
   }
+  sp_unreachable_return(SPN_ERROR);
 }
 
 static spn_err_t emit_abi(spn_toolchain_catalog_t* catalog, spn_toolchain_query_t query) {
@@ -205,9 +199,9 @@ static spn_err_t emit_abi(spn_toolchain_catalog_t* catalog, spn_toolchain_query_
 static spn_err_t select_auto(spn_toolchain_catalog_t* catalog, spn_toolchain_query_t query, spn_toolchain_selection_t* selection) {
   sp_om_for(catalog->entries, it) {
     spn_toolchain_info_t* entry = sp_om_at(catalog->entries, it);
-    spn_toolchain_target_t target = sp_zero;
-    if (satisfies(entry, catalog, query, &target)) {
-      *selection = (spn_toolchain_selection_t) { .toolchain = entry, .target = target };
+    spn_toolchain_row_t row = sp_zero;
+    if (satisfies(entry, query, &row)) {
+      *selection = (spn_toolchain_selection_t) { .toolchain = entry, .row = row };
       return SPN_OK;
     }
   }
@@ -224,12 +218,12 @@ static spn_err_t select_named(spn_toolchain_catalog_t* catalog, spn_toolchain_qu
     return emit(SPN_ERR_TOOLCHAIN_HOST, catalog, query, satisfying(catalog, query), SP_NULLPTR);
   }
 
-  reach_t reached = reach_first(toolchain, catalog, query, query.abis);
+  reach_t reached = reach_first(toolchain, query, query.abis);
   if (reached.err) {
     return emit_reach(catalog, query, toolchain, reached, satisfying(catalog, query));
   }
 
-  *selection = (spn_toolchain_selection_t) { .toolchain = toolchain, .target = reached.target };
+  *selection = (spn_toolchain_selection_t) { .toolchain = toolchain, .row = reached.row };
   return SPN_OK;
 }
 
@@ -250,7 +244,7 @@ static spn_err_t incomplete_named(spn_toolchain_catalog_t* catalog, spn_toolchai
     return emit(SPN_ERR_TOOLCHAIN_HOST, catalog, query, listing(catalog, query.target), SP_NULLPTR);
   }
 
-  reach_t reached = reach_first(toolchain, catalog, query, completions(query.target.os));
+  reach_t reached = reach_first(toolchain, query, completions(query.target.os));
   if (reached.err) {
     return emit_reach(catalog, query, toolchain, reached, listing(catalog, query.target));
   }

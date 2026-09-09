@@ -40,7 +40,6 @@ typedef struct {
   spn_toolchain_launcher_t compiler;
   spn_toolchain_launcher_t cxx;
   spn_toolchain_launcher_t archiver;
-  spn_ld_family_t linker;
   sp_da(sp_str_t) link_args;
   spn_ar_driver_t archiver_driver;
 } spn_cc_toolchain_t;

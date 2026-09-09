@@ -113,6 +113,12 @@ typedef struct {
   spn_sanitizer_set_t sanitizers;
 } spn_toolchain_target_t;
 
+typedef struct {
+  spn_triple_t triple;
+  spn_sdk_t sdk;
+  spn_sanitizer_set_t sanitizers;
+} spn_toolchain_row_t;
+
 typedef enum {
   SPN_TOOLCHAIN_SOURCE_LOCAL,
   SPN_TOOLCHAIN_SOURCE_DISTRIBUTION,
@@ -153,7 +159,7 @@ typedef struct {
   spn_toolchain_launcher_t archiver;
   spn_ld_family_t linker;
   sp_da(sp_str_t) link_args;
-  sp_da(spn_toolchain_target_t) targets;
+  sp_da(spn_toolchain_row_t) rows;
   spn_toolchain_support_t support;
 } spn_toolchain_info_t;
 
@@ -191,7 +197,7 @@ typedef struct {
 
 typedef struct {
   spn_toolchain_info_t* toolchain;
-  spn_toolchain_target_t target;
+  spn_toolchain_row_t row;
 } spn_toolchain_selection_t;
 
 typedef spn_err_t (*spn_fetch_fn)(sp_str_t url, sp_str_t dest, void* user_data);

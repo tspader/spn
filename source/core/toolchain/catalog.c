@@ -91,64 +91,124 @@ spn_err_t spn_toolchain_decls_parse(sp_mem_t mem, sp_str_t json, sp_da(spn_toolc
   return SPN_OK;
 }
 
-static spn_toolchain_target_t stock_target(spn_cc_driver_t driver, spn_triple_t triple) {
+static bool has_row(sp_da(spn_toolchain_row_t) rows, spn_triple_t triple) {
+  sp_da_for(rows, it) {
+    if (spn_triple_equal(rows[it].triple, triple)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static void push_row(sp_da(spn_toolchain_row_t)* rows, spn_toolchain_row_t row) {
+  if (!has_row(*rows, row.triple)) {
+    sp_da_push(*rows, row);
+  }
+}
+
+static spn_path_t sdk_root(spn_toolchain_catalog_t* catalog, spn_toolchain_support_t support, spn_path_t sdk) {
+  switch (support.kind) {
+    case SPN_TOOLCHAIN_SUPPORT_ARTIFACT: return spn_path_join(catalog->mem, spn_toolchain_artifact_root(support.artifact), sdk.sub);
+    case SPN_TOOLCHAIN_SUPPORT_LOCAL:
+    case SPN_TOOLCHAIN_SUPPORT_NONE: return sdk;
+  }
+  sp_unreachable_return(sdk);
+}
+
+static bool bind_row(spn_toolchain_catalog_t* catalog, spn_toolchain_support_t support, spn_toolchain_target_t target, spn_toolchain_row_t* row) {
+  *row = (spn_toolchain_row_t) { .triple = target.triple, .sanitizers = target.sanitizers };
+  switch (target.sdk_source) {
+    case SPN_SDK_SOURCE_PATH: {
+      row->sdk = spn_sdk_at(catalog->mem, target.triple, sdk_root(catalog, support, target.sdk));
+      return true;
+    }
+    case SPN_SDK_SOURCE_TOOLCHAIN: {
+      row->sdk = spn_sdk_from_host(&catalog->sdks, target.triple);
+      return true;
+    }
+    case SPN_SDK_SOURCE_HOST: {
+      return spn_sdk_served(&catalog->sdks, catalog->host, target.triple, &row->sdk);
+    }
+  }
+  sp_unreachable_return(false);
+}
+
+static spn_toolchain_target_t stock(spn_cc_driver_t driver, spn_triple_t triple) {
   return (spn_toolchain_target_t) {
     .triple = triple,
-    .sdk_source = spn_sdk_host_reachable(triple) ? SPN_SDK_SOURCE_HOST : SPN_SDK_SOURCE_TOOLCHAIN,
+    .sdk_source = SPN_SDK_SOURCE_TOOLCHAIN,
     .sanitizers = spn_toolchain_stock_sanitizers(driver, triple),
   };
 }
 
-static void push_served(sp_da(spn_toolchain_target_t)* targets, spn_cc_driver_t driver, spn_triple_t host) {
-  sp_da_push(*targets, stock_target(driver, host));
-  if (host.os != SPN_OS_MACOS || !spn_toolchain_driver_retargets(driver)) {
+static void push_stock(sp_da(spn_toolchain_row_t)* rows, spn_toolchain_catalog_t* catalog, const spn_toolchain_decl_t* decl) {
+  spn_triple_t host = catalog->host;
+  host.abi = host.abi ? host.abi : spn_default_abi(decl->driver, host.os);
+  if (!spn_toolchain_driver_composes(decl->driver, spn_ld_dialect(host))) {
+    return;
+  }
+
+  spn_toolchain_row_t row = sp_zero;
+  bind_row(catalog, sp_zero_struct(spn_toolchain_support_t), stock(decl->driver, host), &row);
+  sp_da_push(*rows, row);
+  if (host.os != SPN_OS_MACOS || !spn_toolchain_driver_retargets(decl->driver)) {
     return;
   }
   const spn_arch_t* arches = SP_NULLPTR;
   u32 count = spn_os_archs(host.os, &arches);
   sp_for(it, count) {
-    if (arches[it] != host.arch) {
-      sp_da_push(*targets, stock_target(driver, (spn_triple_t) { arches[it], host.os, host.abi }));
-    }
+    bind_row(catalog, sp_zero_struct(spn_toolchain_support_t), stock(decl->driver, (spn_triple_t) { arches[it], host.os, host.abi }), &row);
+    push_row(rows, row);
   }
 }
 
-static sp_da(spn_toolchain_target_t) default_targets(spn_toolchain_catalog_t* catalog, const spn_toolchain_decl_t* decl) {
-  spn_triple_t host = catalog->host;
-  host.abi = host.abi ? host.abi : spn_default_abi(decl->driver, host.os);
-
-  sp_da(spn_toolchain_target_t) targets = sp_da_new(catalog->mem, spn_toolchain_target_t);
-  if (!spn_toolchain_driver_composes(decl->driver, spn_ld_dialect(host))) {
-    return targets;
-  }
-  push_served(&targets, decl->driver, host);
-  if (spn_os_format(host.os) == SPN_FORMAT_ELF) {
-    sp_da_push(targets, ((spn_toolchain_target_t) { .triple = { host.arch, SPN_OS_FREESTANDING, SPN_ABI_BARE } }));
-    sp_da_push(targets, ((spn_toolchain_target_t) { .triple = { host.arch, host.os, SPN_ABI_BARE } }));
-  }
-  return targets;
-}
-
-static sp_da(spn_toolchain_target_t) declared_targets(spn_toolchain_catalog_t* catalog, sp_da(spn_toolchain_target_t) declared, spn_toolchain_support_t support) {
-  switch (support.kind) {
-    case SPN_TOOLCHAIN_SUPPORT_ARTIFACT: {
-      spn_path_t root = spn_toolchain_artifact_root(support.artifact);
-      sp_da(spn_toolchain_target_t) targets = sp_da_new(catalog->mem, spn_toolchain_target_t);
-      sp_da_for(declared, it) {
-        spn_toolchain_target_t target = declared[it];
-        if (target.sdk_source == SPN_SDK_SOURCE_PATH) {
-          target.sdk = spn_path_join(catalog->mem, root, target.sdk.sub);
+static void push_hosted(sp_da(spn_toolchain_row_t)* rows, spn_toolchain_catalog_t* catalog) {
+  static const spn_os_t hosted [] = { SPN_OS_LINUX, SPN_OS_MACOS, SPN_OS_WINDOWS };
+  sp_carr_for(hosted, os) {
+    const spn_arch_t* arches = SP_NULLPTR;
+    const spn_abi_t* abis = SP_NULLPTR;
+    u32 num_arches = spn_os_archs(hosted[os], &arches);
+    u32 num_abis = spn_os_completions(hosted[os], &abis);
+    sp_for(arch, num_arches) {
+      sp_for(abi, num_abis) {
+        spn_toolchain_row_t row = { .triple = { arches[arch], hosted[os], abis[abi] } };
+        if (spn_sdk_served(&catalog->sdks, catalog->host, row.triple, &row.sdk)) {
+          push_row(rows, row);
         }
-        sp_da_push(targets, target);
       }
-      return targets;
-    }
-    case SPN_TOOLCHAIN_SUPPORT_LOCAL:
-    case SPN_TOOLCHAIN_SUPPORT_NONE: {
-      return declared;
     }
   }
-  sp_unreachable_return(declared);
+}
+
+static void push_bare(sp_da(spn_toolchain_row_t)* rows, const spn_toolchain_decl_t* decl, spn_triple_t host) {
+  if (!spn_toolchain_driver_composes(decl->driver, SPN_LD_DIALECT_GNU) || spn_os_format(host.os) != SPN_FORMAT_ELF) {
+    return;
+  }
+  push_row(rows, (spn_toolchain_row_t) { .triple = { host.arch, SPN_OS_FREESTANDING, SPN_ABI_BARE } });
+  push_row(rows, (spn_toolchain_row_t) { .triple = { host.arch, SPN_OS_LINUX, SPN_ABI_BARE } });
+}
+
+static sp_da(spn_toolchain_row_t) bind_rows(spn_toolchain_catalog_t* catalog, const spn_toolchain_decl_t* decl, spn_toolchain_support_t support) {
+  sp_da(spn_toolchain_row_t) rows = sp_da_new(catalog->mem, spn_toolchain_row_t);
+  bool derived = sp_da_empty(decl->targets);
+  bool retargets = spn_toolchain_driver_retargets(decl->driver);
+
+  if (derived) {
+    push_stock(&rows, catalog, decl);
+  }
+  sp_da_for(decl->targets, it) {
+    spn_toolchain_row_t row = sp_zero;
+    if (bind_row(catalog, support, decl->targets[it], &row)) {
+      sp_da_push(rows, row);
+    }
+  }
+  if (retargets) {
+    push_hosted(&rows, catalog);
+  }
+  if (retargets || derived) {
+    push_bare(&rows, decl, catalog->host);
+  }
+  return rows;
 }
 
 static bool has_host(sp_da(spn_toolchain_host_t) hosts, spn_triple_t host) {
@@ -193,7 +253,7 @@ static spn_toolchain_info_t bind_toolchain(spn_toolchain_catalog_t* catalog, con
     .archiver = decl->archiver,
     .linker = decl->linker,
     .link_args = decl->link_args,
-    .targets = sp_da_empty(decl->targets) ? default_targets(catalog, decl) : declared_targets(catalog, decl->targets, support),
+    .rows = bind_rows(catalog, decl, support),
     .support = support,
   };
 }

@@ -236,11 +236,10 @@ spn_err_t spn_cc_validate_link(const spn_cc_toolchain_t* toolchain, spn_triple_t
   if (profile->os == SPN_OS_MACOS && !sp_da_empty(link->frameworks) && profile->sdk.kind == SPN_SDK_NONE) {
     return feature_unsupported(toolchain, profile, SPN_CC_FEATURE_FRAMEWORKS);
   }
-  spn_ld_family_t family = spn_ld_family(toolchain->driver, toolchain->linker, target);
-  if (!sp_da_empty(link->scripts) && !spn_ld_scripts(family, spn_os_format(profile->os))) {
+  if (!sp_da_empty(link->scripts) && !spn_ld_scripts(profile->linker, spn_os_format(profile->os))) {
     return feature_unsupported(toolchain, profile, SPN_CC_FEATURE_LINKER_SCRIPT);
   }
-  if (family == SPN_LD_FAMILY_MSVC && host.os != SPN_OS_WINDOWS) {
+  if (profile->linker == SPN_LD_FAMILY_MSVC && host.os != SPN_OS_WINDOWS) {
     return link_refused(SPN_ERR_TOOLCHAIN_MSVC_LINKER_HOST, toolchain, host, profile);
   }
   return SPN_OK;

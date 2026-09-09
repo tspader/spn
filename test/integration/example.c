@@ -17,7 +17,7 @@ sp_test(example, kernel_aarch64) {
   return run_test(t, (test_t) {
     .project = "example/kernel",
     .copy = { "start", "kernel.ld" },
-    .when = { .lanes = { "zig", "aarch64-gnu" }, .target = "aarch64-freestanding-none" },
+    .when.target = "aarch64-freestanding-none",
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", "aarch64-freestanding-none" } } },
       { .kind = ACTION_VERIFY_ELF_ENTRY, .verify_elf_entry = { target_exe("main", "aarch64-freestanding-none"), 0x400000 } },

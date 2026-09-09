@@ -525,7 +525,7 @@ sp_test_each(profile, resolve, test_t, tests, .setup = spn_test_ctx_setup) {
   }
 
   spn_toolchain_info_t info = { .driver = SPN_CC_DRIVER_ZIG };
-  spn_toolchain_selection_t selection = { .toolchain = &info, .target.triple = { result.arch, result.os, it->abi ? it->abi : result.abi } };
+  spn_toolchain_selection_t selection = { .toolchain = &info, .row.triple = { result.arch, result.os, it->abi ? it->abi : result.abi } };
   spn_profile_finalize(&result, &selection);
   sp_expect_eq(t, (u32)it->expect.linkage, (u32)result.linkage);
   return SP_OK;
@@ -560,7 +560,7 @@ sp_test_each(profile, query, query_test_t, query_tests) {
 sp_test_each(profile, finalize, finalize_test_t, finalize_tests) {
   spn_profile_info_t profile = sp_zero;
   spn_toolchain_info_t info = { .driver = it->driver, .linker = it->linker };
-  spn_toolchain_selection_t selection = { .toolchain = &info, .target.triple = it->target };
+  spn_toolchain_selection_t selection = { .toolchain = &info, .row.triple = it->target };
   spn_profile_finalize(&profile, &selection);
   sp_expect_eq(t, (u32)it->expect.linkage, (u32)profile.linkage);
   sp_expect_eq(t, (u32)it->expect.driver, (u32)profile.driver);

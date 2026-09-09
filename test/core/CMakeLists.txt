@@ -139,7 +139,6 @@ add_executable(core
   toolchain/sdk_hash.c
   toolchain/sdk_libc.c
   toolchain/sdk_msvc.c
-  toolchain/sdk_resolve.c
   toolchain/sdk_root.c
   toolchain/sdk_serve.c
   toolchain/search.c
@@ -306,7 +305,6 @@ set_source_files_properties(
   toolchain/sdk_hash.c
   toolchain/sdk_libc.c
   toolchain/sdk_msvc.c
-  toolchain/sdk_resolve.c
   toolchain/sdk_root.c
   toolchain/sdk_serve.c
   toolchain/search.c

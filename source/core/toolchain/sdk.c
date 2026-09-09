@@ -105,6 +105,16 @@ spn_sdk_msvc_t spn_sdk_from_msvc(sp_mem_t mem, const sp_msvc_sdk_t* kits, const 
   };
 }
 
+spn_sdk_t spn_sdk_at(sp_mem_t mem, spn_triple_t target, spn_path_t root) {
+  switch (spn_sdk_kind(target)) {
+    case SPN_SDK_SYSROOT: return spn_sdk_sysroot(root);
+    case SPN_SDK_MACOS: return spn_sdk_macos(mem, root);
+    case SPN_SDK_MSVC: return spn_sdk_msvc(mem, root, target.arch);
+    case SPN_SDK_NONE: sp_unreachable_case();
+  }
+  sp_unreachable_return(sp_zero_struct(spn_sdk_t));
+}
+
 static const spn_sdk_msvc_t* msvc_for(const spn_sdk_host_t* host, spn_arch_t arch) {
   sp_da_for(host->msvc, it) {
     if (host->msvc[it].arch == arch) {
@@ -130,6 +140,17 @@ spn_sdk_t spn_sdk_from_host(const spn_sdk_host_t* host, spn_triple_t target) {
     }
   }
   sp_unreachable_return(none);
+}
+
+bool spn_sdk_served(const spn_sdk_host_t* sdks, spn_triple_t host, spn_triple_t target, spn_sdk_t* sdk) {
+  *sdk = spn_sdk_from_host(sdks, target);
+  switch (spn_sdk_kind(target)) {
+    case SPN_SDK_NONE: return true;
+    case SPN_SDK_SYSROOT: return spn_triple_equal(target, host);
+    case SPN_SDK_MACOS:
+    case SPN_SDK_MSVC: return sdk->kind != SPN_SDK_NONE;
+  }
+  sp_unreachable_return(false);
 }
 
 static sp_str_t xcrun_sdk(sp_mem_t mem) {
@@ -181,23 +202,6 @@ spn_sdk_host_t spn_sdk_detect(sp_mem_t mem, const spn_path_roots_t* roots, sp_en
     detect_msvc(mem, &sdks.msvc);
   }
   return sdks;
-}
-
-spn_sdk_t spn_sdk_resolve(sp_mem_t mem, const spn_sdk_host_t* host, const spn_toolchain_selection_t* selection) {
-  spn_triple_t triple = selection->target.triple;
-  switch (selection->target.sdk_source) {
-    case SPN_SDK_SOURCE_HOST:
-    case SPN_SDK_SOURCE_TOOLCHAIN: return spn_sdk_from_host(host, triple);
-    case SPN_SDK_SOURCE_PATH: break;
-  }
-  spn_path_t root = selection->target.sdk;
-  switch (spn_sdk_kind(triple)) {
-    case SPN_SDK_SYSROOT: return spn_sdk_sysroot(root);
-    case SPN_SDK_MACOS: return spn_sdk_macos(mem, root);
-    case SPN_SDK_MSVC: return spn_sdk_msvc(mem, root, triple.arch);
-    case SPN_SDK_NONE: sp_unreachable_case();
-  }
-  sp_unreachable_return(sp_zero_struct(spn_sdk_t));
 }
 
 sp_hash_t spn_sdk_hash(const spn_sdk_t* sdk) {

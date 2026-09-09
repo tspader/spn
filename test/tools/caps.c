@@ -26,8 +26,8 @@ static sp_str_t read_repo_file(sp_mem_t mem, const c8* rel) {
 }
 
 static bool targets(const spn_toolchain_info_t* info, spn_triple_t triple) {
-  sp_da_for(info->targets, it) {
-    if (spn_triple_equal(info->targets[it].triple, triple)) {
+  sp_da_for(info->rows, it) {
+    if (spn_triple_equal(info->rows[it].triple, triple)) {
       return true;
     }
   }
@@ -39,9 +39,9 @@ static spn_triple_t host_for(const spn_toolchain_info_t* info) {
   if (targets(info, host)) {
     return host;
   }
-  sp_da_for(info->targets, it) {
-    if (info->targets[it].triple.arch == host.arch && info->targets[it].triple.os == host.os) {
-      return info->targets[it].triple;
+  sp_da_for(info->rows, it) {
+    if (info->rows[it].triple.arch == host.arch && info->rows[it].triple.os == host.os) {
+      return info->rows[it].triple;
     }
   }
   return host;
@@ -79,8 +79,8 @@ const c8* test_target_alternate(void) {
   const spn_toolchain_info_t* info = test_toolchain()->info;
   spn_triple_t host = test_host();
 
-  sp_da_for(info->targets, it) {
-    spn_triple_t target = info->targets[it].triple;
+  sp_da_for(info->rows, it) {
+    spn_triple_t target = info->rows[it].triple;
     if (target.os == SPN_OS_FREESTANDING) {
       continue;
     }
@@ -98,10 +98,6 @@ static bool toolchain_enforces_exports(const test_toolchain_t* toolchain, spn_tr
     return false;
   }
   return true;
-}
-
-static bool toolchain_links_elf(const test_toolchain_t* toolchain) {
-  return spn_triple_host().os != SPN_OS_MACOS || toolchain->info->driver != SPN_CC_DRIVER_CLANG;
 }
 
 static bool toolchain_deterministic_objects(const test_toolchain_t* toolchain) {
@@ -139,8 +135,8 @@ static const lane_program_t lane_programs [] = {
 };
 
 static bool links_dialect(const spn_toolchain_info_t* info, spn_ld_dialect_t dialect) {
-  sp_da_for(info->targets, it) {
-    if (spn_ld_dialect(info->targets[it].triple) == dialect) {
+  sp_da_for(info->rows, it) {
+    if (spn_ld_dialect(info->rows[it].triple) == dialect) {
       return true;
     }
   }
@@ -332,10 +328,6 @@ sp_str_t test_when_blocked(test_when_t when) {
       sp_fmt_str(spn_triple_to_str(mem, target)),
       sp_fmt_str(spn_ld_family_to_str(family)),
       sp_fmt_str(spn_ld_family_to_str(when.linker))).value;
-  }
-
-  if (spn_os_format(target.os) == SPN_FORMAT_ELF && !toolchain_links_elf(toolchain)) {
-    return sp_fmt(mem, "{} links with ld64, which can't emit ELF", sp_fmt_cstr(toolchain->name)).value;
   }
 
   spn_toolchain_selection_t selection = sp_zero;

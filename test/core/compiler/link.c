@@ -893,7 +893,6 @@ sp_test_each(render_link, render, link_test_t, tests, .setup = spn_test_ctx_setu
   sp_mem_t mem = sp_test_arena(t);
   spn_cc_toolchain_t toolchain = test_toolchain(it->driver);
   spn_triple_t triple = { it->profile.arch, it->profile.os, it->profile.abi };
-  toolchain.linker = it->linker;
   toolchain.link_args = sp_da_new(mem, sp_str_t);
   sp_carr_for(it->link_args, at) {
     if (!it->link_args[at]) break;
@@ -953,6 +952,7 @@ sp_test_each(render_link, render, link_test_t, tests, .setup = spn_test_ctx_setu
   }
 
   spn_profile_info_t profile = test_profile(it->profile);
+  profile.linker = spn_ld_family(it->driver, it->linker, triple);
   spn_invocation_t invocation = sp_zero;
   spn_err_t err = spn_cc_render_link(mem, &toolchain, it->host, &profile, &link, &files, &invocation);
   sp_expect_eq(t, err, it->expect.err);

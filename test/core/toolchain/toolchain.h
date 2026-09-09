@@ -50,6 +50,18 @@ typedef struct {
 } fixture_sdk_t;
 
 typedef struct {
+  spn_sdk_kind_t kind;
+  test_path_t root;
+  test_path_t vc;
+} fixture_sdk_expect_t;
+
+typedef struct {
+  spn_triple_t triple;
+  fixture_sdk_expect_t sdk;
+  spn_sanitizer_set_t sanitizers;
+} fixture_row_t;
+
+typedef struct {
   test_path_t root;
   spn_arch_t arch;
 } fixture_msvc_t;
@@ -71,6 +83,7 @@ typedef struct {
   const c8* link_args [FIXTURE_MAX_ARGS];
   fixture_host_t hosts [FIXTURE_MAX_HOSTS];
   fixture_target_t targets [FIXTURE_MAX_TARGETS];
+  fixture_row_t rows [FIXTURE_MAX_TARGETS];
 } fixture_toolchain_t;
 
 static bool fixture_triple_empty(spn_triple_t triple) {
@@ -118,12 +131,6 @@ static spn_sdk_host_t fixture_sdks(sp_mem_t mem, fixture_sdks_t sdks) {
   }
   return host;
 }
-
-typedef struct {
-  spn_sdk_kind_t kind;
-  test_path_t root;
-  test_path_t vc;
-} fixture_sdk_expect_t;
 
 static sp_err_t fixture_check_sdk(sp_test_t* t, spn_sdk_t sdk, fixture_sdk_expect_t expect) {
   sp_must_eq(t, (u32)expect.kind, (u32)sdk.kind);
@@ -204,6 +211,27 @@ static sp_err_t fixture_check_targets(sp_test_t* t, sp_da(spn_toolchain_target_t
   return SP_OK;
 }
 
+static sp_err_t fixture_check_rows(sp_test_t* t, sp_da(spn_toolchain_row_t) rows, const fixture_row_t* expect, u32 count) {
+  sp_mem_t mem = sp_test_arena(t);
+  sp_must_eq(t, count, (u32)sp_da_size(rows));
+  sp_for(it, count) {
+    sp_expect_str_eq(t, spn_triple_to_str(mem, rows[it].triple), spn_triple_to_str(mem, expect[it].triple));
+    sp_expect_eq(t, expect[it].sanitizers, rows[it].sanitizers);
+    if (fixture_check_sdk(t, rows[it].sdk, expect[it].sdk)) {
+      return SP_ERR;
+    }
+  }
+  return SP_OK;
+}
+
+static sp_err_t fixture_check_expected_rows(sp_test_t* t, sp_da(spn_toolchain_row_t) rows, const fixture_row_t* expect) {
+  u32 count = 0;
+  while (count < FIXTURE_MAX_TARGETS && !fixture_triple_empty(expect[count].triple)) {
+    count++;
+  }
+  return fixture_check_rows(t, rows, expect, count);
+}
+
 static sp_err_t fixture_check_link_args(sp_test_t* t, sp_da(sp_str_t) link_args, const c8* const* expect) {
   sp_must_strs_eq(t, link_args, sp_da_size(link_args), expect);
   return SP_OK;
@@ -278,7 +306,7 @@ static sp_err_t fixture_check_entry(sp_test_t* t, spn_toolchain_info_t* info, fi
     return SP_ERR;
   }
 
-  return fixture_check_declared_targets(t, info->targets, expect);
+  return fixture_check_expected_rows(t, info->rows, expect.rows);
 }
 
 static sp_err_t fixture_read_json(sp_test_t* t, const c8* file, sp_str_t* json) {

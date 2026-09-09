@@ -5,7 +5,6 @@
 #include "session/session.h"
 #include "str/str.h"
 #include "profile/types.h"
-#include "toolchain/linker.h"
 #include "toolchain/sdk.h"
 
 typedef struct {
@@ -129,7 +128,6 @@ sp_hash_t spn_unit_fingerprint(spn_session_t* session, spn_build_unit_t* build, 
   }
 
   spn_toolchain_info_t* toolchain = build->toolchain->info;
-  spn_triple_t target = spn_profile_triple(&build->profile);
   sp_opt_spn_linkage_t config = spn_session_config_kind(session, pkg->name);
 
   fingerprint.mode = build->profile.mode;
@@ -146,7 +144,7 @@ sp_hash_t spn_unit_fingerprint(spn_session_t* session, spn_build_unit_t* build, 
   fingerprint.toolchain.cc = hash_arg(toolchain->compiler.program);
   fingerprint.toolchain.ar = hash_arg(toolchain->archiver.program);
   fingerprint.toolchain.cxx = hash_arg(toolchain->cxx.program);
-  fingerprint.toolchain.ld = spn_ld_family(toolchain->driver, toolchain->linker, target);
+  fingerprint.toolchain.ld = build->profile.linker;
   fingerprint.toolchain.link_args = hash_strs(toolchain->link_args);
   fingerprint.toolchain.identity = build->toolchain->identity;
   if (toolchain->support.kind == SPN_TOOLCHAIN_SUPPORT_ARTIFACT) {
