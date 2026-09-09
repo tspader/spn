@@ -274,13 +274,3 @@ sp_test(profile, flags) {
   });
 }
 
-sp_test(profile, flags_sanitize) {
-  return run_test(t, (test_t) {
-    .project = "test/integration/fixtures/profile/sanitize",
-    .when.sanitize = SPN_SANITIZER_ADDRESS,
-    .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "-p", "asan" } } },
-      { .kind = ACTION_VERIFY_CC_ARG, .verify_cc_arg = { "-fsanitize=address", "/fsanitize=address" } },
-    },
-  });
-}

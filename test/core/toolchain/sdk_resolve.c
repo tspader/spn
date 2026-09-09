@@ -21,6 +21,12 @@ static const test_t tests [] = {
     .expect = { SPN_SDK_MACOS, { "/H" } },
   },
   {
+    .name = "toolchain_source_takes_a_served_host_sdk",
+    .target = { .triple = HOST_ARM_MACOS, .sdk_toolchain = true },
+    .sdks = { .macos = { "/H" } },
+    .expect = { SPN_SDK_MACOS, { "/H" } },
+  },
+  {
     .name = "host_serves_unlisted_msvc",
     .target = { TARGET_WIN_MSVC },
     .sdks = { .msvc = { { { "/X" }, SPN_ARCH_X64 } } },

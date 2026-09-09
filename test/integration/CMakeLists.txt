@@ -24,6 +24,7 @@ add_executable(integration
   ${UTIL}/str/str.c
   ${SRC}/toolchain/catalog.c
   ${SRC}/toolchain/select.c
+  ${SRC}/profile/profile.c
   ${SRC}/toolchain/toolchain.c
   ${SRC}/toolchain/sdk.c
   ${UTIL}/sp/sp_msvc.c

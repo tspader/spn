@@ -185,6 +185,7 @@
         "name": { "type": "string" },
         "target": { "metadata": { "extern": "triple" } },
         "host": { "metadata": { "extern": "triple" } },
+        "sanitizers": { "metadata": { "extern": "sanitizer_set" } },
         "candidates": { "elements": { "type": "string" } },
         "targets": { "elements": { "metadata": { "extern": "triple" } } }
       }
@@ -229,8 +230,7 @@
         "toolchain": { "type": "string" },
         "target": { "metadata": { "extern": "triple" } },
         "unsupported": { "metadata": { "extern": "sanitizer_set" } },
-        "supported": { "metadata": { "extern": "sanitizer_set" } },
-        "listed": { "type": "boolean" }
+        "supported": { "metadata": { "extern": "sanitizer_set" } }
       }
     },
     "compiler": {

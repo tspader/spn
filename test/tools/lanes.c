@@ -58,13 +58,11 @@ static void write_sanitizer_field(sp_io_writer_t* io, bool* first, spn_sanitizer
   sp_fmt_io(io, "{} sanitizers = [", sp_fmt_cstr(*first ? "" : ","));
   *first = false;
   bool inner = true;
-  sp_for(it, 5) {
-    spn_sanitizer_set_t bit = (spn_sanitizer_set_t)1 << it;
-    if (!(set & bit)) {
-      continue;
-    }
+  while (set) {
+    spn_sanitizer_set_t bit = set & (~set + 1);
     sp_fmt_io(io, "{} \"{}\"", sp_fmt_cstr(inner ? "" : ","), sp_fmt_str(spn_sanitizer_to_str((spn_sanitizer_t)bit)));
     inner = false;
+    set &= set - 1;
   }
   sp_io_write_cstr(io, " ]", SP_NULLPTR);
 }
@@ -103,7 +101,7 @@ static void write_bound_target(sp_io_writer_t* io, const spn_toolchain_target_t*
   switch (target->sdk_source) {
     case SPN_SDK_SOURCE_HOST: break;
     case SPN_SDK_SOURCE_TOOLCHAIN: write_field(io, &first, "sdk", sp_str_lit("toolchain")); break;
-    case SPN_SDK_SOURCE_PATH: write_field(io, &first, "sdk", target->sdk.sub); break;
+    case SPN_SDK_SOURCE_PATH: sp_unreachable_case();
   }
   if (target->sanitizers) {
     write_sanitizer_field(io, &first, target->sanitizers);

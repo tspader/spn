@@ -3,6 +3,9 @@
 #include "fixture.h"
 
 #include "enum/enum.h"
+#include "ctx/types.h"
+#include "event/event.h"
+#include "profile/profile.h"
 #include "paths/paths.h"
 #include "toolchain/catalog.h"
 #include "toolchain/linker.h"
@@ -67,36 +70,6 @@ static spn_triple_t when_target(const test_when_t* when) {
   };
 }
 
-static bool triple_agrees(spn_triple_t a, spn_triple_t b) {
-  bool arch = !a.arch || !b.arch || a.arch == b.arch;
-  bool os = !a.os || !b.os || a.os == b.os;
-  bool abi = !a.abi || !b.abi || a.abi == b.abi;
-  return arch && os && abi;
-}
-
-static bool host_reaches(spn_triple_t target) {
-  switch (spn_sdk_kind(target)) {
-    case SPN_SDK_NONE: return true;
-    case SPN_SDK_SYSROOT: return spn_triple_equal(target, spn_triple_host());
-    case SPN_SDK_MACOS:
-    case SPN_SDK_MSVC: return spn_sdk_from_host(&catalog.sdks, target).kind != SPN_SDK_NONE;
-  }
-  sp_unreachable_return(false);
-}
-
-static bool lane_claims(const spn_toolchain_info_t* info, spn_triple_t target) {
-  sp_da_for(info->targets, it) {
-    const spn_toolchain_target_t* row = &info->targets[it];
-    if (!triple_agrees(row->triple, target)) {
-      continue;
-    }
-    if (row->sdk_source != SPN_SDK_SOURCE_HOST || host_reaches(target)) {
-      return true;
-    }
-  }
-  return spn_toolchain_driver_retargets(info->driver) && spn_sdk_from_host(&catalog.sdks, target).kind != SPN_SDK_NONE;
-}
-
 const c8* test_host_triple(void) {
   sp_mem_t mem = sp_mem_os_new();
   return sp_str_to_cstr(mem, spn_triple_to_str(mem, test_host()));
@@ -120,29 +93,15 @@ const c8* test_target_alternate(void) {
   return SP_NULLPTR;
 }
 
-// A default build asks for musl before the host libc, so a lane that lists
-// musl builds it, and builds it statically
-static spn_triple_t default_target(const spn_toolchain_info_t* info) {
-  spn_triple_t host = test_host();
-  spn_triple_t musl = { host.arch, SPN_OS_LINUX, SPN_ABI_MUSL };
-  return host.os == SPN_OS_LINUX && targets(info, musl) ? musl : host;
-}
-
-// The sanitizers a lane declares for a target are the ones it can build
-static spn_sanitizer_set_t lane_sanitizers(const spn_toolchain_info_t* info, spn_triple_t target) {
-  sp_da_for(info->targets, it) {
-    if (spn_triple_equal(info->targets[it].triple, target)) {
-      return info->targets[it].sanitizers;
-    }
-  }
-  return 0;
-}
-
 static bool toolchain_enforces_exports(const test_toolchain_t* toolchain, spn_triple_t target) {
   if (sp_cstr_equal(toolchain->name, "zig") && target.os == SPN_OS_MACOS) {
     return false;
   }
   return true;
+}
+
+static bool toolchain_links_elf(const test_toolchain_t* toolchain) {
+  return spn_triple_host().os != SPN_OS_MACOS || toolchain->info->driver != SPN_CC_DRIVER_CLANG;
 }
 
 static bool toolchain_deterministic_objects(const test_toolchain_t* toolchain) {
@@ -240,6 +199,8 @@ static sp_err_t load_lanes(void* user) {
     name = sp_str_lit("zig");
   }
 
+  spn.mem = mem;
+  spn.events = spn_event_buffer_new(mem);
   sp_str_t lanes = read_repo_file(mem, SPN_LANES_TEST);
   sp_env_t env = sp_env_capture(mem);
   spn_path_roots_t roots = sp_zero;
@@ -268,6 +229,41 @@ static sp_err_t load_lanes(void* user) {
 const test_toolchain_t* test_toolchain(void) {
   sp_test_once(&once, load_lanes, SP_NULLPTR);
   return &cached;
+}
+
+const c8* test_lane_toolchain_arg(void) {
+  const test_toolchain_t* toolchain = test_toolchain();
+  return sp_cstr_equal(toolchain->name, "zig") ? SP_NULLPTR : toolchain->name;
+}
+
+static const c8* select_reason(spn_err_t err) {
+  switch (err) {
+    case SPN_ERR_TOOLCHAIN_NONE: return "no toolchain can";
+    case SPN_ERR_TOOLCHAIN_HOST: return "doesn't run on this host";
+    case SPN_ERR_TOOLCHAIN_TARGET: return "doesn't target it";
+    case SPN_ERR_TOOLCHAIN_SYSROOT: return "needs a sysroot";
+    case SPN_ERR_TOOLCHAIN_SDK_MACOS: return "needs the macOS SDK";
+    case SPN_ERR_TOOLCHAIN_SDK_MSVC: return "needs the MSVC SDK";
+    case SPN_ERR_TARGET_ABI: return "needs an abi";
+    case SPN_ERR_SANITIZER_UNSUPPORTED: return "doesn't ship those sanitizers";
+    case SPN_ERR_SANITIZER_STATIC: return "links it statically";
+    default: return "can't select it";
+  }
+}
+
+static spn_err_t lane_selects(sp_mem_t mem, const test_when_t* when, spn_triple_t target, spn_toolchain_selection_t* selection) {
+  const c8* named = test_lane_toolchain_arg();
+  spn_profile_info_t profile = {
+    .toolchain = spn_toolchain_ref_from_str(sp_cstr_as_str(named ? named : "auto")),
+    .arch = target.arch,
+    .os = target.os,
+    .abi = when->target ? target.abi : SPN_ABI_NONE,
+    .sanitizers = when->sanitize,
+  };
+  spn_toolchain_query_t query = spn_profile_query(&profile, spn_triple_host());
+  spn_err_t err = query.abis.count ? spn_toolchain_select(&catalog, query, selection) : spn_toolchain_incomplete(&catalog, query);
+  spn_event_buffer_drain(mem, spn.events);
+  return err;
 }
 
 static sp_str_t not_in_lanes(sp_mem_t mem, const test_toolchain_t* toolchain, const c8* const* lanes, u32 count) {
@@ -338,26 +334,23 @@ sp_str_t test_when_blocked(test_when_t when) {
       sp_fmt_str(spn_ld_family_to_str(when.linker))).value;
   }
 
-  if (!lane_claims(toolchain->info, target)) {
-    return sp_fmt(mem, "{} can't target {}",
-      sp_fmt_cstr(toolchain->name),
-      sp_fmt_str(spn_triple_to_str(mem, target))).value;
+  if (spn_os_format(target.os) == SPN_FORMAT_ELF && !toolchain_links_elf(toolchain)) {
+    return sp_fmt(mem, "{} links with ld64, which can't emit ELF", sp_fmt_cstr(toolchain->name)).value;
   }
 
-  if (when.sanitize) {
-    spn_triple_t picked = when.target ? target : default_target(toolchain->info);
-    if (when.sanitize & ~lane_sanitizers(toolchain->info, picked)) {
-      return sp_fmt(mem, "{} targeting {} can't build sanitize={}",
-        sp_fmt_cstr(toolchain->name),
-        sp_fmt_str(spn_triple_to_str(mem, picked)),
-        sp_fmt_str(spn_sanitizer_set_to_str(mem, when.sanitize))).value;
-    }
-    if (picked.abi == SPN_ABI_MUSL && (when.sanitize & ~SPN_SANITIZER_UNDEFINED)) {
-      return sp_fmt(mem, "{} links {} statically, which refuses sanitize={}",
-        sp_fmt_cstr(toolchain->name),
-        sp_fmt_str(spn_triple_to_str(mem, picked)),
-        sp_fmt_str(spn_sanitizer_set_to_str(mem, when.sanitize))).value;
-    }
+  spn_toolchain_selection_t selection = sp_zero;
+  spn_err_t select = lane_selects(mem, &when, target, &selection);
+  if (select) {
+    sp_str_t request = when.sanitize ? sp_fmt(mem, " with sanitize={}", sp_fmt_str(spn_sanitizer_set_to_str(mem, when.sanitize))).value : sp_str_lit("");
+    return sp_fmt(mem, "{} can't build {}{}: {}",
+      sp_fmt_cstr(toolchain->name),
+      sp_fmt_str(spn_triple_to_str(mem, target)),
+      sp_fmt_str(request),
+      sp_fmt_cstr(select_reason(select))).value;
+  }
+  sp_str_t broken = lane_broken(mem, selection.toolchain);
+  if (!sp_str_empty(broken)) {
+    return sp_fmt(mem, "{} {}", sp_fmt_str(selection.toolchain->name), sp_fmt_str(broken)).value;
   }
 
   if (when.cxx && spn_arg_empty(toolchain->info->cxx.program)) {

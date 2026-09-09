@@ -5,6 +5,7 @@ version = "0.1.0"
 [[toolchain]]
 name = "T"
 driver = "zig"
+target = [{ @HOST@ }]
 compiler = "/R"
 archiver = "/R"
 

@@ -10,6 +10,7 @@ name = "custom"
 compiler = "cc"
 archiver = "ar"
 driver = "gcc"
+target = [{ @HOST@ }]
 cxx = "c++"
 
 [profile.default]

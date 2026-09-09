@@ -5,6 +5,7 @@ version = "0.1.0"
 [[toolchain]]
 name = "G"
 driver = "gcc"
+target = [{ @HOST@ }]
 compiler = "gcc"
 archiver = "ar"
 linker = "lld"

@@ -82,7 +82,7 @@ spn_err_t spn_build_render_compile(sp_mem_t mem, spn_compile_unit_t* unit, spn_i
   spn_build_unit_t* build = pkg->build;
 
   spn_cc_compile_t compile = compile_desc(mem, unit);
-  spn_try(spn_cc_render_compile(mem, &build->toolchain->cc, &build->profile, &compile, invocation));
+  spn_cc_render_compile(mem, &build->toolchain->cc, &build->profile, &compile, invocation);
   invocation->cwd = pkg->paths.work;
   return SPN_OK;
 }

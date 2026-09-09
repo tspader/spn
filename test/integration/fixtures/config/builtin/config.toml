@@ -1,5 +1,6 @@
 [[toolchain]]
 name = "gcc"
 driver = "gcc"
+target = [{ @HOST@ }]
 compiler = "/Q"
 archiver = "/Q"

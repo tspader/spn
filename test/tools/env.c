@@ -2,6 +2,7 @@
 #include "caps.h"
 #include "enum/enum.h"
 #include "toolchain/search.h"
+#include "toolchain/sdk.h"
 #include "triple/triple.h"
 
 void write_file(sp_str_t path, sp_str_t content) {
@@ -50,14 +51,14 @@ void fixture_create(fixture_t* fixture, sp_str_t relative, sp_str_t content) {
   write_file(fixture_path(fixture, relative), content);
 }
 
-// A fixture's `[[toolchain]]` writes `target = [{ @HOST@ }]`; a local entry
-// must list its targets, and the host triple is only known at run time
 static sp_str_t fill_host_tokens(sp_mem_t mem, sp_str_t content) {
   spn_triple_t host = spn_triple_host();
-  sp_str_t target = sp_fmt(mem, "arch = \"{}\", os = \"{}\", abi = \"{}\"",
+  host.abi = host.abi ? host.abi : SPN_ABI_GNU;
+  sp_str_t target = sp_fmt(mem, "arch = \"{}\", os = \"{}\", abi = \"{}\"{}",
     sp_fmt_str(spn_arch_to_str(host.arch)),
     sp_fmt_str(spn_os_to_str(host.os)),
-    sp_fmt_str(spn_abi_to_str(host.abi))).value;
+    sp_fmt_str(spn_abi_to_str(host.abi)),
+    sp_fmt_cstr(spn_sdk_host_reachable(host) ? "" : ", sdk = \"toolchain\"")).value;
   sp_str_t token = sp_str_lit("@HOST@");
 
   sp_io_dyn_mem_writer_t w = sp_zero;
@@ -489,8 +490,7 @@ static const c8* toolchain_arg(fixture_t* fixture) {
   if (fixture->toolchain) {
     return fixture->toolchain;
   }
-  const test_toolchain_t* toolchain = test_toolchain();
-  return sp_cstr_equal(toolchain->name, "zig") ? SP_NULLPTR : toolchain->name;
+  return test_lane_toolchain_arg();
 }
 
 static sp_ps_output_t run_spn_ex(sp_test_t* t, fixture_t* fixture, const c8* format, const c8* const* args, const c8* const* env) {

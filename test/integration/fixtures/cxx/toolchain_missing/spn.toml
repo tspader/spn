@@ -10,6 +10,7 @@ name = "conly"
 compiler = "cc"
 archiver = "ar"
 driver = "gcc"
+target = [{ @HOST@ }]
 
 [profile.default]
 toolchain = "conly"

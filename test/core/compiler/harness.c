@@ -29,7 +29,6 @@ spn_profile_info_t test_profile(test_profile_t desc) {
     .mode = desc.mode,
     .opt = desc.opt,
     .sanitizers = desc.sanitizers,
-    .sanitizers_supported = desc.supported,
   };
   if (desc.sdk) {
     spn_sdk_host_t host = sp_zero;

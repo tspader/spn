@@ -160,6 +160,44 @@ spn_sanitizer_set_t spn_toolchain_stock_sanitizers(spn_cc_driver_t driver, spn_t
   SP_UNREACHABLE_RETURN(0);
 }
 
+spn_target_caps_t spn_toolchain_target_caps(const spn_cg_toolchain_target_t* cg, spn_toolchain_target_t* target) {
+  spn_triple_t triple = target->triple;
+  if (!sp_da_empty(cg->sanitizers)) {
+    if (triple.abi == SPN_ABI_BARE || triple.abi == SPN_ABI_ELF) {
+      return SPN_TARGET_CAPS_SANITIZERS_FORBIDDEN;
+    }
+    sp_da_for(cg->sanitizers, it) {
+      target->sanitizers |= cg->sanitizers[it];
+    }
+  }
+  if (sp_str_empty(cg->sdk)) {
+    return spn_sdk_host_reachable(triple) ? SPN_TARGET_CAPS_OK : SPN_TARGET_CAPS_SDK_REQUIRED;
+  }
+  if (!spn_sdk_declarable(spn_sdk_kind(triple))) {
+    return SPN_TARGET_CAPS_SDK_FORBIDDEN;
+  }
+  if (sp_str_equal_cstr(cg->sdk, "toolchain")) {
+    target->sdk_source = SPN_SDK_SOURCE_TOOLCHAIN;
+    return SPN_TARGET_CAPS_OK;
+  }
+  target->sdk_source = SPN_SDK_SOURCE_PATH;
+  return SPN_TARGET_CAPS_SDK_PATH;
+}
+
+spn_linkage_t spn_abi_linkage(spn_abi_t abi) {
+  switch (abi) {
+    case SPN_ABI_GNU:
+    case SPN_ABI_MSVC:
+    case SPN_ABI_APPLE: return SPN_LIB_KIND_SHARED;
+    case SPN_ABI_MUSL:
+    case SPN_ABI_BARE:
+    case SPN_ABI_ELF: return SPN_LIB_KIND_STATIC;
+    case SPN_ABI_NONE:
+    case SPN_ABI_COUNT: sp_unreachable_case();
+  }
+  SP_UNREACHABLE_RETURN(SPN_LIB_KIND_NONE);
+}
+
 spn_abi_t spn_default_abi(spn_cc_driver_t driver, spn_os_t os) {
   switch (os) {
     case SPN_OS_LINUX:

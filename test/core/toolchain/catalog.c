@@ -103,6 +103,20 @@ static const targets_test_t targets_tests [] = {
     .expect = { .targets = { { .triple = HOST_ARM_MACOS, .sanitizers = SAN_GCC_MACOS } } },
   },
   {
+    .name = "clang_on_macos_targets_both_arches",
+    .file = "drivers.json",
+    .host = HOST_ARM_MACOS,
+    .toolchain = "B",
+    .expect = { .targets = { { .triple = HOST_ARM_MACOS, .sanitizers = SAN_CLANG_MACOS }, { .triple = HOST_X64_MACOS, .sanitizers = SAN_CLANG_MACOS } } },
+  },
+  {
+    .name = "gcc_on_windows_brings_its_libc",
+    .file = "drivers.json",
+    .host = HOST_X64_WINDOWS,
+    .toolchain = "A",
+    .expect = { .targets = { { .triple = TARGET_WIN_GNU, .sdk_toolchain = true } } },
+  },
+  {
     .name = "msvc_on_linux_targets_nothing",
     .file = "drivers.json",
     .host = HOST_X64_LINUX,

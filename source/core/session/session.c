@@ -158,18 +158,6 @@ void spn_session_export_toolchain_env(spn_session_t* s) {
   }
 }
 
-spn_err_t spn_session_validate_flags(spn_session_t* s) {
-  sp_om_for(s->units.builds, it) {
-    spn_build_unit_t* build = sp_om_at(s->units.builds, it);
-    sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-    spn_cc_flags_t flags = sp_zero;
-    spn_err_t err = spn_cc_render_flags(scratch.mem, &build->toolchain->cc, &build->profile, &flags);
-    sp_mem_end_scratch(scratch);
-    spn_try(err);
-  }
-  return SPN_OK;
-}
-
 spn_pkg_id_t spn_session_root_pkg(spn_session_t* session) {
   sp_ht_for_kv(session->resolve, it) {
     if (it.val->source == SPN_PKG_SOURCE_ROOT) {

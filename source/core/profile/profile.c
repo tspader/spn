@@ -169,38 +169,17 @@ spn_toolchain_query_t spn_profile_query(const spn_profile_info_t* profile, spn_t
     .toolchain = profile->toolchain,
     .target = spn_profile_triple(profile),
     .abis = abi_order(profile, host),
+    .sanitizers = profile->sanitizers,
+    .linkage = profile->linkage,
   };
-}
-
-static spn_linkage_t abi_linkage(spn_abi_t abi) {
-  switch (abi) {
-    case SPN_ABI_GNU:
-    case SPN_ABI_MSVC:
-    case SPN_ABI_APPLE: {
-      return SPN_LIB_KIND_SHARED;
-    }
-    case SPN_ABI_MUSL:
-    case SPN_ABI_BARE:
-    case SPN_ABI_ELF: {
-      return SPN_LIB_KIND_STATIC;
-    }
-    case SPN_ABI_NONE:
-    case SPN_ABI_COUNT: {
-      sp_unreachable_case();
-    }
-  }
-
-  sp_unreachable_return(SPN_LIB_KIND_NONE);
 }
 
 void spn_profile_finalize(spn_profile_info_t* profile, const spn_toolchain_selection_t* selection) {
   profile->abi = selection->target.triple.abi;
   profile->driver = selection->toolchain->driver;
   profile->linker = spn_ld_family(selection->toolchain->driver, selection->toolchain->linker, selection->target.triple);
-  profile->sanitizers_supported = selection->target.sanitizers;
-  profile->target_listed = selection->listed;
   if (!profile->linkage) {
-    profile->linkage = abi_linkage(profile->abi);
+    profile->linkage = spn_abi_linkage(profile->abi);
   }
 }
 

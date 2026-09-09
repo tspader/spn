@@ -149,44 +149,9 @@ static spn_err_t link_refused(spn_err_t kind, const spn_cc_toolchain_t* toolchai
   });
 }
 
-spn_err_t spn_cc_validate_profile(const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile) {
-  spn_triple_t target = spn_profile_triple(profile);
-  spn_sanitizer_set_t supported = profile->sanitizers_supported;
-  spn_sanitizer_set_t unsupported = profile->sanitizers & ~supported;
-  if (unsupported) {
-    return spn_err_emit(&spn, (spn_err_union_t) {
-      .kind = SPN_ERR_SANITIZER_UNSUPPORTED,
-      .sanitizer = {
-        .toolchain = toolchain->name,
-        .target = target,
-        .unsupported = unsupported,
-        .supported = supported,
-        .listed = profile->target_listed,
-      },
-    });
-  }
-
-  spn_sanitizer_set_t ubsan = profile->sanitizers & ~SPN_SANITIZER_UNDEFINED;
-  bool renders_static = profile->linkage == SPN_LIB_KIND_STATIC && spn_ld_static(spn_ld_dialect(target));
-  if (ubsan && renders_static) {
-    return spn_err_emit(&spn, (spn_err_union_t) {
-      .kind = SPN_ERR_SANITIZER_STATIC,
-      .sanitizer = {
-        .toolchain = toolchain->name,
-        .target = target,
-        .unsupported = ubsan,
-        .supported = supported,
-        .listed = profile->target_listed,
-      },
-    });
-  }
-  return SPN_OK;
-}
-
-spn_err_t spn_cc_render_flags(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, spn_cc_flags_t* flags) {
+void spn_cc_render_flags(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, spn_cc_flags_t* flags) {
   sp_da_init(mem, flags->compile);
   sp_da_init(mem, flags->link);
-  spn_try(spn_cc_validate_profile(toolchain, profile));
   switch (toolchain->driver) {
     case SPN_CC_DRIVER_GCC:
     case SPN_CC_DRIVER_CLANG:
@@ -202,28 +167,25 @@ spn_err_t spn_cc_render_flags(sp_mem_t mem, const spn_cc_toolchain_t* toolchain,
       sp_unreachable_case();
     }
   }
-  return SPN_OK;
 }
 
-spn_err_t spn_cc_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_compile_t* compile, spn_invocation_t* invocation) {
-  spn_try(spn_cc_validate_profile(toolchain, profile));
+void spn_cc_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_compile_t* compile, spn_invocation_t* invocation) {
   *invocation = sp_zero_s(spn_invocation_t);
   switch (toolchain->driver) {
     case SPN_CC_DRIVER_GCC:
     case SPN_CC_DRIVER_CLANG:
     case SPN_CC_DRIVER_ZIG: {
       spn_gnu_render_compile(mem, toolchain, profile, compile, invocation);
-      return SPN_OK;
+      break;
     }
     case SPN_CC_DRIVER_MSVC: {
       spn_msvc_render_compile(mem, toolchain, profile, compile, invocation);
-      return SPN_OK;
+      break;
     }
     case SPN_CC_DRIVER_NONE: {
       sp_unreachable_case();
     }
   }
-  SP_UNREACHABLE_RETURN(SPN_ERROR);
 }
 
 spn_invocation_t spn_cc_render_compile_command(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_invocation_t* base, const spn_cc_compile_files_t* files) {
@@ -262,7 +224,6 @@ spn_invocation_t spn_cc_render_compile_command(sp_mem_t mem, const spn_cc_toolch
 }
 
 spn_err_t spn_cc_validate_link(const spn_cc_toolchain_t* toolchain, spn_triple_t host, const spn_profile_info_t* profile, const spn_cc_link_t* link) {
-  spn_try(spn_cc_validate_profile(toolchain, profile));
   spn_cc_feature_t feature = link_feature(link->kind);
   spn_triple_t target = spn_profile_triple(profile);
 

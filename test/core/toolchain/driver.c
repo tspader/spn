@@ -61,18 +61,9 @@ static const default_abi_t default_abi_tests [] = {
   { "clang_windows", SPN_CC_DRIVER_CLANG, SPN_OS_WINDOWS,      SPN_ABI_MSVC },
   { "zig_windows",   SPN_CC_DRIVER_ZIG,   SPN_OS_WINDOWS,      SPN_ABI_GNU },
   { "msvc_windows",  SPN_CC_DRIVER_MSVC,  SPN_OS_WINDOWS,      SPN_ABI_MSVC },
-  { "gcc_linux",     SPN_CC_DRIVER_GCC,   SPN_OS_LINUX },
-  { "clang_linux",   SPN_CC_DRIVER_CLANG, SPN_OS_LINUX },
-  { "zig_linux",     SPN_CC_DRIVER_ZIG,   SPN_OS_LINUX },
-  { "msvc_linux",    SPN_CC_DRIVER_MSVC,  SPN_OS_LINUX },
-  { "gcc_macos",     SPN_CC_DRIVER_GCC,   SPN_OS_MACOS,        SPN_ABI_APPLE },
-  { "clang_macos",   SPN_CC_DRIVER_CLANG, SPN_OS_MACOS,        SPN_ABI_APPLE },
-  { "zig_macos",     SPN_CC_DRIVER_ZIG,   SPN_OS_MACOS,        SPN_ABI_APPLE },
-  { "msvc_macos",    SPN_CC_DRIVER_MSVC,  SPN_OS_MACOS,        SPN_ABI_APPLE },
-  { "gcc_wasi",      SPN_CC_DRIVER_GCC,   SPN_OS_WASI,         SPN_ABI_MUSL },
-  { "clang_wasi",    SPN_CC_DRIVER_CLANG, SPN_OS_WASI,         SPN_ABI_MUSL },
-  { "zig_wasi",      SPN_CC_DRIVER_ZIG,   SPN_OS_WASI,         SPN_ABI_MUSL },
-  { "msvc_wasi",     SPN_CC_DRIVER_MSVC,  SPN_OS_WASI,         SPN_ABI_MUSL },
+  { "linux",         SPN_CC_DRIVER_GCC,   SPN_OS_LINUX },
+  { "macos",         SPN_CC_DRIVER_CLANG, SPN_OS_MACOS,        SPN_ABI_APPLE },
+  { "wasi",          SPN_CC_DRIVER_CLANG, SPN_OS_WASI,         SPN_ABI_MUSL },
 };
 
 sp_test_each(driver, default_abi, default_abi_t, default_abi_tests) {

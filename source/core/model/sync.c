@@ -567,7 +567,6 @@ spn_err_t sync_packages(spn_op_t* op, bool* reresolve) {
   }
 
   spn_session_export_toolchain_env(session);
-  spn_try(spn_session_validate_flags(session));
   spn_try(check_unused_patches(session));
 
   spn_event_buffer_push(spn.events, (spn_event_t) {

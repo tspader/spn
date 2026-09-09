@@ -225,6 +225,7 @@ readme: false
 | `os` | `windows` \| `linux` \| `macos` \| `wasi` \| `freestanding` |
 | `abi` | `gnu` \| `musl` \| `msvc` \| `apple` \| `none` \| `elf` |
 | `sdk` | `string` |
+| `sanitizers` | array of `address` \| `thread` \| `undefined` \| `memory` \| `leak` |
 
 ## dep
 

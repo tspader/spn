@@ -82,6 +82,14 @@ typedef enum {
   SPN_PATH_MALFORMED,
 } spn_path_check_t;
 
+typedef enum {
+  SPN_TARGET_CAPS_OK,
+  SPN_TARGET_CAPS_SDK_PATH,
+  SPN_TARGET_CAPS_SANITIZERS_FORBIDDEN,
+  SPN_TARGET_CAPS_SDK_FORBIDDEN,
+  SPN_TARGET_CAPS_SDK_REQUIRED,
+} spn_target_caps_t;
+
 typedef struct {
   spn_arg_t program;
   sp_da(sp_str_t) args;
@@ -177,12 +185,13 @@ typedef struct {
   spn_toolchain_ref_t toolchain;
   spn_triple_t target;
   spn_abi_list_t abis;
+  spn_sanitizer_set_t sanitizers;
+  spn_linkage_t linkage;
 } spn_toolchain_query_t;
 
 typedef struct {
   spn_toolchain_info_t* toolchain;
   spn_toolchain_target_t target;
-  bool listed;
 } spn_toolchain_selection_t;
 
 typedef spn_err_t (*spn_fetch_fn)(sp_str_t url, sp_str_t dest, void* user_data);

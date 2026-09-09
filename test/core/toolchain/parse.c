@@ -163,7 +163,7 @@ static const parse_test_t tests [] = {
           .linker = SPN_LD_FAMILY_LLD,
           .targets = {
             { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU },
-            TARGET_WIN_GNU,
+            { .triple = TARGET_WIN_GNU, .sdk_toolchain = true },
             { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MSVC },
             HOST_ARM_MACOS,
             { .triple = TARGET_WASM, .sdk_toolchain = true },
@@ -244,6 +244,36 @@ static const parse_test_t tests [] = {
   {
     .name = "sdk_absolute_in_distribution",
     .file = "sdk_absolute.json",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "sanitizers_and_toolchain_sdk",
+    .file = "caps.json",
+    .expect = {
+      .entries = 1,
+      .toolchains = {
+        {
+          .name = "A",
+          .driver = SPN_CC_DRIVER_CLANG,
+          .compiler = { .name = "A" },
+          .archiver = { .name = "A" },
+          .targets = {
+            { .triple = HOST_X64_LINUX, .sanitizers = SPN_SANITIZER_ADDRESS | SPN_SANITIZER_UNDEFINED },
+            { .triple = TARGET_WASM, .sdk_toolchain = true },
+            { .triple = TARGET_WIN_GNU, .sdk_toolchain = true },
+          },
+        },
+      },
+    },
+  },
+  {
+    .name = "sanitizers_on_none_target",
+    .file = "sanitizers_none.json",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "sdk_required_off_host",
+    .file = "sdk_required.json",
     .expect = { .err = SPN_ERROR },
   },
 };

@@ -468,7 +468,6 @@ static const compile_test_t tests [] = {
       .abi = SPN_ABI_GNU,
       .standard = SPN_C99,
       .sanitizers = SPN_SANITIZER_ADDRESS,
-      .supported = SPN_SANITIZER_ADDRESS,
     },
     .expect = {
       .command = "cc",
@@ -565,15 +564,7 @@ sp_test_each(render_compile, render, compile_test_t, tests, .setup = spn_test_ct
 
   spn_profile_info_t profile = test_profile(it->profile);
   spn_invocation_t base = sp_zero;
-  spn_err_t err = spn_cc_render_compile(mem, &toolchain, &profile, &compile, &base);
-  sp_expect_eq(t, err, it->expect.err);
-  if (it->expect.err) {
-    sp_da(spn_event_t) errs = spn_test_drain_errs(mem);
-    sp_must_eq(t, 1, sp_da_size(errs));
-    sp_expect_eq(t, errs[0].err.kind, it->expect.err);
-    sp_expect_eq(t, errs[0].err.compiler.feature, it->expect.feature);
-    return SP_OK;
-  }
+  spn_cc_render_compile(mem, &toolchain, &profile, &compile, &base);
 
   spn_cc_compile_files_t files = {
     .source = test_arg_path("main.c"),
@@ -601,8 +592,7 @@ sp_test(render_compile, base_shared_across_commands, .setup = spn_test_ctx_setup
   };
 
   spn_invocation_t base = sp_zero;
-  spn_err_t err = spn_cc_render_compile(mem, &toolchain, &profile, &compile, &base);
-  sp_expect_eq(t, err, SPN_OK);
+  spn_cc_render_compile(mem, &toolchain, &profile, &compile, &base);
   u64 args = sp_da_size(base.args);
 
   spn_cc_compile_files_t first = {

@@ -7,34 +7,28 @@
         "program": "A"
       },
       "archiver": {
-        "program": "llvm-ar"
+        "program": "A"
       },
-      "linker": "lld",
       "target": [
         {
           "arch": "x86_64",
           "os": "linux",
-          "abi": "gnu"
+          "abi": "gnu",
+          "sanitizers": [
+            "address",
+            "undefined"
+          ]
         },
         {
-          "arch": "x86_64",
-          "os": "windows",
-          "abi": "gnu",
+          "arch": "wasm32",
+          "os": "wasi",
+          "abi": "musl",
           "sdk": "toolchain"
         },
         {
           "arch": "x86_64",
           "os": "windows",
-          "abi": "msvc"
-        },
-        {
-          "arch": "aarch64",
-          "os": "macos",
-          "abi": "apple"
-        },
-        {
-          "arch": "wasm32",
-          "os": "wasi",
+          "abi": "gnu",
           "sdk": "toolchain"
         }
       ]

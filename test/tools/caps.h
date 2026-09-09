@@ -44,6 +44,7 @@ typedef struct {
 } test_toolchain_t;
 
 const test_toolchain_t* test_toolchain(void);
+const c8* test_lane_toolchain_arg(void);
 sp_str_t  test_lanes_toml(void);
 spn_triple_t test_host(void);
 const c8* test_target_alternate(void);
