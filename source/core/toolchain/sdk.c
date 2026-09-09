@@ -31,6 +31,20 @@ bool spn_sdk_declarable(spn_sdk_kind_t kind) {
   SP_UNREACHABLE_RETURN(false);
 }
 
+bool spn_sdk_host_reachable(spn_triple_t target) {
+  switch (spn_sdk_kind(target)) {
+    case SPN_SDK_NONE:
+    case SPN_SDK_MACOS:
+    case SPN_SDK_MSVC: return true;
+    case SPN_SDK_SYSROOT: return target.os != SPN_OS_WASI && target.os != SPN_OS_FREESTANDING;
+  }
+  SP_UNREACHABLE_RETURN(true);
+}
+
+bool spn_sanitizers_declarable(spn_triple_t target) {
+  return target.abi != SPN_ABI_BARE && target.abi != SPN_ABI_ELF;
+}
+
 static spn_sdk_macos_t macos_layout(sp_mem_t mem, spn_path_t root) {
   return (spn_sdk_macos_t) {
     .root = root,
@@ -175,10 +189,12 @@ spn_sdk_host_t spn_sdk_detect(sp_mem_t mem, const spn_path_roots_t* roots, sp_en
 
 spn_sdk_t spn_sdk_resolve(sp_mem_t mem, const spn_sdk_host_t* host, const spn_toolchain_selection_t* selection) {
   spn_triple_t triple = selection->target.triple;
-  spn_path_t root = selection->target.sdk;
-  if (spn_path_empty(root)) {
-    return spn_sdk_from_host(host, triple);
+  switch (selection->target.sdk_source) {
+    case SPN_SDK_SOURCE_HOST: return spn_sdk_from_host(host, triple);
+    case SPN_SDK_SOURCE_TOOLCHAIN: return sp_zero_struct(spn_sdk_t);
+    case SPN_SDK_SOURCE_PATH: break;
   }
+  spn_path_t root = selection->target.sdk;
   switch (spn_sdk_kind(triple)) {
     case SPN_SDK_SYSROOT: return spn_sdk_sysroot(root);
     case SPN_SDK_MACOS: return spn_sdk_macos(mem, root);

@@ -125,6 +125,41 @@ bool spn_toolchain_driver_retargets(spn_cc_driver_t driver) {
   return spn_toolchain_driver_caps(driver) & SPN_CC_CAP_TARGET_TRIPLE;
 }
 
+static spn_sanitizer_set_t gcc_stock_sanitizers(spn_triple_t host) {
+  switch (host.os) {
+    case SPN_OS_LINUX: return host.abi == SPN_ABI_MUSL ? 0 : SPN_SANITIZER_ADDRESS | SPN_SANITIZER_THREAD | SPN_SANITIZER_UNDEFINED | SPN_SANITIZER_LEAK;
+    case SPN_OS_MACOS: return SPN_SANITIZER_ADDRESS | SPN_SANITIZER_THREAD | SPN_SANITIZER_UNDEFINED;
+    case SPN_OS_WINDOWS:
+    case SPN_OS_WASI:
+    case SPN_OS_FREESTANDING:
+    case SPN_OS_NONE: return 0;
+  }
+  SP_UNREACHABLE_RETURN(0);
+}
+
+static spn_sanitizer_set_t clang_stock_sanitizers(spn_triple_t host) {
+  switch (host.os) {
+    case SPN_OS_LINUX: return SPN_SANITIZER_ADDRESS | SPN_SANITIZER_THREAD | SPN_SANITIZER_UNDEFINED | SPN_SANITIZER_MEMORY | SPN_SANITIZER_LEAK;
+    case SPN_OS_MACOS: return SPN_SANITIZER_ADDRESS | SPN_SANITIZER_THREAD | SPN_SANITIZER_UNDEFINED | SPN_SANITIZER_LEAK;
+    case SPN_OS_WINDOWS:
+    case SPN_OS_WASI:
+    case SPN_OS_FREESTANDING:
+    case SPN_OS_NONE: return 0;
+  }
+  SP_UNREACHABLE_RETURN(0);
+}
+
+spn_sanitizer_set_t spn_toolchain_stock_sanitizers(spn_cc_driver_t driver, spn_triple_t host) {
+  switch (driver) {
+    case SPN_CC_DRIVER_GCC: return gcc_stock_sanitizers(host);
+    case SPN_CC_DRIVER_CLANG: return clang_stock_sanitizers(host);
+    case SPN_CC_DRIVER_ZIG:
+    case SPN_CC_DRIVER_MSVC: return 0;
+    case SPN_CC_DRIVER_NONE: sp_unreachable_case();
+  }
+  SP_UNREACHABLE_RETURN(0);
+}
+
 spn_abi_t spn_default_abi(spn_cc_driver_t driver, spn_os_t os) {
   switch (os) {
     case SPN_OS_LINUX:

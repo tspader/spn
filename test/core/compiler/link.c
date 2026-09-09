@@ -489,6 +489,7 @@ static const link_test_t tests [] = {
       .os = SPN_OS_LINUX,
       .abi = SPN_ABI_GNU,
       .sanitizers = SPN_SANITIZER_ADDRESS,
+      .supported = SPN_SANITIZER_ADDRESS,
     },
     .kind = SPN_CC_OUTPUT_EXE,
     .expect = {

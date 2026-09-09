@@ -33,7 +33,8 @@
         },
         {
           "arch": "wasm32",
-          "os": "wasi"
+          "os": "wasi",
+          "sdk": "toolchain"
         }
       ]
     }

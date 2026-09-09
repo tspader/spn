@@ -1,6 +1,7 @@
 #include "lanes.h"
 
 #include "enum/enum.h"
+#include "toolchain/toolchain.h"
 
 const spn_cg_toolchain_t* lanes_find(const spn_cg_toolchains_t* lanes, sp_str_t name) {
   spn_cg_toolchain_t** entry = sp_str_om_getp(lanes->toolchain, name);
@@ -53,8 +54,27 @@ static void write_artifact(sp_io_writer_t* io, const spn_cg_artifact_t* artifact
   sp_io_write_cstr(io, " }", SP_NULLPTR);
 }
 
+static void write_sanitizer_field(sp_io_writer_t* io, bool* first, spn_sanitizer_set_t set) {
+  sp_fmt_io(io, "{} sanitizers = [", sp_fmt_cstr(*first ? "" : ","));
+  *first = false;
+  bool inner = true;
+  sp_for(it, 5) {
+    spn_sanitizer_set_t bit = (spn_sanitizer_set_t)1 << it;
+    if (!(set & bit)) {
+      continue;
+    }
+    sp_fmt_io(io, "{} \"{}\"", sp_fmt_cstr(inner ? "" : ","), sp_fmt_str(spn_sanitizer_to_str((spn_sanitizer_t)bit)));
+    inner = false;
+  }
+  sp_io_write_cstr(io, " ]", SP_NULLPTR);
+}
+
 static void write_target(sp_io_writer_t* io, const spn_cg_toolchain_target_t* target) {
   bool first = true;
+  spn_sanitizer_set_t sanitizers = 0;
+  sp_da_for(target->sanitizers, it) {
+    sanitizers |= target->sanitizers[it];
+  }
   sp_io_write_cstr(io, "{", SP_NULLPTR);
   if (!sp_opt_is_null(target->arch)) {
     write_field(io, &first, "arch", spn_arch_to_str(sp_opt_get(target->arch)));
@@ -68,10 +88,30 @@ static void write_target(sp_io_writer_t* io, const spn_cg_toolchain_target_t* ta
   if (!sp_str_empty(target->sdk)) {
     write_field(io, &first, "sdk", target->sdk);
   }
+  if (sanitizers) {
+    write_sanitizer_field(io, &first, sanitizers);
+  }
   sp_io_write_cstr(io, " }", SP_NULLPTR);
 }
 
-static void write_lane(sp_io_writer_t* io, const spn_cg_toolchain_t* lane) {
+static void write_bound_target(sp_io_writer_t* io, const spn_toolchain_target_t* target) {
+  bool first = true;
+  sp_io_write_cstr(io, "{", SP_NULLPTR);
+  write_field(io, &first, "arch", spn_arch_to_str(target->triple.arch));
+  write_field(io, &first, "os", spn_os_to_str(target->triple.os));
+  write_field(io, &first, "abi", spn_abi_to_str(target->triple.abi));
+  switch (target->sdk_source) {
+    case SPN_SDK_SOURCE_HOST: break;
+    case SPN_SDK_SOURCE_TOOLCHAIN: write_field(io, &first, "sdk", sp_str_lit("toolchain")); break;
+    case SPN_SDK_SOURCE_PATH: write_field(io, &first, "sdk", target->sdk.sub); break;
+  }
+  if (target->sanitizers) {
+    write_sanitizer_field(io, &first, target->sanitizers);
+  }
+  sp_io_write_cstr(io, " }", SP_NULLPTR);
+}
+
+static void write_lane(sp_io_writer_t* io, const spn_cg_toolchain_t* lane, const spn_toolchain_info_t* info) {
   sp_io_write_cstr(io, "\n[[toolchain]]\n", SP_NULLPTR);
   write_str(io, "name", lane->name);
   write_str(io, "driver", spn_cc_driver_to_str(lane->driver));
@@ -101,17 +141,25 @@ static void write_lane(sp_io_writer_t* io, const spn_cg_toolchain_t* lane) {
       write_target(io, &lane->target[it]);
     }
     sp_io_write_cstr(io, " ]\n", SP_NULLPTR);
+  } else if (info && !sp_da_empty(info->targets)) {
+    sp_io_write_cstr(io, "target = [", SP_NULLPTR);
+    sp_da_for(info->targets, it) {
+      sp_io_write_cstr(io, it ? ", " : " ", SP_NULLPTR);
+      write_bound_target(io, &info->targets[it]);
+    }
+    sp_io_write_cstr(io, " ]\n", SP_NULLPTR);
   }
   if (!sp_str_empty(lane->mirrors)) {
     write_str(io, "mirrors", lane->mirrors);
   }
 }
 
-sp_str_t lanes_toml(sp_mem_t mem, const spn_cg_toolchains_t* lanes) {
+sp_str_t lanes_toml(sp_mem_t mem, spn_toolchain_catalog_t* catalog, const spn_cg_toolchains_t* lanes) {
   sp_io_dyn_mem_writer_t writer = sp_zero;
   sp_io_dyn_mem_writer_init(mem, &writer);
   sp_om_for(lanes->toolchain, it) {
-    write_lane(&writer.base, sp_om_at(lanes->toolchain, it));
+    const spn_cg_toolchain_t* lane = sp_om_at(lanes->toolchain, it);
+    write_lane(&writer.base, lane, spn_toolchain_catalog_get(catalog, lane->name));
   }
   return sp_io_dyn_mem_writer_as_str(&writer);
 }

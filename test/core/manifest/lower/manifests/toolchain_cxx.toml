@@ -7,4 +7,5 @@ name = "custom"
 compiler = "cc"
 archiver = "ar"
 driver = "gcc"
+target = [{ arch = "x86_64", os = "linux", abi = "gnu" }]
 cxx = "g++ -pthread"

@@ -197,6 +197,8 @@ void spn_profile_finalize(spn_profile_info_t* profile, const spn_toolchain_selec
   profile->abi = selection->target.triple.abi;
   profile->driver = selection->toolchain->driver;
   profile->linker = spn_ld_family(selection->toolchain->driver, selection->toolchain->linker, selection->target.triple);
+  profile->sanitizers_supported = selection->target.sanitizers;
+  profile->target_listed = selection->listed;
   if (!profile->linkage) {
     profile->linkage = abi_linkage(profile->abi);
   }

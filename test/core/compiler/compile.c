@@ -468,6 +468,7 @@ static const compile_test_t tests [] = {
       .abi = SPN_ABI_GNU,
       .standard = SPN_C99,
       .sanitizers = SPN_SANITIZER_ADDRESS,
+      .supported = SPN_SANITIZER_ADDRESS,
     },
     .expect = {
       .command = "cc",

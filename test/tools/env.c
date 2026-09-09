@@ -1,5 +1,6 @@
 #include "env.h"
 #include "caps.h"
+#include "enum/enum.h"
 #include "toolchain/search.h"
 #include "triple/triple.h"
 
@@ -49,6 +50,38 @@ void fixture_create(fixture_t* fixture, sp_str_t relative, sp_str_t content) {
   write_file(fixture_path(fixture, relative), content);
 }
 
+// A fixture's `[[toolchain]]` writes `target = [{ @HOST@ }]`; a local entry
+// must list its targets, and the host triple is only known at run time
+static sp_str_t fill_host_tokens(sp_mem_t mem, sp_str_t content) {
+  spn_triple_t host = spn_triple_host();
+  sp_str_t target = sp_fmt(mem, "arch = \"{}\", os = \"{}\", abi = \"{}\"",
+    sp_fmt_str(spn_arch_to_str(host.arch)),
+    sp_fmt_str(spn_os_to_str(host.os)),
+    sp_fmt_str(spn_abi_to_str(host.abi))).value;
+  sp_str_t token = sp_str_lit("@HOST@");
+
+  sp_io_dyn_mem_writer_t w = sp_zero;
+  sp_io_dyn_mem_writer_init(mem, &w);
+  u32 it = 0;
+  while (it < content.len) {
+    if (it + token.len <= content.len && sp_str_equal(sp_str(content.data + it, token.len), token)) {
+      sp_io_write_str(&w.base, target, SP_NULLPTR);
+      it += token.len;
+    } else {
+      sp_io_write_c8(&w.base, content.data[it]);
+      it++;
+    }
+  }
+  return sp_io_dyn_mem_writer_as_str(&w);
+}
+
+static void fill_host_file(sp_mem_t mem, sp_str_t path) {
+  if (!sp_fs_is_file(path)) {
+    return;
+  }
+  write_file(path, fill_host_tokens(mem, test_read_file(mem, path)));
+}
+
 static sp_err_t copy_project_path(sp_test_t* t, fixture_t* fixture, sp_str_t project, sp_str_t relative) {
   sp_str_t from = sp_fs_join_path(fixture->mem, project, relative);
 
@@ -67,6 +100,9 @@ static sp_err_t copy_project_path(sp_test_t* t, fixture_t* fixture, sp_str_t pro
   }
 
   sp_fs_copy(from, to);
+  if (!sp_fs_is_glob(from) && sp_str_ends_with(relative, sp_str_lit(".toml"))) {
+    fill_host_file(fixture->mem, sp_fs_join_path(fixture->mem, to, sp_fs_get_name(relative)));
+  }
   return SP_OK;
 }
 
@@ -392,6 +428,7 @@ static sp_err_t fixture_copy_project(sp_test_t* t, fixture_t* fixture, sp_str_t 
       sp_try(copy_project_path(t, fixture, project, sp_str_view(copy[it])));
     }
   }
+  fill_host_file(fixture->mem, fixture_path(fixture, sp_str_lit("spn.toml")));
   return SP_OK;
 }
 
@@ -401,7 +438,7 @@ sp_err_t fixture_config_append(sp_test_t* t, fixture_t* fixture, const c8* proje
   sp_must(t, sp_fs_exists(from));
 
   sp_str_t path = config_toml_path(fixture);
-  write_file(path, sp_str_concat(mem, test_read_file(mem, path), test_read_file(mem, from)));
+  write_file(path, sp_str_concat(mem, test_read_file(mem, path), fill_host_tokens(mem, test_read_file(mem, from))));
   return SP_OK;
 }
 

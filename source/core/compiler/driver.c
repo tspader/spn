@@ -114,20 +114,6 @@ spn_err_t spn_cc_parse_depfile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain
   SP_UNREACHABLE_RETURN(SPN_ERROR);
 }
 
-spn_sanitizer_set_t get_supported_sanitizers(const spn_cc_toolchain_t* toolchain, spn_triple_t target) {
-  if (target.abi == SPN_ABI_BARE) {
-    return 0;
-  }
-  switch (toolchain->driver) {
-    case SPN_CC_DRIVER_GCC: return spn_gcc_supported_sanitizers(target);
-    case SPN_CC_DRIVER_CLANG: return spn_clang_supported_sanitizers(target);
-    case SPN_CC_DRIVER_MSVC: return spn_msvc_supported_sanitizers(target);
-    case SPN_CC_DRIVER_ZIG: return spn_zig_supported_sanitizers(target);
-    case SPN_CC_DRIVER_NONE: sp_unreachable_case();
-  }
-  SP_UNREACHABLE_RETURN(0);
-}
-
 static spn_cc_feature_t link_feature(spn_cc_output_kind_t kind) {
   switch (kind) {
     case SPN_CC_OUTPUT_EXE: return SPN_CC_FEATURE_LINK_EXE;
@@ -165,7 +151,7 @@ static spn_err_t link_refused(spn_err_t kind, const spn_cc_toolchain_t* toolchai
 
 spn_err_t spn_cc_validate_profile(const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile) {
   spn_triple_t target = spn_profile_triple(profile);
-  spn_sanitizer_set_t supported = get_supported_sanitizers(toolchain, target);
+  spn_sanitizer_set_t supported = profile->sanitizers_supported;
   spn_sanitizer_set_t unsupported = profile->sanitizers & ~supported;
   if (unsupported) {
     return spn_err_emit(&spn, (spn_err_union_t) {
@@ -175,11 +161,11 @@ spn_err_t spn_cc_validate_profile(const spn_cc_toolchain_t* toolchain, const spn
         .target = target,
         .unsupported = unsupported,
         .supported = supported,
+        .listed = profile->target_listed,
       },
     });
   }
 
-  // @spader Not totally sure about this
   spn_sanitizer_set_t ubsan = profile->sanitizers & ~SPN_SANITIZER_UNDEFINED;
   bool renders_static = profile->linkage == SPN_LIB_KIND_STATIC && spn_ld_static(spn_ld_dialect(target));
   if (ubsan && renders_static) {
@@ -190,6 +176,7 @@ spn_err_t spn_cc_validate_profile(const spn_cc_toolchain_t* toolchain, const spn
         .target = target,
         .unsupported = ubsan,
         .supported = supported,
+        .listed = profile->target_listed,
       },
     });
   }

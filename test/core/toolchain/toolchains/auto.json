@@ -13,7 +13,8 @@
         {
           "arch": "x86_64",
           "os": "windows",
-          "abi": "gnu"
+          "abi": "gnu",
+          "sdk": "toolchain"
         }
       ]
     },
@@ -43,17 +44,20 @@
         {
           "arch": "x86_64",
           "os": "linux",
-          "abi": "musl"
+          "abi": "musl",
+          "sdk": "toolchain"
         },
         {
           "arch": "aarch64",
           "os": "linux",
-          "abi": "gnu"
+          "abi": "gnu",
+          "sdk": "toolchain"
         },
         {
           "arch": "aarch64",
           "os": "linux",
-          "abi": "musl"
+          "abi": "musl",
+          "sdk": "toolchain"
         }
       ]
     },
@@ -70,17 +74,20 @@
         {
           "arch": "aarch64",
           "os": "linux",
-          "abi": "gnu"
+          "abi": "gnu",
+          "sdk": "toolchain"
         },
         {
           "arch": "aarch64",
           "os": "linux",
-          "abi": "musl"
+          "abi": "musl",
+          "sdk": "toolchain"
         },
         {
           "arch": "x86_64",
           "os": "windows",
-          "abi": "gnu"
+          "abi": "gnu",
+          "sdk": "toolchain"
         }
       ]
     },

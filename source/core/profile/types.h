@@ -19,6 +19,8 @@ struct spn_profile_info {
   spn_opt_level_t opt;
   spn_sanitizer_set_t sanitizers;
   bool sanitizers_set;
+  spn_sanitizer_set_t sanitizers_supported;
+  bool target_listed;
   spn_when_t options;
   bool targeted;
   spn_sdk_t sdk;

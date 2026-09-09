@@ -51,11 +51,7 @@ static spn_arg_t lower_program(spn_toml_loader_t* ctx, const c8* key, spn_toolch
   return sp_zero_struct(spn_arg_t);
 }
 
-static spn_path_t lower_sdk(spn_toml_loader_t* ctx, spn_toolchain_source_t source, spn_path_root_t base, spn_triple_t triple, sp_str_t sdk) {
-  if (!spn_sdk_declarable(spn_sdk_kind(triple))) {
-    spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "sdk");
-    return sp_zero_struct(spn_path_t);
-  }
+static spn_path_t lower_sdk_path(spn_toml_loader_t* ctx, spn_toolchain_source_t source, spn_path_root_t base, sp_str_t sdk) {
   spn_path_t path = sp_zero;
   sdk = spn_toml_loader_intern(ctx, sp_fs_normalize_path(ctx->mem, sdk));
   spn_path_check_t check = spn_toolchain_path(source, base, sdk, &path);
@@ -66,6 +62,34 @@ static spn_path_t lower_sdk(spn_toml_loader_t* ctx, spn_toolchain_source_t sourc
   spn_toml_loader_issue_at(ctx, path_issue(check), sdk);
   spn_toml_loader_pop(ctx);
   return sp_zero_struct(spn_path_t);
+}
+
+static void lower_target_caps(spn_toml_loader_t* ctx, spn_toolchain_source_t source, spn_path_root_t base, const spn_cg_toolchain_target_t* cg, spn_toolchain_target_t* target) {
+  if (!sp_da_empty(cg->sanitizers)) {
+    if (spn_sanitizers_declarable(target->triple)) {
+      sp_da_for(cg->sanitizers, it) {
+        target->sanitizers |= cg->sanitizers[it];
+      }
+    } else {
+      spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "sanitizers");
+    }
+  }
+  if (sp_str_empty(cg->sdk)) {
+    if (!spn_sdk_host_reachable(target->triple)) {
+      spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, "sdk");
+    }
+    return;
+  }
+  if (!spn_sdk_declarable(spn_sdk_kind(target->triple))) {
+    spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "sdk");
+    return;
+  }
+  if (sp_str_equal_cstr(cg->sdk, "toolchain")) {
+    target->sdk_source = SPN_SDK_SOURCE_TOOLCHAIN;
+    return;
+  }
+  target->sdk_source = SPN_SDK_SOURCE_PATH;
+  target->sdk = lower_sdk_path(ctx, source, base, cg->sdk);
 }
 
 static spn_toolchain_launcher_t lower_launcher(spn_toml_loader_t* ctx, const c8* key, spn_toolchain_source_t source, spn_path_root_t base, sp_str_t str) {
@@ -380,11 +404,9 @@ static sp_da(spn_toolchain_target_t) lower_toolchain_targets(spn_toml_loader_t* 
       spn_toml_loader_pop(ctx);
       continue;
     }
-    if (!sp_str_empty(cg[it].sdk)) {
-      spn_toml_loader_push_index(ctx, it);
-      target.sdk = lower_sdk(ctx, source, base, target.triple, cg[it].sdk);
-      spn_toml_loader_pop(ctx);
-    }
+    spn_toml_loader_push_index(ctx, it);
+    lower_target_caps(ctx, source, base, &cg[it], &target);
+    spn_toml_loader_pop(ctx);
     sp_da_push(targets, target);
   }
   spn_toml_loader_pop(ctx);
@@ -498,6 +520,9 @@ spn_toolchain_decl_t spn_toolchain_lower(spn_toml_loader_t* ctx, u32 at, spn_pat
   if (toolchain.driver) {
     toolchain.linker = lower_linker(ctx, sp_opt_is_null(decl->linker) ? SPN_LD_FAMILY_NONE : sp_opt_get(decl->linker), toolchain.driver);
     toolchain.targets = lower_toolchain_targets(ctx, toolchain.driver, toolchain.source, base, decl->target);
+    if (sp_da_empty(decl->target)) {
+      spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, "target");
+    }
   }
 
   spn_toml_loader_pop(ctx);

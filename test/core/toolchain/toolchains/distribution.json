@@ -37,7 +37,8 @@
       "target": [
         {
           "arch": "wasm32",
-          "os": "wasi"
+          "os": "wasi",
+          "sdk": "toolchain"
         },
         {
           "arch": "x86_64",

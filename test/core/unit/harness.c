@@ -117,7 +117,7 @@ spn_session_t* build_session(sp_mem_t mem, unit_graph_test_t* g) {
   };
   if (g->sdk) {
     spn_sdk_host_t host = sp_zero;
-    spn_toolchain_selection_t selection = { .target = { .triple = { profile.arch, profile.os, profile.abi }, .sdk = { .sub = sp_cstr_as_str(g->sdk) } } };
+    spn_toolchain_selection_t selection = { .target = { .triple = { profile.arch, profile.os, profile.abi }, .sdk_source = SPN_SDK_SOURCE_PATH, .sdk = { .sub = sp_cstr_as_str(g->sdk) } } };
     profile.sdk = spn_sdk_resolve(mem, &host, &selection);
   }
 

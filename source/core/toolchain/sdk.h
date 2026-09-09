@@ -8,6 +8,8 @@
 
 spn_sdk_kind_t spn_sdk_kind(spn_triple_t target);
 bool           spn_sdk_declarable(spn_sdk_kind_t kind);
+bool           spn_sdk_host_reachable(spn_triple_t target);
+bool           spn_sanitizers_declarable(spn_triple_t target);
 spn_sdk_t      spn_sdk_sysroot(spn_path_t root);
 spn_sdk_t      spn_sdk_macos(sp_mem_t mem, spn_path_t root);
 spn_sdk_t      spn_sdk_msvc(sp_mem_t mem, spn_path_t root, spn_arch_t arch);

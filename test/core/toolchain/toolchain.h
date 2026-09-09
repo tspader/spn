@@ -12,8 +12,15 @@
 
 #define FIXTURE_MAX_ARGS 2
 #define FIXTURE_MAX_HOSTS 6
-#define FIXTURE_MAX_TARGETS 14
+#define FIXTURE_MAX_TARGETS 16
 #define FIXTURE_MAX_SDKS 2
+
+#define SAN_GCC_LINUX   (SPN_SANITIZER_ADDRESS | SPN_SANITIZER_THREAD | SPN_SANITIZER_UNDEFINED | SPN_SANITIZER_LEAK)
+#define SAN_CLANG_LINUX (SPN_SANITIZER_ADDRESS | SPN_SANITIZER_THREAD | SPN_SANITIZER_UNDEFINED | SPN_SANITIZER_MEMORY | SPN_SANITIZER_LEAK)
+#define SAN_GCC_MACOS   (SPN_SANITIZER_ADDRESS | SPN_SANITIZER_THREAD | SPN_SANITIZER_UNDEFINED)
+#define SAN_CLANG_MACOS (SPN_SANITIZER_ADDRESS | SPN_SANITIZER_THREAD | SPN_SANITIZER_UNDEFINED | SPN_SANITIZER_LEAK)
+#define SAN_ZIG_UT      (SPN_SANITIZER_UNDEFINED | SPN_SANITIZER_THREAD)
+#define SAN_ZIG_U       (SPN_SANITIZER_UNDEFINED)
 
 typedef struct {
   const c8* name;
@@ -32,6 +39,8 @@ typedef struct {
 typedef struct {
   spn_triple_t triple;
   test_path_t sdk;
+  bool sdk_toolchain;
+  spn_sanitizer_set_t sanitizers;
 } fixture_target_t;
 
 typedef struct {
@@ -136,7 +145,14 @@ static sp_err_t fixture_check_sdk(sp_test_t* t, spn_sdk_t sdk, fixture_sdk_expec
 }
 
 static spn_toolchain_target_t fixture_target(fixture_target_t target) {
-  return (spn_toolchain_target_t) { .triple = target.triple, .sdk = fixture_path(target.sdk) };
+  spn_toolchain_target_t out = { .triple = target.triple, .sanitizers = target.sanitizers };
+  if (target.sdk_toolchain) {
+    out.sdk_source = SPN_SDK_SOURCE_TOOLCHAIN;
+  } else if (target.sdk.path) {
+    out.sdk_source = SPN_SDK_SOURCE_PATH;
+    out.sdk = fixture_path(target.sdk);
+  }
+  return out;
 }
 
 static sp_err_t fixture_check_launcher(sp_test_t* t, spn_toolchain_launcher_t launcher, fixture_launcher_t expect) {
@@ -177,7 +193,10 @@ static sp_err_t fixture_check_triples(sp_test_t* t, sp_da(spn_triple_t) triples,
 static sp_err_t fixture_check_targets(sp_test_t* t, sp_da(spn_toolchain_target_t) targets, const fixture_target_t* expect, u32 count) {
   sp_must_eq(t, count, (u32)sp_da_size(targets));
   sp_for(it, count) {
-    sp_expect(t, spn_triple_equal(expect[it].triple, targets[it].triple));
+    spn_toolchain_target_t want = fixture_target(expect[it]);
+    sp_expect(t, spn_triple_equal(want.triple, targets[it].triple));
+    sp_expect_eq(t, (u32)want.sdk_source, (u32)targets[it].sdk_source);
+    sp_expect_eq(t, want.sanitizers, targets[it].sanitizers);
     if (test_check_path(t, targets[it].sdk, expect[it].sdk)) {
       return SP_ERR;
     }

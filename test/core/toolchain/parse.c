@@ -45,7 +45,7 @@ static const parse_test_t tests [] = {
             },
           },
           .targets = {
-            { SPN_ARCH_WASM32, SPN_OS_WASI, SPN_ABI_MUSL },
+            { .triple = { SPN_ARCH_WASM32, SPN_OS_WASI, SPN_ABI_MUSL }, .sdk_toolchain = true },
             { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL },
           },
         },
@@ -166,7 +166,7 @@ static const parse_test_t tests [] = {
             TARGET_WIN_GNU,
             { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MSVC },
             HOST_ARM_MACOS,
-            TARGET_WASM,
+            { .triple = TARGET_WASM, .sdk_toolchain = true },
           },
         },
       },

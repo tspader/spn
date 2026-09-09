@@ -35,6 +35,12 @@ typedef enum {
   SPN_SDK_MSVC,
 } spn_sdk_kind_t;
 
+typedef enum {
+  SPN_SDK_SOURCE_HOST,
+  SPN_SDK_SOURCE_TOOLCHAIN,
+  SPN_SDK_SOURCE_PATH,
+} spn_sdk_source_t;
+
 typedef struct {
   spn_arch_t arch;
   struct {
@@ -94,7 +100,9 @@ typedef struct {
 
 typedef struct {
   spn_triple_t triple;
+  spn_sdk_source_t sdk_source;
   spn_path_t sdk;
+  spn_sanitizer_set_t sanitizers;
 } spn_toolchain_target_t;
 
 typedef enum {
@@ -174,6 +182,7 @@ typedef struct {
 typedef struct {
   spn_toolchain_info_t* toolchain;
   spn_toolchain_target_t target;
+  bool listed;
 } spn_toolchain_selection_t;
 
 typedef spn_err_t (*spn_fetch_fn)(sp_str_t url, sp_str_t dest, void* user_data);

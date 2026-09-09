@@ -25,12 +25,25 @@ static spn_err_t load_target(const spn_cg_toolchain_target_t* in, spn_cc_driver_
   if (!spn_toolchain_driver_composes(driver, spn_ld_dialect(target->triple))) {
     return SPN_ERROR;
   }
+  if (!sp_da_empty(in->sanitizers)) {
+    if (!spn_sanitizers_declarable(target->triple)) {
+      return SPN_ERROR;
+    }
+    sp_da_for(in->sanitizers, it) {
+      target->sanitizers |= in->sanitizers[it];
+    }
+  }
   if (sp_str_empty(in->sdk)) {
-    return SPN_OK;
+    return spn_sdk_host_reachable(target->triple) ? SPN_OK : SPN_ERROR;
   }
   if (!spn_sdk_declarable(spn_sdk_kind(target->triple))) {
     return SPN_ERROR;
   }
+  if (sp_str_equal_cstr(in->sdk, "toolchain")) {
+    target->sdk_source = SPN_SDK_SOURCE_TOOLCHAIN;
+    return SPN_OK;
+  }
+  target->sdk_source = SPN_SDK_SOURCE_PATH;
   if (spn_toolchain_path(source, SPN_PATH_ROOT_NONE, in->sdk, &target->sdk) != SPN_PATH_OK) {
     return SPN_ERROR;
   }
@@ -101,7 +114,10 @@ static sp_da(spn_toolchain_target_t) default_targets(spn_toolchain_catalog_t* ca
   if (!spn_toolchain_driver_composes(decl->driver, spn_ld_dialect(host))) {
     return targets;
   }
-  sp_da_push(targets, ((spn_toolchain_target_t) { .triple = host }));
+  sp_da_push(targets, ((spn_toolchain_target_t) {
+    .triple = host,
+    .sanitizers = spn_toolchain_stock_sanitizers(decl->driver, host),
+  }));
   if (spn_os_format(host.os) == SPN_FORMAT_ELF) {
     sp_da_push(targets, ((spn_toolchain_target_t) { .triple = { host.arch, SPN_OS_FREESTANDING, SPN_ABI_BARE } }));
     sp_da_push(targets, ((spn_toolchain_target_t) { .triple = { host.arch, host.os, SPN_ABI_BARE } }));
@@ -115,11 +131,11 @@ static sp_da(spn_toolchain_target_t) declared_targets(spn_toolchain_catalog_t* c
       spn_path_t root = spn_toolchain_artifact_root(support.artifact);
       sp_da(spn_toolchain_target_t) targets = sp_da_new(catalog->mem, spn_toolchain_target_t);
       sp_da_for(declared, it) {
-        spn_path_t sdk = declared[it].sdk;
-        sp_da_push(targets, ((spn_toolchain_target_t) {
-          .triple = declared[it].triple,
-          .sdk = spn_path_empty(sdk) ? sdk : spn_path_join(catalog->mem, root, sdk.sub),
-        }));
+        spn_toolchain_target_t target = declared[it];
+        if (target.sdk_source == SPN_SDK_SOURCE_PATH) {
+          target.sdk = spn_path_join(catalog->mem, root, target.sdk.sub);
+        }
+        sp_da_push(targets, target);
       }
       return targets;
     }

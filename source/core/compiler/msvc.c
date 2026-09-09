@@ -7,10 +7,6 @@
 #include "source_deps.gen.h"
 #include "macro/macro.h"
 
-spn_sanitizer_set_t spn_msvc_supported_sanitizers(spn_triple_t target) {
-  return target.os == SPN_OS_WINDOWS && target.abi == SPN_ABI_MSVC && target.arch == SPN_ARCH_X64 ? SPN_SANITIZER_ADDRESS : 0;
-}
-
 static sp_str_t opt_switch(spn_opt_level_t level) {
   switch (level) {
     case SPN_OPT_LEVEL_0: return sp_str_lit("/Od");

@@ -229,7 +229,8 @@
         "toolchain": { "type": "string" },
         "target": { "metadata": { "extern": "triple" } },
         "unsupported": { "metadata": { "extern": "sanitizer_set" } },
-        "supported": { "metadata": { "extern": "sanitizer_set" } }
+        "supported": { "metadata": { "extern": "sanitizer_set" } },
+        "listed": { "type": "boolean" }
       }
     },
     "compiler": {

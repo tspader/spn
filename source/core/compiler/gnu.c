@@ -97,42 +97,6 @@ static sp_str_t render_target(sp_mem_t mem, const spn_cc_toolchain_t* toolchain,
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
-spn_sanitizer_set_t spn_gcc_supported_sanitizers(spn_triple_t target) {
-  switch (target.os) {
-    case SPN_OS_WASI:
-    case SPN_OS_FREESTANDING:
-    case SPN_OS_WINDOWS: return 0;
-    case SPN_OS_MACOS: return SPN_SANITIZER_ADDRESS | SPN_SANITIZER_THREAD | SPN_SANITIZER_UNDEFINED;
-    case SPN_OS_LINUX:
-    case SPN_OS_NONE: return SPN_SANITIZER_ADDRESS | SPN_SANITIZER_THREAD | SPN_SANITIZER_UNDEFINED | SPN_SANITIZER_LEAK;
-  }
-  SP_UNREACHABLE_RETURN(0);
-}
-
-spn_sanitizer_set_t spn_clang_supported_sanitizers(spn_triple_t target) {
-  switch (target.os) {
-    case SPN_OS_WASI:
-    case SPN_OS_FREESTANDING: return 0;
-    case SPN_OS_WINDOWS: return target.abi == SPN_ABI_MSVC && target.arch == SPN_ARCH_X64 ? SPN_SANITIZER_ADDRESS : 0;
-    case SPN_OS_MACOS: return SPN_SANITIZER_ADDRESS | SPN_SANITIZER_THREAD | SPN_SANITIZER_UNDEFINED | SPN_SANITIZER_LEAK;
-    case SPN_OS_LINUX:
-    case SPN_OS_NONE: return SPN_SANITIZER_ADDRESS | SPN_SANITIZER_THREAD | SPN_SANITIZER_UNDEFINED | SPN_SANITIZER_MEMORY | SPN_SANITIZER_LEAK;
-  }
-  SP_UNREACHABLE_RETURN(0);
-}
-
-spn_sanitizer_set_t spn_zig_supported_sanitizers(spn_triple_t target) {
-  switch (target.os) {
-    case SPN_OS_WASI:
-    case SPN_OS_FREESTANDING: return 0;
-    case SPN_OS_WINDOWS: return SPN_SANITIZER_UNDEFINED;
-    case SPN_OS_MACOS:
-    case SPN_OS_LINUX:
-    case SPN_OS_NONE: return SPN_SANITIZER_UNDEFINED | SPN_SANITIZER_THREAD;
-  }
-  SP_UNREACHABLE_RETURN(0);
-}
-
 void spn_gnu_render_flags(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, spn_cc_flags_t* flags) {
   if (profile->mode == SPN_MODE_DEBUG) {
     sp_da_push(flags->compile, sp_str_lit("-g"));

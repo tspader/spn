@@ -14,6 +14,7 @@ spn_path_check_t         spn_toolchain_path(spn_toolchain_source_t source, spn_p
 spn_path_check_t         spn_toolchain_program(spn_toolchain_source_t source, spn_path_root_t base, sp_str_t program, spn_arg_t* arg);
 spn_cc_cap_set_t         spn_toolchain_driver_caps(spn_cc_driver_t driver);
 bool                     spn_toolchain_driver_retargets(spn_cc_driver_t driver);
+spn_sanitizer_set_t      spn_toolchain_stock_sanitizers(spn_cc_driver_t driver, spn_triple_t host);
 bool                     spn_toolchain_driver_composes(spn_cc_driver_t driver, spn_ld_dialect_t dialect);
 spn_abi_t                spn_default_abi(spn_cc_driver_t driver, spn_os_t os);
 spn_path_t               spn_toolchain_artifact_root(spn_artifact_t artifact);

@@ -61,7 +61,8 @@
         {
           "arch": "x86_64",
           "os": "windows",
-          "abi": "gnu"
+          "abi": "gnu",
+          "sdk": "toolchain"
         }
       ]
     },
@@ -89,7 +90,8 @@
         {
           "arch": "x86_64",
           "os": "windows",
-          "abi": "gnu"
+          "abi": "gnu",
+          "sdk": "toolchain"
         }
       ]
     },
@@ -129,7 +131,8 @@
         {
           "arch": "x86_64",
           "os": "linux",
-          "abi": "musl"
+          "abi": "musl",
+          "sdk": "toolchain"
         }
       ]
     },
@@ -153,7 +156,14 @@
         {
           "arch": "x86_64",
           "os": "linux",
-          "abi": "gnu"
+          "abi": "gnu",
+          "sanitizers": [
+            "address",
+            "thread",
+            "undefined",
+            "memory",
+            "leak"
+          ]
         },
         {
           "arch": "x86_64",
@@ -276,7 +286,8 @@
         {
           "arch": "aarch64",
           "os": "linux",
-          "abi": "gnu"
+          "abi": "gnu",
+          "sdk": "toolchain"
         }
       ]
     },
@@ -305,7 +316,8 @@
         {
           "arch": "x86_64",
           "os": "windows",
-          "abi": "gnu"
+          "abi": "gnu",
+          "sdk": "toolchain"
         }
       ]
     },
@@ -333,7 +345,10 @@
         {
           "arch": "x86_64",
           "os": "windows",
-          "abi": "msvc"
+          "abi": "msvc",
+          "sanitizers": [
+            "address"
+          ]
         },
         {
           "arch": "aarch64",
@@ -399,7 +414,10 @@
           "arch": "x86_64",
           "os": "windows",
           "abi": "msvc",
-          "sdk": "/opt/xwin"
+          "sdk": "/opt/xwin",
+          "sanitizers": [
+            "undefined"
+          ]
         }
       ]
     }

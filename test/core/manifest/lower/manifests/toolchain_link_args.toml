@@ -7,4 +7,5 @@ name = "custom"
 compiler = "gcc"
 archiver = "ar"
 driver = "gcc"
+target = [{ arch = "x86_64", os = "linux", abi = "gnu" }]
 link_args = ["-fuse-ld=mold", "-A"]

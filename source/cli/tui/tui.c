@@ -722,14 +722,22 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
               sp_fmt_str(spn_sanitizer_set_to_str(mem, event->err.sanitizer.unsupported)),
               sp_fmt_str(spn_sanitizer_set_to_str(mem, event->err.sanitizer.supported))
             );
-          } else {
+          } else if (event->err.sanitizer.listed) {
             sp_tty_fmt(
               &w,
-              "toolchain {.cyan} targeting {.yellow} doesn't support any sanitizers; drop {.red} or pick another toolchain with {.cyan}",
+              "toolchain {.cyan} targeting {.yellow} declares no sanitizers; drop {.red} or add {.cyan} to its target",
               sp_fmt_str(event->err.sanitizer.toolchain),
               sp_fmt_str(spn_triple_to_str(mem, event->err.sanitizer.target)),
               sp_fmt_str(spn_sanitizer_set_to_str(mem, event->err.sanitizer.unsupported)),
-              sp_fmt_str(sp_str_lit("--toolchain"))
+              sp_fmt_str(sp_str_lit("sanitizers = [...]"))
+            );
+          } else {
+            sp_tty_fmt(
+              &w,
+              "toolchain {.cyan} reaches {.yellow} without listing it, so declares no sanitizers; drop {.red} or pick another toolchain",
+              sp_fmt_str(event->err.sanitizer.toolchain),
+              sp_fmt_str(spn_triple_to_str(mem, event->err.sanitizer.target)),
+              sp_fmt_str(spn_sanitizer_set_to_str(mem, event->err.sanitizer.unsupported))
             );
           }
           break;

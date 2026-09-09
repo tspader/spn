@@ -54,7 +54,7 @@ static const complete_test_t complete_tests [] = {
   {
     .name = "single_abi_must_be_supported",
     .driver = SPN_CC_DRIVER_GCC,
-    .targets = { HOST_X64_LINUX, TARGET_LINUX_MUSL },
+    .targets = { HOST_X64_LINUX, { .triple = TARGET_LINUX_MUSL, .sdk_toolchain = true } },
     .checks = {
       { .target = X64_LINUX, .abis = { SPN_ABI_GNU }, .expect = { .triple = HOST_X64_LINUX } },
       { .target = X64_LINUX, .abis = { SPN_ABI_MUSL }, .expect = { .triple = TARGET_LINUX_MUSL } },
@@ -64,7 +64,7 @@ static const complete_test_t complete_tests [] = {
   {
     .name = "first_supported_abi_wins",
     .driver = SPN_CC_DRIVER_GCC,
-    .targets = { HOST_X64_LINUX, TARGET_LINUX_MUSL },
+    .targets = { HOST_X64_LINUX, { .triple = TARGET_LINUX_MUSL, .sdk_toolchain = true } },
     .checks = {
       { .target = X64_LINUX, .abis = { SPN_ABI_MUSL, SPN_ABI_GNU }, .expect = { .triple = TARGET_LINUX_MUSL } },
       { .target = X64_LINUX, .abis = { SPN_ABI_GNU, SPN_ABI_MUSL }, .expect = { .triple = HOST_X64_LINUX } },
@@ -81,7 +81,7 @@ static const complete_test_t complete_tests [] = {
   {
     .name = "arch_and_os_must_match",
     .driver = SPN_CC_DRIVER_GCC,
-    .targets = { HOST_ARM_MACOS },
+    .targets = { { .triple = HOST_ARM_MACOS, .sdk_toolchain = true } },
     .checks = {
       { .target = ARM_MACOS, .abis = { SPN_ABI_APPLE }, .expect = { .triple = HOST_ARM_MACOS } },
       { .target = X64_MACOS, .abis = { SPN_ABI_APPLE }, .expect = { .err = SPN_ERR_TOOLCHAIN_TARGET, .targets = { HOST_ARM_MACOS } } },
@@ -91,7 +91,7 @@ static const complete_test_t complete_tests [] = {
   {
     .name = "no_abis_needs_one_when_reachable",
     .driver = SPN_CC_DRIVER_GCC,
-    .targets = { HOST_ARM_LINUX, TARGET_ARM_LINUX_MUSL },
+    .targets = { { .triple = HOST_ARM_LINUX, .sdk_toolchain = true }, { .triple = TARGET_ARM_LINUX_MUSL, .sdk_toolchain = true } },
     .checks = {
       { .target = ARM_LINUX, .expect = { .err = SPN_ERR_TARGET_ABI, .abis = { SPN_ABI_GNU, SPN_ABI_MUSL } } },
     },
@@ -115,7 +115,11 @@ static const complete_test_t complete_tests [] = {
   {
     .name = "listed_targets_build_without_sdk",
     .driver = SPN_CC_DRIVER_ZIG,
-    .targets = { TARGET_WIN_GNU, TARGET_WIN_MSVC, HOST_ARM_MACOS },
+    .targets = {
+      { .triple = TARGET_WIN_GNU, .sdk_toolchain = true },
+      { .triple = TARGET_WIN_MSVC, .sdk_toolchain = true },
+      { .triple = HOST_ARM_MACOS, .sdk_toolchain = true },
+    },
     .checks = {
       { .target = X64_WINDOWS, .abis = { SPN_ABI_GNU }, .expect = { .triple = TARGET_WIN_GNU } },
       { .target = X64_WINDOWS, .abis = { SPN_ABI_MSVC }, .expect = { .triple = TARGET_WIN_MSVC } },
@@ -126,6 +130,7 @@ static const complete_test_t complete_tests [] = {
     .name = "msvc_driver_builds_listed_msvc",
     .driver = SPN_CC_DRIVER_MSVC,
     .targets = { TARGET_WIN_MSVC },
+    .sdks = { .msvc = { { { "/X" }, SPN_ARCH_X64 } } },
     .checks = {
       { .target = X64_WINDOWS, .abis = { SPN_ABI_MSVC }, .expect = { .triple = TARGET_WIN_MSVC } },
       { .target = X64_WINDOWS, .abis = { SPN_ABI_GNU }, .expect = { .err = SPN_ERR_TOOLCHAIN_TARGET, .targets = { TARGET_WIN_MSVC } } },
@@ -154,7 +159,7 @@ static const complete_test_t complete_tests [] = {
   {
     .name = "fixed_driver_lists_elf",
     .driver = SPN_CC_DRIVER_GCC,
-    .targets = { TARGET_ARM_ELF },
+    .targets = { { .triple = TARGET_ARM_ELF, .sdk_toolchain = true } },
     .checks = {
       { .target = ARM_FREESTANDING, .abis = { SPN_ABI_ELF }, .expect = { .triple = TARGET_ARM_ELF } },
       { .target = ARM_FREESTANDING, .abis = { SPN_ABI_BARE }, .expect = { .err = SPN_ERR_TOOLCHAIN_TARGET, .targets = { TARGET_ARM_ELF } } },
@@ -239,7 +244,7 @@ static const complete_test_t complete_tests [] = {
   {
     .name = "no_abis_needs_one_when_any_abi_builds",
     .driver = SPN_CC_DRIVER_ZIG,
-    .targets = { TARGET_WIN_GNU },
+    .targets = { { .triple = TARGET_WIN_GNU, .sdk_toolchain = true } },
     .checks = {
       { .target = X64_WINDOWS, .expect = { .err = SPN_ERR_TARGET_ABI, .abis = { SPN_ABI_GNU, SPN_ABI_MSVC } } },
     },
@@ -413,6 +418,7 @@ static const resolve_test_t resolve_tests [] = {
     .target = ARM_MACOS,
     .abis = { SPN_ABI_APPLE },
     .host = HOST_ARM_MACOS,
+    .sdks = { .macos = { "/S" } },
     .expect = { .err = SPN_ERR_TOOLCHAIN_HOST, .candidates = { "B" } },
   },
   {

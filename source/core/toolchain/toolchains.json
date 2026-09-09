@@ -50,71 +50,21 @@
         }
       },
       "target": [
-        {
-          "arch": "wasm32",
-          "os": "wasi",
-          "abi": "musl"
-        },
-        {
-          "arch": "x86_64",
-          "os": "linux",
-          "abi": "gnu"
-        },
-        {
-          "arch": "x86_64",
-          "os": "linux",
-          "abi": "musl"
-        },
-        {
-          "arch": "aarch64",
-          "os": "linux",
-          "abi": "gnu"
-        },
-        {
-          "arch": "aarch64",
-          "os": "linux",
-          "abi": "musl"
-        },
-        {
-          "arch": "x86_64",
-          "os": "macos",
-          "abi": "apple"
-        },
-        {
-          "arch": "aarch64",
-          "os": "macos",
-          "abi": "apple"
-        },
-        {
-          "arch": "x86_64",
-          "os": "windows",
-          "abi": "gnu"
-        },
-        {
-          "arch": "aarch64",
-          "os": "windows",
-          "abi": "gnu"
-        },
-        {
-          "arch": "x86_64",
-          "os": "freestanding",
-          "abi": "none"
-        },
-        {
-          "arch": "aarch64",
-          "os": "freestanding",
-          "abi": "none"
-        },
-        {
-          "arch": "x86_64",
-          "os": "linux",
-          "abi": "none"
-        },
-        {
-          "arch": "aarch64",
-          "os": "linux",
-          "abi": "none"
-        }
+        { "arch": "wasm32",  "os": "wasi",         "abi": "musl",  "sdk": "toolchain" },
+        { "arch": "x86_64",  "os": "linux",        "abi": "gnu",   "sdk": "toolchain", "sanitizers": ["undefined", "thread"] },
+        { "arch": "x86_64",  "os": "linux",        "abi": "musl",  "sdk": "toolchain", "sanitizers": ["undefined", "thread"] },
+        { "arch": "aarch64", "os": "linux",        "abi": "gnu",   "sdk": "toolchain", "sanitizers": ["undefined", "thread"] },
+        { "arch": "aarch64", "os": "linux",        "abi": "musl",  "sdk": "toolchain", "sanitizers": ["undefined", "thread"] },
+        { "arch": "x86_64",  "os": "macos",        "abi": "apple", "sdk": "toolchain", "sanitizers": ["undefined", "thread"] },
+        { "arch": "aarch64", "os": "macos",        "abi": "apple", "sdk": "toolchain", "sanitizers": ["undefined", "thread"] },
+        { "arch": "x86_64",  "os": "windows",      "abi": "gnu",   "sdk": "toolchain", "sanitizers": ["undefined"] },
+        { "arch": "aarch64", "os": "windows",      "abi": "gnu",   "sdk": "toolchain", "sanitizers": ["undefined"] },
+        { "arch": "x86_64",  "os": "windows",      "abi": "msvc",                      "sanitizers": ["undefined"] },
+        { "arch": "aarch64", "os": "windows",      "abi": "msvc",                      "sanitizers": ["undefined"] },
+        { "arch": "x86_64",  "os": "freestanding", "abi": "none" },
+        { "arch": "aarch64", "os": "freestanding", "abi": "none" },
+        { "arch": "x86_64",  "os": "linux",        "abi": "none" },
+        { "arch": "aarch64", "os": "linux",        "abi": "none" }
       ]
     },
     {
@@ -134,16 +84,8 @@
         "aarch64-windows": {}
       },
       "target": [
-        {
-          "arch": "x86_64",
-          "os": "windows",
-          "abi": "msvc"
-        },
-        {
-          "arch": "aarch64",
-          "os": "windows",
-          "abi": "msvc"
-        }
+        { "arch": "x86_64",  "os": "windows", "abi": "msvc", "sanitizers": ["address"] },
+        { "arch": "aarch64", "os": "windows", "abi": "msvc" }
       ]
     },
     {

@@ -6,6 +6,7 @@
     "linkage": { "enum": ["shared", "static", "source", "object"] },
     "cc_driver": { "enum": ["gcc", "clang", "msvc", "zig"] },
     "ld_family": { "enum": ["gnu", "lld", "ld64", "msvc"] },
+    "sanitizer": { "enum": ["address", "thread", "undefined", "memory", "leak"] },
     "index_protocol": { "enum": ["git", "http", "dir"], "metadata": { "include": "index/types.h" } },
     "option_type": { "enum": ["bool", "enum"], "metadata": { "include": "when/types.h" } },
     "pkg_source": { "enum": ["root", "file", "index"], "metadata": { "include": "pkg/types.h" } },
@@ -24,7 +25,8 @@
         "arch": { "ref": "arch" },
         "os": { "ref": "os" },
         "abi": { "ref": "abi" },
-        "sdk": { "type": "string" }
+        "sdk": { "type": "string" },
+        "sanitizers": { "elements": { "ref": "sanitizer" } }
       }
     },
 

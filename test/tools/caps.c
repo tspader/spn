@@ -74,9 +74,23 @@ static bool triple_agrees(spn_triple_t a, spn_triple_t b) {
   return arch && os && abi;
 }
 
+static bool host_reaches(spn_triple_t target) {
+  switch (spn_sdk_kind(target)) {
+    case SPN_SDK_NONE: return true;
+    case SPN_SDK_SYSROOT: return spn_triple_equal(target, spn_triple_host());
+    case SPN_SDK_MACOS:
+    case SPN_SDK_MSVC: return spn_sdk_from_host(&catalog.sdks, target).kind != SPN_SDK_NONE;
+  }
+  sp_unreachable_return(false);
+}
+
 static bool lane_claims(const spn_toolchain_info_t* info, spn_triple_t target) {
   sp_da_for(info->targets, it) {
-    if (triple_agrees(info->targets[it].triple, target)) {
+    const spn_toolchain_target_t* row = &info->targets[it];
+    if (!triple_agrees(row->triple, target)) {
+      continue;
+    }
+    if (row->sdk_source != SPN_SDK_SOURCE_HOST || host_reaches(target)) {
       return true;
     }
   }
@@ -106,8 +120,6 @@ const c8* test_target_alternate(void) {
   return SP_NULLPTR;
 }
 
-spn_sanitizer_set_t get_supported_sanitizers(const spn_cc_toolchain_t* toolchain, spn_triple_t target);
-
 // A default build asks for musl before the host libc, so a lane that lists
 // musl builds it, and builds it statically
 static spn_triple_t default_target(const spn_toolchain_info_t* info) {
@@ -116,17 +128,14 @@ static spn_triple_t default_target(const spn_toolchain_info_t* info) {
   return host.os == SPN_OS_LINUX && targets(info, musl) ? musl : host;
 }
 
-// A system gcc or clang carries sanitizer runtimes for the host libc only; a
-// lane that swaps the libc through a sysroot or a wrapper can't link them
-static bool toolchain_sanitizes(const test_toolchain_t* toolchain, spn_triple_t target) {
-  switch (toolchain->info->driver) {
-    case SPN_CC_DRIVER_GCC:
-    case SPN_CC_DRIVER_CLANG: return target.os != SPN_OS_LINUX || target.abi == spn_triple_host().abi;
-    case SPN_CC_DRIVER_ZIG:
-    case SPN_CC_DRIVER_MSVC: return true;
-    case SPN_CC_DRIVER_NONE: sp_unreachable_case();
+// The sanitizers a lane declares for a target are the ones it can build
+static spn_sanitizer_set_t lane_sanitizers(const spn_toolchain_info_t* info, spn_triple_t target) {
+  sp_da_for(info->targets, it) {
+    if (spn_triple_equal(info->targets[it].triple, target)) {
+      return info->targets[it].sanitizers;
+    }
   }
-  sp_unreachable_return(true);
+  return 0;
 }
 
 static bool toolchain_enforces_exports(const test_toolchain_t* toolchain, spn_triple_t target) {
@@ -240,7 +249,7 @@ static sp_err_t load_lanes(void* user) {
 
   spn_cg_toolchains_t parsed = sp_zero;
   sp_assert(spn_toolchains_read(lanes, &parsed, mem));
-  toml = lanes_toml(mem, &parsed);
+  toml = lanes_toml(mem, &catalog, &parsed);
 
   spn_toolchain_info_t* info = spn_toolchain_catalog_get(&catalog, name);
   if (!info) {
@@ -337,11 +346,7 @@ sp_str_t test_when_blocked(test_when_t when) {
 
   if (when.sanitize) {
     spn_triple_t picked = when.target ? target : default_target(toolchain->info);
-    spn_cc_toolchain_t cc = {
-      .name = toolchain->info->name,
-      .driver = toolchain->info->driver,
-    };
-    if (when.sanitize & ~get_supported_sanitizers(&cc, picked)) {
+    if (when.sanitize & ~lane_sanitizers(toolchain->info, picked)) {
       return sp_fmt(mem, "{} targeting {} can't build sanitize={}",
         sp_fmt_cstr(toolchain->name),
         sp_fmt_str(spn_triple_to_str(mem, picked)),
@@ -352,11 +357,6 @@ sp_str_t test_when_blocked(test_when_t when) {
         sp_fmt_cstr(toolchain->name),
         sp_fmt_str(spn_triple_to_str(mem, picked)),
         sp_fmt_str(spn_sanitizer_set_to_str(mem, when.sanitize))).value;
-    }
-    if (!toolchain_sanitizes(toolchain, picked)) {
-      return sp_fmt(mem, "{} targeting {} has no sanitizer runtime for that libc",
-        sp_fmt_cstr(toolchain->name),
-        sp_fmt_str(spn_triple_to_str(mem, picked))).value;
     }
   }
 

@@ -6,6 +6,8 @@ typedef struct {
   const c8* compile [flags_max];
   const c8* link [flags_max];
   spn_sanitizer_set_t unsupported;
+  spn_sanitizer_set_t supported;
+  bool listed;
   spn_err_t kind;
 } flags_expect_t;
 
@@ -50,6 +52,7 @@ static const flags_test_t tests [] = {
       .mode = SPN_MODE_DEBUG,
       .opt = SPN_OPT_LEVEL_0,
       .sanitizers = SPN_SANITIZER_ADDRESS | SPN_SANITIZER_UNDEFINED,
+      .sanitizers_supported = SPN_SANITIZER_ADDRESS | SPN_SANITIZER_UNDEFINED,
     },
     .driver = SPN_CC_DRIVER_CLANG,
     .expect = {
@@ -66,6 +69,7 @@ static const flags_test_t tests [] = {
       .mode = SPN_MODE_RELEASE,
       .opt = SPN_OPT_LEVEL_2,
       .sanitizers = SPN_SANITIZER_ADDRESS,
+      .sanitizers_supported = SPN_SANITIZER_ADDRESS,
     },
     .driver = SPN_CC_DRIVER_MSVC,
     .expect = {
@@ -86,57 +90,40 @@ static const flags_test_t tests [] = {
     .expect = { .compile = { "/Z7", "/Od" } },
   },
   {
-    .name = "reject_msan_on_macos",
-    .profile = {
-      .arch = SPN_ARCH_X64,
-      .os = SPN_OS_MACOS,
-      .sanitizers = SPN_SANITIZER_MEMORY,
-    },
-    .driver = SPN_CC_DRIVER_CLANG,
-    .expect = { .kind = SPN_ERR_SANITIZER_UNSUPPORTED, .unsupported = SPN_SANITIZER_MEMORY },
-  },
-  {
-    .name = "reject_asan_on_wasi",
-    .profile = {
-      .arch = SPN_ARCH_WASM32,
-      .os = SPN_OS_WASI,
-      .sanitizers = SPN_SANITIZER_ADDRESS,
-    },
-    .driver = SPN_CC_DRIVER_CLANG,
-    .expect = { .kind = SPN_ERR_SANITIZER_UNSUPPORTED, .unsupported = SPN_SANITIZER_ADDRESS },
-  },
-  {
-    .name = "reject_sanitizers_on_none",
+    .name = "reject_sanitizers_not_in_supported_set",
     .profile = {
       .arch = SPN_ARCH_X64,
       .os = SPN_OS_LINUX,
-      .abi = SPN_ABI_BARE,
-      .sanitizers = SPN_SANITIZER_ADDRESS,
-    },
-    .driver = SPN_CC_DRIVER_GCC,
-    .expect = { .kind = SPN_ERR_SANITIZER_UNSUPPORTED, .unsupported = SPN_SANITIZER_ADDRESS },
-  },
-  {
-    .name = "reject_ubsan_on_freestanding_elf",
-    .profile = {
-      .arch = SPN_ARCH_ARM64,
-      .os = SPN_OS_FREESTANDING,
-      .abi = SPN_ABI_ELF,
-      .sanitizers = SPN_SANITIZER_UNDEFINED,
-    },
-    .driver = SPN_CC_DRIVER_CLANG,
-    .expect = { .kind = SPN_ERR_SANITIZER_UNSUPPORTED, .unsupported = SPN_SANITIZER_UNDEFINED },
-  },
-  {
-    .name = "zig_driver_rejects_asan",
-    .profile = {
-      .arch = SPN_ARCH_X64,
-      .os = SPN_OS_LINUX,
-      .abi = SPN_ABI_MUSL,
+      .abi = SPN_ABI_GNU,
       .sanitizers = SPN_SANITIZER_ADDRESS | SPN_SANITIZER_UNDEFINED,
+      .sanitizers_supported = SPN_SANITIZER_UNDEFINED,
+      .target_listed = true,
     },
-    .driver = SPN_CC_DRIVER_ZIG,
+    .driver = SPN_CC_DRIVER_CLANG,
+    .expect = { .kind = SPN_ERR_SANITIZER_UNSUPPORTED, .unsupported = SPN_SANITIZER_ADDRESS, .supported = SPN_SANITIZER_UNDEFINED, .listed = true },
+  },
+  {
+    .name = "reject_sanitizers_when_reached_unlisted",
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_GNU,
+      .sanitizers = SPN_SANITIZER_ADDRESS,
+    },
+    .driver = SPN_CC_DRIVER_CLANG,
     .expect = { .kind = SPN_ERR_SANITIZER_UNSUPPORTED, .unsupported = SPN_SANITIZER_ADDRESS },
+  },
+  {
+    .name = "reject_sanitizers_when_listed_declares_none",
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_GNU,
+      .sanitizers = SPN_SANITIZER_ADDRESS,
+      .target_listed = true,
+    },
+    .driver = SPN_CC_DRIVER_CLANG,
+    .expect = { .kind = SPN_ERR_SANITIZER_UNSUPPORTED, .unsupported = SPN_SANITIZER_ADDRESS, .listed = true },
   },
   {
     .name = "zig_driver_allows_ubsan_on_windows",
@@ -147,6 +134,7 @@ static const flags_test_t tests [] = {
       .mode = SPN_MODE_DEBUG,
       .opt = SPN_OPT_LEVEL_0,
       .sanitizers = SPN_SANITIZER_UNDEFINED,
+      .sanitizers_supported = SPN_SANITIZER_UNDEFINED,
     },
     .driver = SPN_CC_DRIVER_ZIG,
     .expect = {
@@ -163,6 +151,7 @@ static const flags_test_t tests [] = {
       .mode = SPN_MODE_DEBUG,
       .opt = SPN_OPT_LEVEL_0,
       .sanitizers = SPN_SANITIZER_THREAD,
+      .sanitizers_supported = SPN_SANITIZER_THREAD,
     },
     .driver = SPN_CC_DRIVER_ZIG,
     .expect = {
@@ -179,23 +168,13 @@ static const flags_test_t tests [] = {
       .mode = SPN_MODE_DEBUG,
       .opt = SPN_OPT_LEVEL_0,
       .sanitizers = SPN_SANITIZER_THREAD,
+      .sanitizers_supported = SPN_SANITIZER_THREAD,
     },
     .driver = SPN_CC_DRIVER_ZIG,
     .expect = {
       .compile = { "-g", "-O0", "-fsanitize=thread", "-fno-sanitize-recover=all", "-fno-omit-frame-pointer" },
       .link = { "-fsanitize=thread" },
     },
-  },
-  {
-    .name = "zig_driver_rejects_tsan_on_windows",
-    .profile = {
-      .arch = SPN_ARCH_X64,
-      .os = SPN_OS_WINDOWS,
-      .abi = SPN_ABI_GNU,
-      .sanitizers = SPN_SANITIZER_THREAD | SPN_SANITIZER_UNDEFINED,
-    },
-    .driver = SPN_CC_DRIVER_ZIG,
-    .expect = { .kind = SPN_ERR_SANITIZER_UNSUPPORTED, .unsupported = SPN_SANITIZER_THREAD },
   },
   {
     .name = "zig_driver_allows_ubsan",
@@ -206,6 +185,7 @@ static const flags_test_t tests [] = {
       .mode = SPN_MODE_DEBUG,
       .opt = SPN_OPT_LEVEL_0,
       .sanitizers = SPN_SANITIZER_UNDEFINED,
+      .sanitizers_supported = SPN_SANITIZER_UNDEFINED,
     },
     .driver = SPN_CC_DRIVER_ZIG,
     .expect = {
@@ -270,11 +250,13 @@ static const flags_test_t tests [] = {
       .abi = SPN_ABI_GNU,
       .linkage = SPN_LIB_KIND_STATIC,
       .sanitizers = SPN_SANITIZER_ADDRESS | SPN_SANITIZER_UNDEFINED,
+      .sanitizers_supported = SPN_SANITIZER_ADDRESS | SPN_SANITIZER_UNDEFINED,
     },
     .driver = SPN_CC_DRIVER_CLANG,
     .expect = {
       .kind = SPN_ERR_SANITIZER_STATIC,
       .unsupported = SPN_SANITIZER_ADDRESS,
+      .supported = SPN_SANITIZER_ADDRESS | SPN_SANITIZER_UNDEFINED,
     },
   },
 };
@@ -292,6 +274,8 @@ sp_test_each(render_flags, resolve, flags_test_t, tests, .setup = spn_test_ctx_s
     sp_must_eq(t, 1, sp_da_size(errs));
     sp_expect_eq(t, errs[0].err.kind, err);
     sp_expect_eq(t, errs[0].err.sanitizer.unsupported, it->expect.unsupported);
+    sp_expect_eq(t, errs[0].err.sanitizer.supported, it->expect.supported);
+    sp_expect_eq(t, errs[0].err.sanitizer.listed, it->expect.listed);
     sp_expect_eq(t, errs[0].err.sanitizer.target.arch, it->profile.arch);
     sp_expect_eq(t, errs[0].err.sanitizer.target.os, it->profile.os);
     sp_expect_eq(t, errs[0].err.sanitizer.target.abi, it->profile.abi);

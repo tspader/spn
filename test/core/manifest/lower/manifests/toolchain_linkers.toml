@@ -13,5 +13,5 @@ target = [
   { arch = "x86_64", os = "windows", abi = "gnu" },
   { arch = "x86_64", os = "windows", abi = "msvc" },
   { arch = "aarch64", os = "macos", abi = "apple" },
-  { arch = "wasm32", os = "wasi", abi = "musl" },
+  { arch = "wasm32", os = "wasi", abi = "musl", sdk = "toolchain" },
 ]
