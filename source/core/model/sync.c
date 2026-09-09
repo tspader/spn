@@ -58,6 +58,7 @@ static spn_cc_toolchain_t cc_toolchain(spn_toolchain_info_t* toolchain, spn_tool
     .archiver = archiver,
     .link_args = toolchain->link_args,
     .archiver_driver = toolchain->driver == SPN_CC_DRIVER_MSVC ? SPN_AR_DRIVER_MSVC : SPN_AR_DRIVER_GNU,
+    .wasi = spn_toolchain_wasi_spelling(&spn.roots, spn.mem, toolchain),
   };
 }
 

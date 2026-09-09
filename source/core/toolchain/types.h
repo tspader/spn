@@ -36,6 +36,11 @@ typedef enum {
   SPN_SDK_MSVC,
 } spn_sdk_kind_t;
 
+typedef enum {
+  SPN_WASI_SPELLING_WASI,
+  SPN_WASI_SPELLING_WASIP1,
+} spn_wasi_spelling_t;
+
 typedef struct {
   spn_arch_t arch;
   struct {

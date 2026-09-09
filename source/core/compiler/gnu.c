@@ -77,12 +77,22 @@ static bool codeview(const spn_cc_toolchain_t* toolchain, const spn_profile_info
   return profile->abi == SPN_ABI_MSVC || spn_cc_has(toolchain, SPN_CC_CAP_CODEVIEW);
 }
 
+static sp_str_t render_wasi(spn_wasi_spelling_t spelling) {
+  switch (spelling) {
+    case SPN_WASI_SPELLING_WASI: return sp_str_lit("wasm32-wasi");
+    case SPN_WASI_SPELLING_WASIP1: return sp_str_lit("wasm32-wasip1");
+  }
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
 static sp_str_t render_target(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, spn_triple_t triple) {
   switch (triple.os) {
-    case SPN_OS_MACOS:
-    case SPN_OS_WASI: {
+    case SPN_OS_MACOS: {
       triple.abi = SPN_ABI_NONE;
       return spn_triple_to_str(mem, triple);
+    }
+    case SPN_OS_WASI: {
+      return render_wasi(toolchain->wasi);
     }
     case SPN_OS_FREESTANDING: {
       if (spn_cc_has(toolchain, SPN_CC_CAP_LLVM_TRIPLE)) {

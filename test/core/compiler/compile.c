@@ -3,6 +3,7 @@
 typedef struct {
   const c8* name;
   spn_cc_driver_t driver;
+  spn_wasi_spelling_t wasi;
   test_profile_t profile;
   spn_lang_t lang;
   spn_cxx_options_t cxx;
@@ -89,6 +90,21 @@ static const compile_test_t tests [] = {
     .expect = {
       .command = "cc",
       .args = { "--target=wasm32-wasi", "-std=c99", "-O2", "-c", "-Werror=return-type", "main.c", "-o", "main.o" },
+    },
+  },
+  {
+    .name = "clang_wasi_p1",
+    .driver = SPN_CC_DRIVER_CLANG,
+    .wasi = SPN_WASI_SPELLING_WASIP1,
+    .profile = {
+      .arch = SPN_ARCH_WASM32,
+      .os = SPN_OS_WASI,
+      .standard = SPN_C99,
+      .opt = SPN_OPT_LEVEL_2,
+    },
+    .expect = {
+      .command = "cc",
+      .args = { "--target=wasm32-wasip1", "-std=c99", "-O2", "-c", "-Werror=return-type", "main.c", "-o", "main.o" },
     },
   },
   {
@@ -539,6 +555,7 @@ static const compile_test_t tests [] = {
 sp_test_each(render_compile, render, compile_test_t, tests, .setup = spn_test_ctx_setup) {
   sp_mem_t mem = sp_test_arena(t);
   spn_cc_toolchain_t toolchain = test_toolchain(it->driver);
+  toolchain.wasi = it->wasi;
   spn_cc_compile_t compile = {
     .lang = it->lang,
     .cxx = it->cxx,

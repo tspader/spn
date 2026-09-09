@@ -89,6 +89,15 @@ spn_path_check_t spn_toolchain_program(spn_toolchain_source_t source, spn_path_r
   return SPN_PATH_OK;
 }
 
+spn_wasi_spelling_t spn_toolchain_wasi_spelling(const spn_path_roots_t* roots, sp_mem_t mem, const spn_toolchain_info_t* toolchain) {
+  sp_da_for(toolchain->rows, it) {
+    if (toolchain->rows[it].triple.os == SPN_OS_WASI) {
+      return spn_sdk_wasi_spelling(roots, mem, &toolchain->rows[it].sdk);
+    }
+  }
+  return SPN_WASI_SPELLING_WASI;
+}
+
 bool spn_toolchain_has_cxx(spn_toolchain_info_t* toolchain) {
   return !spn_arg_empty(toolchain->cxx.program);
 }
