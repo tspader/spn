@@ -61,6 +61,16 @@ spn_path_check_t spn_toolchain_path(spn_toolchain_source_t source, spn_path_root
   SP_UNREACHABLE_RETURN(SPN_PATH_MALFORMED);
 }
 
+// An sdk may live outside the artifact: an absolute path is a host path on
+// any source. Programs stay strict, since a distribution ships its own.
+spn_path_check_t spn_toolchain_sdk_path(spn_toolchain_source_t source, spn_path_root_t base, sp_str_t str, spn_path_t* path) {
+  if (spn_path_normal(str) && sp_fs_is_absolute(str)) {
+    *path = (spn_path_t) { .sub = str };
+    return SPN_PATH_OK;
+  }
+  return spn_toolchain_path(source, base, str, path);
+}
+
 spn_path_check_t spn_toolchain_program(spn_toolchain_source_t source, spn_path_root_t base, sp_str_t program, spn_arg_t* arg) {
   if (!spn_path_normal(program)) {
     return SPN_PATH_MALFORMED;
@@ -171,16 +181,11 @@ spn_target_caps_t spn_toolchain_target_caps(const spn_cg_toolchain_target_t* cg,
     }
   }
   if (sp_str_empty(cg->sdk)) {
-    return spn_sdk_host_reachable(triple) ? SPN_TARGET_CAPS_OK : SPN_TARGET_CAPS_SDK_REQUIRED;
-  }
-  if (!spn_sdk_declarable(spn_sdk_kind(triple))) {
-    return SPN_TARGET_CAPS_SDK_FORBIDDEN;
-  }
-  if (sp_str_equal_cstr(cg->sdk, "toolchain")) {
-    target->sdk_source = SPN_SDK_SOURCE_TOOLCHAIN;
     return SPN_TARGET_CAPS_OK;
   }
-  target->sdk_source = SPN_SDK_SOURCE_PATH;
+  if (spn_sdk_kind(triple) == SPN_SDK_NONE) {
+    return SPN_TARGET_CAPS_SDK_FORBIDDEN;
+  }
   return SPN_TARGET_CAPS_SDK_PATH;
 }
 

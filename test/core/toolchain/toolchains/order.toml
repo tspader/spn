@@ -11,6 +11,6 @@ driver = "gcc"
 compiler = "B"
 archiver = "ar"
 target = [
-  { arch = "x86_64", os = "linux", abi = "musl", sdk = "toolchain" },
+  { arch = "x86_64", os = "linux", abi = "musl" },
   { arch = "x86_64", os = "linux", abi = "gnu" }
 ]

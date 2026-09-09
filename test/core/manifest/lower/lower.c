@@ -76,7 +76,6 @@ typedef struct {
 typedef struct {
   spn_triple_t triple;
   test_path_t sdk;
-  bool sdk_toolchain;
   spn_sanitizer_set_t sanitizers;
 } toolchain_target_t;
 
@@ -520,10 +519,10 @@ static const test_t tests [] = {
         .lld = true,
         .targets = {
           { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU },
-          { .triple = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU }, .sdk_toolchain = true },
+          { .triple = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU } },
           { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MSVC },
           { SPN_ARCH_ARM64, SPN_OS_MACOS, SPN_ABI_APPLE },
-          { .triple = { SPN_ARCH_WASM32, SPN_OS_WASI, SPN_ABI_MUSL }, .sdk_toolchain = true },
+          { .triple = { SPN_ARCH_WASM32, SPN_OS_WASI, SPN_ABI_MUSL } },
         },
       },
     },
@@ -616,7 +615,7 @@ static const test_t tests [] = {
         .driver = SPN_CC_DRIVER_CLANG,
         .targets = {
           { .triple = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU }, .sanitizers = SPN_SANITIZER_ADDRESS | SPN_SANITIZER_UNDEFINED },
-          { .triple = { SPN_ARCH_WASM32, SPN_OS_WASI, SPN_ABI_MUSL }, .sdk_toolchain = true },
+          { .triple = { SPN_ARCH_WASM32, SPN_OS_WASI, SPN_ABI_MUSL } },
         },
       },
     },
@@ -629,10 +628,16 @@ static const test_t tests [] = {
     },
   },
   {
-    .name = "validate_toolchain_sdk_required",
-    .manifest = "toolchain_sdk_required",
-    .issues = {
-      { SPN_ERR_CODEGEN_MISSING_KEY, "toolchain[0].target[0].sdk" }
+    .name = "toolchain_sdk_absent_off_host",
+    .manifest = "toolchain_sdk_absent",
+    .toolchains = {
+      {
+        .name = "T",
+        .compiler = { .name = "clang" },
+        .archiver = { .name = "ar" },
+        .driver = SPN_CC_DRIVER_CLANG,
+        .targets = { { .triple = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU } } },
+      },
     },
   },
   {
@@ -1381,13 +1386,6 @@ static sp_err_t check_targets(sp_test_t* t, spn_target_map_t om, const target_t*
   return SP_OK;
 }
 
-static spn_sdk_source_t target_sdk_source(toolchain_target_t target) {
-  if (target.sdk_toolchain) {
-    return SPN_SDK_SOURCE_TOOLCHAIN;
-  }
-  return target.sdk.path ? SPN_SDK_SOURCE_PATH : SPN_SDK_SOURCE_HOST;
-}
-
 sp_test_each(lower, cases, test_t, tests) {
   sp_mem_t mem = sp_test_arena(t);
   sp_intern_t* interner = sp_intern_new(mem);
@@ -1540,7 +1538,6 @@ sp_test_each(lower, cases, test_t, tests) {
       if (target.triple.arch == SPN_ARCH_NONE) break;
       sp_must(t, r < sp_da_size(tc->targets));
       sp_expect(t, spn_triple_equal(target.triple, tc->targets[r].triple));
-      sp_expect_eq(t, (u32)target_sdk_source(target), (u32)tc->targets[r].sdk_source);
       sp_expect_eq(t, target.sanitizers, tc->targets[r].sanitizers);
       if (test_check_path(t, tc->targets[r].sdk, target.sdk)) return SP_ERR;
     }

@@ -45,7 +45,7 @@ static const parse_test_t tests [] = {
             },
           },
           .targets = {
-            { .triple = { SPN_ARCH_WASM32, SPN_OS_WASI, SPN_ABI_MUSL }, .sdk_toolchain = true },
+            { .triple = { SPN_ARCH_WASM32, SPN_OS_WASI, SPN_ABI_MUSL } },
             { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL },
           },
         },
@@ -163,10 +163,10 @@ static const parse_test_t tests [] = {
           .lld = true,
           .targets = {
             { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU },
-            { .triple = TARGET_WIN_GNU, .sdk_toolchain = true },
+            { .triple = TARGET_WIN_GNU },
             { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MSVC },
             HOST_ARM_MACOS,
-            { .triple = TARGET_WASM, .sdk_toolchain = true },
+            { .triple = TARGET_WASM },
           },
         },
       },
@@ -242,9 +242,25 @@ static const parse_test_t tests [] = {
     },
   },
   {
-    .name = "sdk_absolute_in_distribution",
+    .name = "sdk_absolute_in_distribution_is_a_host_path",
     .file = "sdk_absolute.toml",
-    .expect = { .err = SPN_ERROR },
+    .expect = {
+      .entries = 1,
+      .toolchains = {
+        {
+          .name = "A",
+          .driver = SPN_CC_DRIVER_CLANG,
+          .compiler = { .path = "A" },
+          .archiver = { .path = "A" },
+          .hosts = {
+            { .triple = { SPN_ARCH_X64, SPN_OS_LINUX }, .url = "https://example.com/linux.tar.xz", .sha256 = "aa" },
+          },
+          .targets = {
+            { .triple = HOST_ARM_LINUX, .sdk = { "/S" } },
+          },
+        },
+      },
+    },
   },
   {
     .name = "sanitizers_and_toolchain_sdk",
@@ -259,8 +275,8 @@ static const parse_test_t tests [] = {
           .archiver = { .name = "A" },
           .targets = {
             { .triple = HOST_X64_LINUX, .sanitizers = SPN_SANITIZER_ADDRESS | SPN_SANITIZER_UNDEFINED },
-            { .triple = TARGET_WASM, .sdk_toolchain = true },
-            { .triple = TARGET_WIN_GNU, .sdk_toolchain = true },
+            { .triple = TARGET_WASM },
+            { .triple = TARGET_WIN_GNU },
           },
         },
       },
@@ -272,9 +288,20 @@ static const parse_test_t tests [] = {
     .expect = { .err = SPN_ERROR },
   },
   {
-    .name = "sdk_required_off_host",
-    .file = "sdk_required.toml",
-    .expect = { .err = SPN_ERROR },
+    .name = "sdk_absent_off_host_is_the_toolchains",
+    .file = "sdk_absent.toml",
+    .expect = {
+      .entries = 1,
+      .toolchains = {
+        {
+          .name = "A",
+          .driver = SPN_CC_DRIVER_CLANG,
+          .compiler = { .name = "A" },
+          .archiver = { .name = "A" },
+          .targets = { { TARGET_WIN_GNU } },
+        },
+      },
+    },
   },
 };
 

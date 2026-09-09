@@ -30,7 +30,7 @@ static spn_arg_t lower_program(spn_toml_loader_t* ctx, const c8* key, spn_toolch
 static spn_path_t lower_sdk_path(spn_toml_loader_t* ctx, spn_toolchain_source_t source, spn_path_root_t base, sp_str_t sdk) {
   spn_path_t path = sp_zero;
   sdk = spn_toml_loader_intern(ctx, sp_fs_normalize_path(ctx->mem, sdk));
-  spn_path_check_t check = spn_toolchain_path(source, base, sdk, &path);
+  spn_path_check_t check = spn_toolchain_sdk_path(source, base, sdk, &path);
   if (check == SPN_PATH_OK) {
     return path;
   }
@@ -46,7 +46,6 @@ static void lower_target_caps(spn_toml_loader_t* ctx, spn_toolchain_source_t sou
     case SPN_TARGET_CAPS_SDK_PATH: target->sdk = lower_sdk_path(ctx, source, base, cg->sdk); break;
     case SPN_TARGET_CAPS_SANITIZERS_FORBIDDEN: spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "sanitizers"); break;
     case SPN_TARGET_CAPS_SDK_FORBIDDEN: spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "sdk"); break;
-    case SPN_TARGET_CAPS_SDK_REQUIRED: spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, "sdk"); break;
   }
 }
 

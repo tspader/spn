@@ -7,8 +7,6 @@
 #include "toolchain/types.h"
 
 spn_sdk_kind_t spn_sdk_kind(spn_triple_t target);
-bool           spn_sdk_declarable(spn_sdk_kind_t kind);
-bool           spn_sdk_host_reachable(spn_triple_t target);
 spn_sdk_t      spn_sdk_sysroot(spn_path_t root);
 spn_sdk_t      spn_sdk_macos(sp_mem_t mem, spn_path_t root);
 spn_sdk_t      spn_sdk_msvc(sp_mem_t mem, spn_path_t root, spn_arch_t arch);
@@ -17,6 +15,7 @@ spn_sdk_host_t spn_sdk_detect(sp_mem_t mem, const spn_path_roots_t* roots, sp_en
 spn_sdk_t      spn_sdk_at(sp_mem_t mem, spn_triple_t target, spn_path_t root);
 spn_sdk_t      spn_sdk_from_host(const spn_sdk_host_t* host, spn_triple_t target);
 bool           spn_sdk_served(const spn_sdk_host_t* sdks, spn_triple_t host, spn_triple_t target, spn_sdk_t* sdk);
+bool           spn_sdk_default(const spn_sdk_host_t* sdks, spn_triple_t target, spn_sdk_t* sdk);
 sp_hash_t      spn_sdk_hash(const spn_sdk_t* sdk);
 
 #endif

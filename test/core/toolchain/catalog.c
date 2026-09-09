@@ -176,6 +176,13 @@ static const rows_test_t rows_tests [] = {
     .toolchain = "A",
     .expect = { .rows = { { HOST_ARM_LINUX, { SPN_SDK_SYSROOT, { "/S" } } } } },
   },
+  {
+    .name = "artifact_absolute_sdk_is_a_host_path",
+    .file = "sdk_absolute.toml",
+    .host = HOST_X64_LINUX,
+    .toolchain = "A",
+    .expect = { .rows = { { HOST_ARM_LINUX, { SPN_SDK_SYSROOT, { "/S" } } } } },
+  },
 };
 
 static const bind_test_t bind_tests [] = {
@@ -188,22 +195,7 @@ static const bind_test_t bind_tests [] = {
     .expect = { .rows = { { HOST_ARM_MACOS, { SPN_SDK_MACOS, { "/E" } } } } },
   },
   {
-    .name = "toolchain_source_takes_a_served_host_sdk",
-    .driver = SPN_CC_DRIVER_GCC,
-    .host = HOST_ARM_MACOS,
-    .sdks = { .macos = { "/H" } },
-    .targets = { { .triple = HOST_ARM_MACOS, .sdk_toolchain = true } },
-    .expect = { .rows = { { HOST_ARM_MACOS, { SPN_SDK_MACOS, { "/H" } } } } },
-  },
-  {
-    .name = "toolchain_source_without_a_host_sdk_is_none",
-    .driver = SPN_CC_DRIVER_GCC,
-    .host = HOST_X64_LINUX,
-    .targets = { { .triple = HOST_ARM_MACOS, .sdk_toolchain = true } },
-    .expect = { .rows = { { HOST_ARM_MACOS } } },
-  },
-  {
-    .name = "host_source_takes_the_served_host_sdk",
+    .name = "absent_macos_takes_the_served_host_sdk",
     .driver = SPN_CC_DRIVER_GCC,
     .host = HOST_ARM_MACOS,
     .sdks = { .macos = { "/H" } },
@@ -211,18 +203,39 @@ static const bind_test_t bind_tests [] = {
     .expect = { .rows = { { HOST_ARM_MACOS, { SPN_SDK_MACOS, { "/H" } } } } },
   },
   {
-    .name = "host_source_without_a_host_sdk_is_dropped",
+    .name = "absent_macos_without_a_host_sdk_is_kept",
     .driver = SPN_CC_DRIVER_GCC,
     .host = HOST_ARM_MACOS,
     .sdks = { .msvc = { { { "/X" }, SPN_ARCH_X64 } } },
     .targets = { { HOST_ARM_MACOS } },
+    .expect = { .rows = { { HOST_ARM_MACOS } } },
   },
   {
-    .name = "host_source_sysroot_must_be_the_host",
+    .name = "absent_msvc_takes_the_served_host_sdk",
+    .driver = SPN_CC_DRIVER_CLANG,
+    .host = HOST_X64_WINDOWS,
+    .sdks = { .msvc = { { { "/X" }, SPN_ARCH_X64 } } },
+    .targets = { { TARGET_WIN_MSVC } },
+    .expect = { .rows = { { TARGET_WIN_MSVC, { SPN_SDK_MSVC, .vc = { "/X/crt/lib/x86_64" } } } } },
+  },
+  {
+    .name = "absent_msvc_without_a_host_sdk_is_dropped",
+    .driver = SPN_CC_DRIVER_CLANG,
+    .host = HOST_X64_WINDOWS,
+    .sdks = { .macos = { "/H" } },
+    .targets = { { TARGET_WIN_MSVC } },
+  },
+  {
+    .name = "absent_sysroot_passes_nothing_anywhere",
     .driver = SPN_CC_DRIVER_GCC,
     .host = HOST_X64_LINUX,
-    .targets = { { HOST_X64_LINUX }, { HOST_X64_LINUX_MUSL }, { HOST_ARM_LINUX } },
-    .expect = { .rows = { { HOST_X64_LINUX } } },
+    .targets = { { HOST_X64_LINUX }, { HOST_X64_LINUX_MUSL }, { HOST_ARM_LINUX }, { TARGET_WIN_GNU }, { TARGET_WASM } },
+    .expect = { .rows = { { HOST_X64_LINUX }, { HOST_X64_LINUX_MUSL }, { HOST_ARM_LINUX }, { TARGET_WIN_GNU }, { TARGET_WASM } } },
+  },
+  {
+    .name = "derived_msvc_host_row_needs_the_sdk",
+    .driver = SPN_CC_DRIVER_CLANG,
+    .host = HOST_X64_WINDOWS,
   },
   {
     .name = "derived_retargeting_driver_reaches_served_sdks",
@@ -243,7 +256,7 @@ static const bind_test_t bind_tests [] = {
     .driver = SPN_CC_DRIVER_CLANG,
     .host = HOST_X64_LINUX,
     .sdks = { .macos = { "/H" }, .msvc = { { { "/X" }, SPN_ARCH_X64 } } },
-    .targets = { { .triple = TARGET_WASM, .sdk_toolchain = true } },
+    .targets = { { .triple = TARGET_WASM } },
     .expect = { .rows = { { TARGET_WASM } } },
   },
   {
@@ -251,14 +264,14 @@ static const bind_test_t bind_tests [] = {
     .driver = SPN_CC_DRIVER_GCC,
     .host = HOST_X64_LINUX,
     .sdks = { .macos = { "/H" }, .msvc = { { { "/X" }, SPN_ARCH_X64 } } },
-    .targets = { { .triple = TARGET_WASM, .sdk_toolchain = true } },
+    .targets = { { .triple = TARGET_WASM } },
     .expect = { .rows = { { TARGET_WASM } } },
   },
   {
     .name = "listed_rows_keep_their_sanitizers",
     .driver = SPN_CC_DRIVER_ZIG,
     .host = HOST_X64_LINUX,
-    .targets = { { .triple = HOST_X64_LINUX, .sdk_toolchain = true, .sanitizers = SAN_ZIG_UT }, { .triple = TARGET_X64_BARE } },
+    .targets = { { .triple = HOST_X64_LINUX, .sanitizers = SAN_ZIG_UT }, { .triple = TARGET_X64_BARE } },
     .expect = { .rows = { { HOST_X64_LINUX, .sanitizers = SAN_ZIG_UT }, { TARGET_X64_BARE } } },
   },
   {
@@ -266,7 +279,7 @@ static const bind_test_t bind_tests [] = {
     .driver = SPN_CC_DRIVER_CLANG,
     .lld = true,
     .host = HOST_X64_WINDOWS,
-    .targets = { { .triple = TARGET_WIN_GNU, .sdk_toolchain = true } },
+    .targets = { { .triple = TARGET_WIN_GNU } },
     .expect = { .rows = { { TARGET_WIN_GNU } } },
   },
   {

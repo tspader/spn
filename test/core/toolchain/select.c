@@ -61,7 +61,7 @@ static const complete_test_t complete_tests [] = {
   {
     .name = "single_abi_must_be_supported",
     .driver = SPN_CC_DRIVER_GCC,
-    .targets = { HOST_X64_LINUX, { .triple = TARGET_LINUX_MUSL, .sdk_toolchain = true } },
+    .targets = { HOST_X64_LINUX, { .triple = TARGET_LINUX_MUSL } },
     .checks = {
       { .target = X64_LINUX, .abis = { SPN_ABI_GNU }, .expect = { .triple = HOST_X64_LINUX } },
       { .target = X64_LINUX, .abis = { SPN_ABI_MUSL }, .expect = { .triple = TARGET_LINUX_MUSL } },
@@ -70,7 +70,7 @@ static const complete_test_t complete_tests [] = {
   {
     .name = "first_supported_abi_wins",
     .driver = SPN_CC_DRIVER_GCC,
-    .targets = { HOST_X64_LINUX, { .triple = TARGET_LINUX_MUSL, .sdk_toolchain = true } },
+    .targets = { HOST_X64_LINUX, { .triple = TARGET_LINUX_MUSL } },
     .checks = {
       { .target = X64_LINUX, .abis = { SPN_ABI_MUSL, SPN_ABI_GNU }, .expect = { .triple = TARGET_LINUX_MUSL } },
       { .target = X64_LINUX, .abis = { SPN_ABI_GNU, SPN_ABI_MUSL }, .expect = { .triple = HOST_X64_LINUX } },
@@ -87,7 +87,7 @@ static const complete_test_t complete_tests [] = {
   {
     .name = "arch_and_os_must_match",
     .driver = SPN_CC_DRIVER_GCC,
-    .targets = { { .triple = HOST_ARM_MACOS, .sdk_toolchain = true } },
+    .targets = { { .triple = HOST_ARM_MACOS } },
     .checks = {
       { .target = ARM_MACOS, .abis = { SPN_ABI_APPLE }, .expect = { .triple = HOST_ARM_MACOS } },
       { .target = X64_MACOS, .abis = { SPN_ABI_APPLE }, .expect = { .err = SPN_ERR_TOOLCHAIN_TARGET, .targets = { HOST_ARM_MACOS } } },
@@ -97,7 +97,7 @@ static const complete_test_t complete_tests [] = {
   {
     .name = "no_abis_needs_one_when_reachable",
     .driver = SPN_CC_DRIVER_GCC,
-    .targets = { { .triple = HOST_ARM_LINUX, .sdk_toolchain = true }, { .triple = TARGET_ARM_LINUX_MUSL, .sdk_toolchain = true } },
+    .targets = { { .triple = HOST_ARM_LINUX }, { .triple = TARGET_ARM_LINUX_MUSL } },
     .checks = {
       { .target = ARM_LINUX, .expect = { .err = SPN_ERR_TARGET_ABI, .abis = { SPN_ABI_GNU, SPN_ABI_MUSL } } },
     },
@@ -105,7 +105,7 @@ static const complete_test_t complete_tests [] = {
   {
     .name = "no_abis_is_target_error_when_unreachable",
     .driver = SPN_CC_DRIVER_GCC,
-    .targets = { { .triple = TARGET_WASM, .sdk_toolchain = true } },
+    .targets = { { .triple = TARGET_WASM } },
     .checks = {
       { .target = X64_WINDOWS, .expect = { .err = SPN_ERR_TOOLCHAIN_TARGET, .targets = { TARGET_WASM } } },
     },
@@ -120,16 +120,16 @@ static const complete_test_t complete_tests [] = {
     },
   },
   {
-    .name = "listed_targets_build_without_sdk",
+    .name = "listed_targets_build_without_sdk_except_msvc",
     .driver = SPN_CC_DRIVER_ZIG,
     .targets = {
-      { .triple = TARGET_WIN_GNU, .sdk_toolchain = true },
-      { .triple = TARGET_WIN_MSVC, .sdk_toolchain = true },
-      { .triple = HOST_ARM_MACOS, .sdk_toolchain = true },
+      { .triple = TARGET_WIN_GNU },
+      { .triple = TARGET_WIN_MSVC },
+      { .triple = HOST_ARM_MACOS },
     },
     .checks = {
       { .target = X64_WINDOWS, .abis = { SPN_ABI_GNU }, .expect = { .triple = TARGET_WIN_GNU } },
-      { .target = X64_WINDOWS, .abis = { SPN_ABI_MSVC }, .expect = { .triple = TARGET_WIN_MSVC } },
+      { .target = X64_WINDOWS, .abis = { SPN_ABI_MSVC }, .expect = { .err = SPN_ERR_TOOLCHAIN_SDK_MSVC, .targets = { TARGET_WIN_GNU, HOST_ARM_MACOS } } },
       { .target = ARM_MACOS, .abis = { SPN_ABI_APPLE }, .expect = { .triple = HOST_ARM_MACOS } },
     },
   },
@@ -182,7 +182,7 @@ static const complete_test_t complete_tests [] = {
   {
     .name = "fixed_driver_lists_elf",
     .driver = SPN_CC_DRIVER_GCC,
-    .targets = { { .triple = TARGET_ARM_ELF, .sdk_toolchain = true } },
+    .targets = { { .triple = TARGET_ARM_ELF } },
     .checks = {
       { .target = ARM_FREESTANDING, .abis = { SPN_ABI_ELF }, .expect = { .triple = TARGET_ARM_ELF } },
     },
@@ -206,7 +206,7 @@ static const complete_test_t complete_tests [] = {
   {
     .name = "listed_toolchain_does_not_reach_the_host",
     .driver = SPN_CC_DRIVER_CLANG,
-    .targets = { { .triple = TARGET_WASM, .sdk_toolchain = true } },
+    .targets = { { .triple = TARGET_WASM } },
     .checks = {
       { .target = X64_LINUX, .abis = { SPN_ABI_GNU }, .expect = { .err = SPN_ERR_TOOLCHAIN_TARGET, .targets = { TARGET_WASM } } },
     },
@@ -239,7 +239,7 @@ static const complete_test_t complete_tests [] = {
   {
     .name = "retargeting_driver_needs_msvc_sdk",
     .driver = SPN_CC_DRIVER_ZIG,
-    .targets = { { .triple = TARGET_WIN_GNU, .sdk_toolchain = true } },
+    .targets = { { .triple = TARGET_WIN_GNU } },
     .checks = {
       { .target = X64_WINDOWS, .abis = { SPN_ABI_MSVC }, .expect = { .err = SPN_ERR_TOOLCHAIN_SDK_MSVC, .targets = { TARGET_WIN_GNU } } },
     },
@@ -264,7 +264,7 @@ static const complete_test_t complete_tests [] = {
   {
     .name = "no_abis_needs_one_when_any_abi_builds",
     .driver = SPN_CC_DRIVER_ZIG,
-    .targets = { { .triple = TARGET_WIN_GNU, .sdk_toolchain = true } },
+    .targets = { { .triple = TARGET_WIN_GNU } },
     .checks = {
       { .target = X64_WINDOWS, .expect = { .err = SPN_ERR_TARGET_ABI, .abis = { SPN_ABI_GNU, SPN_ABI_MSVC } } },
     },
@@ -306,7 +306,7 @@ static const complete_test_t complete_tests [] = {
   {
     .name = "listed_toolchain_does_not_reach_a_served_sdk",
     .driver = SPN_CC_DRIVER_ZIG,
-    .targets = { { .triple = TARGET_WIN_GNU, .sdk_toolchain = true } },
+    .targets = { { .triple = TARGET_WIN_GNU } },
     .sdks = { .msvc = { { { "/X" }, SPN_ARCH_X64 } } },
     .checks = {
       { .target = X64_WINDOWS, .abis = { SPN_ABI_MSVC }, .expect = { .err = SPN_ERR_TOOLCHAIN_TARGET, .targets = { TARGET_WIN_GNU } } },
@@ -323,7 +323,7 @@ static const complete_test_t complete_tests [] = {
   {
     .name = "named_needs_declared_sanitizers",
     .driver = SPN_CC_DRIVER_ZIG,
-    .targets = { { .triple = HOST_X64_LINUX, .sdk_toolchain = true, .sanitizers = SAN_ZIG_UT } },
+    .targets = { { .triple = HOST_X64_LINUX, .sanitizers = SAN_ZIG_UT } },
     .checks = {
       { .target = X64_LINUX, .abis = { SPN_ABI_GNU }, .sanitizers = SPN_SANITIZER_UNDEFINED, .expect = { .triple = HOST_X64_LINUX } },
       { .target = X64_LINUX, .abis = { SPN_ABI_GNU }, .sanitizers = SPN_SANITIZER_ADDRESS, .expect = { .err = SPN_ERR_SANITIZER_UNSUPPORTED, .triple = HOST_X64_LINUX, .unsupported = SPN_SANITIZER_ADDRESS, .supported = SAN_ZIG_UT } },
@@ -333,8 +333,8 @@ static const complete_test_t complete_tests [] = {
     .name = "sanitizers_pick_the_abi",
     .driver = SPN_CC_DRIVER_ZIG,
     .targets = {
-      { .triple = TARGET_LINUX_MUSL, .sdk_toolchain = true, .sanitizers = SAN_ZIG_UT },
-      { .triple = HOST_X64_LINUX, .sdk_toolchain = true, .sanitizers = SAN_ZIG_UT | SPN_SANITIZER_ADDRESS },
+      { .triple = TARGET_LINUX_MUSL, .sanitizers = SAN_ZIG_UT },
+      { .triple = HOST_X64_LINUX, .sanitizers = SAN_ZIG_UT | SPN_SANITIZER_ADDRESS },
     },
     .checks = {
       { .target = X64_LINUX, .abis = { SPN_ABI_MUSL, SPN_ABI_GNU }, .sanitizers = SPN_SANITIZER_ADDRESS, .expect = { .triple = HOST_X64_LINUX } },
@@ -346,7 +346,7 @@ static const complete_test_t complete_tests [] = {
     .driver = SPN_CC_DRIVER_GCC,
     .targets = {
       { .triple = HOST_X64_LINUX, .sanitizers = SAN_GCC_LINUX },
-      { .triple = TARGET_LINUX_MUSL, .sdk_toolchain = true, .sanitizers = SAN_GCC_LINUX },
+      { .triple = TARGET_LINUX_MUSL, .sanitizers = SAN_GCC_LINUX },
     },
     .checks = {
       { .target = X64_LINUX, .abis = { SPN_ABI_MUSL, SPN_ABI_GNU }, .sanitizers = SPN_SANITIZER_ADDRESS, .expect = { .triple = HOST_X64_LINUX } },

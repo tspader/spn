@@ -19,9 +19,10 @@ static void push_row(sp_da(spn_toolchain_row_t)* rows, spn_toolchain_row_t row) 
   }
 }
 
+// A relative sdk lives inside the artifact; an absolute one is a host path.
 static spn_path_t sdk_root(spn_toolchain_catalog_t* catalog, spn_toolchain_support_t support, spn_path_t sdk) {
   switch (support.kind) {
-    case SPN_TOOLCHAIN_SUPPORT_ARTIFACT: return spn_path_join(catalog->mem, spn_toolchain_artifact_root(support.artifact), sdk.sub);
+    case SPN_TOOLCHAIN_SUPPORT_ARTIFACT: return sp_fs_is_absolute(sdk.sub) ? sdk : spn_path_join(catalog->mem, spn_toolchain_artifact_root(support.artifact), sdk.sub);
     case SPN_TOOLCHAIN_SUPPORT_LOCAL:
     case SPN_TOOLCHAIN_SUPPORT_NONE: return sdk;
   }
@@ -30,26 +31,16 @@ static spn_path_t sdk_root(spn_toolchain_catalog_t* catalog, spn_toolchain_suppo
 
 static bool bind_row(spn_toolchain_catalog_t* catalog, spn_toolchain_support_t support, spn_toolchain_target_t target, spn_toolchain_row_t* row) {
   *row = (spn_toolchain_row_t) { .triple = target.triple, .sanitizers = target.sanitizers };
-  switch (target.sdk_source) {
-    case SPN_SDK_SOURCE_PATH: {
-      row->sdk = spn_sdk_at(catalog->mem, target.triple, sdk_root(catalog, support, target.sdk));
-      return true;
-    }
-    case SPN_SDK_SOURCE_TOOLCHAIN: {
-      row->sdk = spn_sdk_from_host(&catalog->sdks, target.triple);
-      return true;
-    }
-    case SPN_SDK_SOURCE_HOST: {
-      return spn_sdk_served(&catalog->sdks, catalog->host, target.triple, &row->sdk);
-    }
+  if (!spn_path_empty(target.sdk)) {
+    row->sdk = spn_sdk_at(catalog->mem, target.triple, sdk_root(catalog, support, target.sdk));
+    return true;
   }
-  sp_unreachable_return(false);
+  return spn_sdk_default(&catalog->sdks, target.triple, &row->sdk);
 }
 
 static spn_toolchain_target_t stock(spn_cc_driver_t driver, spn_triple_t triple) {
   return (spn_toolchain_target_t) {
     .triple = triple,
-    .sdk_source = SPN_SDK_SOURCE_TOOLCHAIN,
     .sanitizers = spn_toolchain_stock_sanitizers(driver, triple),
   };
 }
@@ -62,16 +53,18 @@ static void push_stock(sp_da(spn_toolchain_row_t)* rows, spn_toolchain_catalog_t
   }
 
   spn_toolchain_row_t row = sp_zero;
-  bind_row(catalog, sp_zero_struct(spn_toolchain_support_t), stock(decl->driver, host), &row);
-  sp_da_push(*rows, row);
+  if (bind_row(catalog, sp_zero_struct(spn_toolchain_support_t), stock(decl->driver, host), &row)) {
+    sp_da_push(*rows, row);
+  }
   if (host.os != SPN_OS_MACOS || !spn_toolchain_driver_retargets(decl->driver)) {
     return;
   }
   const spn_arch_t* arches = SP_NULLPTR;
   u32 count = spn_os_archs(host.os, &arches);
   sp_for(it, count) {
-    bind_row(catalog, sp_zero_struct(spn_toolchain_support_t), stock(decl->driver, (spn_triple_t) { arches[it], host.os, host.abi }), &row);
-    push_row(rows, row);
+    if (bind_row(catalog, sp_zero_struct(spn_toolchain_support_t), stock(decl->driver, (spn_triple_t) { arches[it], host.os, host.abi }), &row)) {
+      push_row(rows, row);
+    }
   }
 }
 

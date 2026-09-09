@@ -21,26 +21,6 @@ spn_sdk_kind_t spn_sdk_kind(spn_triple_t target) {
   SP_UNREACHABLE_RETURN(SPN_SDK_NONE);
 }
 
-bool spn_sdk_declarable(spn_sdk_kind_t kind) {
-  switch (kind) {
-    case SPN_SDK_SYSROOT:
-    case SPN_SDK_MACOS:
-    case SPN_SDK_MSVC: return true;
-    case SPN_SDK_NONE: return false;
-  }
-  SP_UNREACHABLE_RETURN(false);
-}
-
-bool spn_sdk_host_reachable(spn_triple_t target) {
-  switch (spn_sdk_kind(target)) {
-    case SPN_SDK_NONE:
-    case SPN_SDK_MACOS:
-    case SPN_SDK_MSVC: return true;
-    case SPN_SDK_SYSROOT: return target.os == SPN_OS_LINUX;
-  }
-  SP_UNREACHABLE_RETURN(true);
-}
-
 static spn_sdk_macos_t macos_layout(sp_mem_t mem, spn_path_t root) {
   return (spn_sdk_macos_t) {
     .root = root,
@@ -140,6 +120,21 @@ spn_sdk_t spn_sdk_from_host(const spn_sdk_host_t* host, spn_triple_t target) {
     }
   }
   sp_unreachable_return(none);
+}
+
+// What a row with no sdk binds to. Sysroot kinds pass nothing, since the
+// toolchain that lists the row brings its runtime. macOS takes the host SDK
+// when there is one and builds without it otherwise. MSVC takes the host SDK
+// and is dropped without one: nothing ships that CRT.
+bool spn_sdk_default(const spn_sdk_host_t* sdks, spn_triple_t target, spn_sdk_t* sdk) {
+  *sdk = spn_sdk_from_host(sdks, target);
+  switch (spn_sdk_kind(target)) {
+    case SPN_SDK_NONE:
+    case SPN_SDK_SYSROOT:
+    case SPN_SDK_MACOS: return true;
+    case SPN_SDK_MSVC: return sdk->kind != SPN_SDK_NONE;
+  }
+  sp_unreachable_return(false);
 }
 
 bool spn_sdk_served(const spn_sdk_host_t* sdks, spn_triple_t host, spn_triple_t target, spn_sdk_t* sdk) {

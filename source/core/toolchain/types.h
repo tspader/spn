@@ -36,12 +36,6 @@ typedef enum {
   SPN_SDK_MSVC,
 } spn_sdk_kind_t;
 
-typedef enum {
-  SPN_SDK_SOURCE_HOST,
-  SPN_SDK_SOURCE_TOOLCHAIN,
-  SPN_SDK_SOURCE_PATH,
-} spn_sdk_source_t;
-
 typedef struct {
   spn_arch_t arch;
   struct {
@@ -88,7 +82,6 @@ typedef enum {
   SPN_TARGET_CAPS_SDK_PATH,
   SPN_TARGET_CAPS_SANITIZERS_FORBIDDEN,
   SPN_TARGET_CAPS_SDK_FORBIDDEN,
-  SPN_TARGET_CAPS_SDK_REQUIRED,
 } spn_target_caps_t;
 
 typedef struct {
@@ -107,9 +100,9 @@ typedef struct {
   spn_artifact_t artifact;
 } spn_toolchain_host_t;
 
+// A declared row. An empty sdk means the target's kind decides at bind.
 typedef struct {
   spn_triple_t triple;
-  spn_sdk_source_t sdk_source;
   spn_path_t sdk;
   spn_sanitizer_set_t sanitizers;
 } spn_toolchain_target_t;

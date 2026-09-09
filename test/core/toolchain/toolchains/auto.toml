@@ -3,7 +3,7 @@ name = "A"
 driver = "gcc"
 compiler = "A"
 archiver = "ar"
-target = [{ arch = "x86_64", os = "windows", abi = "gnu", sdk = "toolchain" }]
+target = [{ arch = "x86_64", os = "windows", abi = "gnu" }]
 
 [[toolchain]]
 name = "B"
@@ -15,9 +15,9 @@ mirrors = "https://example.com/mirrors.txt"
 host = { x86_64-linux = { url = "https://example.com/linux.tar.xz", sha256 = "aa" } }
 target = [
   { arch = "x86_64", os = "linux", abi = "gnu" },
-  { arch = "x86_64", os = "linux", abi = "musl", sdk = "toolchain" },
-  { arch = "aarch64", os = "linux", abi = "gnu", sdk = "toolchain" },
-  { arch = "aarch64", os = "linux", abi = "musl", sdk = "toolchain" }
+  { arch = "x86_64", os = "linux", abi = "musl" },
+  { arch = "aarch64", os = "linux", abi = "gnu" },
+  { arch = "aarch64", os = "linux", abi = "musl" }
 ]
 
 [[toolchain]]
@@ -26,9 +26,9 @@ driver = "gcc"
 compiler = "C"
 archiver = "ar"
 target = [
-  { arch = "aarch64", os = "linux", abi = "gnu", sdk = "toolchain" },
-  { arch = "aarch64", os = "linux", abi = "musl", sdk = "toolchain" },
-  { arch = "x86_64", os = "windows", abi = "gnu", sdk = "toolchain" }
+  { arch = "aarch64", os = "linux", abi = "gnu" },
+  { arch = "aarch64", os = "linux", abi = "musl" },
+  { arch = "x86_64", os = "windows", abi = "gnu" }
 ]
 
 [[toolchain]]
