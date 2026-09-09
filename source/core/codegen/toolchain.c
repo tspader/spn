@@ -98,10 +98,32 @@ static bool lower_linker(spn_toml_loader_t* ctx, spn_ld_family_t declared, spn_c
   return declared == SPN_LD_FAMILY_LLD;
 }
 
-static sp_da(spn_toolchain_target_t) lower_toolchain_targets(spn_toml_loader_t* ctx, spn_cc_driver_t driver, spn_toolchain_source_t source, spn_path_root_t base, sp_da(spn_cg_toolchain_target_t) cg) {
+static bool target_has_fields(const spn_cg_toolchain_target_t* cg) {
+  return !sp_opt_is_null(cg->arch) || !sp_opt_is_null(cg->os) || !sp_opt_is_null(cg->abi) || !sp_str_empty(cg->sdk) || !sp_da_empty(cg->sanitizers);
+}
+
+// "host" names the rows the driver derives on the machine spn runs on. It
+// carries nothing else, and it appears at most once.
+static bool lower_host_row(spn_toml_loader_t* ctx, const spn_cg_toolchain_target_t* cg, bool* host_row) {
+  if (!sp_str_equal_cstr(cg->kind, "host") || target_has_fields(cg) || *host_row) {
+    spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "kind");
+    return false;
+  }
+  *host_row = true;
+  return true;
+}
+
+static sp_da(spn_toolchain_target_t) lower_toolchain_targets(spn_toml_loader_t* ctx, spn_cc_driver_t driver, spn_toolchain_source_t source, spn_path_root_t base, sp_da(spn_cg_toolchain_target_t) cg, bool* host_row) {
   sp_da(spn_toolchain_target_t) targets = sp_da_new(ctx->mem, spn_toolchain_target_t);
+  *host_row = sp_da_empty(cg);
   spn_toml_loader_push_key(ctx, "target");
   sp_da_for(cg, it) {
+    if (!sp_str_empty(cg[it].kind)) {
+      spn_toml_loader_push_index(ctx, it);
+      lower_host_row(ctx, &cg[it], host_row);
+      spn_toml_loader_pop(ctx);
+      continue;
+    }
     spn_triple_t partial = lower_triple(&cg[it]);
     spn_toolchain_target_t target = sp_zero;
     spn_triple_entry_t entry = spn_triple_entry(partial, &target.triple);
@@ -195,7 +217,7 @@ spn_toolchain_decl_t spn_toolchain_lower(spn_toml_loader_t* ctx, u32 at, spn_pat
   toolchain.archiver = lower_launcher(ctx, "archiver", toolchain.source, base, decl->archiver);
   if (toolchain.driver) {
     toolchain.lld = lower_linker(ctx, sp_opt_is_null(decl->linker) ? SPN_LD_FAMILY_NONE : sp_opt_get(decl->linker), toolchain.driver);
-    toolchain.targets = lower_toolchain_targets(ctx, toolchain.driver, toolchain.source, base, decl->target);
+    toolchain.targets = lower_toolchain_targets(ctx, toolchain.driver, toolchain.source, base, decl->target, &toolchain.host_row);
   }
 
   spn_toml_loader_pop(ctx);

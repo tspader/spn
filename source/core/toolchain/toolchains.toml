@@ -60,7 +60,12 @@ archiver = "llvm-ar"
 cxx = "clang++"
 linker = "lld"
 link_args = ["-fuse-ld=lld"]
-host = { x86_64-linux = {}, aarch64-linux = {}, x86_64-macos = {}, aarch64-macos = {} }
+host = { x86_64-linux = {}, aarch64-linux = {}, x86_64-macos = {}, aarch64-macos = {}, x86_64-windows = {}, aarch64-windows = {} }
+target = [
+  "host",
+  { arch = "x86_64",  os = "windows", abi = "msvc", sanitizers = ["address"] },
+  { arch = "aarch64", os = "windows", abi = "msvc" },
+]
 
 [[toolchain]]
 name = "gcc"

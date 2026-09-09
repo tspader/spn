@@ -91,6 +91,7 @@ typedef struct {
   const c8* cxx_args [8];
   spn_cc_driver_t driver;
   bool lld;
+  bool host_row;
   const c8* link_args [2];
   spn_triple_t hosts [2];
   toolchain_target_t targets [5];
@@ -641,7 +642,7 @@ static const test_t tests [] = {
     },
   },
   {
-    .name = "toolchain_without_target_derives",
+    .name = "toolchain_without_target_is_host",
     .manifest = "toolchain_no_target",
     .toolchains = {
       {
@@ -649,7 +650,36 @@ static const test_t tests [] = {
         .compiler = { .name = "clang" },
         .archiver = { .name = "ar" },
         .driver = SPN_CC_DRIVER_CLANG,
+        .host_row = true,
       },
+    },
+  },
+  {
+    .name = "toolchain_host_beside_a_list",
+    .manifest = "toolchain_host",
+    .toolchains = {
+      {
+        .name = "T",
+        .compiler = { .name = "clang" },
+        .archiver = { .name = "ar" },
+        .driver = SPN_CC_DRIVER_CLANG,
+        .host_row = true,
+        .targets = { { .triple = { SPN_ARCH_X64, SPN_OS_FREESTANDING, SPN_ABI_BARE } } },
+      },
+    },
+  },
+  {
+    .name = "validate_toolchain_host_with_fields",
+    .manifest = "toolchain_host_fields",
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].target[0].kind" }
+    },
+  },
+  {
+    .name = "validate_toolchain_row_kind_unknown",
+    .manifest = "toolchain_kind_unknown",
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].target[0].kind" }
     },
   },
   {
@@ -1526,6 +1556,7 @@ sp_test_each(lower, cases, test_t, tests) {
     if (test_check_arg(t, tc->compiler.program, expected.compiler)) return SP_ERR;
     if (test_check_arg(t, tc->archiver.program, expected.archiver)) return SP_ERR;
     sp_expect_eq(t, expected.lld, tc->lld);
+    sp_expect_eq(t, expected.host_row, tc->host_row);
     sp_must_strs_eq(t, tc->link_args, sp_da_size(tc->link_args), expected.link_args);
     if (test_check_arg(t, tc->cxx.program, expected.cxx)) return SP_ERR;
     if (expected.driver)   sp_expect_eq(t, (u32)expected.driver, (u32)tc->driver);

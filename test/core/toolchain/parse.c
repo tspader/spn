@@ -60,6 +60,7 @@ static const parse_test_t tests [] = {
       .toolchains = {
         {
           .name = "A",
+          .host = true,
           .version = "",
           .driver = SPN_CC_DRIVER_GCC,
           .compiler = { .name = "cc" },
@@ -77,6 +78,7 @@ static const parse_test_t tests [] = {
       .toolchains = {
         {
           .name = "A",
+          .host = true,
           .version = "",
           .driver = SPN_CC_DRIVER_GCC,
           .compiler = { .name = "A" },
@@ -90,6 +92,7 @@ static const parse_test_t tests [] = {
         },
         {
           .name = "B",
+          .host = true,
           .driver = SPN_CC_DRIVER_GCC,
           .compiler = { .name = "B" },
         },
@@ -104,11 +107,13 @@ static const parse_test_t tests [] = {
       .toolchains = {
         {
           .name = "A",
+          .host = true,
           .driver = SPN_CC_DRIVER_GCC,
           .compiler = { .name = "A" },
         },
         {
           .name = "B",
+          .host = true,
           .driver = SPN_CC_DRIVER_CLANG,
           .compiler = { .name = "B" },
         },
@@ -180,6 +185,7 @@ static const parse_test_t tests [] = {
       .toolchains = {
         {
           .name = "A",
+          .host = true,
           .driver = SPN_CC_DRIVER_GCC,
           .compiler = { .path = "/A" },
           .archiver = { .name = "ar" },
@@ -281,6 +287,38 @@ static const parse_test_t tests [] = {
         },
       },
     },
+  },
+  {
+    .name = "host_row_beside_a_list",
+    .file = "host.toml",
+    .expect = {
+      .entries = 1,
+      .toolchains = {
+        {
+          .name = "A",
+          .host = true,
+          .driver = SPN_CC_DRIVER_CLANG,
+          .compiler = { .name = "A" },
+          .archiver = { .name = "A" },
+          .targets = { { TARGET_X64_BARE } },
+        },
+      },
+    },
+  },
+  {
+    .name = "host_row_named_twice",
+    .file = "host_twice.toml",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "host_row_with_fields",
+    .file = "host_fields.toml",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "unknown_row_kind",
+    .file = "kind_unknown.toml",
+    .expect = { .err = SPN_ERROR },
   },
   {
     .name = "sanitizers_on_none_target",

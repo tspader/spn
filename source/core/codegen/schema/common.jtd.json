@@ -22,6 +22,7 @@
 
     "toolchain_target": {
       "optionalProperties": {
+        "kind": { "type": "string" },
         "arch": { "ref": "arch" },
         "os": { "ref": "os" },
         "abi": { "ref": "abi" },
@@ -49,7 +50,7 @@
         "cxx": { "type": "string" },
         "host": { "values": { "ref": "artifact" } },
         "mirrors": { "type": "string" },
-        "target": { "elements": { "ref": "toolchain_target" } }
+        "target": { "elements": { "ref": "toolchain_target" }, "metadata": { "shorthand": "kind" } }
       }
     },
 

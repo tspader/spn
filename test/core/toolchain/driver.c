@@ -58,7 +58,7 @@ typedef struct {
 
 static const default_abi_t default_abi_tests [] = {
   { "gcc_windows",   SPN_CC_DRIVER_GCC,   SPN_OS_WINDOWS,      SPN_ABI_GNU },
-  { "clang_windows", SPN_CC_DRIVER_CLANG, SPN_OS_WINDOWS,      SPN_ABI_MSVC },
+  { "clang_windows", SPN_CC_DRIVER_CLANG, SPN_OS_WINDOWS },
   { "zig_windows",   SPN_CC_DRIVER_ZIG,   SPN_OS_WINDOWS,      SPN_ABI_GNU },
   { "msvc_windows",  SPN_CC_DRIVER_MSVC,  SPN_OS_WINDOWS,      SPN_ABI_MSVC },
   { "linux",         SPN_CC_DRIVER_GCC,   SPN_OS_LINUX },

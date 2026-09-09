@@ -78,7 +78,7 @@ readme: false
 | `cxx` | `string` |
 | `host` | map of [`artifact`](#artifact) |
 | `mirrors` | `string` |
-| `target` | array of [`toolchain_target`](#toolchain_target) |
+| `target` | array of [`toolchain_target`](#toolchain_target) \| `string` |
 
 ## index
 
@@ -222,6 +222,7 @@ readme: false
 
 | Field | Type |
 |---|---|
+| `kind` | `string` |
 | `arch` | `x86_64` \| `aarch64` \| `wasm32` |
 | `os` | `windows` \| `linux` \| `macos` \| `wasi` \| `freestanding` |
 | `abi` | `gnu` \| `musl` \| `msvc` \| `apple` \| `none` \| `elf` |

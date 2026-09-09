@@ -44,7 +44,12 @@ and skips with a reason otherwise.
 - `.target`: the lane's declared `target` list must contain it. A lane claims
   only what its container proves: builtins claim the host (and, for `gcc` on
   Linux, the host's bare metal triple), and a test-only cross lane lists its
-  target explicitly.
+  target explicitly. A row in the list is a triple, or the word `"host"` for
+  the rows the driver derives on the machine spn runs on; no list means
+  `["host"]`. `clang-bare` and `clang-sysroot` list `"host"` beside their one
+  cross row. `clang-musl` lists its host row by hand instead: `link_args` apply
+  to every row, and its `-unwindlib=none` is the musl row's, so the host row
+  must not claim the sanitizers a bare `host` would.
 - `.linker = SPN_LD_FAMILY_LLD`: only where the lane's linker family for the
   target is that one. Cases about what a family accepts gate on this, never on
   a lane or driver name.

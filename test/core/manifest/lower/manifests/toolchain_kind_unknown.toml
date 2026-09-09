@@ -1,0 +1,10 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[[toolchain]]
+name = "T"
+compiler = "clang"
+archiver = "ar"
+driver = "clang"
+target = ["everything"]

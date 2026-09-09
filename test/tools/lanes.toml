@@ -77,7 +77,10 @@ compiler = "clang"
 archiver = "ar"
 link_args = ["-rtlib=compiler-rt", "-unwindlib=none"]
 host = { x86_64-linux = {} }
-target = ["host", { arch = "x86_64", os = "linux", abi = "musl", sdk = "/sysroot/musl" }]
+target = [
+  { arch = "x86_64", os = "linux", abi = "gnu" },
+  { arch = "x86_64", os = "linux", abi = "musl", sdk = "/sysroot/musl" },
+]
 
 [[toolchain]]
 name = "clang-sysroot"

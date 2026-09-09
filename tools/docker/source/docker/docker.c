@@ -448,8 +448,16 @@ static sp_str_t seed_profile(docker_t* docker, lane_t seed) {
   sp_fmt_io(&writer.base, "toolchain = \"{}\"\n", sp_fmt_cstr(lane_name(seed)));
 
   const spn_cg_toolchain_decl_t* lane = lanes_find(&docker->lanes, sp_cstr_as_str(lane_name(seed)));
-  if (lane && !sp_da_empty(lane->target)) {
-    const spn_cg_toolchain_target_t* target = &lane->target[0];
+  const spn_cg_toolchain_target_t* target = SP_NULLPTR;
+  if (lane) {
+    sp_da_for(lane->target, it) {
+      if (sp_str_empty(lane->target[it].kind)) {
+        target = &lane->target[it];
+        break;
+      }
+    }
+  }
+  if (target) {
     if (!sp_opt_is_null(target->arch)) {
       sp_fmt_io(&writer.base, "arch = \"{}\"\n", sp_fmt_str(spn_arch_to_str(sp_opt_get(target->arch))));
     }

@@ -45,30 +45,25 @@ static spn_toolchain_target_t stock(spn_cc_driver_t driver, spn_triple_t triple)
   };
 }
 
+// The machine's own triple. A host with no abi takes the driver's default,
+// and a driver with no default on that host has no stock row.
 static void push_stock(sp_da(spn_toolchain_row_t)* rows, spn_toolchain_catalog_t* catalog, const spn_toolchain_decl_t* decl) {
   spn_triple_t host = catalog->host;
   host.abi = host.abi ? host.abi : spn_default_abi(decl->driver, host.os);
-  if (!spn_toolchain_driver_composes(decl->driver, spn_ld_dialect(host))) {
+  if (!host.abi || !spn_toolchain_driver_composes(decl->driver, spn_ld_dialect(host))) {
     return;
   }
 
   spn_toolchain_row_t row = sp_zero;
   if (bind_row(catalog, sp_zero_struct(spn_toolchain_support_t), stock(decl->driver, host), &row)) {
-    sp_da_push(*rows, row);
-  }
-  if (host.os != SPN_OS_MACOS || !spn_toolchain_driver_retargets(decl->driver)) {
-    return;
-  }
-  const spn_arch_t* arches = SP_NULLPTR;
-  u32 count = spn_os_archs(host.os, &arches);
-  sp_for(it, count) {
-    if (bind_row(catalog, sp_zero_struct(spn_toolchain_support_t), stock(decl->driver, (spn_triple_t) { arches[it], host.os, host.abi }), &row)) {
-      push_row(rows, row);
-    }
+    push_row(rows, row);
   }
 }
 
-static void push_hosted(sp_da(spn_toolchain_row_t)* rows, spn_toolchain_catalog_t* catalog) {
+// Every hosted target the machine serves an SDK for. A row on the host's own
+// os is built with the runtimes the toolchain ships for that os, so it keeps
+// the stock sanitizers; a foreign os gets none.
+static void push_hosted(sp_da(spn_toolchain_row_t)* rows, spn_toolchain_catalog_t* catalog, spn_cc_driver_t driver) {
   static const spn_os_t hosted [] = { SPN_OS_LINUX, SPN_OS_MACOS, SPN_OS_WINDOWS };
   sp_carr_for(hosted, os) {
     const spn_arch_t* arches = SP_NULLPTR;
@@ -78,6 +73,9 @@ static void push_hosted(sp_da(spn_toolchain_row_t)* rows, spn_toolchain_catalog_
     sp_for(arch, num_arches) {
       sp_for(abi, num_abis) {
         spn_toolchain_row_t row = { .triple = { arches[arch], hosted[os], abis[abi] } };
+        if (row.triple.os == catalog->host.os) {
+          row.sanitizers = spn_toolchain_stock_sanitizers(driver, row.triple);
+        }
         if (spn_sdk_served(&catalog->sdks, catalog->host, row.triple, &row.sdk)) {
           push_row(rows, row);
         }
@@ -90,26 +88,28 @@ static void push_bare(sp_da(spn_toolchain_row_t)* rows, spn_cc_driver_t driver, 
   if (!(spn_toolchain_driver_caps(driver) & SPN_CC_CAP_BARE) || spn_os_format(host.os) != SPN_FORMAT_ELF) {
     return;
   }
-  sp_da_push(*rows, ((spn_toolchain_row_t) { .triple = { host.arch, SPN_OS_FREESTANDING, SPN_ABI_BARE } }));
-  sp_da_push(*rows, ((spn_toolchain_row_t) { .triple = { host.arch, SPN_OS_LINUX, SPN_ABI_BARE } }));
+  push_row(rows, (spn_toolchain_row_t) { .triple = { host.arch, SPN_OS_FREESTANDING, SPN_ABI_BARE } });
+  push_row(rows, (spn_toolchain_row_t) { .triple = { host.arch, SPN_OS_LINUX, SPN_ABI_BARE } });
 }
 
+// Listed rows bind as written. "host" then adds what the driver does on this
+// machine, for every triple the list did not already claim.
 static sp_da(spn_toolchain_row_t) bind_rows(spn_toolchain_catalog_t* catalog, const spn_toolchain_decl_t* decl, spn_toolchain_support_t support) {
   sp_da(spn_toolchain_row_t) rows = sp_da_new(catalog->mem, spn_toolchain_row_t);
-  if (!sp_da_empty(decl->targets)) {
-    sp_da_for(decl->targets, it) {
-      spn_toolchain_row_t row = sp_zero;
-      if (bind_row(catalog, support, decl->targets[it], &row)) {
-        sp_da_push(rows, row);
-      }
+  sp_da_for(decl->targets, it) {
+    spn_toolchain_row_t row = sp_zero;
+    if (bind_row(catalog, support, decl->targets[it], &row)) {
+      sp_da_push(rows, row);
     }
+  }
+  if (!decl->host_row) {
     return rows;
   }
 
   push_stock(&rows, catalog, decl);
   push_bare(&rows, decl->driver, catalog->host);
   if (spn_toolchain_driver_retargets(decl->driver)) {
-    push_hosted(&rows, catalog);
+    push_hosted(&rows, catalog, decl->driver);
   }
   return rows;
 }

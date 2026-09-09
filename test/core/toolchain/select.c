@@ -39,6 +39,7 @@ typedef struct {
   const c8* name;
   spn_cc_driver_t driver;
   bool lld;
+  bool host_row;
   fixture_target_t targets [FIXTURE_MAX_TARGETS];
   fixture_sdks_t sdks;
   check_t checks [SELECT_MAX_CHECKS];
@@ -356,6 +357,16 @@ static const complete_test_t complete_tests [] = {
     },
   },
   {
+    .name = "host_row_beside_a_listed_row",
+    .driver = SPN_CC_DRIVER_CLANG,
+    .host_row = true,
+    .targets = { { TARGET_X64_BARE } },
+    .checks = {
+      { .target = X64_LINUX, .abis = { SPN_ABI_GNU }, .expect = { .triple = HOST_X64_LINUX } },
+      { .target = X64_FREESTANDING, .abis = { SPN_ABI_BARE }, .expect = { .triple = TARGET_X64_BARE } },
+    },
+  },
+  {
     .name = "fixed_driver_ignores_host_sdk",
     .driver = SPN_CC_DRIVER_GCC,
     .targets = { HOST_X64_LINUX },
@@ -614,6 +625,7 @@ sp_test_each(select, complete, complete_test_t, complete_tests, .setup = spn_tes
       sp_da_push(toolchain.targets, fixture_target(it->targets[at]));
     }
   }
+  toolchain.host_row = it->host_row || !declared;
 
   spn_toolchain_catalog_t catalog = sp_zero;
   spn_toolchain_catalog_init(&catalog, (spn_triple_t) HOST_X64_LINUX, fixture_sdks(mem, it->sdks), mem);

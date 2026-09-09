@@ -209,7 +209,18 @@ spn_abi_t spn_default_abi(spn_cc_driver_t driver, spn_os_t os) {
     case SPN_OS_FREESTANDING: return SPN_ABI_NONE;
     case SPN_OS_MACOS: return SPN_ABI_APPLE;
     case SPN_OS_WASI: return SPN_ABI_MUSL;
-    case SPN_OS_WINDOWS: return driver == SPN_CC_DRIVER_CLANG || driver == SPN_CC_DRIVER_MSVC ? SPN_ABI_MSVC : SPN_ABI_GNU;
+    // gcc on Windows is always mingw and cl is always msvc. clang's default
+    // target is a fact about the install, so it has none here.
+    case SPN_OS_WINDOWS: {
+      switch (driver) {
+        case SPN_CC_DRIVER_GCC:
+        case SPN_CC_DRIVER_ZIG: return SPN_ABI_GNU;
+        case SPN_CC_DRIVER_MSVC: return SPN_ABI_MSVC;
+        case SPN_CC_DRIVER_CLANG: return SPN_ABI_NONE;
+        case SPN_CC_DRIVER_NONE: sp_unreachable_case();
+      }
+      SP_UNREACHABLE_RETURN(SPN_ABI_NONE);
+    }
     case SPN_OS_NONE: sp_unreachable_case();
   }
   SP_UNREACHABLE_RETURN(SPN_ABI_NONE);

@@ -73,6 +73,7 @@ typedef struct {
 typedef struct {
   const c8* name;
   bool absent;
+  bool host;
   const c8* version;
   spn_cc_driver_t driver;
   fixture_launcher_t compiler;
@@ -259,6 +260,7 @@ static sp_err_t fixture_check_decl(sp_test_t* t, const spn_toolchain_decl_t* dec
   }
   sp_expect_eq(t, (u32)expect.driver, (u32)decl->driver);
   sp_expect_eq(t, expect.lld, decl->lld);
+  sp_expect_eq(t, expect.host, decl->host_row);
   if (fixture_check_launchers(t, decl->compiler, decl->cxx, decl->archiver, expect)) {
     return SP_ERR;
   }
@@ -352,6 +354,7 @@ static spn_toolchain_decl_t fixture_local_toolchain(const c8* name, fixture_laun
     .driver = SPN_CC_DRIVER_GCC,
     .compiler = { .program = fixture_arg(compiler) },
     .archiver = { .program = spn_arg_lit(sp_cstr_as_str("ar")) },
+    .host_row = true,
   };
 }
 

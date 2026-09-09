@@ -37,6 +37,7 @@ typedef struct {
   const c8* name;
   spn_cc_driver_t driver;
   bool lld;
+  bool host_row;
   spn_triple_t host;
   fixture_sdks_t sdks;
   fixture_target_t targets [FIXTURE_MAX_TARGETS];
@@ -120,18 +121,18 @@ static const rows_test_t rows_tests [] = {
     .expect = { .rows = { { HOST_ARM_MACOS, .sanitizers = SAN_GCC_MACOS } } },
   },
   {
-    .name = "clang_on_macos_targets_both_arches_and_no_elf",
+    .name = "clang_on_macos_without_sdk_targets_host_only",
     .file = "multiple.toml",
     .host = HOST_ARM_MACOS,
     .toolchain = "B",
-    .expect = { .rows = { { HOST_ARM_MACOS, .sanitizers = SAN_CLANG_MACOS }, { HOST_X64_MACOS, .sanitizers = SAN_CLANG_MACOS } } },
+    .expect = { .rows = { { HOST_ARM_MACOS, .sanitizers = SAN_CLANG_MACOS } } },
   },
   {
     .name = "lld_on_macos_targets_no_elf",
     .file = "drivers.toml",
     .host = HOST_ARM_MACOS,
     .toolchain = "B",
-    .expect = { .rows = { { HOST_ARM_MACOS, .sanitizers = SAN_CLANG_MACOS }, { HOST_X64_MACOS, .sanitizers = SAN_CLANG_MACOS } } },
+    .expect = { .rows = { { HOST_ARM_MACOS, .sanitizers = SAN_CLANG_MACOS } } },
   },
   {
     .name = "gcc_on_windows_brings_its_libc",
@@ -289,6 +290,41 @@ static const bind_test_t bind_tests [] = {
     .host = HOST_X64_LINUX,
     .expect = { .rows = { { HOST_X64_LINUX, .sanitizers = SAN_GCC_LINUX }, { TARGET_X64_BARE }, { TARGET_X64_LINUX_NONE } } },
   },
+  {
+    .name = "host_row_adds_to_a_list",
+    .driver = SPN_CC_DRIVER_CLANG,
+    .host_row = true,
+    .host = HOST_X64_LINUX,
+    .targets = { { TARGET_X64_BARE } },
+    .expect = { .rows = { { TARGET_X64_BARE }, { HOST_X64_LINUX, .sanitizers = SAN_CLANG_LINUX } } },
+  },
+  {
+    .name = "listed_row_wins_over_host",
+    .driver = SPN_CC_DRIVER_GCC,
+    .host_row = true,
+    .host = HOST_X64_LINUX,
+    .targets = { { HOST_X64_LINUX, { "/S" } } },
+    .expect = { .rows = { { HOST_X64_LINUX, { SPN_SDK_SYSROOT, { "/S" } } }, { TARGET_X64_BARE }, { TARGET_X64_LINUX_NONE } } },
+  },
+  {
+    .name = "clang_on_windows_has_no_stock_row",
+    .driver = SPN_CC_DRIVER_CLANG,
+    .host = HOST_X64_WINDOWS,
+  },
+  {
+    .name = "clang_on_windows_reaches_the_served_msvc_sdk",
+    .driver = SPN_CC_DRIVER_CLANG,
+    .host = HOST_X64_WINDOWS,
+    .sdks = { .msvc = { { { "/X" }, SPN_ARCH_X64 } } },
+    .expect = { .rows = { { TARGET_WIN_MSVC, { SPN_SDK_MSVC, .vc = { "/X/crt/lib/x86_64" } } } } },
+  },
+  {
+    .name = "macos_host_with_sdk_reaches_both_arches_with_sanitizers",
+    .driver = SPN_CC_DRIVER_CLANG,
+    .host = HOST_ARM_MACOS,
+    .sdks = { .macos = { "/H" } },
+    .expect = { .rows = { { HOST_ARM_MACOS, { SPN_SDK_MACOS, { "/H" } }, SAN_CLANG_MACOS }, { HOST_X64_MACOS, { SPN_SDK_MACOS, { "/H" } }, SAN_CLANG_MACOS } } },
+  },
 };
 
 static const support_test_t support_tests [] = {
@@ -397,6 +433,7 @@ sp_test_each(catalog, bind, bind_test_t, bind_tests) {
     }
     sp_da_push(toolchain.targets, fixture_target(it->targets[at]));
   }
+  toolchain.host_row = it->host_row || sp_da_empty(toolchain.targets);
 
   spn_toolchain_catalog_t catalog = sp_zero;
   spn_toolchain_catalog_init(&catalog, it->host, fixture_sdks(mem, it->sdks), mem);
