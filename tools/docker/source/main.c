@@ -3,6 +3,7 @@
 #include "sp/sp_prompt.h"
 
 #include "docker/docker.h"
+#include "toml/issue.h"
 #include "tail/tail.h"
 #include "variant/variant.h"
 
@@ -71,7 +72,8 @@ static sp_cli_result_t init(sp_cli_t* cli, smoke_t* smoke) {
       return sp_cli_set_error(cli, sp_fmt(mem, "failed to load templates from {.cyan}", sp_fmt_str(smoke->docker.paths.templates)).value);
     }
     case DOCKER_INIT_ERR_LANES: {
-      return sp_cli_set_error(cli, sp_fmt(mem, "{.cyan}: {}", sp_fmt_str(smoke->docker.err.lanes.path), sp_fmt_str(smoke->docker.err.lanes.issues)).value);
+      sp_str_t why = smoke->docker.err.lanes.read == LANES_READ_UNREADABLE ? sp_str_lit("unreadable") : spn_codegen_issues_message(mem, smoke->docker.err.lanes.issues);
+      return sp_cli_set_error(cli, sp_fmt(mem, "{.cyan}: {}", sp_fmt_str(smoke->docker.err.lanes.path), sp_fmt_str(why)).value);
     }
     case DOCKER_INIT_ERR_VERIFY: {
       return sp_cli_set_error(cli, verify_message(mem, smoke->docker.err.verify));
@@ -179,16 +181,23 @@ static sp_cli_result_t run_shell(sp_cli_t* cli) {
   return SP_CLI_OK;
 }
 
+static bool unloadable(smoke_t* smoke, lane_t lane, const variant_t* variant) {
+  sp_da(spn_codegen_issue_t) issues = smoke->docker.issues[lane];
+  if (sp_da_empty(issues)) {
+    return false;
+  }
+  sp_prompt_error(smoke->prompt, cfmt(smoke->mem, "FAIL {} in {} ({})", sp_fmt_cstr(lane_name(lane)), sp_fmt_cstr(variant->name), sp_fmt_str(spn_codegen_issues_message(smoke->mem, issues))));
+  return true;
+}
+
 static sp_cli_result_t check_session(sp_cli_t* cli, smoke_t* smoke, sp_da(const variant_t*) selected) {
   sp_mem_t mem = smoke->mem;
 
   u32 failures = 0;
   sp_da_for(selected, it) {
     const variant_t* variant = selected[it];
-    sp_str_t issues = docker_lane_issues(&smoke->docker, variant->check);
-    if (!sp_str_empty(issues)) {
+    if (unloadable(smoke, variant->check, variant)) {
       failures++;
-      sp_prompt_error(smoke->prompt, cfmt(mem, "FAIL {} ({}: {})", sp_fmt_cstr(variant->name), sp_fmt_cstr(lane_name(variant->check)), sp_fmt_str(issues)));
       continue;
     }
     try(build_image(cli, smoke, variant));
@@ -293,10 +302,8 @@ static sp_cli_result_t test_session(sp_cli_t* cli, smoke_t* smoke, sp_da(run_t) 
   sp_da_for(runs, it) {
     run_t run = runs[it];
     const c8* lane = lane_name(run.lane);
-    sp_str_t issues = docker_lane_issues(&smoke->docker, run.lane);
-    if (!sp_str_empty(issues)) {
+    if (unloadable(smoke, run.lane, run.variant)) {
       failures++;
-      sp_prompt_error(smoke->prompt, cfmt(mem, "FAIL {} in {} ({})", sp_fmt_cstr(lane), sp_fmt_cstr(run.variant->name), sp_fmt_str(issues)));
       continue;
     }
     if (run.variant != built) {

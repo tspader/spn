@@ -6,7 +6,6 @@
 #include "toml/loader.h"
 #include "toolchain/catalog.h"
 #include "lanes.h"
-#include "toolchain/catalog.h"
 
 static sp_test_once_t spn_ctx_once;
 static sp_intern_t* spn_ctx_intern;
@@ -36,18 +35,12 @@ sp_da(spn_event_t) spn_test_drain_errs(sp_mem_t mem) {
   return errs;
 }
 
-sp_err_t spn_test_lower_toolchains(sp_test_t* t, sp_str_t toml, spn_path_root_t base, sp_da(spn_toolchain_decl_t)* decls, sp_da(spn_codegen_issue_t)* issues) {
+void spn_test_lower_toolchains(sp_test_t* t, sp_str_t toml, spn_path_root_t base, sp_da(spn_toolchain_decl_t)* decls, sp_da(spn_codegen_issue_t)* issues) {
   sp_mem_t mem = sp_test_arena(t);
-  spn_cg_config_t config = sp_zero;
   spn_toml_loader_t loader = sp_zero;
   spn_toml_loader_init(&loader, mem, sp_intern_new(mem));
-  spn_toolchains_parse(&loader, toml, &config);
-  *decls = sp_da_new(mem, spn_toolchain_decl_t);
-  sp_da_for(config.toolchain, it) {
-    sp_da_push(*decls, spn_toolchain_lower(&loader, it, base, &config.toolchain[it]));
-  }
+  *decls = spn_toolchains_lower(&loader, toml, base);
   *issues = loader.issues;
-  return SP_OK;
 }
 
 sp_err_t spn_test_builtin_toml(sp_test_t* t, sp_str_t* toml) {

@@ -4,34 +4,22 @@
 #include "toml/loader.h"
 #include "intern/intern.h"
 
-bool lanes_read(sp_mem_t mem, sp_str_t path, lanes_t* out, sp_str_t* issues) {
-  *out = (lanes_t) { .mem = mem, .intern = sp_intern_new(mem), .path = path };
-  *issues = sp_str_lit("");
-  if (sp_io_read_file(mem, path, &out->text)) {
-    *issues = sp_str_lit("unreadable");
-    return false;
+lanes_read_t lanes_read(sp_mem_t mem, sp_str_t path, lanes_t* lanes) {
+  *lanes = (lanes_t) { .mem = mem, .intern = sp_intern_new(mem), .path = path };
+  if (sp_io_read_file(mem, path, &lanes->text)) {
+    return LANES_READ_UNREADABLE;
   }
   spn_toml_loader_t loader = sp_zero;
-  spn_toml_loader_init(&loader, mem, out->intern);
-  toml_table_t* table = spn_codegen_parse_str(&loader, out->text);
-  if (!table) {
-    *issues = spn_codegen_issues_message(mem, loader.issues);
-    return false;
-  }
-  spn_config_read(&loader, table, &out->config);
-  toml_free(table);
-  out->issues = loader.issues;
-  return true;
+  spn_toml_loader_init(&loader, mem, lanes->intern);
+  bool parsed = spn_toolchains_parse(&loader, lanes->text, &lanes->config);
+  lanes->issues = loader.issues;
+  return parsed ? LANES_READ_OK : LANES_READ_PARSE;
 }
 
 static bool issue_in_entry(const spn_codegen_issue_t* issue, u32 at) {
-  sp_str_t prefix = sp_str_lit("toolchain[");
-  if (!sp_str_starts_with(issue->path, prefix)) {
-    return false;
-  }
-  sp_str_t rest = sp_str_suffix(issue->path, issue->path.len - prefix.len);
-  s32 close = sp_str_find_c8(rest, ']');
-  return close > 0 && sp_parse_u64(sp_str_prefix(rest, (u32)close)) == at;
+  return issue->depth >= 2
+    && issue->segs[0].kind == SPN_CODEGEN_PATH_KEY && sp_cstr_equal(issue->segs[0].key, "toolchain")
+    && issue->segs[1].kind == SPN_CODEGEN_PATH_INDEX && issue->segs[1].index == at;
 }
 
 const spn_cg_toolchain_decl_t* lanes_find(const lanes_t* lanes, sp_str_t name) {
@@ -43,7 +31,7 @@ const spn_cg_toolchain_decl_t* lanes_find(const lanes_t* lanes, sp_str_t name) {
   return SP_NULLPTR;
 }
 
-sp_str_t lanes_lower(const lanes_t* lanes, u32 at, spn_path_root_t base, spn_toolchain_decl_t* out) {
+sp_da(spn_codegen_issue_t) lanes_lower(const lanes_t* lanes, u32 at, spn_path_root_t base, spn_toolchain_decl_t* decl) {
   spn_toml_loader_t loader = sp_zero;
   spn_toml_loader_init(&loader, lanes->mem, lanes->intern);
   sp_da_for(lanes->issues, it) {
@@ -51,8 +39,8 @@ sp_str_t lanes_lower(const lanes_t* lanes, u32 at, spn_path_root_t base, spn_too
       sp_da_push(loader.issues, lanes->issues[it]);
     }
   }
-  *out = spn_toolchain_lower(&loader, at, base, &lanes->config.toolchain[at]);
-  return sp_da_empty(loader.issues) ? sp_str_lit("") : spn_codegen_issues_message(lanes->mem, loader.issues);
+  *decl = spn_toolchain_lower(&loader, at, base, &lanes->config.toolchain[at]);
+  return loader.issues;
 }
 
 static bool is_header(sp_str_t line) {

@@ -41,9 +41,14 @@ static bool parse_artifact(sp_str_t line, artifact_line_t* out) {
 
 static sp_str_t with_sha256(sp_mem_t mem, sp_str_t line, sp_str_t hash) {
   s32 at = sp_str_find(line, sp_str_lit("sha256 = \""));
+  if (at < 0) {
+    sp_str_t open = sp_str_strip_right(sp_str_trim_right(line), sp_str_lit("}"));
+    return sp_fmt(mem, "{}, sha256 = \"{}\" }", sp_fmt_str(sp_str_trim_right(open)), sp_fmt_str(hash)).value;
+  }
   sp_str_t head = sp_str_prefix(line, (u32)at + (u32)sp_cstr_len("sha256 = \""));
   sp_str_t rest = sp_str_suffix(line, line.len - head.len);
   s32 end = sp_str_find_c8(rest, '"');
+  sp_assert(end >= 0);
   return sp_fmt(mem, "{}{}{}", sp_fmt_str(head), sp_fmt_str(hash), sp_fmt_str(sp_str_suffix(rest, rest.len - (u32)end))).value;
 }
 

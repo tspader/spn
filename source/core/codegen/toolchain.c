@@ -51,7 +51,9 @@ static void lower_target_caps(spn_toml_loader_t* ctx, spn_toolchain_source_t sou
 
 static spn_toolchain_launcher_t lower_launcher(spn_toml_loader_t* ctx, const c8* key, spn_toolchain_source_t source, spn_path_root_t base, sp_str_t str) {
   spn_toolchain_launcher_t launcher = sp_zero;
-  if (sp_str_empty(str)) return launcher;
+  if (sp_str_empty(str)) {
+    return launcher;
+  }
 
   sp_da(sp_str_t) parts = sp_str_split_c8(ctx->mem, str, ' ');
   launcher.args = sp_da_new(ctx->mem, sp_str_t);
@@ -63,7 +65,7 @@ static spn_toolchain_launcher_t lower_launcher(spn_toml_loader_t* ctx, const c8*
     return launcher;
   }
   launcher.program = lower_program(ctx, key, source, base, parts[first]);
-  for (u32 it = first + 1; it < sp_da_size(parts); it++) {
+  sp_for_range(it, first + 1, sp_da_size(parts)) {
     if (!sp_str_empty(parts[it])) {
       sp_da_push(launcher.args, spn_toml_loader_intern(ctx, parts[it]));
     }
@@ -102,23 +104,26 @@ static bool target_has_fields(const spn_cg_toolchain_target_t* cg) {
   return !sp_opt_is_null(cg->arch) || !sp_opt_is_null(cg->os) || !sp_opt_is_null(cg->abi) || !sp_str_empty(cg->sdk) || !sp_da_empty(cg->sanitizers);
 }
 
-static bool lower_host_row(spn_toml_loader_t* ctx, const spn_cg_toolchain_target_t* cg, bool* host_row) {
-  if (!sp_str_equal_cstr(cg->kind, "host") || target_has_fields(cg) || *host_row) {
-    spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "kind");
-    return false;
-  }
-  *host_row = true;
-  return true;
-}
-
-static sp_da(spn_toolchain_target_t) lower_toolchain_targets(spn_toml_loader_t* ctx, spn_cc_driver_t driver, spn_toolchain_source_t source, spn_path_root_t base, sp_da(spn_cg_toolchain_target_t) cg, bool* host_row) {
+static void lower_toolchain_targets(spn_toml_loader_t* ctx, spn_path_root_t base, sp_da(spn_cg_toolchain_target_t) cg, spn_toolchain_decl_t* toolchain) {
   sp_da(spn_toolchain_target_t) targets = sp_da_new(ctx->mem, spn_toolchain_target_t);
-  *host_row = sp_da_empty(cg);
+  spn_cc_driver_t driver = toolchain->driver;
+  spn_toolchain_source_t source = toolchain->source;
   spn_toml_loader_push_key(ctx, "target");
   sp_da_for(cg, it) {
     if (!sp_str_empty(cg[it].kind)) {
       spn_toml_loader_push_index(ctx, it);
-      lower_host_row(ctx, &cg[it], host_row);
+      if (!sp_str_equal_cstr(cg[it].kind, "host")) {
+        spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "kind");
+      }
+      else if (target_has_fields(&cg[it])) {
+        spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "kind");
+      }
+      else if (toolchain->host_row) {
+        spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_DUPLICATE_KEY, "kind");
+      }
+      else {
+        toolchain->host_row = true;
+      }
       spn_toml_loader_pop(ctx);
       continue;
     }
@@ -143,7 +148,7 @@ static sp_da(spn_toolchain_target_t) lower_toolchain_targets(spn_toml_loader_t* 
     sp_da_push(targets, target);
   }
   spn_toml_loader_pop(ctx);
-  return targets;
+  toolchain->targets = targets;
 }
 
 static sp_da(sp_str_t) lower_strs(spn_toml_loader_t* ctx, sp_da(sp_str_t) values) {
@@ -213,9 +218,10 @@ spn_toolchain_decl_t spn_toolchain_lower(spn_toml_loader_t* ctx, u32 at, spn_pat
   toolchain.compiler = lower_launcher(ctx, "compiler", toolchain.source, base, decl->compiler);
   toolchain.cxx = lower_launcher(ctx, "cxx", toolchain.source, base, decl->cxx);
   toolchain.archiver = lower_launcher(ctx, "archiver", toolchain.source, base, decl->archiver);
+  toolchain.host_row = sp_da_empty(decl->target);
   if (toolchain.driver) {
     toolchain.lld = lower_linker(ctx, sp_opt_is_null(decl->linker) ? SPN_LD_FAMILY_NONE : sp_opt_get(decl->linker), toolchain.driver);
-    toolchain.targets = lower_toolchain_targets(ctx, toolchain.driver, toolchain.source, base, decl->target, &toolchain.host_row);
+    lower_toolchain_targets(ctx, base, decl->target, &toolchain);
   }
 
   spn_toml_loader_pop(ctx);
@@ -223,10 +229,22 @@ spn_toolchain_decl_t spn_toolchain_lower(spn_toml_loader_t* ctx, u32 at, spn_pat
   return toolchain;
 }
 
-void spn_toolchains_parse(spn_toml_loader_t* ctx, sp_str_t toml, spn_cg_config_t* out) {
+bool spn_toolchains_parse(spn_toml_loader_t* ctx, sp_str_t toml, spn_cg_config_t* config) {
   toml_table_t* table = spn_codegen_parse_str(ctx, toml);
-  if (table) {
-    spn_config_read(ctx, table, out);
-    toml_free(table);
+  if (!table) {
+    return false;
   }
+  spn_config_read(ctx, table, config);
+  toml_free(table);
+  return true;
+}
+
+sp_da(spn_toolchain_decl_t) spn_toolchains_lower(spn_toml_loader_t* ctx, sp_str_t toml, spn_path_root_t base) {
+  sp_da(spn_toolchain_decl_t) decls = sp_da_new(ctx->mem, spn_toolchain_decl_t);
+  spn_cg_config_t config = sp_zero;
+  spn_toolchains_parse(ctx, toml, &config);
+  sp_da_for(config.toolchain, it) {
+    sp_da_push(decls, spn_toolchain_lower(ctx, it, base, &config.toolchain[it]));
+  }
+  return decls;
 }

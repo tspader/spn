@@ -235,14 +235,13 @@ static spn_err_t open_ctx(spn_ctx_t* ctx, spn_open_request_t request) {
 }
 
 static void load_builtins(spn_ctx_t* ctx) {
-  spn_cg_config_t config = sp_zero;
   spn_toml_loader_t loader = sp_zero;
   spn_toml_loader_init(&loader, ctx->mem, ctx->intern);
-  spn_toolchains_parse(&loader, sp_str((const c8*)toolchains_toml, toolchains_toml_size), &config);
-  sp_da_for(config.toolchain, it) {
-    spn_toolchain_catalog_add(&ctx->catalog, spn_toolchain_lower(&loader, it, SPN_PATH_ROOT_NONE, &config.toolchain[it]));
-  }
+  sp_da(spn_toolchain_decl_t) decls = spn_toolchains_lower(&loader, sp_str((const c8*)toolchains_toml, toolchains_toml_size), SPN_PATH_ROOT_NONE);
   sp_assert(sp_da_empty(loader.issues));
+  sp_da_for(decls, it) {
+    spn_toolchain_catalog_add(&ctx->catalog, decls[it]);
+  }
 }
 
 spn_ctx_t* spn_ctx_new(spn_wake_fn_t wake, void* wake_data) {

@@ -13,6 +13,7 @@
 #include "toolchain/toolchain.h"
 #include "triple/triple.h"
 #include "lanes.h"
+#include "toml/issue.h"
 
 static sp_test_once_t once;
 static test_toolchain_t cached;
@@ -21,12 +22,21 @@ static lanes_t builtin;
 static lanes_t lanes;
 static sp_str_t toml;
 
-static void read_lanes(sp_mem_t mem, const c8* rel, lanes_t* out) {
-  sp_str_t issues = sp_zero;
-  if (!lanes_read(mem, test_repo_path(mem, sp_cstr_as_str(rel)), out, &issues)) {
-    sp_log("{.red}: {}", sp_fmt_cstr(rel), sp_fmt_str(issues));
-    sp_sys_exit(1);
+static void read_lanes(sp_mem_t mem, const c8* rel, lanes_t* lanes) {
+  switch (lanes_read(mem, test_repo_path(mem, sp_cstr_as_str(rel)), lanes)) {
+    case LANES_READ_OK: {
+      return;
+    }
+    case LANES_READ_UNREADABLE: {
+      sp_log("{.red}: unreadable", sp_fmt_cstr(rel));
+      break;
+    }
+    case LANES_READ_PARSE: {
+      sp_log("{.red}: {}", sp_fmt_cstr(rel), sp_fmt_str(spn_codegen_issues_message(mem, lanes->issues)));
+      break;
+    }
   }
+  sp_sys_exit(1);
 }
 
 static bool declared(sp_str_t name) {
@@ -213,26 +223,21 @@ static sp_err_t load_lanes(void* user) {
 
   sp_da_for(builtin.config.toolchain, it) {
     spn_toolchain_decl_t decl = sp_zero;
-    sp_str_t issues = lanes_lower(&builtin, it, SPN_PATH_ROOT_NONE, &decl);
-    sp_assert(sp_str_empty(issues));
+    sp_da(spn_codegen_issue_t) issues = lanes_lower(&builtin, it, SPN_PATH_ROOT_NONE, &decl);
+    sp_assert(sp_da_empty(issues));
     spn_toolchain_catalog_add(&catalog, decl);
   }
 
-  sp_str_t broken = sp_str_lit("");
   sp_da_for(lanes.config.toolchain, it) {
     spn_toolchain_decl_t decl = sp_zero;
-    sp_str_t issues = lanes_lower(&lanes, it, SPN_PATH_ROOT_NONE, &decl);
-    if (!sp_str_empty(issues)) {
-      if (sp_str_equal(decl.name, name)) {
-        broken = issues;
-      }
-      continue;
+    sp_da(spn_codegen_issue_t) issues = lanes_lower(&lanes, it, SPN_PATH_ROOT_NONE, &decl);
+    if (sp_da_empty(issues)) {
+      spn_toolchain_catalog_add(&catalog, decl);
     }
-    spn_toolchain_catalog_add(&catalog, decl);
-  }
-  if (!sp_str_empty(broken)) {
-    sp_log("lane {.red} is broken: {}", sp_fmt_str(name), sp_fmt_str(broken));
-    sp_sys_exit(1);
+    else if (sp_str_equal(decl.name, name)) {
+      sp_log("lane {.red} is broken: {}", sp_fmt_str(name), sp_fmt_str(spn_codegen_issues_message(mem, issues)));
+      sp_sys_exit(1);
+    }
   }
 
   spn_toolchain_info_t* info = spn_toolchain_catalog_get(&catalog, name);
@@ -240,7 +245,7 @@ static sp_err_t load_lanes(void* user) {
     sp_log("unknown lane {.red}", sp_fmt_str(name));
     sp_sys_exit(1);
   }
-  broken = lane_broken(mem, info);
+  sp_str_t broken = lane_broken(mem, info);
   if (!sp_str_empty(broken)) {
     sp_log("lane {.red} is broken: {}", sp_fmt_str(name), sp_fmt_str(broken));
     sp_sys_exit(1);

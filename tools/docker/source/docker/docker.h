@@ -43,7 +43,7 @@ typedef struct {
   sp_template_registry_t* templates;
   lanes_t builtin;
   lanes_t lanes;
-  sp_str_t issues [LANE_COUNT];
+  sp_da(spn_codegen_issue_t) issues [LANE_COUNT];
   spn_toolchain_catalog_t catalog;
   spn_toolchain_store_t store;
   sp_str_t host;
@@ -81,7 +81,8 @@ typedef struct {
     } xwin;
     struct {
       sp_str_t path;
-      sp_str_t issues;
+      lanes_read_t read;
+      sp_da(spn_codegen_issue_t) issues;
     } lanes;
     verify_t verify;
     s32 render;
@@ -99,6 +100,5 @@ sp_ps_config_t         docker_check(docker_t* docker, const variant_t* variant);
 sp_ps_config_t         docker_shell(docker_t* docker, const variant_t* variant);
 sp_ps_config_t         docker_test(docker_t* docker, const variant_t* variant, lane_t lane, const c8* filter);
 sp_str_t               docker_log(docker_t* docker, const c8* name);
-sp_str_t               docker_lane_issues(docker_t* docker, lane_t lane);
 
 #endif

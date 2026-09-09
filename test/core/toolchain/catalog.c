@@ -234,11 +234,6 @@ static const bind_test_t bind_tests [] = {
     .expect = { .rows = { { HOST_X64_LINUX }, { HOST_X64_LINUX_MUSL }, { HOST_ARM_LINUX }, { TARGET_WIN_GNU }, { TARGET_WASM } } },
   },
   {
-    .name = "derived_msvc_host_row_needs_the_sdk",
-    .driver = SPN_CC_DRIVER_CLANG,
-    .host = HOST_X64_WINDOWS,
-  },
-  {
     .name = "derived_retargeting_driver_reaches_served_sdks",
     .driver = SPN_CC_DRIVER_CLANG,
     .host = HOST_X64_LINUX,

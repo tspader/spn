@@ -82,7 +82,7 @@ static sp_str_t render_wasi(spn_wasi_spelling_t spelling) {
     case SPN_WASI_SPELLING_WASI: return sp_str_lit("wasm32-wasi");
     case SPN_WASI_SPELLING_WASIP1: return sp_str_lit("wasm32-wasip1");
   }
-  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+  sp_unreachable_return(sp_str_lit(""));
 }
 
 static sp_str_t render_target(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, spn_triple_t triple) {

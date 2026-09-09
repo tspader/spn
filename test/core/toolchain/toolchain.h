@@ -314,7 +314,8 @@ static sp_err_t fixture_decls(sp_test_t* t, const c8* file, sp_da(spn_toolchain_
   if (fixture_read_toml(t, file, &toml)) {
     return SP_ERR;
   }
-  return spn_test_lower_toolchains(t, toml, SPN_PATH_ROOT_NONE, decls, issues);
+  spn_test_lower_toolchains(t, toml, SPN_PATH_ROOT_NONE, decls, issues);
+  return SP_OK;
 }
 
 static const spn_toolchain_decl_t* fixture_decl(sp_da(spn_toolchain_decl_t) decls, const c8* name) {

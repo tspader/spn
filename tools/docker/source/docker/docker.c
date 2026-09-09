@@ -90,35 +90,28 @@ static bool missing(docker_t* docker, sp_str_t path, const c8* hint) {
   return true;
 }
 
-static bool read_lanes(docker_t* docker, sp_str_t path, lanes_t* out) {
-  if (!lanes_read(docker->mem, path, out, &docker->err.lanes.issues)) {
-    docker->err.lanes.path = path;
-    return false;
-  }
-  return true;
+static bool read_lanes(docker_t* docker, sp_str_t path, lanes_t* lanes) {
+  docker->err.lanes.read = lanes_read(docker->mem, path, lanes);
+  docker->err.lanes.path = path;
+  docker->err.lanes.issues = lanes->issues;
+  return docker->err.lanes.read == LANES_READ_OK;
 }
 
 static void bind_lanes(docker_t* docker) {
   sp_da_for(docker->builtin.config.toolchain, it) {
     spn_toolchain_decl_t decl = sp_zero;
-    sp_str_t issues = lanes_lower(&docker->builtin, it, SPN_PATH_ROOT_NONE, &decl);
-    sp_assert(sp_str_empty(issues));
+    sp_da(spn_codegen_issue_t) issues = lanes_lower(&docker->builtin, it, SPN_PATH_ROOT_NONE, &decl);
+    sp_assert(sp_da_empty(issues));
     spn_toolchain_catalog_add(&docker->catalog, decl);
   }
   sp_da_for(docker->lanes.config.toolchain, it) {
     spn_toolchain_decl_t decl = sp_zero;
-    sp_str_t issues = lanes_lower(&docker->lanes, it, SPN_PATH_ROOT_NONE, &decl);
-    lane_t lane = lane_find(decl.name);
-    if (!sp_str_empty(issues)) {
-      docker->issues[lane] = issues;
-      continue;
+    sp_da(spn_codegen_issue_t) issues = lanes_lower(&docker->lanes, it, SPN_PATH_ROOT_NONE, &decl);
+    docker->issues[lane_find(decl.name)] = issues;
+    if (sp_da_empty(issues)) {
+      spn_toolchain_catalog_add(&docker->catalog, decl);
     }
-    spn_toolchain_catalog_add(&docker->catalog, decl);
   }
-}
-
-sp_str_t docker_lane_issues(docker_t* docker, lane_t lane) {
-  return docker->issues[lane];
 }
 
 static bool sysroot_artifact(docker_t* docker, const sysroot_t* sysroot, spn_artifact_t* out) {
@@ -140,7 +133,7 @@ static bool render_config(docker_t* docker) {
   sp_io_dyn_mem_writer_init(docker->mem, &w);
   sp_da_for(docker->lanes.config.toolchain, it) {
     sp_str_t name = docker->lanes.config.toolchain[it].name;
-    if (!sp_str_empty(docker->issues[lane_find(name)])) {
+    if (!sp_da_empty(docker->issues[lane_find(name)])) {
       continue;
     }
     sp_io_write_str(&w.base, lanes_text(&docker->lanes, name), SP_NULLPTR);

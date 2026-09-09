@@ -49,7 +49,10 @@ static sp_str_t spn_codegen_path(spn_toml_loader_t* ctx) {
 }
 
 static void spn_toml_loader_record(spn_toml_loader_t* ctx, spn_err_t code, sp_str_t detail) {
-  spn_codegen_issue_t issue = { .code = code, .path = spn_codegen_path(ctx), .detail = sp_str_copy(ctx->mem, detail) };
+  spn_codegen_issue_t issue = { .code = code, .path = spn_codegen_path(ctx), .detail = sp_str_copy(ctx->mem, detail), .depth = ctx->depth };
+  sp_for(it, ctx->depth) {
+    issue.segs[it] = ctx->path[it];
+  }
   sp_da_push(ctx->issues, issue);
 }
 
@@ -326,12 +329,10 @@ toml_table_t* spn_codegen_parse(spn_toml_loader_t* ctx, sp_str_t path) {
 }
 
 toml_table_t* spn_codegen_parse_str(spn_toml_loader_t* ctx, sp_str_t content) {
-  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  c8 diag [1024] = {0};
-  toml_table_t* table = toml_parse(sp_str_to_cstr(scratch.mem, content), diag, SP_CARR_LEN(diag));
-  sp_mem_end_scratch(scratch);
+  sp_str_t diag = sp_zero;
+  toml_table_t* table = spn_toml_parse_str_diag(ctx->mem, content, &diag);
   if (!table) {
-    spn_toml_loader_issue_at(ctx, SPN_ERR_CODEGEN_PARSE, sp_str_copy(ctx->mem, sp_cstr_as_str(diag)));
+    spn_toml_loader_issue_at(ctx, SPN_ERR_CODEGEN_PARSE, diag);
   }
   return table;
 }

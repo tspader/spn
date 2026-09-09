@@ -64,10 +64,11 @@ static void push_hosted(sp_da(spn_toolchain_row_t)* rows, spn_toolchain_catalog_
     const spn_abi_t* abis = SP_NULLPTR;
     u32 num_arches = spn_os_archs(hosted[os], &arches);
     u32 num_abis = spn_os_completions(hosted[os], &abis);
+    bool own = hosted[os] == catalog->host.os;
     sp_for(arch, num_arches) {
       sp_for(abi, num_abis) {
         spn_toolchain_row_t row = { .triple = { arches[arch], hosted[os], abis[abi] } };
-        if (row.triple.os == catalog->host.os) {
+        if (own) {
           row.sanitizers = spn_toolchain_stock_sanitizers(driver, row.triple);
         }
         if (spn_sdk_served(&catalog->sdks, catalog->host, row.triple, &row.sdk)) {

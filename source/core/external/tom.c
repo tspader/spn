@@ -35,8 +35,15 @@ toml_table_t* spn_toml_parse_diag(sp_mem_t mem, sp_str_t path, sp_str_t* diag) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   sp_str_t file = sp_zero;
   sp_io_read_file(scratch.mem, path, &file);
+  toml_table_t* toml = spn_toml_parse_str_diag(mem, file, diag);
+  sp_mem_end_scratch(scratch);
+  return toml;
+}
+
+toml_table_t* spn_toml_parse_str_diag(sp_mem_t mem, sp_str_t content, sp_str_t* diag) {
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   c8 parse_err[1024] = {0};
-  toml_table_t* toml = toml_parse(sp_str_to_cstr(scratch.mem, file), parse_err, SP_CARR_LEN(parse_err));
+  toml_table_t* toml = toml_parse(sp_str_to_cstr(scratch.mem, content), parse_err, sp_carr_len(parse_err));
   sp_mem_end_scratch(scratch);
 
   if (!toml && diag) {

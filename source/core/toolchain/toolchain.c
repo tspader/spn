@@ -224,7 +224,7 @@ spn_abi_t spn_default_abi(spn_cc_driver_t driver, spn_os_t os) {
         case SPN_CC_DRIVER_CLANG: return SPN_ABI_NONE;
         case SPN_CC_DRIVER_NONE: sp_unreachable_case();
       }
-      SP_UNREACHABLE_RETURN(SPN_ABI_NONE);
+      sp_unreachable_return(SPN_ABI_NONE);
     }
     case SPN_OS_NONE: sp_unreachable_case();
   }
