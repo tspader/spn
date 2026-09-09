@@ -78,8 +78,9 @@ static reach_t attempt(const spn_toolchain_info_t* toolchain, spn_toolchain_quer
   return supports(*row, query);
 }
 
-static spn_err_t refusal(spn_cc_driver_t driver, spn_triple_t target) {
-  if (!spn_toolchain_driver_retargets(driver)) {
+static spn_err_t refusal(const spn_toolchain_catalog_t* catalog, spn_cc_driver_t driver, spn_triple_t target) {
+  spn_sdk_t sdk = sp_zero;
+  if (!spn_toolchain_driver_retargets(driver) || spn_sdk_served(&catalog->sdks, catalog->host, target, &sdk)) {
     return SPN_ERR_TOOLCHAIN_TARGET;
   }
   switch (spn_sdk_kind(target)) {
@@ -170,7 +171,7 @@ static spn_err_t emit_reach(spn_toolchain_catalog_t* catalog, spn_toolchain_quer
       });
     }
     case SPN_ERR_TOOLCHAIN_TARGET: {
-      return emit(refusal(toolchain->driver, reached.row.triple), catalog, query, candidates, triples(catalog->mem, toolchain->rows));
+      return emit(refusal(catalog, toolchain->driver, reached.row.triple), catalog, query, candidates, triples(catalog->mem, toolchain->rows));
     }
     default: {
       sp_unreachable_case();

@@ -156,14 +156,7 @@
         {
           "arch": "x86_64",
           "os": "linux",
-          "abi": "gnu",
-          "sanitizers": [
-            "address",
-            "thread",
-            "undefined",
-            "memory",
-            "leak"
-          ]
+          "abi": "gnu"
         },
         {
           "arch": "x86_64",

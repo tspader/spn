@@ -99,18 +99,18 @@ static const rows_test_t rows_tests [] = {
     .expect = { .rows = { { HOST_X64_LINUX, .sanitizers = SAN_GCC_LINUX }, { TARGET_X64_BARE }, { TARGET_X64_LINUX_NONE } } },
   },
   {
-    .name = "clang_on_linux_targets_host_and_its_arch_bare",
+    .name = "clang_on_linux_targets_host_and_no_bare",
     .file = "multiple.json",
     .host = HOST_ARM_LINUX,
     .toolchain = "B",
-    .expect = { .rows = { { HOST_ARM_LINUX, .sanitizers = SAN_CLANG_LINUX }, { TARGET_ARM_BARE }, { TARGET_ARM_LINUX_NONE } } },
+    .expect = { .rows = { { HOST_ARM_LINUX, .sanitizers = SAN_CLANG_LINUX } } },
   },
   {
-    .name = "lld_does_not_add_arches",
+    .name = "lld_does_not_add_bare",
     .file = "drivers.json",
     .host = HOST_ARM_LINUX,
     .toolchain = "B",
-    .expect = { .rows = { { HOST_ARM_LINUX, .sanitizers = SAN_CLANG_LINUX }, { TARGET_ARM_BARE }, { TARGET_ARM_LINUX_NONE } } },
+    .expect = { .rows = { { HOST_ARM_LINUX, .sanitizers = SAN_CLANG_LINUX } } },
   },
   {
     .name = "gcc_on_macos_targets_host_only",
@@ -166,8 +166,6 @@ static const rows_test_t rows_tests [] = {
         { TARGET_WIN_GNU, { SPN_SDK_SYSROOT, { "aa/S/windows", SPN_PATH_ROOT_TOOLCHAIN } } },
         { TARGET_WIN_MSVC, { SPN_SDK_MSVC, .vc = { "aa/S/msvc/crt/lib/x86_64", SPN_PATH_ROOT_TOOLCHAIN } } },
         { HOST_X64_LINUX },
-        { TARGET_X64_BARE },
-        { TARGET_X64_LINUX_NONE },
       },
     },
   },
@@ -176,7 +174,7 @@ static const rows_test_t rows_tests [] = {
     .file = "sdk_local.json",
     .host = HOST_X64_LINUX,
     .toolchain = "A",
-    .expect = { .rows = { { HOST_ARM_LINUX, { SPN_SDK_SYSROOT, { "/S" } } }, { HOST_X64_LINUX }, { TARGET_X64_BARE }, { TARGET_X64_LINUX_NONE } } },
+    .expect = { .rows = { { HOST_ARM_LINUX, { SPN_SDK_SYSROOT, { "/S" } } } } },
   },
 };
 
@@ -227,22 +225,26 @@ static const bind_test_t bind_tests [] = {
     .expect = { .rows = { { HOST_X64_LINUX } } },
   },
   {
-    .name = "retargeting_driver_reaches_served_sdks",
+    .name = "derived_retargeting_driver_reaches_served_sdks",
+    .driver = SPN_CC_DRIVER_CLANG,
+    .host = HOST_X64_LINUX,
+    .sdks = { .macos = { "/H" }, .msvc = { { { "/X" }, SPN_ARCH_X64 } } },
+    .expect = {
+      .rows = {
+        { HOST_X64_LINUX, .sanitizers = SAN_CLANG_LINUX },
+        { HOST_X64_MACOS, { SPN_SDK_MACOS, { "/H" } } },
+        { HOST_ARM_MACOS, { SPN_SDK_MACOS, { "/H" } } },
+        { TARGET_WIN_MSVC, { SPN_SDK_MSVC, .vc = { "/X/crt/lib/x86_64" } } },
+      },
+    },
+  },
+  {
+    .name = "listed_retargeting_driver_reaches_only_its_list",
     .driver = SPN_CC_DRIVER_CLANG,
     .host = HOST_X64_LINUX,
     .sdks = { .macos = { "/H" }, .msvc = { { { "/X" }, SPN_ARCH_X64 } } },
     .targets = { { .triple = TARGET_WASM, .sdk_toolchain = true } },
-    .expect = {
-      .rows = {
-        { TARGET_WASM },
-        { HOST_X64_LINUX },
-        { HOST_X64_MACOS, { SPN_SDK_MACOS, { "/H" } } },
-        { HOST_ARM_MACOS, { SPN_SDK_MACOS, { "/H" } } },
-        { TARGET_WIN_MSVC, { SPN_SDK_MSVC, .vc = { "/X/crt/lib/x86_64" } } },
-        { TARGET_X64_BARE },
-        { TARGET_X64_LINUX_NONE },
-      },
-    },
+    .expect = { .rows = { { TARGET_WASM } } },
   },
   {
     .name = "fixed_driver_reaches_only_its_list",
@@ -257,7 +259,7 @@ static const bind_test_t bind_tests [] = {
     .driver = SPN_CC_DRIVER_ZIG,
     .host = HOST_X64_LINUX,
     .targets = { { .triple = HOST_X64_LINUX, .sdk_toolchain = true, .sanitizers = SAN_ZIG_UT }, { .triple = TARGET_X64_BARE } },
-    .expect = { .rows = { { HOST_X64_LINUX, .sanitizers = SAN_ZIG_UT }, { TARGET_X64_BARE }, { TARGET_X64_LINUX_NONE } } },
+    .expect = { .rows = { { HOST_X64_LINUX, .sanitizers = SAN_ZIG_UT }, { TARGET_X64_BARE } } },
   },
   {
     .name = "coff_host_targets_no_bare",
@@ -268,7 +270,7 @@ static const bind_test_t bind_tests [] = {
     .expect = { .rows = { { TARGET_WIN_GNU } } },
   },
   {
-    .name = "lld_does_not_retarget_gcc",
+    .name = "gcc_derives_its_arch_bare",
     .driver = SPN_CC_DRIVER_GCC,
     .lld = true,
     .host = HOST_X64_LINUX,

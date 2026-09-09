@@ -181,33 +181,30 @@ static void push_hosted(sp_da(spn_toolchain_row_t)* rows, spn_toolchain_catalog_
   }
 }
 
-static void push_bare(sp_da(spn_toolchain_row_t)* rows, const spn_toolchain_decl_t* decl, spn_triple_t host) {
-  if (!spn_toolchain_driver_composes(decl->driver, SPN_LD_DIALECT_GNU) || spn_os_format(host.os) != SPN_FORMAT_ELF) {
+static void push_bare(sp_da(spn_toolchain_row_t)* rows, spn_cc_driver_t driver, spn_triple_t host) {
+  if (!(spn_toolchain_driver_caps(driver) & SPN_CC_CAP_BARE) || spn_os_format(host.os) != SPN_FORMAT_ELF) {
     return;
   }
-  push_row(rows, (spn_toolchain_row_t) { .triple = { host.arch, SPN_OS_FREESTANDING, SPN_ABI_BARE } });
-  push_row(rows, (spn_toolchain_row_t) { .triple = { host.arch, SPN_OS_LINUX, SPN_ABI_BARE } });
+  sp_da_push(*rows, ((spn_toolchain_row_t) { .triple = { host.arch, SPN_OS_FREESTANDING, SPN_ABI_BARE } }));
+  sp_da_push(*rows, ((spn_toolchain_row_t) { .triple = { host.arch, SPN_OS_LINUX, SPN_ABI_BARE } }));
 }
 
 static sp_da(spn_toolchain_row_t) bind_rows(spn_toolchain_catalog_t* catalog, const spn_toolchain_decl_t* decl, spn_toolchain_support_t support) {
   sp_da(spn_toolchain_row_t) rows = sp_da_new(catalog->mem, spn_toolchain_row_t);
-  bool derived = sp_da_empty(decl->targets);
-  bool retargets = spn_toolchain_driver_retargets(decl->driver);
-
-  if (derived) {
-    push_stock(&rows, catalog, decl);
-  }
-  sp_da_for(decl->targets, it) {
-    spn_toolchain_row_t row = sp_zero;
-    if (bind_row(catalog, support, decl->targets[it], &row)) {
-      sp_da_push(rows, row);
+  if (!sp_da_empty(decl->targets)) {
+    sp_da_for(decl->targets, it) {
+      spn_toolchain_row_t row = sp_zero;
+      if (bind_row(catalog, support, decl->targets[it], &row)) {
+        sp_da_push(rows, row);
+      }
     }
+    return rows;
   }
-  if (retargets) {
+
+  push_stock(&rows, catalog, decl);
+  push_bare(&rows, decl->driver, catalog->host);
+  if (spn_toolchain_driver_retargets(decl->driver)) {
     push_hosted(&rows, catalog);
-  }
-  if (retargets || derived) {
-    push_bare(&rows, decl, catalog->host);
   }
   return rows;
 }
