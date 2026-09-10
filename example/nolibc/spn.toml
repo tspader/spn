@@ -7,4 +7,5 @@ name = "main"
 source = ["main.c"]
 
 [profile.default]
+os = "linux"
 abi = "none"
