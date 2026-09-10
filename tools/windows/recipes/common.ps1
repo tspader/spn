@@ -7,7 +7,7 @@ Write-Host "== common: base setup =="
 $Root = 'C:\toolchains'
 New-Item -ItemType Directory -Force -Path $Root | Out-Null
 
-$exclusions = @($Root, "$env:LOCALAPPDATA\spn", "$env:APPDATA\spn")
+$exclusions = @($Root, $env:TEMP, "$env:LOCALAPPDATA\spn", "$env:APPDATA\spn")
 foreach ($path in $exclusions) {
   try { Add-MpPreference -ExclusionPath $path -ErrorAction Stop }
   catch { Write-Host "  (skipped Defender exclusion for ${path}: $($_.Exception.Message))" }
