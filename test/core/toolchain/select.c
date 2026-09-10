@@ -511,6 +511,14 @@ static const resolve_test_t resolve_tests [] = {
     .expect = { .name = "A", .triple = TARGET_WIN_GNU },
   },
   {
+    .name = "windows_host_without_msvc_sdk_names_the_sdk",
+    .file = "drivers.toml",
+    .toolchain = "C",
+    .target = X64_WINDOWS,
+    .host = HOST_X64_WINDOWS,
+    .expect = { .err = SPN_ERR_TOOLCHAIN_SDK_MSVC, .triple = TARGET_WIN_MSVC, .candidates = { "A", "D" } },
+  },
+  {
     .name = "macos_host_reaches_both_arches",
     .file = "drivers.toml",
     .toolchain = "B",
