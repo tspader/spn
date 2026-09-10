@@ -181,29 +181,27 @@ static sp_da(sp_str_t) lower_strs(spn_toml_loader_t* ctx, sp_da(sp_str_t) values
   return out;
 }
 
+static spn_toolchain_source_t lower_source(sp_da(spn_cg_toolchain_decl_host_entry_t) hosts) {
+  bool local = false;
+  bool distributed = false;
+  sp_da_for(hosts, it) {
+    if (sp_str_empty(hosts[it].value.url)) {
+      local = true;
+    }
+    else {
+      distributed = true;
+    }
+  }
+  if (local && distributed) {
+    return SPN_TOOLCHAIN_SOURCE_MIXED;
+  }
+  return distributed ? SPN_TOOLCHAIN_SOURCE_DISTRIBUTION : SPN_TOOLCHAIN_SOURCE_LOCAL;
+}
+
 static void lower_hosts(spn_toml_loader_t* ctx, const spn_cg_toolchain_decl_t* decl, spn_toolchain_decl_t* toolchain) {
+  toolchain->source = lower_source(decl->host);
   toolchain->hosts = sp_da_new(ctx->mem, spn_toolchain_host_t);
   spn_toml_loader_push_key(ctx, "host");
-  sp_da_for(decl->host, it) {
-    const spn_cg_toolchain_decl_host_entry_t* cell = &decl->host[it];
-    spn_triple_t host = sp_zero;
-    if (spn_triple_parse_host(cell->key, &host)) {
-      spn_toml_loader_push_key(ctx, sp_str_to_cstr(ctx->mem, cell->key));
-      spn_toml_loader_issue_at(ctx, SPN_ERR_CODEGEN_INVALID, cell->key);
-      spn_toml_loader_pop(ctx);
-      continue;
-    }
-    sp_da_push(toolchain->hosts, ((spn_toolchain_host_t) {
-      .triple = host,
-      .artifact = {
-        .url = cell->value.url,
-        .sha256 = cell->value.sha256,
-        .mirror_list = decl->mirrors,
-      },
-    }));
-  }
-  toolchain->source = spn_toolchain_source(toolchain->hosts);
-
   sp_da_for(decl->host, it) {
     const spn_cg_toolchain_decl_host_entry_t* cell = &decl->host[it];
     bool url = !sp_str_empty(cell->value.url);
@@ -214,6 +212,20 @@ static void lower_hosts(spn_toml_loader_t* ctx, const spn_cg_toolchain_decl_t* d
     }
     if (!url && (sha || toolchain->source == SPN_TOOLCHAIN_SOURCE_MIXED)) {
       spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, "url");
+    }
+    spn_triple_t host = sp_zero;
+    if (spn_triple_parse_host(cell->key, &host)) {
+      spn_toml_loader_issue_at(ctx, SPN_ERR_CODEGEN_INVALID, cell->key);
+    }
+    else {
+      sp_da_push(toolchain->hosts, ((spn_toolchain_host_t) {
+        .triple = host,
+        .artifact = {
+          .url = cell->value.url,
+          .sha256 = cell->value.sha256,
+          .mirror_list = decl->mirrors,
+        },
+      }));
     }
     spn_toml_loader_pop(ctx);
   }

@@ -26,6 +26,5 @@ sp_str_t                 spn_toolchain_launcher_to_str(const spn_path_roots_t* r
 bool                     spn_toolchain_has_cxx(spn_toolchain_info_t* toolchain);
 spn_wasi_spelling_t      spn_toolchain_wasi_spelling(const spn_path_roots_t* roots, sp_mem_t mem, const spn_toolchain_info_t* toolchain);
 spn_toolchain_ref_t      spn_toolchain_ref_from_str(sp_str_t str);
-spn_toolchain_source_t   spn_toolchain_source(sp_da(spn_toolchain_host_t) hosts);
 
 #endif
