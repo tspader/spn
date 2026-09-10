@@ -44,18 +44,10 @@ static bool sanitizable(spn_triple_t triple) {
   return triple.abi != SPN_ABI_BARE && triple.abi != SPN_ABI_ELF;
 }
 
-static spn_sanitizer_set_t lower_sanitizers(sp_da(spn_sanitizer_t) sanitizers) {
-  spn_sanitizer_set_t set = 0;
-  sp_da_for(sanitizers, it) {
-    set |= sanitizers[it];
-  }
-  return set;
-}
-
 static void lower_target_fields(spn_toml_loader_t* ctx, spn_toolchain_source_t source, spn_path_root_t base, const spn_cg_toolchain_target_t* cg, spn_toolchain_target_t* target) {
   if (!sp_da_empty(cg->sanitizers)) {
     if (sanitizable(target->triple)) {
-      target->sanitizers = lower_sanitizers(cg->sanitizers);
+      target->sanitizers = spn_sanitizer_set_from_list(cg->sanitizers);
     }
     else {
       spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "sanitizers");

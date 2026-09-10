@@ -38,6 +38,7 @@ sp_str_t spn_tree_to_str(spn_tree_t tree);
 spn_sanitizer_t spn_sanitizer_from_str(sp_str_t str);
 sp_str_t spn_sanitizer_to_str(spn_sanitizer_t sanitizer);
 sp_str_t spn_sanitizer_set_to_str(sp_mem_t mem, spn_sanitizer_set_t set);
+spn_sanitizer_set_t spn_sanitizer_set_from_list(sp_da(spn_sanitizer_t) list);
 bool spn_sanitizer_set_has_conflict(spn_sanitizer_set_t set);
 
 spn_linkage_t spn_lib_kind_from_str(sp_str_t str);

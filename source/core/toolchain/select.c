@@ -33,15 +33,6 @@ static const spn_toolchain_row_t* listed(const spn_toolchain_info_t* toolchain, 
   return SP_NULLPTR;
 }
 
-static bool has_triple(sp_da(spn_triple_t) triples, spn_triple_t triple) {
-  sp_da_for(triples, it) {
-    if (spn_triple_equal(triples[it], triple)) {
-      return true;
-    }
-  }
-  return false;
-}
-
 static sp_da(spn_triple_t) triples(sp_mem_t mem, sp_da(spn_toolchain_row_t) rows) {
   sp_da(spn_triple_t) out = sp_da_new(mem, spn_triple_t);
   sp_da_for(rows, it) {
@@ -88,7 +79,7 @@ static reach_t supports(spn_toolchain_row_t row, spn_toolchain_query_t query) {
 }
 
 static reach_kind_t absence(const spn_toolchain_catalog_t* catalog, const spn_toolchain_info_t* toolchain, spn_triple_t triple) {
-  if (has_triple(toolchain->unserved, triple)) {
+  if (spn_triple_in(toolchain->unserved, triple)) {
     return REACH_DROPPED;
   }
   spn_sdk_t sdk = sp_zero;

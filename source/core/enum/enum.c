@@ -434,6 +434,14 @@ sp_str_t spn_sanitizer_set_to_str(sp_mem_t mem, spn_sanitizer_set_t set) {
   return sp_io_dyn_mem_writer_as_str(&out);
 }
 
+spn_sanitizer_set_t spn_sanitizer_set_from_list(sp_da(spn_sanitizer_t) list) {
+  spn_sanitizer_set_t set = 0;
+  sp_da_for(list, it) {
+    set |= list[it];
+  }
+  return set;
+}
+
 bool spn_sanitizer_set_has_conflict(spn_sanitizer_set_t set) {
   if ((set & SPN_SANITIZER_THREAD) && (set & (SPN_SANITIZER_ADDRESS | SPN_SANITIZER_MEMORY | SPN_SANITIZER_LEAK))) {
     return true;

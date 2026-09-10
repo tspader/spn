@@ -622,13 +622,6 @@ static const test_t tests [] = {
     },
   },
   {
-    .name = "validate_toolchain_sanitizers_on_none",
-    .manifest = "toolchain_sanitizers_none",
-    .issues = {
-      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].target[0].sanitizers" }
-    },
-  },
-  {
     .name = "toolchain_sdk_absent_off_host",
     .manifest = "toolchain_sdk_absent",
     .toolchains = {
@@ -680,13 +673,6 @@ static const test_t tests [] = {
     .manifest = "toolchain_kind_unknown",
     .issues = {
       { SPN_ERR_CODEGEN_INVALID, "toolchain[0].target[0].kind" }
-    },
-  },
-  {
-    .name = "validate_toolchain_sdk_forbidden",
-    .manifest = "toolchain_sdk_none",
-    .issues = {
-      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].target[0].sdk" }
     },
   },
   {

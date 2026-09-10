@@ -281,14 +281,6 @@ static void lower_toolchains(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg
   }
 }
 
-static spn_sanitizer_set_t lower_sanitizers(sp_da(spn_sanitizer_t) sanitizers) {
-  spn_sanitizer_set_t set = 0;
-  sp_da_for(sanitizers, it) {
-    set |= sanitizers[it];
-  }
-  return set;
-}
-
 static void lower_profiles(const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
   sp_str_om_init(out->profiles);
   sp_da_for(cg->profile, i) {
@@ -303,7 +295,7 @@ static void lower_profiles(const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
       .standard = sp_opt_is_null(p->standard) ? SPN_C_STANDARD_NONE : sp_opt_get(p->standard),
       .mode = sp_opt_is_null(p->mode) ? SPN_MODE_NONE : sp_opt_get(p->mode),
       .opt = sp_opt_is_null(p->opt) ? SPN_OPT_LEVEL_NONE : sp_opt_get(p->opt),
-      .sanitizers = lower_sanitizers(p->sanitize),
+      .sanitizers = spn_sanitizer_set_from_list(p->sanitize),
       .sanitizers_set = p->sanitize != SP_NULLPTR,
       .options = p->options,
     };
@@ -824,7 +816,7 @@ static void validate_profiles(spn_toml_loader_t* ctx, const spn_cg_manifest_t* c
     if (!sp_opt_is_null(p->opt) && sp_opt_get(p->opt) == SPN_OPT_LEVEL_NONE) {
       spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "opt");
     }
-    if (spn_sanitizer_set_has_conflict(lower_sanitizers(p->sanitize))) {
+    if (spn_sanitizer_set_has_conflict(spn_sanitizer_set_from_list(p->sanitize))) {
       spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "sanitize");
     }
     spn_toml_loader_pop(ctx);

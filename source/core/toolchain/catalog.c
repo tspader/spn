@@ -13,15 +13,6 @@ static bool has_row(sp_da(spn_toolchain_row_t) rows, spn_triple_t triple) {
   return false;
 }
 
-static bool has_triple(sp_da(spn_triple_t) triples, spn_triple_t triple) {
-  sp_da_for(triples, it) {
-    if (spn_triple_equal(triples[it], triple)) {
-      return true;
-    }
-  }
-  return false;
-}
-
 static void push_row(sp_da(spn_toolchain_row_t)* rows, spn_toolchain_row_t row) {
   if (!has_row(*rows, row.triple)) {
     sp_da_push(*rows, row);
@@ -38,7 +29,7 @@ static spn_path_t sdk_root(spn_toolchain_catalog_t* catalog, spn_toolchain_suppo
 }
 
 static bool declared(const spn_toolchain_info_t* info, spn_triple_t triple) {
-  return has_row(info->rows, triple) || has_triple(info->unserved, triple);
+  return has_row(info->rows, triple) || spn_triple_in(info->unserved, triple);
 }
 
 static void bind(spn_toolchain_catalog_t* catalog, spn_toolchain_info_t* info, spn_toolchain_support_t support, spn_toolchain_target_t target) {
