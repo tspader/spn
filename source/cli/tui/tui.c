@@ -87,55 +87,6 @@ static sp_str_t colored_fmt(sp_tty_color_t color, sp_mem_t mem, const c8* fmt, .
   return sp_io_dyn_mem_writer_take_str(&buf);
 }
 
-static void write_manifest_issue(sp_tty_t* w, const spn_err_issue_t* issue) {
-  switch (issue->code) {
-    case SPN_ERR_CODEGEN_MISSING_KEY:
-      sp_tty_fmt(w, "missing required field {.cyan}", SP_FMT_STR(issue->path));
-      break;
-    case SPN_ERR_CODEGEN_EXPECTED_STR:
-      sp_tty_fmt(w, "{.cyan} must be a string", SP_FMT_STR(issue->path));
-      break;
-    case SPN_ERR_CODEGEN_EXPECTED_INT:
-      sp_tty_fmt(w, "{.cyan} must be a non-negative integer", SP_FMT_STR(issue->path));
-      break;
-    case SPN_ERR_CODEGEN_EXPECTED_BOOL:
-      sp_tty_fmt(w, "{.cyan} must be a boolean", SP_FMT_STR(issue->path));
-      break;
-    case SPN_ERR_CODEGEN_EXPECTED_OBJECT:
-      sp_tty_fmt(w, "{.cyan} must be a table", SP_FMT_STR(issue->path));
-      break;
-    case SPN_ERR_CODEGEN_DUPLICATE_KEY:
-      sp_tty_fmt(w, "duplicate {.yellow} at {.cyan}", SP_FMT_STR(issue->detail), SP_FMT_STR(issue->path));
-      break;
-    case SPN_ERR_CODEGEN_UNKNOWN_KEY:
-      if (sp_str_empty(issue->path)) {
-        sp_tty_fmt(w, "unknown field {.red}", SP_FMT_STR(issue->detail));
-      } else {
-        sp_tty_fmt(w, "unknown field {.red} in {.cyan}", SP_FMT_STR(issue->detail), SP_FMT_STR(issue->path));
-      }
-      break;
-    case SPN_ERR_CODEGEN_INVALID:
-      sp_tty_fmt(w, "invalid value at {.cyan}", SP_FMT_STR(issue->path));
-      break;
-    case SPN_ERR_CODEGEN_PARSE:
-      if (sp_str_empty(issue->detail)) {
-        sp_io_write_str(w->io, sp_str_lit("not valid toml"), SP_NULLPTR);
-      } else {
-        sp_tty_fmt(w, "not valid toml: {}", SP_FMT_STR(issue->detail));
-      }
-      break;
-    case SPN_ERR_CODEGEN_FILE_MISSING:
-      sp_io_write_str(w->io, sp_str_lit("file is missing"), SP_NULLPTR);
-      break;
-    case SPN_ERR_CODEGEN_ROOT_ONLY:
-      sp_tty_fmt(w, "{.cyan} is only allowed in the root manifest", SP_FMT_STR(issue->path));
-      break;
-    default:
-      sp_tty_fmt(w, "invalid field at {.cyan}", SP_FMT_STR(issue->path));
-      break;
-  }
-}
-
 static sp_str_t setter_to_str(spn_err_setter_t setter) {
   switch (setter.kind) {
     case SPN_OPTION_SETTER_NONE: {
@@ -1488,7 +1439,7 @@ static void render_event_extra(sp_tty_t* w, spn_event_t* event) {
         case SPN_ERR_MANIFEST_ISSUES: {
           sp_da_for(event->err.manifest.issues, it) {
             sp_io_write_str(w->io, sp_str_lit("  - "), SP_NULLPTR);
-            write_manifest_issue(w, &event->err.manifest.issues[it]);
+            spn_err_issue_write(w, &event->err.manifest.issues[it]);
             sp_io_write_c8(w->io, '\n');
           }
           break;

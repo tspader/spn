@@ -47,6 +47,7 @@ spn_err_t spn_triple_parse(sp_str_t str, spn_triple_t* triple);
 spn_triple_t spn_triple_host();
 spn_triple_t spn_triple_merge(spn_triple_t base, spn_triple_t partial);
 sp_str_t spn_triple_to_str(sp_mem_t mem, spn_triple_t triple);
+void spn_err_issue_write(sp_tty_t* tty, const spn_err_issue_t* issue);
 sp_str_t spn_triple_exe_file_name(sp_mem_t mem, spn_triple_t triple, sp_str_t name);
 sp_str_t spn_triple_lib_file_name(sp_mem_t mem, spn_triple_t triple, sp_str_t name, sp_os_lib_kind_t kind);
 spn_arch_t spn_arch_from_str(sp_str_t str);
