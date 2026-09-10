@@ -209,7 +209,8 @@
         "name": { "type": "string" },
         "url": { "type": "string" },
         "expected": { "type": "string" },
-        "actual": { "type": "string" }
+        "actual": { "type": "string" },
+        "output": { "type": "string" }
       }
     },
     "wasm": {

@@ -5,7 +5,7 @@
 #include "spn/core.h"
 #include "toolchain/types.h"
 
-spn_err_t spn_fetch_curl(sp_str_t url, sp_str_t dest, void* user_data);
+spn_err_t spn_fetch_curl(spn_toolchain_store_t* store, sp_str_t url, sp_str_t dest, sp_str_t* output);
 
 sp_str_t  spn_toolchain_store_path(spn_toolchain_store_t* store, spn_artifact_t artifact);
 sp_str_t  spn_artifact_resolve_url(sp_mem_t mem, spn_artifact_t artifact, sp_str_t mirror);

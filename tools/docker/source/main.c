@@ -26,8 +26,8 @@ typedef struct {
 #define try(expr) do { sp_cli_result_t _e = (expr); if (_e) return _e; } while (0)
 #define cfmt(mem, ...) sp_str_to_cstr(mem, sp_fmt(mem, __VA_ARGS__).value)
 
-static spn_err_t fetch(sp_str_t url, sp_str_t dest, void* user) {
-  smoke_t* smoke = user;
+static spn_err_t fetch(spn_toolchain_store_t* store, sp_str_t url, sp_str_t dest, sp_str_t* output) {
+  smoke_t* smoke = store->fetch_user_data;
   sp_ps_config_t curl = {
     .command = sp_str_lit("curl"),
     .args = { sp_str_lit("-fsSL"), sp_str_lit("-o"), dest, url },

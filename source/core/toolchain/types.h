@@ -193,7 +193,8 @@ typedef struct {
   spn_toolchain_row_t row;
 } spn_toolchain_selection_t;
 
-typedef spn_err_t (*spn_fetch_fn)(sp_str_t url, sp_str_t dest, void* user_data);
+typedef struct spn_toolchain_store spn_toolchain_store_t;
+typedef spn_err_t (*spn_fetch_fn)(spn_toolchain_store_t* store, sp_str_t url, sp_str_t dest, sp_str_t* output);
 
 typedef struct {
   sp_str_t path;
@@ -208,13 +209,13 @@ typedef struct {
   sp_str_om(spn_probe_entry_t) entries;
 } spn_probe_cache_t;
 
-typedef struct {
+struct spn_toolchain_store {
   sp_mem_t mem;
   sp_str_t dir;
   sp_str_t mirror;
   spn_fetch_fn fetch;
   void* fetch_user_data;
   spn_probe_cache_t probes;
-} spn_toolchain_store_t;
+};
 
 #endif

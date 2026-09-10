@@ -15,6 +15,7 @@ typedef struct {
   bool extracted;
   bool store_clean;
   bool err_reports_sha;
+  const c8* output;
 } provision_expect_t;
 
 typedef struct {
@@ -24,6 +25,7 @@ typedef struct {
   const c8* sha;
   const c8* mirror;
   bool fetch_fail;
+  bool fetch_vanish;
   const c8* fail_url_containing;
   const c8* store_dir;
   bool dest_file;
@@ -44,6 +46,7 @@ typedef struct {
   sp_str_t last_url;
   sp_str_t fail_url_containing;
   bool fail;
+  bool vanish;
 } fetch_stub_t;
 
 static const provision_test_t tests [] = {
@@ -79,10 +82,20 @@ static const provision_test_t tests [] = {
     },
   },
   {
-    .name = "fetch_failure_propagates",
+    .name = "fetch_failure_propagates_with_output",
     .fetch_fail = true,
     .expect = {
       .kind = SPN_ERR_TOOLCHAIN_FETCH,
+      .calls = 1,
+      .store_clean = true,
+      .output = "E",
+    },
+  },
+  {
+    .name = "vanished_download_is_a_read_failure",
+    .fetch_vanish = true,
+    .expect = {
+      .kind = SPN_ERR_FS_READ,
       .calls = 1,
       .store_clean = true,
     },
@@ -168,12 +181,14 @@ static const resolve_test_t resolve_tests [] = {
   },
 };
 
-static spn_err_t fetch_stub(sp_str_t url, sp_str_t dest, void* user_data) {
-  fetch_stub_t* stub = (fetch_stub_t*)user_data;
+static spn_err_t fetch_stub(spn_toolchain_store_t* store, sp_str_t url, sp_str_t dest, sp_str_t* output) {
+  fetch_stub_t* stub = (fetch_stub_t*)store->fetch_user_data;
   stub->calls++;
   stub->last_url = sp_str_copy(stub->mem, url);
+  *output = sp_str_lit("E");
   if (stub->fail) return SPN_ERROR;
   if (!sp_str_empty(stub->fail_url_containing) && sp_str_contains(url, stub->fail_url_containing)) return SPN_ERROR;
+  if (stub->vanish) return SPN_OK;
   if (sp_fs_copy(stub->tarball, dest)) return SPN_ERROR;
   return SPN_OK;
 }
@@ -191,6 +206,7 @@ sp_test_each(provision, store, provision_test_t, tests, .setup = spn_test_ctx_se
   fetch_stub_t stub = sp_zero;
   stub.mem = mem;
   stub.fail = it->fetch_fail;
+  stub.vanish = it->fetch_vanish;
   if (it->fail_url_containing) {
     stub.fail_url_containing = sp_str_view(it->fail_url_containing);
   }
@@ -276,7 +292,12 @@ sp_test_each(provision, store, provision_test_t, tests, .setup = spn_test_ctx_se
       sp_must_eq(t, 1, sp_da_size(errs));
       payload = errs[0].err;
       sp_expect_eq(t, payload.kind, err);
-      sp_expect_str_eq_c(t, payload.artifact.name, name);
+      switch (payload.kind) {
+        case SPN_ERR_TOOLCHAIN_FETCH:
+        case SPN_ERR_TOOLCHAIN_SHA:
+        case SPN_ERR_TOOLCHAIN_EXTRACT: sp_expect_str_eq_c(t, payload.artifact.name, name); break;
+        default: break;
+      }
     }
   }
 
@@ -301,6 +322,9 @@ sp_test_each(provision, store, provision_test_t, tests, .setup = spn_test_ctx_se
   if (it->expect.err_reports_sha) {
     sp_expect_str_eq(t, payload.artifact.expected, artifact.sha256);
     sp_expect_str_eq(t, payload.artifact.actual, sha);
+  }
+  if (it->expect.output) {
+    sp_expect_str_eq_c(t, payload.artifact.output, it->expect.output);
   }
 
   return SP_OK;
