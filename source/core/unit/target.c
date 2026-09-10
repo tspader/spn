@@ -100,6 +100,7 @@ static spn_err_t set_target_kind(spn_session_t* s, spn_target_unit_t* target) {
             .kind = SPN_ERR_TARGET_LINKAGE,
             .target = {
               .pkg = target->pkg->info->name,
+              .name = info->name,
               .requested = spn_linkage_to_str(query.config.some ? query.config.value : query.linkage),
               .requester = query.config.some ? sp_str_lit("the root manifest") : sp_str_lit("the profile"),
             },

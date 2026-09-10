@@ -32,7 +32,7 @@ static bool declared(const spn_toolchain_info_t* info, spn_triple_t triple) {
   return has_row(info->rows, triple) || spn_triple_in(info->unserved, triple);
 }
 
-static void bind(spn_toolchain_catalog_t* catalog, spn_toolchain_info_t* info, spn_toolchain_support_t support, spn_toolchain_target_t target) {
+static void bind_target(spn_toolchain_catalog_t* catalog, spn_toolchain_info_t* info, spn_toolchain_support_t support, spn_toolchain_target_t target) {
   spn_toolchain_row_t row = { .triple = target.triple, .sanitizers = target.sanitizers };
   if (!spn_path_empty(target.sdk)) {
     row.sdk = spn_sdk_at(catalog->mem, target.triple, sdk_root(catalog, support, target.sdk));
@@ -59,7 +59,7 @@ static void push_stock(spn_toolchain_catalog_t* catalog, spn_toolchain_info_t* i
   if (!host.abi || !spn_toolchain_driver_composes(decl->driver, spn_ld_dialect(host)) || declared(info, host)) {
     return;
   }
-  bind(catalog, info, sp_zero_struct(spn_toolchain_support_t), stock(decl->driver, host));
+  bind_target(catalog, info, sp_zero_struct(spn_toolchain_support_t), stock(decl->driver, host));
 }
 
 static void push_hosted(sp_da(spn_toolchain_row_t)* rows, spn_toolchain_catalog_t* catalog, spn_cc_driver_t driver) {
@@ -96,7 +96,7 @@ static void bind_rows(spn_toolchain_catalog_t* catalog, const spn_toolchain_decl
   info->rows = sp_da_new(catalog->mem, spn_toolchain_row_t);
   info->unserved = sp_da_new(catalog->mem, spn_triple_t);
   sp_da_for(decl->targets, it) {
-    bind(catalog, info, support, decl->targets[it]);
+    bind_target(catalog, info, support, decl->targets[it]);
   }
   if (!decl->host_row) {
     return;

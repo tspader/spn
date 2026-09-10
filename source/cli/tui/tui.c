@@ -1227,7 +1227,8 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
         case SPN_ERR_TARGET_LINKAGE: {
           sp_tty_fmt(
             &w,
-            "{} doesn't support {.red} linkage (requested by {})",
+            "library {.yellow} in {} doesn't support {.red} linkage (requested by {})",
+            sp_fmt_str(event->err.target.name),
             sp_fmt_str(colored_name(w.color, mem, event->err.target.pkg)),
             sp_fmt_str(event->err.target.requested),
             sp_fmt_str(event->err.target.requester)
