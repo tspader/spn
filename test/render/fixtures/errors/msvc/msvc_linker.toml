@@ -1,0 +1,7 @@
+
+[[toolchain]]
+name = "msvc-host"
+driver = "msvc"
+compiler = "cl"
+archiver = "lib"
+target = [{ arch = "x86_64", os = "windows", abi = "msvc", sdk = "/usr" }]

@@ -1,0 +1,10 @@
+
+[[toolchain]]
+name = "T"
+driver = "gcc"
+compiler = "bin/gcc"
+archiver = "bin/ar"
+target = [{ arch = "x86_64", os = "linux", abi = "gnu" }]
+
+[toolchain.host]
+x86_64-linux = { url = "https://example.invalid/x.tar.gz" }

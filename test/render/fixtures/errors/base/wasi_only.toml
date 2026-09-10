@@ -1,0 +1,7 @@
+
+[[toolchain]]
+name = "wasi-only"
+driver = "clang"
+compiler = "clang"
+archiver = "llvm-ar"
+target = [{ arch = "wasm32", os = "wasi", abi = "musl", sdk = "/usr" }]

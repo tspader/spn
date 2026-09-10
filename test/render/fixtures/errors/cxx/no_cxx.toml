@@ -1,0 +1,6 @@
+
+[[toolchain]]
+name = "no-cxx"
+driver = "gcc"
+compiler = "gcc"
+archiver = "ar"
