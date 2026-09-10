@@ -4,9 +4,10 @@ param([string]$Year = '2022')
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
+# aka.ms channel names changed at major 18: release/pre -> stable/insiders
 $channels = @{
   '2022' = 'https://aka.ms/vs/17/release/vs_BuildTools.exe'
-  '2026' = 'https://aka.ms/vs/18/insiders/vs_BuildTools.exe'
+  '2026' = 'https://aka.ms/vs/18/stable/vs_BuildTools.exe'
 }
 $url = $channels[$Year]
 if (-not $url) { throw "unknown VS year: $Year" }

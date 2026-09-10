@@ -108,6 +108,8 @@ static const c8* lane_names [LANE_COUNT] = {
   [LANE_ARM_GNU_SYSROOT]  = "arm-gnu-sysroot",
   [LANE_W64DEVKIT]        = "w64devkit",
   [LANE_CLANG64]          = "clang64",
+  [LANE_MINGW64]          = "mingw64",
+  [LANE_UCRT64]           = "ucrt64",
   [LANE_OSXCROSS]         = "osxcross",
 };
 

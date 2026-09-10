@@ -258,11 +258,29 @@ x86_64-windows = { url = "https://github.com/skeeto/w64devkit/releases/download/
 [[toolchain]]
 name = "clang64"
 driver = "clang"
-compiler = "clang"
-archiver = "llvm-ar"
-cxx = "clang++"
+compiler = "C:/tools/msys64/clang64/bin/clang"
+archiver = "C:/tools/msys64/clang64/bin/llvm-ar"
+cxx = "C:/tools/msys64/clang64/bin/clang++"
 linker = "lld"
 link_args = ["-fuse-ld=lld"]
+host = { x86_64-windows = {} }
+target = [{ arch = "x86_64", os = "windows", abi = "gnu" }]
+
+[[toolchain]]
+name = "mingw64"
+driver = "gcc"
+compiler = "C:/tools/msys64/mingw64/bin/gcc"
+archiver = "C:/tools/msys64/mingw64/bin/ar"
+cxx = "C:/tools/msys64/mingw64/bin/g++"
+host = { x86_64-windows = {} }
+target = [{ arch = "x86_64", os = "windows", abi = "gnu" }]
+
+[[toolchain]]
+name = "ucrt64"
+driver = "gcc"
+compiler = "C:/tools/msys64/ucrt64/bin/gcc"
+archiver = "C:/tools/msys64/ucrt64/bin/ar"
+cxx = "C:/tools/msys64/ucrt64/bin/g++"
 host = { x86_64-windows = {} }
 target = [{ arch = "x86_64", os = "windows", abi = "gnu" }]
 
