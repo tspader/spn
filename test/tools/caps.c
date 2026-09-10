@@ -32,7 +32,7 @@ static void read_lanes(sp_mem_t mem, const c8* rel, lanes_t* lanes) {
       break;
     }
     case LANES_READ_PARSE: {
-      sp_log("{.red}: {}", sp_fmt_cstr(rel), sp_fmt_str(spn_codegen_issues_message(mem, lanes->issues)));
+      sp_log("{.red}: {}", sp_fmt_cstr(rel), sp_fmt_str(spn_codegen_issues_to_json(mem, lanes->issues)));
       break;
     }
   }
@@ -235,7 +235,7 @@ static sp_err_t load_lanes(void* user) {
       spn_toolchain_catalog_add(&catalog, decl);
     }
     else if (sp_str_equal(decl.name, name)) {
-      sp_log("lane {.red} is broken: {}", sp_fmt_str(name), sp_fmt_str(spn_codegen_issues_message(mem, issues)));
+      sp_log("lane {.red} is broken: {}", sp_fmt_str(name), sp_fmt_str(spn_codegen_issues_to_json(mem, issues)));
       sp_sys_exit(1);
     }
   }

@@ -2,7 +2,6 @@
 
 #include "error/error.h"
 #include "intern/intern.h"
-#include "toml/issue.h"
 #include "pkg/id.h"
 #include "semver/compare.h"
 #include "semver/convert.h"
@@ -99,6 +98,18 @@ static void dump_error_id(spn_cg_resolve_error_t* error, const spn_err_pkg_name_
   error->name = id->name;
 }
 
+static sp_da(spn_cg_resolve_issue_t) dump_issues(sp_mem_t mem, sp_da(spn_err_issue_t) issues) {
+  sp_da(spn_cg_resolve_issue_t) out = sp_da_new(mem, spn_cg_resolve_issue_t);
+  sp_da_for(issues, it) {
+    sp_da_push(out, ((spn_cg_resolve_issue_t) {
+      .code = spn_err_to_str(issues[it].code),
+      .path = issues[it].path,
+      .detail = issues[it].detail,
+    }));
+  }
+  return out;
+}
+
 static spn_cg_resolve_error_t dump_error(sp_mem_t mem, const spn_err_union_t* err) {
   spn_cg_resolve_error_t error = {
     .kind = spn_err_to_str(err->kind),
@@ -146,7 +157,7 @@ static spn_cg_resolve_error_t dump_error(sp_mem_t mem, const spn_err_union_t* er
     }
     case SPN_ERR_MANIFEST_ISSUES: {
       dump_error_pkg(&error, spn_pkg_name_from_qualified(err->manifest.name));
-      error.detail = spn_err_issues_message(mem, err->manifest.issues);
+      error.issues = dump_issues(mem, err->manifest.issues);
       break;
     }
     case SPN_ERR_NO_MANIFEST: {

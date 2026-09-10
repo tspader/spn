@@ -218,74 +218,6 @@ const c8* spn_codegen_err_name(spn_err_t code) {
   }
 }
 
-void spn_err_issue_write(sp_tty_t* w, const spn_err_issue_t* issue) {
-  switch (issue->code) {
-    case SPN_ERR_CODEGEN_MISSING_KEY:
-      sp_tty_fmt(w, "missing required field {.cyan}", SP_FMT_STR(issue->path));
-      break;
-    case SPN_ERR_CODEGEN_EXPECTED_STR:
-      sp_tty_fmt(w, "{.cyan} must be a string", SP_FMT_STR(issue->path));
-      break;
-    case SPN_ERR_CODEGEN_EXPECTED_INT:
-      sp_tty_fmt(w, "{.cyan} must be a non-negative integer", SP_FMT_STR(issue->path));
-      break;
-    case SPN_ERR_CODEGEN_EXPECTED_BOOL:
-      sp_tty_fmt(w, "{.cyan} must be a boolean", SP_FMT_STR(issue->path));
-      break;
-    case SPN_ERR_CODEGEN_EXPECTED_OBJECT:
-      sp_tty_fmt(w, "{.cyan} must be a table", SP_FMT_STR(issue->path));
-      break;
-    case SPN_ERR_CODEGEN_DUPLICATE_KEY:
-      sp_tty_fmt(w, "duplicate {.yellow} at {.cyan}", SP_FMT_STR(issue->detail), SP_FMT_STR(issue->path));
-      break;
-    case SPN_ERR_CODEGEN_UNKNOWN_KEY:
-      if (sp_str_empty(issue->path)) {
-        sp_tty_fmt(w, "unknown field {.red}", SP_FMT_STR(issue->detail));
-      } else {
-        sp_tty_fmt(w, "unknown field {.red} in {.cyan}", SP_FMT_STR(issue->detail), SP_FMT_STR(issue->path));
-      }
-      break;
-    case SPN_ERR_CODEGEN_INVALID:
-      sp_tty_fmt(w, "invalid value at {.cyan}", SP_FMT_STR(issue->path));
-      break;
-    case SPN_ERR_CODEGEN_PARSE:
-      if (sp_str_empty(issue->detail)) {
-        sp_io_write_str(w->io, sp_str_lit("not valid toml"), SP_NULLPTR);
-      } else {
-        sp_tty_fmt(w, "not valid toml: {}", SP_FMT_STR(issue->detail));
-      }
-      break;
-    case SPN_ERR_CODEGEN_FILE_MISSING:
-      sp_io_write_str(w->io, sp_str_lit("file is missing"), SP_NULLPTR);
-      break;
-    case SPN_ERR_CODEGEN_ROOT_ONLY:
-      sp_tty_fmt(w, "{.cyan} is only allowed in the root manifest", SP_FMT_STR(issue->path));
-      break;
-    case SPN_ERR_CODEGEN_PATH:
-      sp_tty_fmt(w, "path {.yellow} must not contain '.', '..', or empty components", SP_FMT_STR(issue->detail));
-      break;
-    case SPN_ERR_CODEGEN_UNROOTED:
-      sp_tty_fmt(w, "path {.yellow} cannot be rooted at {.cyan}", SP_FMT_STR(issue->detail), SP_FMT_STR(issue->path));
-      break;
-    default:
-      sp_tty_fmt(w, "invalid field at {.cyan}", SP_FMT_STR(issue->path));
-      break;
-  }
-}
-
-sp_str_t spn_err_issues_message(sp_mem_t mem, sp_da(spn_err_issue_t) issues) {
-  sp_io_dyn_mem_writer_t b = sp_zero;
-  sp_io_dyn_mem_writer_init(mem, &b);
-  sp_tty_t tty = { .io = &b.base, .color = SP_TTY_COLOR_NONE };
-  sp_da_for(issues, it) {
-    if (it) {
-      sp_io_write_str(&b.base, sp_str_lit("; "), SP_NULLPTR);
-    }
-    spn_err_issue_write(&tty, &issues[it]);
-  }
-  return sp_io_dyn_mem_writer_as_str(&b);
-}
-
 sp_da(spn_err_issue_t) spn_codegen_issues_to_err(sp_mem_t mem, sp_da(spn_codegen_issue_t) issues) {
   sp_da(spn_err_issue_t) projected = sp_da_new(mem, spn_err_issue_t);
   sp_da_for(issues, it) {
@@ -296,10 +228,6 @@ sp_da(spn_err_issue_t) spn_codegen_issues_to_err(sp_mem_t mem, sp_da(spn_codegen
     }));
   }
   return projected;
-}
-
-sp_str_t spn_codegen_issues_message(sp_mem_t mem, sp_da(spn_codegen_issue_t) issues) {
-  return spn_err_issues_message(mem, spn_codegen_issues_to_err(mem, issues));
 }
 
 toml_table_t* spn_codegen_parse(spn_toml_loader_t* ctx, sp_str_t path) {
@@ -355,5 +283,12 @@ sp_str_t spn_codegen_issues_to_str(sp_mem_t mem, sp_da(spn_codegen_issue_t) issu
   spn_codegen_json_writer_t pretty;
   spn_codegen_json_writer_init(&pretty, &sink.base);
   spn_codegen_json_issues(&pretty.base, issues);
+  return sp_io_dyn_mem_writer_as_str(&sink);
+}
+
+sp_str_t spn_codegen_issues_to_json(sp_mem_t mem, sp_da(spn_codegen_issue_t) issues) {
+  sp_io_dyn_mem_writer_t sink;
+  sp_io_dyn_mem_writer_init(mem, &sink);
+  spn_codegen_json_issues(&sink.base, issues);
   return sp_io_dyn_mem_writer_as_str(&sink);
 }

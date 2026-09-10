@@ -19,6 +19,15 @@
         "selected": { "type": "string" },
         "version": { "type": "string" },
         "versions": { "elements": { "type": "string" } },
+        "detail": { "type": "string" },
+        "issues": { "elements": { "ref": "resolve_issue" } }
+      }
+    },
+
+    "resolve_issue": {
+      "properties": {
+        "code": { "type": "string" },
+        "path": { "type": "string" },
         "detail": { "type": "string" }
       }
     },

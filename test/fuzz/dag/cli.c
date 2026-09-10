@@ -190,7 +190,7 @@ static sp_cli_result_t load_config(sp_cli_t* cli, sp_mem_t mem, cli_t* config, s
     toml_free(table);
   }
   if (!sp_da_empty(loader.issues)) {
-    return sp_cli_set_error(cli, sp_fmt(mem, "{.cyan}: {}", sp_fmt_cstr(config->config), sp_fmt_str(spn_codegen_issues_message(mem, loader.issues))).value);
+    return sp_cli_set_error(cli, sp_fmt(mem, "{.cyan}: {}", sp_fmt_cstr(config->config), sp_fmt_str(spn_codegen_issues_to_json(mem, loader.issues))).value);
   }
   return SP_CLI_OK;
 }
