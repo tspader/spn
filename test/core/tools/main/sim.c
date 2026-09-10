@@ -7,13 +7,20 @@
 static sp_sim_t sim;
 static sp_sys_vtable_t sim_vtable;
 
-static s64 sim_get_cwd_path(c8* buf, u64 size) {
-  sp_str_t cwd = sp_str_lit("/sim");
-  if (size < cwd.len) {
+static s64 sim_path(c8* buf, u64 size, sp_str_t path) {
+  if (size < path.len) {
     return -1;
   }
-  sp_mem_copy(buf, cwd.data, cwd.len);
-  return (s64)cwd.len;
+  sp_mem_copy(buf, path.data, path.len);
+  return (s64)path.len;
+}
+
+static s64 sim_get_cwd_path(c8* buf, u64 size) {
+  return sim_path(buf, size, sp_str_lit("/sim"));
+}
+
+static s64 sim_get_exe_path(c8* buf, u64 size) {
+  return sim_path(buf, size, sp_str_lit("/sim/core"));
 }
 
 s32 main(s32 argc, const c8** argv) {
@@ -22,6 +29,7 @@ s32 main(s32 argc, const c8** argv) {
     sp_sim_install(&sim);
     sim_vtable = *sp_rt.vt;
     sim_vtable.get_cwd_path = sim_get_cwd_path;
+    sim_vtable.get_exe_path = sim_get_exe_path;
     sp_sys_set_vtable(&sim_vtable);
   }
   return sp_test_main(argc, argv, SP_NULLPTR);
