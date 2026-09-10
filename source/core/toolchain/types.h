@@ -152,6 +152,7 @@ typedef struct {
   bool lld;
   sp_da(sp_str_t) link_args;
   sp_da(spn_toolchain_row_t) rows;
+  sp_da(spn_triple_t) unserved;
   spn_toolchain_support_t support;
 } spn_toolchain_info_t;
 

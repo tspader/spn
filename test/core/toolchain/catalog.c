@@ -23,6 +23,7 @@ typedef struct {
 
 typedef struct {
   fixture_row_t rows [FIXTURE_MAX_TARGETS];
+  spn_triple_t unserved [FIXTURE_MAX_TARGETS];
 } rows_expect_t;
 
 typedef struct {
@@ -220,11 +221,18 @@ static const bind_test_t bind_tests [] = {
     .expect = { .rows = { { TARGET_WIN_MSVC, { SPN_SDK_MSVC, .vc = { "/X/crt/lib/x86_64" } } } } },
   },
   {
-    .name = "absent_msvc_without_a_host_sdk_is_dropped",
+    .name = "absent_msvc_without_a_host_sdk_is_unserved",
     .driver = SPN_CC_DRIVER_CLANG,
     .host = HOST_X64_WINDOWS,
     .sdks = { .macos = { "/H" } },
     .targets = { { TARGET_WIN_MSVC } },
+    .expect = { .unserved = { TARGET_WIN_MSVC } },
+  },
+  {
+    .name = "msvc_host_row_without_a_host_sdk_is_unserved",
+    .driver = SPN_CC_DRIVER_MSVC,
+    .host = HOST_X64_WINDOWS,
+    .expect = { .unserved = { TARGET_WIN_MSVC } },
   },
   {
     .name = "absent_sysroot_passes_nothing_anywhere",
@@ -436,7 +444,12 @@ sp_test_each(catalog, bind, bind_test_t, bind_tests) {
 
   spn_toolchain_info_t* info = spn_toolchain_catalog_get(&catalog, sp_str_lit("A"));
   sp_must(t, info);
-  return fixture_check_expected_rows(t, info->rows, it->expect.rows);
+  if (fixture_check_expected_rows(t, info->rows, it->expect.rows)) {
+    return SP_ERR;
+  }
+  u32 unserved = 0;
+  sp_carr_detect_len(it->expect.unserved, unserved, !fixture_triple_empty(it->expect.unserved[unserved]));
+  return fixture_check_triples(t, info->unserved, it->expect.unserved, unserved);
 }
 
 sp_test_each(catalog, support, support_test_t, support_tests) {

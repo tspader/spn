@@ -13,6 +13,15 @@ static bool has_row(sp_da(spn_toolchain_row_t) rows, spn_triple_t triple) {
   return false;
 }
 
+static bool has_triple(sp_da(spn_triple_t) triples, spn_triple_t triple) {
+  sp_da_for(triples, it) {
+    if (spn_triple_equal(triples[it], triple)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 static void push_row(sp_da(spn_toolchain_row_t)* rows, spn_toolchain_row_t row) {
   if (!has_row(*rows, row.triple)) {
     sp_da_push(*rows, row);
@@ -28,13 +37,21 @@ static spn_path_t sdk_root(spn_toolchain_catalog_t* catalog, spn_toolchain_suppo
   sp_unreachable_return(sdk);
 }
 
-static bool bind_row(spn_toolchain_catalog_t* catalog, spn_toolchain_support_t support, spn_toolchain_target_t target, spn_toolchain_row_t* row) {
-  *row = (spn_toolchain_row_t) { .triple = target.triple, .sanitizers = target.sanitizers };
-  if (!spn_path_empty(target.sdk)) {
-    row->sdk = spn_sdk_at(catalog->mem, target.triple, sdk_root(catalog, support, target.sdk));
-    return true;
+static void bind(spn_toolchain_catalog_t* catalog, spn_toolchain_info_t* info, spn_toolchain_support_t support, spn_toolchain_target_t target) {
+  if (has_row(info->rows, target.triple) || has_triple(info->unserved, target.triple)) {
+    return;
   }
-  return spn_sdk_default(&catalog->sdks, target.triple, &row->sdk);
+  spn_toolchain_row_t row = { .triple = target.triple, .sanitizers = target.sanitizers };
+  if (!spn_path_empty(target.sdk)) {
+    row.sdk = spn_sdk_at(catalog->mem, target.triple, sdk_root(catalog, support, target.sdk));
+    sp_da_push(info->rows, row);
+    return;
+  }
+  if (spn_sdk_default(&catalog->sdks, target.triple, &row.sdk)) {
+    sp_da_push(info->rows, row);
+    return;
+  }
+  sp_da_push(info->unserved, target.triple);
 }
 
 static spn_toolchain_target_t stock(spn_cc_driver_t driver, spn_triple_t triple) {
@@ -44,17 +61,13 @@ static spn_toolchain_target_t stock(spn_cc_driver_t driver, spn_triple_t triple)
   };
 }
 
-static void push_stock(sp_da(spn_toolchain_row_t)* rows, spn_toolchain_catalog_t* catalog, const spn_toolchain_decl_t* decl) {
+static void push_stock(spn_toolchain_catalog_t* catalog, spn_toolchain_info_t* info, const spn_toolchain_decl_t* decl) {
   spn_triple_t host = catalog->host;
   host.abi = host.abi ? host.abi : spn_default_abi(decl->driver, host.os);
   if (!host.abi || !spn_toolchain_driver_composes(decl->driver, spn_ld_dialect(host))) {
     return;
   }
-
-  spn_toolchain_row_t row = sp_zero;
-  if (bind_row(catalog, sp_zero_struct(spn_toolchain_support_t), stock(decl->driver, host), &row)) {
-    push_row(rows, row);
-  }
+  bind(catalog, info, sp_zero_struct(spn_toolchain_support_t), stock(decl->driver, host));
 }
 
 static void push_hosted(sp_da(spn_toolchain_row_t)* rows, spn_toolchain_catalog_t* catalog, spn_cc_driver_t driver) {
@@ -87,24 +100,21 @@ static void push_bare(sp_da(spn_toolchain_row_t)* rows, spn_cc_driver_t driver, 
   push_row(rows, (spn_toolchain_row_t) { .triple = { host.arch, SPN_OS_LINUX, SPN_ABI_BARE } });
 }
 
-static sp_da(spn_toolchain_row_t) bind_rows(spn_toolchain_catalog_t* catalog, const spn_toolchain_decl_t* decl, spn_toolchain_support_t support) {
-  sp_da(spn_toolchain_row_t) rows = sp_da_new(catalog->mem, spn_toolchain_row_t);
+static void bind_rows(spn_toolchain_catalog_t* catalog, const spn_toolchain_decl_t* decl, spn_toolchain_support_t support, spn_toolchain_info_t* info) {
+  info->rows = sp_da_new(catalog->mem, spn_toolchain_row_t);
+  info->unserved = sp_da_new(catalog->mem, spn_triple_t);
   sp_da_for(decl->targets, it) {
-    spn_toolchain_row_t row = sp_zero;
-    if (bind_row(catalog, support, decl->targets[it], &row)) {
-      sp_da_push(rows, row);
-    }
+    bind(catalog, info, support, decl->targets[it]);
   }
   if (!decl->host_row) {
-    return rows;
+    return;
   }
 
-  push_stock(&rows, catalog, decl);
-  push_bare(&rows, decl->driver, catalog->host);
+  push_stock(catalog, info, decl);
+  push_bare(&info->rows, decl->driver, catalog->host);
   if (spn_toolchain_driver_retargets(decl->driver)) {
-    push_hosted(&rows, catalog, decl->driver);
+    push_hosted(&info->rows, catalog, decl->driver);
   }
-  return rows;
 }
 
 static bool has_host(sp_da(spn_toolchain_host_t) hosts, spn_triple_t host) {
@@ -139,8 +149,7 @@ static spn_toolchain_support_t bind_support(spn_toolchain_catalog_t* catalog, co
 }
 
 static spn_toolchain_info_t bind_toolchain(spn_toolchain_catalog_t* catalog, const spn_toolchain_decl_t* decl) {
-  spn_toolchain_support_t support = bind_support(catalog, decl);
-  return (spn_toolchain_info_t) {
+  spn_toolchain_info_t info = {
     .name = decl->name,
     .version = decl->version,
     .driver = decl->driver,
@@ -149,9 +158,10 @@ static spn_toolchain_info_t bind_toolchain(spn_toolchain_catalog_t* catalog, con
     .archiver = decl->archiver,
     .lld = decl->lld,
     .link_args = decl->link_args,
-    .rows = bind_rows(catalog, decl, support),
-    .support = support,
+    .support = bind_support(catalog, decl),
   };
+  bind_rows(catalog, decl, info.support, &info);
+  return info;
 }
 
 void spn_toolchain_catalog_init(spn_toolchain_catalog_t* catalog, spn_triple_t host, spn_sdk_host_t sdks, sp_mem_t mem) {
