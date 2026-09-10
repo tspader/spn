@@ -10,7 +10,8 @@ typedef enum {
   REACH_UNSERVED,
   REACH_UNLISTED,
   REACH_DROPPED,
-  REACH_ROW,
+  REACH_SANITIZERS,
+  REACH_OK,
 } reach_kind_t;
 
 typedef struct {
@@ -68,14 +69,14 @@ static bool lists_completion(const spn_toolchain_info_t* toolchain, spn_triple_t
 static reach_t supports(spn_toolchain_row_t row, spn_toolchain_query_t query) {
   spn_sanitizer_set_t missing = query.sanitizers & ~row.sanitizers;
   if (missing) {
-    return (reach_t) { .kind = REACH_ROW, .err = SPN_ERR_SANITIZER_UNSUPPORTED, .row = row, .unsupported = missing };
+    return (reach_t) { .kind = REACH_SANITIZERS, .err = SPN_ERR_SANITIZER_UNSUPPORTED, .row = row, .unsupported = missing };
   }
   spn_sanitizer_set_t heavy = query.sanitizers & ~SPN_SANITIZER_UNDEFINED;
   spn_linkage_t linkage = query.linkage ? query.linkage : spn_abi_linkage(row.triple.abi);
   if (heavy && linkage == SPN_LIB_KIND_STATIC && spn_ld_static(spn_ld_dialect(row.triple))) {
-    return (reach_t) { .kind = REACH_ROW, .err = SPN_ERR_SANITIZER_STATIC, .row = row, .unsupported = heavy };
+    return (reach_t) { .kind = REACH_SANITIZERS, .err = SPN_ERR_SANITIZER_STATIC, .row = row, .unsupported = heavy };
   }
-  return (reach_t) { .kind = REACH_ROW, .row = row };
+  return (reach_t) { .kind = REACH_OK, .row = row };
 }
 
 static reach_kind_t absence(const spn_toolchain_catalog_t* catalog, const spn_toolchain_info_t* toolchain, spn_triple_t triple) {
@@ -98,17 +99,21 @@ static reach_t attempt(const spn_toolchain_catalog_t* catalog, const spn_toolcha
 }
 
 static bool reached(reach_t reach) {
-  return reach.kind == REACH_ROW && !reach.err;
+  return reach.kind == REACH_OK;
+}
+
+static bool closer(reach_t a, reach_t b) {
+  return a.kind > b.kind;
 }
 
 static reach_t reach_best(const spn_toolchain_catalog_t* catalog, const spn_toolchain_info_t* toolchain, spn_toolchain_query_t query, spn_abi_list_t abis) {
-  reach_t best = sp_zero;
-  sp_for(it, abis.count) {
-    reach_t reach = attempt(catalog, toolchain, query, with_abi(query.target, abis.items[it]));
-    if (reached(reach)) {
-      return reach;
+  reach_t best = attempt(catalog, toolchain, query, with_abi(query.target, abis.items[0]));
+  sp_for_range(it, 1, abis.count) {
+    if (reached(best)) {
+      break;
     }
-    if (!it || reach.kind > best.kind) {
+    reach_t reach = attempt(catalog, toolchain, query, with_abi(query.target, abis.items[it]));
+    if (closer(reach, best)) {
       best = reach;
     }
   }
@@ -173,7 +178,7 @@ static spn_err_t emit(spn_err_t kind, spn_toolchain_catalog_t* catalog, spn_tool
 
 static spn_err_t emit_reach(spn_toolchain_catalog_t* catalog, spn_toolchain_query_t query, const spn_toolchain_info_t* toolchain, reach_t reach, sp_da(sp_str_t) candidates) {
   switch (reach.kind) {
-    case REACH_ROW: {
+    case REACH_SANITIZERS: {
       return spn_err_emit(&spn, (spn_err_union_t) {
         .kind = reach.err,
         .sanitizer = {
@@ -190,6 +195,9 @@ static spn_err_t emit_reach(spn_toolchain_catalog_t* catalog, spn_toolchain_quer
     }
     case REACH_UNLISTED: {
       return emit(SPN_ERR_TOOLCHAIN_TARGET, catalog, query, query.target, candidates, triples(catalog->mem, toolchain->rows));
+    }
+    case REACH_OK: {
+      sp_unreachable_case();
     }
   }
   sp_unreachable_return(SPN_ERROR);
