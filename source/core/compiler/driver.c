@@ -127,13 +127,16 @@ static spn_cc_feature_t link_feature(spn_cc_output_kind_t kind) {
   SP_UNREACHABLE_RETURN(SPN_CC_FEATURE_LINK_EXE);
 }
 
-static spn_err_t feature_unsupported(const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, spn_cc_feature_t feature) {
+static spn_err_t feature_unsupported(const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_link_t* link, spn_cc_feature_t feature) {
   return spn_err_emit(&spn, (spn_err_union_t) {
     .kind = SPN_ERR_COMPILER_FEATURE_UNSUPPORTED,
     .compiler = {
       .toolchain = toolchain->name,
       .target = spn_profile_triple(profile),
       .feature = feature,
+      .pkg = link->pkg,
+      .name = link->name,
+      .frameworks = link->frameworks,
     },
   });
 }
@@ -228,16 +231,16 @@ spn_err_t spn_cc_validate_link(const spn_cc_toolchain_t* toolchain, spn_triple_t
   spn_triple_t target = spn_profile_triple(profile);
 
   if (link->kind == SPN_CC_OUTPUT_REACTOR && profile->os != SPN_OS_WASI) {
-    return feature_unsupported(toolchain, profile, feature);
+    return feature_unsupported(toolchain, profile, link, feature);
   }
   if (link->kind == SPN_CC_OUTPUT_SHARED_LIB && !spn_triple_dynamic(target)) {
-    return feature_unsupported(toolchain, profile, feature);
+    return feature_unsupported(toolchain, profile, link, feature);
   }
   if (profile->os == SPN_OS_MACOS && !sp_da_empty(link->frameworks) && profile->sdk.kind == SPN_SDK_NONE) {
-    return feature_unsupported(toolchain, profile, SPN_CC_FEATURE_FRAMEWORKS);
+    return feature_unsupported(toolchain, profile, link, SPN_CC_FEATURE_FRAMEWORKS);
   }
   if (!sp_da_empty(link->scripts) && !spn_ld_scripts(profile->linker, spn_os_format(profile->os))) {
-    return feature_unsupported(toolchain, profile, SPN_CC_FEATURE_LINKER_SCRIPT);
+    return feature_unsupported(toolchain, profile, link, SPN_CC_FEATURE_LINKER_SCRIPT);
   }
   if (profile->linker == SPN_LD_FAMILY_MSVC && host.os != SPN_OS_WINDOWS) {
     return link_refused(SPN_ERR_TOOLCHAIN_MSVC_LINKER_HOST, toolchain, host, profile);

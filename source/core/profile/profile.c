@@ -267,13 +267,13 @@ spn_err_t spn_profile_resolve(spn_profile_table_t profiles, const spn_profile_ov
     case SPN_TRIPLE_ENTRY_FOREIGN_ARCH: {
       return spn_err_emit(&spn, (spn_err_union_t) {
         .kind = SPN_ERR_PROFILE_ARCH,
-        .profile = { .name = name, .target = pinned },
+        .profile = { .name = name, .target = pinned, .targets = spn_arch_triples(spn.mem, pinned.arch) },
       });
     }
     case SPN_TRIPLE_ENTRY_FOREIGN_ABI: {
       return spn_err_emit(&spn, (spn_err_union_t) {
         .kind = SPN_ERR_PROFILE_ABI,
-        .profile = { .name = name, .target = pinned },
+        .profile = { .name = name, .target = pinned, .targets = spn_os_triples(spn.mem, pinned.arch, pinned.os) },
       });
     }
     case SPN_TRIPLE_ENTRY_MISSING_ARCH:

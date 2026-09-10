@@ -456,56 +456,56 @@ static const test_t tests [] = {
     .name = "validate_toolchain_incomplete",
     .manifest = "toolchain_incomplete",
     .issues = {
-      { SPN_ERR_CODEGEN_MISSING_KEY, "toolchain[0].compiler" }
+      { SPN_ERR_CODEGEN_MISSING_KEY, "compiler" }
     }
   },
   {
     .name = "validate_toolchain_name_auto",
     .manifest = "toolchain_name_auto",
     .issues = {
-      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].name" }
+      { SPN_ERR_CODEGEN_INVALID, "name" }
     }
   },
   {
     .name = "validate_toolchain_target_abi",
     .manifest = "toolchain_target_abi",
     .issues = {
-      { SPN_ERR_CODEGEN_MISSING_KEY, "toolchain[0].target[0].abi" }
+      { SPN_ERR_CODEGEN_MISSING_KEY, "target[0].abi" }
     }
   },
   {
     .name = "validate_toolchain_target_os",
     .manifest = "toolchain_target_os",
     .issues = {
-      { SPN_ERR_CODEGEN_MISSING_KEY, "toolchain[0].target[0].os" }
+      { SPN_ERR_CODEGEN_MISSING_KEY, "target[0].os" }
     }
   },
   {
     .name = "validate_toolchain_target_foreign_arch",
     .manifest = "toolchain_target_arch",
     .issues = {
-      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].target[0].arch" }
+      { SPN_ERR_CODEGEN_INVALID, "target[0].arch" }
     }
   },
   {
     .name = "validate_toolchain_target_beyond_driver",
     .manifest = "toolchain_target_driver",
     .issues = {
-      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].target[0]" }
+      { SPN_ERR_CODEGEN_INVALID, "target[0]" }
     }
   },
   {
     .name = "validate_toolchain_linker_rejected",
     .manifest = "toolchain_linker_rejected",
     .issues = {
-      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].linker" },
+      { SPN_ERR_CODEGEN_LINKER, "linker" },
     }
   },
   {
     .name = "validate_toolchain_without_driver_skips_targets",
     .manifest = "toolchain_no_driver",
     .issues = {
-      { SPN_ERR_CODEGEN_MISSING_KEY, "toolchain[0].driver" }
+      { SPN_ERR_CODEGEN_MISSING_KEY, "driver" }
     }
   },
   {
@@ -665,78 +665,78 @@ static const test_t tests [] = {
     .name = "validate_toolchain_host_with_fields",
     .manifest = "toolchain_host_fields",
     .issues = {
-      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].target[0].kind" }
+      { SPN_ERR_CODEGEN_INVALID, "target[0].kind" }
     },
   },
   {
     .name = "validate_toolchain_row_kind_unknown",
     .manifest = "toolchain_kind_unknown",
     .issues = {
-      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].target[0].kind" }
+      { SPN_ERR_CODEGEN_INVALID, "target[0].kind" }
     },
   },
   {
     .name = "validate_toolchain_target_duplicate",
     .manifest = "toolchain_target_duplicate",
     .issues = {
-      { SPN_ERR_CODEGEN_DUPLICATE_KEY, "toolchain[0].target[1]" },
+      { SPN_ERR_CODEGEN_DUPLICATE_KEY, "target[1]" },
     },
   },
   {
     .name = "validate_toolchain_bare_reports_every_field",
     .manifest = "toolchain_bare_fields",
     .issues = {
-      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].target[0].sanitizers" },
-      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].target[0].sdk" },
+      { SPN_ERR_CODEGEN_INVALID, "target[0].sanitizers" },
+      { SPN_ERR_CODEGEN_INVALID, "target[0].sdk" },
     },
   },
   {
     .name = "validate_toolchain_sdk_malformed",
     .manifest = "toolchain_sdk_malformed",
     .issues = {
-      { SPN_ERR_CODEGEN_PATH, "toolchain[0].target[0].sdk" }
+      { SPN_ERR_CODEGEN_PATH, "target[0].sdk" }
     },
   },
   {
     .name = "validate_toolchain_program_malformed",
     .manifest = "toolchain_program_malformed",
     .issues = {
-      { SPN_ERR_CODEGEN_PATH, "toolchain[0].compiler" }
+      { SPN_ERR_CODEGEN_PATH, "compiler" }
     },
   },
   {
     .name = "validate_toolchain_url_without_sha",
     .manifest = "toolchain_no_sha",
     .issues = {
-      { SPN_ERR_CODEGEN_MISSING_KEY, "toolchain[0].host.x86_64-linux.sha256" }
+      { SPN_ERR_CODEGEN_MISSING_KEY, "host.x86_64-linux.sha256" }
     }
   },
   {
     .name = "validate_toolchain_sha_without_url",
     .manifest = "toolchain_sha_without_url",
     .issues = {
-      { SPN_ERR_CODEGEN_MISSING_KEY, "toolchain[0].host.x86_64-linux.url" }
+      { SPN_ERR_CODEGEN_MISSING_KEY, "host.x86_64-linux.url" }
     }
   },
   {
     .name = "validate_toolchain_host_invalid",
     .manifest = "toolchain_host_invalid",
     .issues = {
-      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].host.x86-linux" }
+      { SPN_ERR_CODEGEN_INVALID, "host.x86-linux" }
     }
   },
   {
     .name = "validate_toolchain_host_mixed",
     .manifest = "toolchain_host_mixed",
     .issues = {
-      { SPN_ERR_CODEGEN_MISSING_KEY, "toolchain[0].host.aarch64-macos.url" }
+      { SPN_ERR_CODEGEN_MISSING_KEY, "host.aarch64-macos.url" }
     }
   },
   {
     .name = "validate_toolchain_target_foreign_abi",
     .manifest = "toolchain_target_foreign_abi",
     .issues = {
-      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].target[0].abi" }
+      { SPN_ERR_CODEGEN_INVALID, "target[0].abi" }
     }
   },
   {

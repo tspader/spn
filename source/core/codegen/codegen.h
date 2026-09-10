@@ -10,8 +10,11 @@
 void               spn_toml_loader_push_key(spn_toml_loader_t* t, const c8* key);
 void               spn_toml_loader_push_index(spn_toml_loader_t* t, u32 index);
 void               spn_toml_loader_pop(spn_toml_loader_t* t);
+void               spn_toml_loader_push_scope(spn_toml_loader_t* t, sp_str_t name);
+void               spn_toml_loader_pop_scope(spn_toml_loader_t* t);
 bool               spn_toml_loader_issue(spn_toml_loader_t* t, spn_err_t code, const c8* key);
 bool               spn_toml_loader_issue_at(spn_toml_loader_t* t, spn_err_t code, sp_str_t detail);
+bool               spn_toml_loader_issue_with(spn_toml_loader_t* t, const c8* key, spn_codegen_issue_t issue);
 sp_str_t           spn_toml_loader_intern(spn_toml_loader_t* t, sp_str_t value);
 sp_str_t           spn_toml_loader_intern_value(spn_toml_loader_t* t, toml_value_t value);
 bool               spn_toml_loader_field_present(toml_table_t* table, const c8* key);

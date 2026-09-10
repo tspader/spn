@@ -168,6 +168,7 @@ static spn_err_t emit(spn_err_t kind, spn_toolchain_catalog_t* catalog, spn_tool
     .toolchain = {
       .name = query.toolchain.name,
       .target = target,
+      .query = query.target,
       .host = catalog->host,
       .sanitizers = query.sanitizers,
       .candidates = candidates,

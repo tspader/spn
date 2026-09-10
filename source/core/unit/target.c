@@ -69,6 +69,23 @@ static spn_target_unit_t* add_target(spn_session_t* s, spn_pkg_unit_t* pkg, spn_
   return target;
 }
 
+static sp_da(spn_linkage_t) linkage_list(sp_mem_t mem, spn_linkage_set_t set) {
+  sp_da(spn_linkage_t) list = sp_da_new(mem, spn_linkage_t);
+  if (set.shared) {
+    sp_da_push(list, SPN_LIB_KIND_SHARED);
+  }
+  if (set.static_lib) {
+    sp_da_push(list, SPN_LIB_KIND_STATIC);
+  }
+  if (set.source) {
+    sp_da_push(list, SPN_LIB_KIND_SOURCE);
+  }
+  if (set.object) {
+    sp_da_push(list, SPN_LIB_KIND_OBJECT);
+  }
+  return list;
+}
+
 static spn_err_t set_target_kind(spn_session_t* s, spn_target_unit_t* target) {
   spn_target_info_t* info = target->info;
 
@@ -102,7 +119,8 @@ static spn_err_t set_target_kind(spn_session_t* s, spn_target_unit_t* target) {
               .pkg = target->pkg->info->name,
               .name = info->name,
               .requested = spn_linkage_to_str(query.config.some ? query.config.value : query.linkage),
-              .requester = query.config.some ? sp_str_lit("the root manifest") : sp_str_lit("the profile"),
+              .requester = query.config.some ? SPN_LINKAGE_REQUESTER_ROOT_MANIFEST : SPN_LINKAGE_REQUESTER_PROFILE,
+              .supported = linkage_list(s->mem, info->linkages),
             },
           });
         }
@@ -397,6 +415,8 @@ static spn_link_plan_t link_plan(spn_target_unit_t* target) {
   spn_link_plan_t plan = {
     .libs = spn_closure_get_linked_libs(mem, closure),
     .cc = {
+      .pkg = pkg->info->name,
+      .name = target->info->name,
       .kind = target->kind,
       .min_os = link_plan_min_os(target, closure),
       .subsystem = target->info->windows.subsystem,

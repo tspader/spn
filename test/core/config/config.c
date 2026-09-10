@@ -53,7 +53,7 @@ static const test_t tests [] = {
         { .name = "U", .driver = SPN_CC_DRIVER_GCC, .archiver = { .name = "A" } },
       },
       .issues = {
-        { SPN_ERR_CODEGEN_MISSING_KEY, "toolchain[1].compiler" },
+        { SPN_ERR_CODEGEN_MISSING_KEY, "compiler" },
       },
     },
   },
@@ -75,7 +75,7 @@ static const test_t tests [] = {
         { .name = "T", .driver = SPN_CC_DRIVER_GCC, .compiler = { .name = "D" }, .archiver = { .name = "A" } },
       },
       .issues = {
-        { SPN_ERR_CODEGEN_DUPLICATE_KEY, "toolchain[1].name" },
+        { SPN_ERR_CODEGEN_DUPLICATE_KEY, "name" },
       },
     },
   },
@@ -87,7 +87,7 @@ static const test_t tests [] = {
         { .name = "T", .driver = SPN_CC_DRIVER_GCC, .archiver = { .name = "A" } },
       },
       .issues = {
-        { SPN_ERR_CODEGEN_UNROOTED, "toolchain[0].compiler" },
+        { SPN_ERR_CODEGEN_UNROOTED, "compiler" },
       },
     },
   },

@@ -524,6 +524,18 @@ sp_str_t spn_option_setter_kind_to_str(spn_option_setter_kind_t kind) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
+sp_str_t spn_linkage_requester_to_str(spn_linkage_requester_t requester) {
+  switch (requester) {
+    case SPN_LINKAGE_REQUESTER_PROFILE: {
+      return sp_str_lit("profile");
+    }
+    case SPN_LINKAGE_REQUESTER_ROOT_MANIFEST: {
+      return sp_str_lit("root_manifest");
+    }
+  }
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
 sp_str_t spn_cc_feature_to_str(spn_cc_feature_t feature) {
   switch (feature) {
     case SPN_CC_FEATURE_LINK_EXE: {

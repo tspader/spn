@@ -173,6 +173,32 @@ static bool os_has_abi(spn_os_t os, spn_abi_t abi) {
   return false;
 }
 
+sp_da(spn_triple_t) spn_os_triples(sp_mem_t mem, spn_arch_t arch, spn_os_t os) {
+  sp_da(spn_triple_t) triples = sp_da_new(mem, spn_triple_t);
+  const spn_abi_t* abis = SP_NULLPTR;
+  u32 count = spn_os_abis(os, &abis);
+  sp_for(it, count) {
+    sp_da_push(triples, ((spn_triple_t) { arch, os, abis[it] }));
+  }
+  return triples;
+}
+
+sp_da(spn_triple_t) spn_arch_triples(sp_mem_t mem, spn_arch_t arch) {
+  static const spn_os_t oses [] = { SPN_OS_LINUX, SPN_OS_WINDOWS, SPN_OS_MACOS, SPN_OS_WASI, SPN_OS_FREESTANDING };
+  sp_da(spn_triple_t) triples = sp_da_new(mem, spn_triple_t);
+  sp_carr_for(oses, it) {
+    if (!os_has_arch(oses[it], arch)) {
+      continue;
+    }
+    const spn_abi_t* abis = SP_NULLPTR;
+    u32 count = spn_os_abis(oses[it], &abis);
+    sp_for(at, count) {
+      sp_da_push(triples, ((spn_triple_t) { arch, oses[it], abis[at] }));
+    }
+  }
+  return triples;
+}
+
 spn_format_t spn_os_format(spn_os_t os) {
   switch (os) {
     case SPN_OS_LINUX:

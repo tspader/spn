@@ -108,6 +108,11 @@ typedef enum {
 } spn_option_setter_kind_t;
 
 typedef enum {
+  SPN_LINKAGE_REQUESTER_PROFILE,
+  SPN_LINKAGE_REQUESTER_ROOT_MANIFEST,
+} spn_linkage_requester_t;
+
+typedef enum {
   SPN_MODE_NONE,
   SPN_MODE_DEBUG,
   SPN_MODE_RELEASE,

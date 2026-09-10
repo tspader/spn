@@ -35,6 +35,7 @@
     "codegen_parse": { "properties": {} },
     "codegen_file_missing": { "properties": {} },
     "codegen_invalid": { "properties": {} },
+    "codegen_linker": { "properties": {} },
     "codegen_root_only": { "properties": {} },
     "codegen_path": { "properties": {} },
     "codegen_unrooted": { "properties": {} },
@@ -145,10 +146,13 @@
     "issue": {
       "properties": {
         "code": { "metadata": { "extern": "err" } },
-        "path": { "type": "string" }
+        "path": { "type": "string" },
+        "choices": { "elements": { "type": "string" } }
       },
       "optionalProperties": {
-        "detail": { "type": "string" }
+        "detail": { "type": "string" },
+        "value": { "type": "string" },
+        "scope": { "type": "string" }
       }
     },
     "no_manifest": {
@@ -189,7 +193,8 @@
         "host": { "metadata": { "extern": "triple" } },
         "sanitizers": { "metadata": { "extern": "sanitizer_set" } },
         "candidates": { "elements": { "type": "string" } },
-        "targets": { "elements": { "metadata": { "extern": "triple" } } }
+        "targets": { "elements": { "metadata": { "extern": "triple" } } },
+        "query": { "metadata": { "extern": "triple" } }
       }
     },
     "completion": {
@@ -206,6 +211,7 @@
       }
     },
     "cc_feature": { "enum": ["link_exe", "link_shared", "link_reactor", "archive", "frameworks", "linker_script"] },
+    "linkage_requester": { "enum": ["profile", "root_manifest"] },
     "artifact": {
       "properties": {
         "name": { "type": "string" },
@@ -225,7 +231,8 @@
     "profile": {
       "properties": {
         "name": { "type": "string" },
-        "target": { "metadata": { "extern": "triple" } }
+        "target": { "metadata": { "extern": "triple" } },
+        "targets": { "elements": { "metadata": { "extern": "triple" } } }
       }
     },
     "sanitizer": {
@@ -240,7 +247,10 @@
       "properties": {
         "toolchain": { "type": "string" },
         "target": { "metadata": { "extern": "triple" } },
-        "feature": { "ref": "cc_feature" }
+        "feature": { "ref": "cc_feature" },
+        "pkg": { "type": "string" },
+        "name": { "type": "string" },
+        "frameworks": { "elements": { "type": "string" } }
       }
     },
     "fs": {
@@ -341,7 +351,8 @@
         "pkg": { "type": "string" },
         "name": { "type": "string" },
         "requested": { "type": "string" },
-        "requester": { "type": "string" }
+        "requester": { "ref": "linkage_requester" },
+        "supported": { "elements": { "metadata": { "extern": "linkage" } } }
       }
     },
     "script": {

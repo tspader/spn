@@ -22,6 +22,8 @@ spn_abi_t spn_host_libc(sp_mem_t mem, sp_io_seeking_reader_t* elf);
 u32 spn_os_abis(spn_os_t os, const spn_abi_t** abis);
 u32 spn_os_completions(spn_os_t os, const spn_abi_t** abis);
 u32 spn_os_archs(spn_os_t os, const spn_arch_t** archs);
+sp_da(spn_triple_t) spn_os_triples(sp_mem_t mem, spn_arch_t arch, spn_os_t os);
+sp_da(spn_triple_t) spn_arch_triples(sp_mem_t mem, spn_arch_t arch);
 spn_format_t spn_os_format(spn_os_t os);
 bool spn_triple_dynamic(spn_triple_t triple);
 bool spn_triple_pic(spn_triple_t triple);

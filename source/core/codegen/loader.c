@@ -9,6 +9,7 @@ void spn_toml_loader_init(spn_toml_loader_t* ctx, sp_mem_t mem, sp_intern_t* int
   ctx->mem = mem;
   ctx->intern = intern;
   ctx->depth = 0;
+  ctx->scope = sp_zero_s(spn_codegen_scope_t);
   ctx->issues = sp_da_new(mem, spn_codegen_issue_t);
 }
 
@@ -34,13 +35,21 @@ void spn_toml_loader_pop(spn_toml_loader_t* ctx) {
   }
 }
 
+void spn_toml_loader_push_scope(spn_toml_loader_t* ctx, sp_str_t name) {
+  ctx->scope = (spn_codegen_scope_t) { .name = name, .depth = ctx->depth };
+}
+
+void spn_toml_loader_pop_scope(spn_toml_loader_t* ctx) {
+  ctx->scope = sp_zero_s(spn_codegen_scope_t);
+}
+
 static sp_str_t spn_codegen_path(spn_toml_loader_t* ctx) {
   sp_io_dyn_mem_writer_t writer;
   sp_io_dyn_mem_writer_init(ctx->mem, &writer);
-  sp_for(it, ctx->depth) {
+  for (u32 it = ctx->scope.depth; it < ctx->depth; it++) {
     spn_codegen_path_seg_t* seg = &ctx->path[it];
     if (seg->kind == SPN_CODEGEN_PATH_KEY) {
-      sp_fmt_io(&writer.base, it ? ".{}" : "{}", sp_fmt_cstr(seg->key));
+      sp_fmt_io(&writer.base, it > ctx->scope.depth ? ".{}" : "{}", sp_fmt_cstr(seg->key));
     } else {
       sp_fmt_io(&writer.base, "[{}]", sp_fmt_uint(seg->index));
     }
@@ -48,23 +57,35 @@ static sp_str_t spn_codegen_path(spn_toml_loader_t* ctx) {
   return sp_io_dyn_mem_writer_as_str(&writer);
 }
 
-static void spn_toml_loader_record(spn_toml_loader_t* ctx, spn_err_t code, sp_str_t detail) {
-  spn_codegen_issue_t issue = { .code = code, .path = spn_codegen_path(ctx), .detail = sp_str_copy(ctx->mem, detail), .depth = ctx->depth };
+static void record(spn_toml_loader_t* ctx, spn_codegen_issue_t issue) {
+  spn_codegen_issue_t recorded = {
+    .code = issue.code,
+    .path = spn_codegen_path(ctx),
+    .detail = sp_str_copy(ctx->mem, issue.detail),
+    .value = sp_str_copy(ctx->mem, issue.value),
+    .scope = sp_str_copy(ctx->mem, ctx->scope.name),
+    .choices = issue.choices,
+    .depth = ctx->depth,
+  };
   sp_for(it, ctx->depth) {
-    issue.segs[it] = ctx->path[it];
+    recorded.segs[it] = ctx->path[it];
   }
-  sp_da_push(ctx->issues, issue);
+  sp_da_push(ctx->issues, recorded);
 }
 
-bool spn_toml_loader_issue(spn_toml_loader_t* ctx, spn_err_t code, const c8* key) {
+bool spn_toml_loader_issue_with(spn_toml_loader_t* ctx, const c8* key, spn_codegen_issue_t issue) {
   spn_toml_loader_push_key(ctx, key);
-  spn_toml_loader_record(ctx, code, sp_cstr_as_str(key));
+  record(ctx, issue);
   spn_toml_loader_pop(ctx);
   return true;
 }
 
+bool spn_toml_loader_issue(spn_toml_loader_t* ctx, spn_err_t code, const c8* key) {
+  return spn_toml_loader_issue_with(ctx, key, (spn_codegen_issue_t) { .code = code, .detail = sp_cstr_as_str(key) });
+}
+
 bool spn_toml_loader_issue_at(spn_toml_loader_t* ctx, spn_err_t code, sp_str_t detail) {
-  spn_toml_loader_record(ctx, code, detail);
+  record(ctx, (spn_codegen_issue_t) { .code = code, .detail = detail });
   return true;
 }
 
@@ -190,7 +211,7 @@ sp_da(sp_str_t) spn_toml_loader_read_str_array(spn_toml_loader_t* ctx, toml_tabl
     if (element.ok) {
       sp_da_push(values, spn_toml_loader_intern_value(ctx, element));
     } else {
-      spn_toml_loader_record(ctx, SPN_ERR_CODEGEN_EXPECTED_STR, sp_str_lit(""));
+      record(ctx, (spn_codegen_issue_t) { .code = SPN_ERR_CODEGEN_EXPECTED_STR });
     }
     spn_toml_loader_pop(ctx);
   }
@@ -226,6 +247,9 @@ sp_da(spn_err_issue_t) spn_codegen_issues_to_err(sp_mem_t mem, sp_da(spn_codegen
       .code = issues[it].code,
       .path = issues[it].path,
       .detail = issues[it].detail,
+      .value = issues[it].value,
+      .scope = issues[it].scope,
+      .choices = issues[it].choices,
     }));
   }
   return projected;

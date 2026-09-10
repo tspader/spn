@@ -67,6 +67,8 @@ typedef struct {
 } spn_cc_exports_t;
 
 typedef struct {
+  sp_str_t pkg;
+  sp_str_t name;
   spn_lang_t lang;
   spn_cc_output_kind_t kind;
   sp_da(sp_str_t) libs;
