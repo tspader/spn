@@ -245,22 +245,19 @@ x86_64-linux = { url = "https://developer.arm.com/-/media/Files/downloads/gnu/14
 
 [[toolchain]]
 name = "w64devkit"
-version = "1.23.0"
 driver = "gcc"
-compiler = "bin/gcc"
-archiver = "bin/ar"
-cxx = "bin/g++"
+compiler = "C:/toolchains/w64devkit/bin/gcc.exe"
+archiver = "C:/toolchains/w64devkit/bin/ar.exe"
+cxx = "C:/toolchains/w64devkit/bin/g++.exe"
+host = { x86_64-windows = {} }
 target = [{ arch = "x86_64", os = "windows", abi = "gnu" }]
-
-[toolchain.host]
-x86_64-windows = { url = "https://github.com/skeeto/w64devkit/releases/download/v1.23.0/w64devkit-1.23.0.zip", sha256 = "5c7dce6762be3e0dba648a9317790444c0e2f1ef3e677315c115727d7a549539" }
 
 [[toolchain]]
 name = "clang64"
 driver = "clang"
-compiler = "C:/tools/msys64/clang64/bin/clang"
-archiver = "C:/tools/msys64/clang64/bin/llvm-ar"
-cxx = "C:/tools/msys64/clang64/bin/clang++"
+compiler = "C:/tools/msys64/clang64/bin/clang.exe"
+archiver = "C:/tools/msys64/clang64/bin/llvm-ar.exe"
+cxx = "C:/tools/msys64/clang64/bin/clang++.exe"
 linker = "lld"
 link_args = ["-fuse-ld=lld"]
 host = { x86_64-windows = {} }
@@ -269,18 +266,18 @@ target = [{ arch = "x86_64", os = "windows", abi = "gnu" }]
 [[toolchain]]
 name = "mingw64"
 driver = "gcc"
-compiler = "C:/tools/msys64/mingw64/bin/gcc"
-archiver = "C:/tools/msys64/mingw64/bin/ar"
-cxx = "C:/tools/msys64/mingw64/bin/g++"
+compiler = "C:/tools/msys64/mingw64/bin/gcc.exe"
+archiver = "C:/tools/msys64/mingw64/bin/ar.exe"
+cxx = "C:/tools/msys64/mingw64/bin/g++.exe"
 host = { x86_64-windows = {} }
 target = [{ arch = "x86_64", os = "windows", abi = "gnu" }]
 
 [[toolchain]]
 name = "ucrt64"
 driver = "gcc"
-compiler = "C:/tools/msys64/ucrt64/bin/gcc"
-archiver = "C:/tools/msys64/ucrt64/bin/ar"
-cxx = "C:/tools/msys64/ucrt64/bin/g++"
+compiler = "C:/tools/msys64/ucrt64/bin/gcc.exe"
+archiver = "C:/tools/msys64/ucrt64/bin/ar.exe"
+cxx = "C:/tools/msys64/ucrt64/bin/g++.exe"
 host = { x86_64-windows = {} }
 target = [{ arch = "x86_64", os = "windows", abi = "gnu" }]
 

@@ -4,6 +4,7 @@
 #include "sp.h"
 
 #define WINVM_MAX_STEPS 6
+#define WINVM_MAX_LANES 4
 
 typedef struct {
   const c8* recipe;
@@ -17,6 +18,7 @@ typedef struct {
   u32 vcpus;
   u8 octet;
   winvm_step_t steps[WINVM_MAX_STEPS];
+  const c8* lanes[WINVM_MAX_LANES];
 } winvm_variant_t;
 
 extern const winvm_variant_t winvm_variants[];

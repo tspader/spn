@@ -266,10 +266,14 @@ static sp_str_t recipe_name(winvm_t* vm, winvm_step_t step) {
 
 s32 winvm_upload_recipe(winvm_t* vm, const winvm_variant_t* variant, winvm_step_t step) {
   sp_str_t local = sp_fs_join_path(vm->mem, vm->paths.recipes, sp_fmt(vm->mem, "{}.ps1", sp_fmt_cstr(step.recipe)).value);
+  return winvm_upload_file(vm, variant, local, recipe_name(vm, step));
+}
+
+s32 winvm_upload_file(winvm_t* vm, const winvm_variant_t* variant, sp_str_t local, sp_str_t remote) {
   sp_ps_config_t scp = { .command = sp_str_lit("scp"), .io.err = { .mode = SP_PS_IO_MODE_REDIRECT } };
   ssh_opts(vm, &scp);
   sp_ps_config_add_arg(vm->mem, &scp, local);
-  sp_ps_config_add_arg(vm->mem, &scp, sp_fmt(vm->mem, "{}:{}", sp_fmt_str(ssh_target(vm, variant)), sp_fmt_str(recipe_name(vm, step))).value);
+  sp_ps_config_add_arg(vm->mem, &scp, sp_fmt(vm->mem, "{}:{}", sp_fmt_str(ssh_target(vm, variant)), sp_fmt_str(remote)).value);
   return sp_ps_run(vm->mem, scp).status.exit_code;
 }
 
