@@ -87,6 +87,21 @@ static sp_str_t colored_fmt(sp_tty_color_t color, sp_mem_t mem, const c8* fmt, .
   return sp_io_dyn_mem_writer_take_str(&buf);
 }
 
+static sp_str_t colored_sanitizers(sp_tty_color_t color, sp_mem_t mem, sp_fmt_style_t style, spn_sanitizer_set_t set) {
+  sp_io_dyn_mem_writer_t buf = sp_zero;
+  sp_io_dyn_mem_writer_init(mem, &buf);
+  sp_tty_t tty = { .io = &buf.base, .color = color };
+  u32 written = 0;
+  for (spn_sanitizer_set_t bit = SPN_SANITIZER_ADDRESS; bit <= SPN_SANITIZER_LEAK; bit <<= 1) {
+    if (!(set & bit)) {
+      continue;
+    }
+    sp_tty_fmt(&tty, written ? ", {.$}" : "{.$}", sp_fmt_style(style), sp_fmt_str(spn_sanitizer_to_str((spn_sanitizer_t)bit)));
+    written++;
+  }
+  return sp_io_dyn_mem_writer_take_str(&buf);
+}
+
 static void write_manifest_issue(sp_tty_t* w, const spn_err_issue_t* issue) {
   switch (issue->code) {
     case SPN_ERR_CODEGEN_MISSING_KEY:
@@ -105,7 +120,7 @@ static void write_manifest_issue(sp_tty_t* w, const spn_err_issue_t* issue) {
       sp_tty_fmt(w, "{.cyan} must be a table", SP_FMT_STR(issue->path));
       break;
     case SPN_ERR_CODEGEN_DUPLICATE_KEY:
-      sp_tty_fmt(w, "duplicate {.yellow} at {.cyan}", SP_FMT_STR(issue->detail), SP_FMT_STR(issue->path));
+      sp_tty_fmt(w, "duplicate {.red} at {.cyan}", SP_FMT_STR(issue->detail), SP_FMT_STR(issue->path));
       break;
     case SPN_ERR_CODEGEN_UNKNOWN_KEY:
       if (sp_str_empty(issue->path)) {
@@ -131,7 +146,7 @@ static void write_manifest_issue(sp_tty_t* w, const spn_err_issue_t* issue) {
       sp_tty_fmt(w, "{.cyan} is only allowed in the root manifest", SP_FMT_STR(issue->path));
       break;
     case SPN_ERR_CODEGEN_PATH:
-      sp_tty_fmt(w, "path {.yellow} must not contain '.', '..', or empty components", SP_FMT_STR(issue->detail));
+      sp_tty_fmt(w, "path {.red} has a '.', '..', or empty component", SP_FMT_STR(issue->detail));
       break;
     case SPN_ERR_CODEGEN_UNROOTED:
       sp_tty_fmt(w, "relative path {.red} at {.cyan} has no base directory; use an absolute path", SP_FMT_STR(issue->detail), SP_FMT_STR(issue->path));
@@ -677,7 +692,7 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
         case SPN_ERR_PROFILE_INVALID: {
           sp_tty_fmt(
             &w,
-            "invalid profile {.cyan}",
+            "invalid profile name {.red}",
             sp_fmt_str(event->err.profile.name)
           );
           break;
@@ -685,7 +700,7 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
         case SPN_ERR_PROFILE_UNDEFINED: {
           sp_tty_fmt(
             &w,
-            "profile {.cyan} isn't defined",
+            "no profile named {.red}",
             sp_fmt_str(event->err.profile.name)
           );
           break;
@@ -693,7 +708,7 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
         case SPN_ERR_PROFILE_ARCH: {
           sp_tty_fmt(
             &w,
-            "target {.yellow} isn't valid; {} doesn't run on {.red}",
+            "invalid target {.yellow}; {} doesn't run on {.red}",
             sp_fmt_str(spn_triple_to_str(mem, event->err.profile.target)),
             sp_fmt_str(spn_os_to_str(event->err.profile.target.os)),
             sp_fmt_str(spn_arch_to_str(event->err.profile.target.arch))
@@ -703,7 +718,7 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
         case SPN_ERR_PROFILE_ABI: {
           sp_tty_fmt(
             &w,
-            "target {.yellow} isn't valid; {} has no {.red} abi",
+            "invalid target {.yellow}; {} has no {.red} abi",
             sp_fmt_str(spn_triple_to_str(mem, event->err.profile.target)),
             sp_fmt_str(spn_os_to_str(event->err.profile.target.os)),
             sp_fmt_str(spn_abi_to_str(event->err.profile.target.abi))
@@ -713,39 +728,28 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
         case SPN_ERR_PROFILE_LINKAGE: {
           sp_tty_fmt(
             &w,
-            "target {.yellow} can't link {.red}; {} has no dynamic loader",
+            "target {.yellow} can't use {.red}; {} has no dynamic loader",
             sp_fmt_str(spn_triple_to_str(mem, event->err.profile.target)),
-            sp_fmt_str(sp_str_lit("shared")),
+            sp_fmt_str(sp_str_lit("linkage = \"shared\"")),
             sp_fmt_str(spn_os_to_str(event->err.profile.target.os))
           );
           break;
         }
         case SPN_ERR_SANITIZER_UNSUPPORTED: {
-          if (event->err.sanitizer.supported) {
-            sp_tty_fmt(
-              &w,
-              "toolchain {.cyan} targeting {.yellow} doesn't support {.red}; it supports {.green}",
-              sp_fmt_str(event->err.sanitizer.toolchain),
-              sp_fmt_str(spn_triple_to_str(mem, event->err.sanitizer.target)),
-              sp_fmt_str(spn_sanitizer_set_to_str(mem, event->err.sanitizer.unsupported)),
-              sp_fmt_str(spn_sanitizer_set_to_str(mem, event->err.sanitizer.supported))
-            );
-          } else {
-            sp_tty_fmt(
-              &w,
-              "toolchain {.cyan} declares no sanitizers for {.yellow}; drop {.red} or pick another toolchain",
-              sp_fmt_str(event->err.sanitizer.toolchain),
-              sp_fmt_str(spn_triple_to_str(mem, event->err.sanitizer.target)),
-              sp_fmt_str(spn_sanitizer_set_to_str(mem, event->err.sanitizer.unsupported))
-            );
-          }
+          sp_tty_fmt(
+            &w,
+            "toolchain {} can't build for {.yellow} with {}",
+            sp_fmt_str(colored_name(w.color, mem, event->err.sanitizer.toolchain)),
+            sp_fmt_str(spn_triple_to_str(mem, event->err.sanitizer.target)),
+            sp_fmt_str(colored_sanitizers(w.color, mem, sp_fmt_style_red, event->err.sanitizer.unsupported))
+          );
           break;
         }
         case SPN_ERR_SANITIZER_STATIC: {
           sp_tty_fmt(
             &w,
-            "{.red} requires a dynamically linked executable; set {.cyan} in the profile",
-            sp_fmt_str(spn_sanitizer_set_to_str(mem, event->err.sanitizer.unsupported)),
+            "{} can't be linked statically; set {.cyan} in the profile",
+            sp_fmt_str(colored_sanitizers(w.color, mem, sp_fmt_style_red, event->err.sanitizer.unsupported)),
             sp_fmt_str(sp_str_lit("linkage = \"shared\""))
           );
           break;
@@ -753,20 +757,20 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
         case SPN_ERR_COMPILER_FEATURE_UNSUPPORTED: {
           const c8* feature = "";
           switch (event->err.compiler.feature) {
-            case SPN_CC_FEATURE_LINK_EXE: feature = "executable linking"; break;
-            case SPN_CC_FEATURE_LINK_SHARED: feature = "shared library linking"; break;
-            case SPN_CC_FEATURE_LINK_REACTOR: feature = "reactor module linking"; break;
-            case SPN_CC_FEATURE_ARCHIVE: feature = "static archiving"; break;
-            case SPN_CC_FEATURE_FRAMEWORKS: feature = "framework linking without a macOS SDK"; break;
-            case SPN_CC_FEATURE_LINKER_SCRIPT: feature = "linker scripts"; break;
+            case SPN_CC_FEATURE_LINK_EXE: feature = "link executables"; break;
+            case SPN_CC_FEATURE_LINK_SHARED: feature = "link shared libraries"; break;
+            case SPN_CC_FEATURE_LINK_REACTOR: feature = "link reactor modules"; break;
+            case SPN_CC_FEATURE_ARCHIVE: feature = "build static archives"; break;
+            case SPN_CC_FEATURE_FRAMEWORKS: feature = "link frameworks without a macOS SDK"; break;
+            case SPN_CC_FEATURE_LINKER_SCRIPT: feature = "use linker scripts"; break;
           }
 
           sp_tty_fmt(
             &w,
-            "toolchain {.cyan} targeting {.yellow} doesn't support {.red}",
-            sp_fmt_str(event->err.compiler.toolchain),
-            sp_fmt_str(spn_triple_to_str(mem, event->err.compiler.target)),
-            sp_fmt_cstr(feature)
+            "toolchain {} can't {} for {.yellow}",
+            sp_fmt_str(colored_name(w.color, mem, event->err.compiler.toolchain)),
+            sp_fmt_cstr(feature),
+            sp_fmt_str(spn_triple_to_str(mem, event->err.compiler.target))
           );
           break;
         }
@@ -1001,7 +1005,7 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
         case SPN_ERR_TOOLCHAIN_FETCH: {
           sp_tty_fmt(
             &w,
-            "toolchain {} failed to download from {.gray}",
+            "failed to download toolchain {} from {.gray}",
             sp_fmt_str(colored_name(w.color, mem, event->err.artifact.name)),
             sp_fmt_str(event->err.artifact.url)
           );
@@ -1010,18 +1014,18 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
         case SPN_ERR_TOOLCHAIN_SHA: {
           sp_tty_fmt(
             &w,
-            "toolchain {} sha256 mismatch for {.gray}: expected {.yellow}, got {.red}",
+            "toolchain {} downloaded from {.gray} has sha256 {.red}; expected {.yellow}",
             sp_fmt_str(colored_name(w.color, mem, event->err.artifact.name)),
             sp_fmt_str(event->err.artifact.url),
-            sp_fmt_str(event->err.artifact.expected),
-            sp_fmt_str(event->err.artifact.actual)
+            sp_fmt_str(event->err.artifact.actual),
+            sp_fmt_str(event->err.artifact.expected)
           );
           break;
         }
         case SPN_ERR_TOOLCHAIN_READ: {
           sp_tty_fmt(
             &w,
-            "toolchain {} downloaded {.gray}, but the file can't be read",
+            "failed to read toolchain {} downloaded from {.gray}",
             sp_fmt_str(colored_name(w.color, mem, event->err.artifact.name)),
             sp_fmt_str(event->err.artifact.url)
           );
@@ -1030,7 +1034,7 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
         case SPN_ERR_TOOLCHAIN_EXTRACT: {
           sp_tty_fmt(
             &w,
-            "toolchain {} failed to extract archive from {.gray}",
+            "failed to extract toolchain {} downloaded from {.gray}",
             sp_fmt_str(colored_name(w.color, mem, event->err.artifact.name)),
             sp_fmt_str(event->err.artifact.url)
           );
@@ -1039,7 +1043,7 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
         case SPN_ERR_TOOLCHAIN_UNKNOWN: {
           sp_tty_fmt(
             &w,
-            "toolchain {} isn't defined",
+            "no toolchain named {}",
             sp_fmt_str(colored_name(w.color, mem, event->err.toolchain.name))
           );
           break;
@@ -1047,7 +1051,7 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
         case SPN_ERR_TOOLCHAIN_TARGET: {
           sp_tty_fmt(
             &w,
-            "toolchain {} can't target {.yellow}",
+            "toolchain {} can't build for {.yellow}",
             sp_fmt_str(colored_name(w.color, mem, event->err.toolchain.name)),
             sp_fmt_str(spn_triple_to_str(mem, event->err.toolchain.target))
           );
@@ -1056,17 +1060,16 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
         case SPN_ERR_TOOLCHAIN_SYSROOT: {
           sp_tty_fmt(
             &w,
-            "toolchain {} needs a sysroot to target {.yellow} from {.yellow}",
+            "toolchain {} needs a sysroot to build for {.yellow}",
             sp_fmt_str(colored_name(w.color, mem, event->err.toolchain.name)),
-            sp_fmt_str(spn_triple_to_str(mem, event->err.toolchain.target)),
-            sp_fmt_str(spn_triple_to_str(mem, event->err.toolchain.host))
+            sp_fmt_str(spn_triple_to_str(mem, event->err.toolchain.target))
           );
           break;
         }
         case SPN_ERR_TOOLCHAIN_SDK_MACOS: {
           sp_tty_fmt(
             &w,
-            "toolchain {} needs the macOS SDK to target {.yellow}, and none was found",
+            "toolchain {} needs the macOS SDK to build for {.yellow}",
             sp_fmt_str(colored_name(w.color, mem, event->err.toolchain.name)),
             sp_fmt_str(spn_triple_to_str(mem, event->err.toolchain.target))
           );
@@ -1075,7 +1078,7 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
         case SPN_ERR_TOOLCHAIN_SDK_MSVC: {
           sp_tty_fmt(
             &w,
-            "toolchain {} needs the MSVC SDK to target {.yellow}, and none was found",
+            "toolchain {} needs the MSVC SDK to build for {.yellow}",
             sp_fmt_str(colored_name(w.color, mem, event->err.toolchain.name)),
             sp_fmt_str(spn_triple_to_str(mem, event->err.toolchain.target))
           );
@@ -1084,22 +1087,21 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
         case SPN_ERR_TOOLCHAIN_MSVC_LINKER_HOST: {
           sp_tty_fmt(
             &w,
-            "toolchain {} can't link {.yellow} from {.yellow} with {.red}; declare {.cyan} and add {.cyan} to its {.cyan} to link with lld instead",
+            "toolchain {} can't link {.yellow} with {.red} on {.yellow}; set {.cyan}",
             sp_fmt_str(colored_name(w.color, mem, event->err.toolchain.name)),
             sp_fmt_str(spn_triple_to_str(mem, event->err.toolchain.target)),
-            sp_fmt_str(spn_triple_to_str(mem, event->err.toolchain.host)),
             sp_fmt_str(sp_str_lit("link.exe")),
-            sp_fmt_str(sp_str_lit("linker = { msvc = \"lld\" }")),
-            sp_fmt_str(sp_str_lit("-fuse-ld=lld")),
-            sp_fmt_str(sp_str_lit("link_args"))
+            sp_fmt_str(spn_triple_to_str(mem, event->err.toolchain.host)),
+            sp_fmt_str(sp_str_lit("linker = \"lld\""))
           );
           break;
         }
         case SPN_ERR_TARGET_ABI: {
           sp_tty_fmt(
             &w,
-            "cross target {.yellow} needs an abi; pass --abi or add it to --target",
-            sp_fmt_str(spn_triple_to_str(mem, event->err.completion.target))
+            "target {.yellow} needs an abi; pass {.cyan}",
+            sp_fmt_str(spn_triple_to_str(mem, event->err.completion.target)),
+            sp_fmt_str(sp_str_lit("--abi"))
           );
           break;
         }
@@ -1108,14 +1110,14 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
           if (event->err.toolchain.sanitizers) {
             sp_tty_fmt(
               &w,
-              "no toolchain in the catalog can target {.yellow} with {.red}",
+              "no toolchain can build for {.yellow} with {}",
               sp_fmt_str(target),
-              sp_fmt_str(spn_sanitizer_set_to_str(mem, event->err.toolchain.sanitizers))
+              sp_fmt_str(colored_sanitizers(w.color, mem, sp_fmt_style_red, event->err.toolchain.sanitizers))
             );
           } else {
             sp_tty_fmt(
               &w,
-              "no toolchain in the catalog can target {.yellow}",
+              "no toolchain can build for {.yellow}",
               sp_fmt_str(target)
             );
           }
@@ -1125,7 +1127,7 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
           sp_str_t host = spn_triple_to_str(mem, event->err.toolchain.host);
           sp_tty_fmt(
             &w,
-            "toolchain {} isn't available on host {.yellow}",
+            "toolchain {} isn't available on {.yellow}",
             sp_fmt_str(colored_name(w.color, mem, event->err.toolchain.name)),
             sp_fmt_str(host)
           );
@@ -1134,7 +1136,7 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
         case SPN_ERR_TOOLCHAIN_MISSING: {
           sp_tty_fmt(
             &w,
-            "toolchain {} needs {.cyan}, which isn't installed",
+            "toolchain {} can't find {.cyan}",
             sp_fmt_str(colored_name(w.color, mem, event->err.program.name)),
             sp_fmt_str(event->err.program.program)
           );
@@ -1216,16 +1218,17 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
         case SPN_ERR_TOOLCHAIN_NO_CXX: {
           sp_tty_fmt(
             &w,
-            "Toolchain {} has no C++ compiler, but the build contains C++ sources",
-            sp_fmt_str(colored_name(w.color, mem, event->err.toolchain.name))
+            "toolchain {} has no C++ compiler; set {.cyan} in its [[toolchain]] table",
+            sp_fmt_str(colored_name(w.color, mem, event->err.toolchain.name)),
+            sp_fmt_str(sp_str_lit("cxx"))
           );
           break;
         }
         case SPN_ERR_TARGET_LINKAGE: {
           sp_tty_fmt(
             &w,
-            "{.cyan} doesn't support {.yellow} ({} requested it)",
-            sp_fmt_str(event->err.target.pkg),
+            "{} doesn't support {.red} linkage (requested by {})",
+            sp_fmt_str(colored_name(w.color, mem, event->err.target.pkg)),
             sp_fmt_str(event->err.target.requested),
             sp_fmt_str(event->err.target.requester)
           );
@@ -1525,7 +1528,7 @@ static void render_event_extra(sp_tty_t* w, spn_event_t* event) {
         case SPN_ERR_TOOLCHAIN_SDK_MSVC: {
           sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
           sp_da_for(event->err.toolchain.targets, it) {
-            sp_io_write_str(w->io, it ? sp_str_lit(", ") : sp_str_lit("it can target: "), SP_NULLPTR);
+            sp_io_write_str(w->io, it ? sp_str_lit(", ") : sp_str_lit("it can build for: "), SP_NULLPTR);
             sp_tty_fmt(w, "{.yellow}", sp_fmt_str(spn_triple_to_str(scratch.mem, event->err.toolchain.targets[it])));
           }
           sp_mem_end_scratch(scratch);
@@ -1550,6 +1553,15 @@ static void render_event_extra(sp_tty_t* w, spn_event_t* event) {
           }
           if (!sp_da_empty(event->err.toolchain.candidates)) {
             sp_io_write_c8(w->io, '\n');
+          }
+          break;
+        }
+        case SPN_ERR_SANITIZER_UNSUPPORTED: {
+          if (event->err.sanitizer.supported) {
+            sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+            sp_tty_fmt(w, "it supports: {}", sp_fmt_str(colored_sanitizers(w->color, scratch.mem, sp_fmt_style_green, event->err.sanitizer.supported)));
+            sp_io_write_c8(w->io, '\n');
+            sp_mem_end_scratch(scratch);
           }
           break;
         }
