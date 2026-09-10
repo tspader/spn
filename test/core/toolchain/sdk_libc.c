@@ -78,7 +78,7 @@ static const path_test_t path_tests [] = {
 static spn_path_roots_t test_roots(sp_test_t* t) {
   spn_path_roots_t roots = sp_zero;
   spn_path_roots_set(&roots, sp_test_arena(t), SPN_PATH_ROOT_CACHE, sp_test_dir(t));
-  spn_path_roots_set(&roots, sp_test_arena(t), SPN_PATH_ROOT_TOOLCHAIN, sp_str_lit(SDK_LIBC_TOOLCHAIN_DIR));
+  roots.dirs[SPN_PATH_ROOT_TOOLCHAIN] = sp_str_lit(SDK_LIBC_TOOLCHAIN_DIR);
   return roots;
 }
 
