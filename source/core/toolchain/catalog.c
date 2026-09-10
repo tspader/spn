@@ -37,10 +37,11 @@ static spn_path_t sdk_root(spn_toolchain_catalog_t* catalog, spn_toolchain_suppo
   sp_unreachable_return(sdk);
 }
 
+static bool declared(const spn_toolchain_info_t* info, spn_triple_t triple) {
+  return has_row(info->rows, triple) || has_triple(info->unserved, triple);
+}
+
 static void bind(spn_toolchain_catalog_t* catalog, spn_toolchain_info_t* info, spn_toolchain_support_t support, spn_toolchain_target_t target) {
-  if (has_row(info->rows, target.triple) || has_triple(info->unserved, target.triple)) {
-    return;
-  }
   spn_toolchain_row_t row = { .triple = target.triple, .sanitizers = target.sanitizers };
   if (!spn_path_empty(target.sdk)) {
     row.sdk = spn_sdk_at(catalog->mem, target.triple, sdk_root(catalog, support, target.sdk));
@@ -64,7 +65,7 @@ static spn_toolchain_target_t stock(spn_cc_driver_t driver, spn_triple_t triple)
 static void push_stock(spn_toolchain_catalog_t* catalog, spn_toolchain_info_t* info, const spn_toolchain_decl_t* decl) {
   spn_triple_t host = catalog->host;
   host.abi = host.abi ? host.abi : spn_default_abi(decl->driver, host.os);
-  if (!host.abi || !spn_toolchain_driver_composes(decl->driver, spn_ld_dialect(host))) {
+  if (!host.abi || !spn_toolchain_driver_composes(decl->driver, spn_ld_dialect(host)) || declared(info, host)) {
     return;
   }
   bind(catalog, info, sp_zero_struct(spn_toolchain_support_t), stock(decl->driver, host));

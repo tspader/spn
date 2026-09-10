@@ -126,6 +126,15 @@ static bool target_has_fields(const spn_cg_toolchain_target_t* cg) {
   return !sp_opt_is_null(cg->arch) || !sp_opt_is_null(cg->os) || !sp_opt_is_null(cg->abi) || !sp_str_empty(cg->sdk) || !sp_da_empty(cg->sanitizers);
 }
 
+static bool targeted(sp_da(spn_toolchain_target_t) targets, spn_triple_t triple) {
+  sp_da_for(targets, it) {
+    if (spn_triple_equal(targets[it].triple, triple)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 static void lower_toolchain_targets(spn_toml_loader_t* ctx, spn_path_root_t base, sp_da(spn_cg_toolchain_target_t) cg, spn_toolchain_decl_t* toolchain) {
   sp_da(spn_toolchain_target_t) targets = sp_da_new(ctx->mem, spn_toolchain_target_t);
   spn_cc_driver_t driver = toolchain->driver;
@@ -165,6 +174,9 @@ static void lower_toolchain_targets(spn_toml_loader_t* ctx, spn_path_root_t base
       continue;
     }
     spn_toml_loader_push_index(ctx, it);
+    if (targeted(targets, target.triple)) {
+      spn_toml_loader_issue_at(ctx, SPN_ERR_CODEGEN_DUPLICATE_KEY, spn_triple_to_str(ctx->mem, target.triple));
+    }
     lower_target_fields(ctx, source, base, &cg[it], &target);
     spn_toml_loader_pop(ctx);
     sp_da_push(targets, target);

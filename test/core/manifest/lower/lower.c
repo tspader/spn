@@ -690,6 +690,13 @@ static const test_t tests [] = {
     },
   },
   {
+    .name = "validate_toolchain_target_duplicate",
+    .manifest = "toolchain_target_duplicate",
+    .issues = {
+      { SPN_ERR_CODEGEN_DUPLICATE_KEY, "toolchain[0].target[1]" },
+    },
+  },
+  {
     .name = "validate_toolchain_bare_reports_every_field",
     .manifest = "toolchain_bare_fields",
     .issues = {
