@@ -95,7 +95,7 @@ static const provision_test_t tests [] = {
     .name = "vanished_download_is_a_read_failure",
     .fetch_vanish = true,
     .expect = {
-      .kind = SPN_ERR_FS_READ,
+      .kind = SPN_ERR_TOOLCHAIN_READ,
       .calls = 1,
       .store_clean = true,
     },
@@ -292,12 +292,7 @@ sp_test_each(provision, store, provision_test_t, tests, .setup = spn_test_ctx_se
       sp_must_eq(t, 1, sp_da_size(errs));
       payload = errs[0].err;
       sp_expect_eq(t, payload.kind, err);
-      switch (payload.kind) {
-        case SPN_ERR_TOOLCHAIN_FETCH:
-        case SPN_ERR_TOOLCHAIN_SHA:
-        case SPN_ERR_TOOLCHAIN_EXTRACT: sp_expect_str_eq_c(t, payload.artifact.name, name); break;
-        default: break;
-      }
+      sp_expect_str_eq_c(t, payload.artifact.name, name);
     }
   }
 

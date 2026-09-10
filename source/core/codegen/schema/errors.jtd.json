@@ -20,6 +20,7 @@
     "toolchain_host": { "ref": "toolchain" },
     "toolchain_fetch": { "ref": "artifact" },
     "toolchain_sha": { "ref": "artifact" },
+    "toolchain_read": { "ref": "artifact" },
     "toolchain_extract": { "ref": "artifact" },
     "toolchain_no_cxx": { "ref": "toolchain" },
     "toolchain_missing": { "ref": "program" },

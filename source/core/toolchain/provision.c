@@ -6,7 +6,8 @@
 #include "fs/fs.h"
 
 spn_err_t spn_fetch_curl(spn_toolchain_store_t* store, sp_str_t url, sp_str_t dest, sp_str_t* output) {
-  sp_ps_output_t result = sp_ps_run(store->mem, (sp_ps_config_t) {
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_ps_output_t result = sp_ps_run(scratch.mem, (sp_ps_config_t) {
     .command = sp_str_lit("curl"),
     .args = {
       sp_str_lit("-fsSL"),
@@ -17,7 +18,8 @@ spn_err_t spn_fetch_curl(spn_toolchain_store_t* store, sp_str_t url, sp_str_t de
       .err = { .mode = SP_PS_IO_MODE_CREATE },
     },
   });
-  *output = sp_str_trim(result.err);
+  *output = sp_str_copy(store->mem, sp_str_trim(result.err));
+  sp_mem_end_scratch(scratch);
   return result.status.exit_code ? SPN_ERROR : SPN_OK;
 }
 
@@ -71,8 +73,11 @@ static spn_err_t fill(spn_toolchain_store_t* store, sp_str_t name, spn_artifact_
   if (spn_digest_file_hex(SPN_DIGEST_SHA256, store->mem, tarball, &actual)) {
     sp_fs_remove_file(tarball);
     return spn_err_emit(&spn, (spn_err_union_t) {
-      .kind = SPN_ERR_FS_READ,
-      .fs = { .path = tarball },
+      .kind = SPN_ERR_TOOLCHAIN_READ,
+      .artifact = {
+        .name = name,
+        .url = url,
+      },
     });
   }
   if (!sp_str_equal(actual, artifact.sha256)) {
@@ -108,7 +113,7 @@ static spn_err_t fill(spn_toolchain_store_t* store, sp_str_t name, spn_artifact_
       sp_str_lit("-C"), work,
     },
     .io = {
-      .err = { .mode = SP_PS_IO_MODE_NULL },
+      .err = { .mode = SP_PS_IO_MODE_CREATE },
     },
   });
 
@@ -124,6 +129,7 @@ static spn_err_t fill(spn_toolchain_store_t* store, sp_str_t name, spn_artifact_
       .artifact = {
         .name = name,
         .url = url,
+        .output = sp_str_trim(extract.err),
       },
     });
   }

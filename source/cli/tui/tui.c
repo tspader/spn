@@ -1015,6 +1015,15 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
           );
           break;
         }
+        case SPN_ERR_TOOLCHAIN_READ: {
+          sp_tty_fmt(
+            &w,
+            "toolchain {} downloaded {.gray}, but the file can't be read",
+            sp_fmt_str(colored_name(w.color, mem, event->err.artifact.name)),
+            sp_fmt_str(event->err.artifact.url)
+          );
+          break;
+        }
         case SPN_ERR_TOOLCHAIN_EXTRACT: {
           sp_tty_fmt(
             &w,
@@ -1502,7 +1511,8 @@ static void render_event_extra(sp_tty_t* w, spn_event_t* event) {
           sp_io_write_str(w->io, event->err.publish.output, SP_NULLPTR);
           break;
         }
-        case SPN_ERR_TOOLCHAIN_FETCH: {
+        case SPN_ERR_TOOLCHAIN_FETCH:
+        case SPN_ERR_TOOLCHAIN_EXTRACT: {
           sp_io_write_str(w->io, event->err.artifact.output, SP_NULLPTR);
           break;
         }
