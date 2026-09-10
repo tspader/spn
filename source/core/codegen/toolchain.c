@@ -40,12 +40,34 @@ static spn_path_t lower_sdk_path(spn_toml_loader_t* ctx, spn_toolchain_source_t 
   return sp_zero_struct(spn_path_t);
 }
 
-static void lower_target_caps(spn_toml_loader_t* ctx, spn_toolchain_source_t source, spn_path_root_t base, const spn_cg_toolchain_target_t* cg, spn_toolchain_target_t* target) {
-  switch (spn_toolchain_target_caps(cg, target)) {
-    case SPN_TARGET_CAPS_OK: break;
-    case SPN_TARGET_CAPS_SDK_PATH: target->sdk = lower_sdk_path(ctx, source, base, cg->sdk); break;
-    case SPN_TARGET_CAPS_SANITIZERS_FORBIDDEN: spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "sanitizers"); break;
-    case SPN_TARGET_CAPS_SDK_FORBIDDEN: spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "sdk"); break;
+static bool sanitizable(spn_triple_t triple) {
+  return triple.abi != SPN_ABI_BARE && triple.abi != SPN_ABI_ELF;
+}
+
+static spn_sanitizer_set_t lower_sanitizers(sp_da(spn_sanitizer_t) sanitizers) {
+  spn_sanitizer_set_t set = 0;
+  sp_da_for(sanitizers, it) {
+    set |= sanitizers[it];
+  }
+  return set;
+}
+
+static void lower_target_fields(spn_toml_loader_t* ctx, spn_toolchain_source_t source, spn_path_root_t base, const spn_cg_toolchain_target_t* cg, spn_toolchain_target_t* target) {
+  if (!sp_da_empty(cg->sanitizers)) {
+    if (sanitizable(target->triple)) {
+      target->sanitizers = lower_sanitizers(cg->sanitizers);
+    }
+    else {
+      spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "sanitizers");
+    }
+  }
+  if (!sp_str_empty(cg->sdk)) {
+    if (spn_sdk_kind(target->triple) != SPN_SDK_NONE) {
+      target->sdk = lower_sdk_path(ctx, source, base, cg->sdk);
+    }
+    else {
+      spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "sdk");
+    }
   }
 }
 
@@ -143,7 +165,7 @@ static void lower_toolchain_targets(spn_toml_loader_t* ctx, spn_path_root_t base
       continue;
     }
     spn_toml_loader_push_index(ctx, it);
-    lower_target_caps(ctx, source, base, &cg[it], &target);
+    lower_target_fields(ctx, source, base, &cg[it], &target);
     spn_toml_loader_pop(ctx);
     sp_da_push(targets, target);
   }

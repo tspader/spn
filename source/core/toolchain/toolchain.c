@@ -177,25 +177,6 @@ spn_sanitizer_set_t spn_toolchain_stock_sanitizers(spn_cc_driver_t driver, spn_t
   SP_UNREACHABLE_RETURN(0);
 }
 
-spn_target_caps_t spn_toolchain_target_caps(const spn_cg_toolchain_target_t* cg, spn_toolchain_target_t* target) {
-  spn_triple_t triple = target->triple;
-  if (!sp_da_empty(cg->sanitizers)) {
-    if (triple.abi == SPN_ABI_BARE || triple.abi == SPN_ABI_ELF) {
-      return SPN_TARGET_CAPS_SANITIZERS_FORBIDDEN;
-    }
-    sp_da_for(cg->sanitizers, it) {
-      target->sanitizers |= cg->sanitizers[it];
-    }
-  }
-  if (sp_str_empty(cg->sdk)) {
-    return SPN_TARGET_CAPS_OK;
-  }
-  if (spn_sdk_kind(triple) == SPN_SDK_NONE) {
-    return SPN_TARGET_CAPS_SDK_FORBIDDEN;
-  }
-  return SPN_TARGET_CAPS_SDK_PATH;
-}
-
 spn_linkage_t spn_abi_linkage(spn_abi_t abi) {
   switch (abi) {
     case SPN_ABI_GNU:

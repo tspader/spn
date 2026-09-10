@@ -82,13 +82,6 @@ typedef enum {
   SPN_PATH_MALFORMED,
 } spn_path_check_t;
 
-typedef enum {
-  SPN_TARGET_CAPS_OK,
-  SPN_TARGET_CAPS_SDK_PATH,
-  SPN_TARGET_CAPS_SANITIZERS_FORBIDDEN,
-  SPN_TARGET_CAPS_SDK_FORBIDDEN,
-} spn_target_caps_t;
-
 typedef struct {
   spn_arg_t program;
   sp_da(sp_str_t) args;

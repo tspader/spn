@@ -690,6 +690,14 @@ static const test_t tests [] = {
     },
   },
   {
+    .name = "validate_toolchain_bare_reports_every_field",
+    .manifest = "toolchain_bare_fields",
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].target[0].sanitizers" },
+      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].target[0].sdk" },
+    },
+  },
+  {
     .name = "validate_toolchain_sdk_malformed",
     .manifest = "toolchain_sdk_malformed",
     .issues = {
