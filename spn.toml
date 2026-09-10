@@ -133,6 +133,17 @@ include = ["include", "source/core", "source/util", "source/core/codegen/gen", "
 deps = ["spn"]
 
 [[script]]
+name = "winvm"
+source = [
+  "tools/windows/source/main.c",
+  "tools/windows/source/winvm/winvm.c",
+  "tools/windows/source/variant/variant.c",
+  "tools/docker/source/tail/tail.c",
+]
+include = ["include", "source/core", "source/util", "source/core/codegen/gen", "tools/windows/source", "tools/docker/source"]
+deps = ["spn"]
+
+[[script]]
 name = "smoke-shell"
 source = ["tools/docker/source/container/shell.c"]
 include = ["tools/docker/source"]

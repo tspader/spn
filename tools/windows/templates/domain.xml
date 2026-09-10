@@ -1,0 +1,54 @@
+<domain type='kvm'>
+  <name>{{.name}}</name>
+  <memory unit='MiB'>{{.memory}}</memory>
+  <vcpu placement='static'>{{.vcpus}}</vcpu>
+  <os firmware='efi'>
+    <type arch='x86_64' machine='pc-q35-11.0'>hvm</type>
+    <firmware>
+      <feature enabled='no' name='enrolled-keys'/>
+      <feature enabled='yes' name='secure-boot'/>
+    </firmware>
+    <loader readonly='yes' secure='yes' type='pflash' format='raw'>/usr/share/edk2/x64/OVMF_CODE.secboot.4m.fd</loader>
+    <nvram template='/usr/share/edk2/x64/OVMF_VARS.4m.fd' templateFormat='raw' format='raw'>/var/lib/libvirt/qemu/nvram/{{.name}}_VARS.fd</nvram>
+    <boot dev='hd'/>
+  </os>
+  <features>
+    <acpi/><apic/>
+    <hyperv mode='custom'>
+      <relaxed state='on'/><vapic state='on'/><spinlocks state='on' retries='8191'/>
+    </hyperv>
+    <vmport state='off'/><smm state='on'/>
+  </features>
+  <cpu mode='host-passthrough' check='none' migratable='on'/>
+  <clock offset='localtime'>
+    <timer name='rtc' tickpolicy='catchup'/>
+    <timer name='pit' tickpolicy='delay'/>
+    <timer name='hpet' present='no'/>
+    <timer name='hypervclock' present='yes'/>
+  </clock>
+  <devices>
+    <emulator>/usr/bin/qemu-system-x86_64</emulator>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2' discard='unmap'/>
+      <source file='{{.disk}}'/>
+      <target dev='vda' bus='virtio'/>
+    </disk>
+    <controller type='sata' index='0'/>
+    <controller type='virtio-serial' index='0'/>
+    <interface type='network'>
+      <mac address='{{.mac}}'/>
+      <source network='{{.network}}'/>
+      <model type='virtio'/>
+    </interface>
+    <channel type='unix'>
+      <target type='virtio' name='org.qemu.guest_agent.0'/>
+    </channel>
+    <input type='tablet' bus='usb'/>
+    <tpm model='tpm-crb'>
+      <backend type='emulator' version='2.0'/>
+    </tpm>
+    <graphics type='spice' autoport='yes' listen='127.0.0.1'/>
+    <video><model type='qxl'/></video>
+    <memballoon model='virtio'/>
+  </devices>
+</domain>
