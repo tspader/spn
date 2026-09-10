@@ -707,21 +707,21 @@ static const test_t tests [] = {
     .name = "validate_toolchain_url_without_sha",
     .manifest = "toolchain_no_sha",
     .issues = {
-      { SPN_ERR_CODEGEN_MISSING_KEY, "toolchain[0].sha256" }
+      { SPN_ERR_CODEGEN_MISSING_KEY, "toolchain[0].host.x86_64-linux.sha256" }
     }
   },
   {
     .name = "validate_toolchain_sha_without_url",
     .manifest = "toolchain_sha_without_url",
     .issues = {
-      { SPN_ERR_CODEGEN_MISSING_KEY, "toolchain[0].url" }
+      { SPN_ERR_CODEGEN_MISSING_KEY, "toolchain[0].host.x86_64-linux.url" }
     }
   },
   {
     .name = "validate_toolchain_host_invalid",
     .manifest = "toolchain_host_invalid",
     .issues = {
-      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].host" }
+      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].host.x86-linux" }
     }
   },
   {

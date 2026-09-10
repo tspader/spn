@@ -159,6 +159,45 @@ static sp_da(sp_str_t) lower_strs(spn_toml_loader_t* ctx, sp_da(sp_str_t) values
   return out;
 }
 
+static void lower_hosts(spn_toml_loader_t* ctx, const spn_cg_toolchain_decl_t* decl, spn_toolchain_decl_t* toolchain) {
+  toolchain->hosts = sp_da_new(ctx->mem, spn_toolchain_host_t);
+  spn_toml_loader_push_key(ctx, "host");
+  sp_da_for(decl->host, it) {
+    const spn_cg_toolchain_decl_host_entry_t* cell = &decl->host[it];
+    spn_triple_t host = sp_zero;
+    if (spn_triple_parse_host(cell->key, &host)) {
+      spn_toml_loader_push_key(ctx, sp_str_to_cstr(ctx->mem, cell->key));
+      spn_toml_loader_issue_at(ctx, SPN_ERR_CODEGEN_INVALID, cell->key);
+      spn_toml_loader_pop(ctx);
+      continue;
+    }
+    sp_da_push(toolchain->hosts, ((spn_toolchain_host_t) {
+      .triple = host,
+      .artifact = {
+        .url = cell->value.url,
+        .sha256 = cell->value.sha256,
+        .mirror_list = decl->mirrors,
+      },
+    }));
+  }
+  toolchain->source = spn_toolchain_source(toolchain->hosts);
+
+  sp_da_for(decl->host, it) {
+    const spn_cg_toolchain_decl_host_entry_t* cell = &decl->host[it];
+    bool url = !sp_str_empty(cell->value.url);
+    bool sha = !sp_str_empty(cell->value.sha256);
+    spn_toml_loader_push_key(ctx, sp_str_to_cstr(ctx->mem, cell->key));
+    if (url && !sha) {
+      spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, "sha256");
+    }
+    if (!url && (sha || toolchain->source == SPN_TOOLCHAIN_SOURCE_MIXED)) {
+      spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, "url");
+    }
+    spn_toml_loader_pop(ctx);
+  }
+  spn_toml_loader_pop(ctx);
+}
+
 spn_toolchain_decl_t spn_toolchain_lower(spn_toml_loader_t* ctx, u32 at, spn_path_root_t base, const spn_cg_toolchain_decl_t* decl) {
   spn_toml_loader_push_key(ctx, "toolchain");
   spn_toml_loader_push_index(ctx, at);
@@ -177,43 +216,7 @@ spn_toolchain_decl_t spn_toolchain_lower(spn_toml_loader_t* ctx, u32 at, spn_pat
   toolchain.driver = sp_opt_is_null(decl->driver) ? SPN_CC_DRIVER_NONE : sp_opt_get(decl->driver);
   toolchain.link_args = lower_strs(ctx, decl->link_args);
 
-  toolchain.hosts = sp_da_new(ctx->mem, spn_toolchain_host_t);
-  sp_da_for(decl->host, it) {
-    bool url = !sp_str_empty(decl->host[it].value.url);
-    bool sha = !sp_str_empty(decl->host[it].value.sha256);
-    if (url && !sha) {
-      spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, "sha256");
-    }
-    if (sha && !url) {
-      spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, "url");
-    }
-
-    spn_triple_t host = sp_zero;
-    if (spn_triple_parse_host(decl->host[it].key, &host)) {
-      spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "host");
-      continue;
-    }
-    sp_da_push(toolchain.hosts, ((spn_toolchain_host_t) {
-      .triple = host,
-      .artifact = {
-        .url = decl->host[it].value.url,
-        .sha256 = decl->host[it].value.sha256,
-        .mirror_list = decl->mirrors,
-      },
-    }));
-  }
-  toolchain.source = spn_toolchain_source(toolchain.hosts);
-  if (toolchain.source == SPN_TOOLCHAIN_SOURCE_MIXED) {
-    spn_toml_loader_push_key(ctx, "host");
-    sp_da_for(toolchain.hosts, it) {
-      if (sp_str_empty(toolchain.hosts[it].artifact.url)) {
-        spn_toml_loader_push_key(ctx, sp_str_to_cstr(ctx->mem, spn_triple_to_str(ctx->mem, toolchain.hosts[it].triple)));
-        spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, "url");
-        spn_toml_loader_pop(ctx);
-      }
-    }
-    spn_toml_loader_pop(ctx);
-  }
+  lower_hosts(ctx, decl, &toolchain);
 
   toolchain.compiler = lower_launcher(ctx, "compiler", toolchain.source, base, decl->compiler);
   toolchain.cxx = lower_launcher(ctx, "cxx", toolchain.source, base, decl->cxx);
