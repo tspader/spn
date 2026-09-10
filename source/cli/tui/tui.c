@@ -134,7 +134,10 @@ static void write_manifest_issue(sp_tty_t* w, const spn_err_issue_t* issue) {
       sp_tty_fmt(w, "path {.yellow} must not contain '.', '..', or empty components", SP_FMT_STR(issue->detail));
       break;
     case SPN_ERR_CODEGEN_UNROOTED:
-      sp_tty_fmt(w, "path {.yellow} cannot be rooted at {.cyan}", SP_FMT_STR(issue->detail), SP_FMT_STR(issue->path));
+      sp_tty_fmt(w, "relative path {.red} at {.cyan} has no base directory; use an absolute path", SP_FMT_STR(issue->detail), SP_FMT_STR(issue->path));
+      break;
+    case SPN_ERR_CODEGEN_ABSOLUTE:
+      sp_tty_fmt(w, "path {.red} at {.cyan} must be relative to the downloaded toolchain", SP_FMT_STR(issue->detail), SP_FMT_STR(issue->path));
       break;
     default:
       sp_unreachable_case();

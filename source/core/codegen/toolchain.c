@@ -8,6 +8,7 @@
 static spn_err_t path_issue(spn_path_check_t check) {
   switch (check) {
     case SPN_PATH_UNROOTED: return SPN_ERR_CODEGEN_UNROOTED;
+    case SPN_PATH_ABSOLUTE: return SPN_ERR_CODEGEN_ABSOLUTE;
     case SPN_PATH_MALFORMED: return SPN_ERR_CODEGEN_PATH;
     case SPN_PATH_OK: sp_unreachable_case();
   }

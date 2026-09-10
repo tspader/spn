@@ -22,7 +22,7 @@ static const test_t tests [] = {
   { "local_relative_without_base", SPN_TOOLCHAIN_SOURCE_LOCAL,        SPN_PATH_ROOT_NONE,    "A/B",  .expect = { .check = SPN_PATH_UNROOTED } },
   { "distribution_name",           SPN_TOOLCHAIN_SOURCE_DISTRIBUTION, SPN_PATH_ROOT_NONE,    "A",    .expect = { .arg = { .path = "A" } } },
   { "distribution_relative",       SPN_TOOLCHAIN_SOURCE_DISTRIBUTION, SPN_PATH_ROOT_NONE,    "A/B",  .expect = { .arg = { .path = "A/B" } } },
-  { "distribution_absolute",       SPN_TOOLCHAIN_SOURCE_DISTRIBUTION, SPN_PATH_ROOT_NONE,    "/A",   .expect = { .check = SPN_PATH_UNROOTED } },
+  { "distribution_absolute",       SPN_TOOLCHAIN_SOURCE_DISTRIBUTION, SPN_PATH_ROOT_NONE,    "/A",   .expect = { .check = SPN_PATH_ABSOLUTE } },
 };
 
 sp_test_each(program, classify, test_t, tests) {

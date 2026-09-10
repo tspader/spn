@@ -79,6 +79,7 @@ typedef struct {
 typedef enum {
   SPN_PATH_OK,
   SPN_PATH_UNROOTED,
+  SPN_PATH_ABSOLUTE,
   SPN_PATH_MALFORMED,
 } spn_path_check_t;
 

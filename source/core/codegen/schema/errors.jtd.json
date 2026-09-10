@@ -38,6 +38,7 @@
     "codegen_root_only": { "properties": {} },
     "codegen_path": { "properties": {} },
     "codegen_unrooted": { "properties": {} },
+    "codegen_absolute": { "properties": {} },
     "wasm_init_failed": { "ref": "wasm" },
     "wasm_register_failed": { "ref": "wasm" },
     "wasm_module_load_failed": { "ref": "wasm" },

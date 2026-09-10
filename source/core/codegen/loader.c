@@ -214,6 +214,7 @@ const c8* spn_codegen_err_name(spn_err_t code) {
     case SPN_ERR_CODEGEN_ROOT_ONLY:      return "root_only";
     case SPN_ERR_CODEGEN_PATH:           return "path";
     case SPN_ERR_CODEGEN_UNROOTED:       return "unrooted";
+    case SPN_ERR_CODEGEN_ABSOLUTE:       return "absolute";
     default:                             return "unknown";
   }
 }

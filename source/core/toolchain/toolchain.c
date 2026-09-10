@@ -40,7 +40,7 @@ spn_path_check_t spn_toolchain_path(spn_toolchain_source_t source, spn_path_root
   switch (source) {
     case SPN_TOOLCHAIN_SOURCE_DISTRIBUTION: {
       if (absolute) {
-        return SPN_PATH_UNROOTED;
+        return SPN_PATH_ABSOLUTE;
       }
       *path = (spn_path_t) { .sub = str };
       return SPN_PATH_OK;
