@@ -189,14 +189,12 @@ static spn_err_t open_ctx(spn_ctx_t* ctx, spn_open_request_t request) {
     spn_toml_loader_t loader = sp_zero;
     spn_toml_loader_init(&loader, ctx->mem, ctx->intern);
     sp_da(spn_index_info_t) indexes = sp_da_new(ctx->heap, spn_index_info_t);
-    sp_da(spn_toolchain_decl_t) toolchains = sp_da_new(ctx->mem, spn_toolchain_decl_t);
+    sp_da(spn_toolchain_decl_t) toolchains = SP_NULLPTR;
     if (spn_codegen_load_config(&loader, ctx->paths.config.toml, &config) == SPN_OK) {
       sp_da_for(config.index, it) {
         sp_da_push(indexes, spn_index_lower(&loader, it, SPN_INDEX_KIND_USER, &config.index[it]));
       }
-      sp_da_for(config.toolchain, it) {
-        sp_da_push(toolchains, spn_toolchain_lower(&loader, it, SPN_PATH_ROOT_NONE, &config.toolchain[it]));
-      }
+      toolchains = spn_toolchains_lower_list(&loader, SPN_PATH_ROOT_NONE, config.toolchain);
     }
     if (!sp_da_empty(loader.issues)) {
       return spn_err_emit(ctx, (spn_err_union_t) {

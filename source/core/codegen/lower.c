@@ -275,9 +275,9 @@ static void lower_targets(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, s
 
 static void lower_toolchains(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
   sp_str_om_init(out->toolchains);
-  sp_da_for(cg->toolchain, it) {
-    spn_toolchain_decl_t toolchain = spn_toolchain_lower(ctx, it, SPN_PATH_ROOT_PROJECT, &cg->toolchain[it]);
-    sp_str_om_insert(out->toolchains, toolchain.name, toolchain);
+  sp_da(spn_toolchain_decl_t) toolchains = spn_toolchains_lower_list(ctx, SPN_PATH_ROOT_PROJECT, cg->toolchain);
+  sp_da_for(toolchains, it) {
+    sp_str_om_insert(out->toolchains, toolchains[it].name, toolchains[it]);
   }
 }
 

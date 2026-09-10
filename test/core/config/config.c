@@ -67,6 +67,19 @@ static const test_t tests [] = {
     },
   },
   {
+    .name = "toolchain_duplicate_name",
+    .config = "toolchain_duplicate",
+    .expect = {
+      .toolchains = {
+        { .name = "T", .driver = SPN_CC_DRIVER_GCC, .compiler = { .name = "C" }, .archiver = { .name = "A" } },
+        { .name = "T", .driver = SPN_CC_DRIVER_GCC, .compiler = { .name = "D" }, .archiver = { .name = "A" } },
+      },
+      .issues = {
+        { SPN_ERR_CODEGEN_DUPLICATE_KEY, "toolchain[1].name" },
+      },
+    },
+  },
+  {
     .name = "toolchain_program_relative",
     .config = "toolchain_program_relative",
     .expect = {
@@ -90,10 +103,7 @@ sp_test_each(config, lower, test_t, tests) {
   spn_cg_config_t cg = sp_zero;
   spn_codegen_load_config(&ctx, path, &cg);
 
-  sp_da(spn_toolchain_decl_t) toolchains = sp_da_new(mem, spn_toolchain_decl_t);
-  sp_da_for(cg.toolchain, n) {
-    sp_da_push(toolchains, spn_toolchain_lower(&ctx, n, SPN_PATH_ROOT_NONE, &cg.toolchain[n]));
-  }
+  sp_da(spn_toolchain_decl_t) toolchains = spn_toolchains_lower_list(&ctx, SPN_PATH_ROOT_NONE, cg.toolchain);
 
   const expect_t* expect = &it->expect;
   u32 num_issues = 0;

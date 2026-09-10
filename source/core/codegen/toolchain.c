@@ -264,12 +264,35 @@ bool spn_toolchains_parse(spn_toml_loader_t* ctx, sp_str_t toml, spn_cg_config_t
   return true;
 }
 
-sp_da(spn_toolchain_decl_t) spn_toolchains_lower(spn_toml_loader_t* ctx, sp_str_t toml, spn_path_root_t base) {
+static bool named(sp_da(spn_toolchain_decl_t) decls, sp_str_t name) {
+  sp_da_for(decls, it) {
+    if (sp_str_equal(decls[it].name, name)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+sp_da(spn_toolchain_decl_t) spn_toolchains_lower_list(spn_toml_loader_t* ctx, spn_path_root_t base, sp_da(spn_cg_toolchain_decl_t) list) {
   sp_da(spn_toolchain_decl_t) decls = sp_da_new(ctx->mem, spn_toolchain_decl_t);
-  spn_cg_config_t config = sp_zero;
-  spn_toolchains_parse(ctx, toml, &config);
-  sp_da_for(config.toolchain, it) {
-    sp_da_push(decls, spn_toolchain_lower(ctx, it, base, &config.toolchain[it]));
+  sp_da_for(list, it) {
+    spn_toolchain_decl_t decl = spn_toolchain_lower(ctx, it, base, &list[it]);
+    if (!sp_str_empty(decl.name) && named(decls, decl.name)) {
+      spn_toml_loader_push_key(ctx, "toolchain");
+      spn_toml_loader_push_index(ctx, it);
+      spn_toml_loader_push_key(ctx, "name");
+      spn_toml_loader_issue_at(ctx, SPN_ERR_CODEGEN_DUPLICATE_KEY, decl.name);
+      spn_toml_loader_pop(ctx);
+      spn_toml_loader_pop(ctx);
+      spn_toml_loader_pop(ctx);
+    }
+    sp_da_push(decls, decl);
   }
   return decls;
+}
+
+sp_da(spn_toolchain_decl_t) spn_toolchains_lower(spn_toml_loader_t* ctx, sp_str_t toml, spn_path_root_t base) {
+  spn_cg_config_t config = sp_zero;
+  spn_toolchains_parse(ctx, toml, &config);
+  return spn_toolchains_lower_list(ctx, base, config.toolchain);
 }

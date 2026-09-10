@@ -1,0 +1,11 @@
+[[toolchain]]
+name = "T"
+driver = "gcc"
+compiler = "C"
+archiver = "A"
+
+[[toolchain]]
+name = "T"
+driver = "gcc"
+compiler = "D"
+archiver = "A"
