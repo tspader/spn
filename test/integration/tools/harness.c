@@ -741,6 +741,34 @@ sp_err_t run_rebuild_test(sp_test_t* t, rebuild_test_t test) {
   return SP_OK;
 }
 
+static sp_str_t bare_expect_token(bare_expect_t expect) {
+  switch (expect) {
+    case BARE_EXPECT_RUNS: return sp_str_lit("runs");
+    case BARE_EXPECT_NOT_LOADABLE: return sp_str_lit("not_loadable");
+  }
+  sp_unreachable_return(sp_str_lit("runs"));
+}
+
+static sp_err_t stage_bare_run(sp_test_t* t, fixture_t* fixture, action_t action) {
+  sp_str_t root = sp_os_env_get(sp_str_lit("SPN_BARE_PROBES"));
+  if (sp_str_empty(root)) {
+    return SP_OK;
+  }
+
+  sp_mem_t mem = fixture->mem;
+  sp_str_t lane = sp_os_env_get(sp_str_lit("SPN_TEST_TOOLCHAIN"));
+  sp_str_t project = sp_cstr_as_str(fixture->project);
+  sp_str_t leaf = sp_fs_join_path(mem, sp_fs_get_name(sp_fs_parent_path(project)), sp_fs_get_name(project));
+  sp_str_t dir = sp_fs_join_path(mem, sp_fs_join_path(mem, root, lane), leaf);
+  sp_try(sp_fs_create_dir(dir));
+
+  sp_str_t exe_name = sp_fs_get_name(exe(action.bare.name));
+  sp_try(sp_fs_copy_file(fixture_path(fixture, exe(action.bare.name)), sp_fs_join_path(mem, dir, exe_name)));
+
+  sp_str_t manifest = sp_fmt(mem, "{}\n{}\n", sp_fmt_str(exe_name), sp_fmt_str(bare_expect_token(action.bare.expect))).value;
+  return sp_fs_create_file_str(sp_fs_join_path(mem, dir, sp_str_lit("probe")), manifest);
+}
+
 sp_err_t run_actions(sp_test_t* t, fixture_t* fixture, const action_t* actions) {
   sp_mem_t mem = fixture->mem;
 
@@ -771,6 +799,10 @@ sp_err_t run_actions(sp_test_t* t, fixture_t* fixture, const action_t* actions) 
         sp_test_kv(t, "command", bin);
         sp_test_kv(t, "output", output.out);
         sp_expect_eq(t, action.bin.rc, output.status.exit_code);
+        break;
+      }
+      case ACTION_STAGE_BARE_RUN: {
+        sp_try(stage_bare_run(t, fixture, action));
         break;
       }
       case ACTION_VERIFY_EXISTS: {

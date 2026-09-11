@@ -34,6 +34,7 @@ winvm_init_err_t winvm_init(winvm_t* vm, sp_mem_t mem) {
   vm->paths.domains = sp_fs_join_path(mem, vm->paths.repo, sp_str_lit("build/winvm/domains"));
   vm->paths.logs = sp_fs_join_path(mem, vm->paths.repo, sp_str_lit("build/winvm/logs"));
   vm->paths.known_hosts = sp_fs_join_path(mem, vm->paths.repo, sp_str_lit("build/winvm/known_hosts"));
+  vm->paths.probes = sp_fs_join_path(mem, vm->paths.repo, sp_str_lit("build/winvm/probes"));
 
   vm->cfg.connect = env_or(mem, "SPN_WIN_CONNECT", sp_str_lit("qemu:///system"));
   vm->cfg.pool = env_or(mem, "SPN_WIN_POOL", sp_str_lit("default"));
@@ -50,6 +51,7 @@ winvm_init_err_t winvm_init(winvm_t* vm, sp_mem_t mem) {
 
   sp_fs_create_dir(vm->paths.logs);
   sp_fs_create_dir(vm->paths.domains);
+  sp_fs_create_dir(vm->paths.probes);
   return WINVM_INIT_OK;
 }
 
@@ -277,11 +279,86 @@ s32 winvm_upload_file(winvm_t* vm, const winvm_variant_t* variant, sp_str_t loca
   return sp_ps_run(vm->mem, scp).status.exit_code;
 }
 
+s32 winvm_download_dir(winvm_t* vm, const winvm_variant_t* variant, sp_str_t remote, sp_str_t local) {
+  sp_ps_config_t scp = { .command = sp_str_lit("scp"), .io.err = { .mode = SP_PS_IO_MODE_REDIRECT } };
+  ssh_opts(vm, &scp);
+  sp_ps_config_add_arg(vm->mem, &scp, sp_str_lit("-r"));
+  sp_ps_config_add_arg(vm->mem, &scp, sp_fmt(vm->mem, "{}:{}", sp_fmt_str(ssh_target(vm, variant)), sp_fmt_str(remote)).value);
+  sp_ps_config_add_arg(vm->mem, &scp, local);
+  return sp_ps_run(vm->mem, scp).status.exit_code;
+}
+
+s32 winvm_upload_dir(winvm_t* vm, const winvm_variant_t* variant, sp_str_t local, sp_str_t remote) {
+  sp_ps_config_t scp = { .command = sp_str_lit("scp"), .io.err = { .mode = SP_PS_IO_MODE_REDIRECT } };
+  ssh_opts(vm, &scp);
+  sp_ps_config_add_arg(vm->mem, &scp, sp_str_lit("-r"));
+  sp_ps_config_add_arg(vm->mem, &scp, local);
+  sp_ps_config_add_arg(vm->mem, &scp, sp_fmt(vm->mem, "{}:{}", sp_fmt_str(ssh_target(vm, variant)), sp_fmt_str(remote)).value);
+  return sp_ps_run(vm->mem, scp).status.exit_code;
+}
+
 sp_ps_config_t winvm_recipe_config(winvm_t* vm, const winvm_variant_t* variant, winvm_step_t step) {
   sp_str_t remote = sp_fmt(vm->mem, "C:/Users/{}/{}", sp_fmt_str(vm->cfg.user), sp_fmt_str(recipe_name(vm, step))).value;
   sp_str_t invoke = step.arg
     ? sp_fmt(vm->mem, "pwsh -NoProfile -ExecutionPolicy Bypass -File {} {}", sp_fmt_str(remote), sp_fmt_cstr(step.arg)).value
     : sp_fmt(vm->mem, "pwsh -NoProfile -ExecutionPolicy Bypass -File {}", sp_fmt_str(remote)).value;
+  return winvm_ssh_config(vm, variant, sp_str_to_cstr(vm->mem, invoke));
+}
+
+s32 winvm_probe_expected_code(winvm_probe_expect_t expect) {
+  switch (expect) {
+    case WINVM_PROBE_RUNS: return 0;
+    case WINVM_PROBE_NOT_LOADABLE: return 10;
+  }
+  SP_UNREACHABLE_RETURN(0);
+}
+
+static winvm_probe_expect_t probe_expect_from_token(sp_str_t token) {
+  if (sp_str_equal_cstr(sp_str_trim(token), "not_loadable")) {
+    return WINVM_PROBE_NOT_LOADABLE;
+  }
+  return WINVM_PROBE_RUNS;
+}
+
+s32 winvm_probes_read(winvm_t* vm, sp_da(winvm_probe_t)* probes) {
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_da(sp_fs_entry_t) entries = sp_zero;
+  sp_fs_collect_recursive(scratch.mem, vm->paths.probes, &entries);
+
+  s32 result = 0;
+  sp_da_for(entries, it) {
+    if (entries[it].kind == SP_FS_KIND_DIR || !sp_str_equal(sp_fs_get_name(entries[it].path), sp_str_lit("probe"))) {
+      continue;
+    }
+    sp_str_t content = sp_zero;
+    if (sp_io_read_file(vm->mem, entries[it].path, &content)) {
+      result = -1;
+      break;
+    }
+    s32 nl = sp_str_find_c8(content, '\n');
+    if (nl < 0) {
+      result = -1;
+      break;
+    }
+    sp_str_t dir = sp_fs_parent_path(entries[it].path);
+    winvm_probe_t probe = {
+      .rel = sp_str_copy(vm->mem, sp_str_suffix(dir, dir.len - vm->paths.probes.len - 1)),
+      .exe = sp_str_trim(sp_str_prefix(content, nl)),
+      .expect = probe_expect_from_token(sp_str_suffix(content, content.len - nl - 1)),
+    };
+    sp_da_push(*probes, probe);
+  }
+
+  sp_mem_end_scratch(scratch);
+  return result;
+}
+
+sp_ps_config_t winvm_probe_config(winvm_t* vm, const winvm_variant_t* variant, winvm_probe_t probe) {
+  sp_str_t script = sp_fmt(vm->mem, "C:/Users/{}/barerun.ps1", sp_fmt_str(vm->cfg.user)).value;
+  sp_str_t dir = sp_fmt(vm->mem, "C:/Users/{}/probes/{}", sp_fmt_str(vm->cfg.user), sp_fmt_str(probe.rel)).value;
+  sp_str_t invoke = sp_fmt(vm->mem,
+    "pwsh -NoProfile -ExecutionPolicy Bypass -File {} -Dir {} -Exe {}",
+    sp_fmt_str(script), sp_fmt_str(dir), sp_fmt_str(probe.exe)).value;
   return winvm_ssh_config(vm, variant, sp_str_to_cstr(vm->mem, invoke));
 }
 

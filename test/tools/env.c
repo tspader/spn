@@ -408,6 +408,7 @@ sp_err_t fixture_config_append(sp_test_t* t, fixture_t* fixture, const c8* proje
 
 sp_err_t prepare_test(sp_test_t* t, fixture_t* fixture, const c8* project, const c8* const* copy) {
   sp_mem_t mem = fixture->mem;
+  fixture->project = project;
 
   fixture->paths.config = fixture_path(fixture, sp_str_lit(".home/config"));
   fixture->paths.storage = fixture_path(fixture, sp_str_lit(".home/storage"));
