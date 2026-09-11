@@ -750,11 +750,8 @@ spn_c_standard_t spn_c_standard_from_str(sp_str_t str) {
   if (sp_str_equal_cstr(str, "gnu11")) {
     return SPN_GNU11;
   }
-  if (sp_str_empty(str)) {
-    return SPN_C_STANDARD_NONE;
-  }
 
-  SP_UNREACHABLE_RETURN(SPN_C99);
+  return SPN_C_STANDARD_NONE;
 }
 
 sp_str_t spn_pkg_source_to_str(spn_pkg_source_t kind) {

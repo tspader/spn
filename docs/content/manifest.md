@@ -95,15 +95,15 @@ readme: false
 
 | Field | Type |
 |---|---|
-| `linkage` | `shared` \| `static` \| `source` \| `object` |
-| `standard` | `c89` \| `c99` \| `c11` \| `gnu89` \| `gnu99` \| `gnu11` |
-| `toolchain` | `string` |
-| `mode` | `release` \| `debug` |
-| `opt` | `0` \| `1` \| `2` \| `3` \| `s` \| `z` |
+| `linkage` | array of [`value_entry`](#value_entry) \| `string` |
+| `standard` | array of [`value_entry`](#value_entry) \| `string` |
+| `toolchain` | array of [`value_entry`](#value_entry) \| `string` |
+| `mode` | array of [`value_entry`](#value_entry) \| `string` |
+| `opt` | array of [`value_entry`](#value_entry) \| `string` |
 | `sanitize` | array of `address` \| `thread` \| `undefined` \| `memory` \| `leak` |
 | `os` | `windows` \| `linux` \| `macos` \| `wasi` \| `freestanding` |
 | `arch` | `x86_64` \| `aarch64` \| `wasm32` |
-| `abi` | `gnu` \| `musl` \| `msvc` \| `apple` \| `none` \| `elf` |
+| `abi` | array of [`value_entry`](#value_entry) \| `string` |
 | `options` | [`when`](#extern-types) |
 
 ## option

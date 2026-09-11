@@ -5,10 +5,14 @@
   },
   "profile": {
     "debug": {
-      "mode": "debug"
+      "mode": [
+        "debug"
+      ]
     },
     "release": {
-      "mode": "release"
+      "mode": [
+        "release"
+      ]
     }
   }
 }

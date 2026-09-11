@@ -1,0 +1,10 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[profile.a]
+abi = [{ value = "gnu", when = { abi = "gnu" } }]
+toolchain = [{ value = "clang", when = { tls = true } }]
+
+[options.tls]
+type = "bool"

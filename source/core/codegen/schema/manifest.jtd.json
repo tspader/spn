@@ -173,15 +173,15 @@
 
     "profile": {
       "optionalProperties": {
-        "linkage": { "ref": "linkage" },
-        "standard": { "ref": "c_standard" },
-        "toolchain": { "type": "string" },
-        "mode": { "ref": "mode" },
-        "opt": { "ref": "opt_level" },
+        "linkage": { "elements": { "ref": "value_entry" }, "metadata": { "shorthand": "value" } },
+        "standard": { "elements": { "ref": "value_entry" }, "metadata": { "shorthand": "value" } },
+        "toolchain": { "elements": { "ref": "value_entry" }, "metadata": { "shorthand": "value" } },
+        "mode": { "elements": { "ref": "value_entry" }, "metadata": { "shorthand": "value" } },
+        "opt": { "elements": { "ref": "value_entry" }, "metadata": { "shorthand": "value" } },
         "sanitize": { "elements": { "ref": "sanitizer" } },
         "os": { "ref": "os" },
         "arch": { "ref": "arch" },
-        "abi": { "ref": "abi" },
+        "abi": { "elements": { "ref": "value_entry" }, "metadata": { "shorthand": "value" } },
         "options": { "metadata": { "extern": "when", "include": "when/types.h" } }
       }
     },

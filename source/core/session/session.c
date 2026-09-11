@@ -79,9 +79,6 @@ spn_err_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem, spn_p
   s->paths.build = spn_path_join(s->mem, s->paths.root, sp_str_lit("build"));
   spn_triple_t host = ctx->host;
 
-  sp_str_ht_init(s->mem, s->profiles);
-  spn_profile_populate(&s->profiles, root);
-
   sp_ht_init(s->mem, s->registry);
   sp_ht_init(s->mem, s->packages);
   sp_ht_init(s->mem, s->options);
@@ -93,7 +90,7 @@ spn_err_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem, spn_p
   sp_om_new(s->units.targets);
   sp_om_new(s->units.objects);
 
-  spn_try(spn_profile_resolve(s->profiles, &config.profile, host, root, &s->profile));
+  spn_try(spn_profile_resolve(&config.profile, host, root, &s->profile));
 
   spn_toolchain_query_t query = spn_profile_query(&s->profile, host);
   if (!query.abis.count) {

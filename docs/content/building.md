@@ -43,7 +43,7 @@ build/debug/
 
 ### Profiles
 
-Packages are compiled against a profile, which contains the target triple, toolchain, build mode, optimization level, sanitizers, etc.
+Packages are compiled against a profile, which contains the target triple, toolchain, build mode, optimization level, sanitizers, etc. `spn` bakes in two profiles, `debug` and `release`, and reserves `[profile.default]` as the base fields which every profile uses unless overridden.
 
 ```toml
 [profile.default]
@@ -51,7 +51,24 @@ toolchain = "zig"
 linkage = "static"
 standard = "c11"
 mode = "debug"
+
+[profile.debug]
+opt = "2"
+
+[profile.foo]
+abi = { value = "gnu", when = { os = "linux" } }
+toolchain = [
+  { value = "clang", when = { os = "macos" } },
+  { value = "gcc" },
+]
 ```
+
+Here, `debug` applies optimization on top of the default profile, and `foo` overrides the toolchain and ABI. Lists are tried in order such that the first match wins and an ungated entry is the fallback.
+
+When building:
+- `spn build` uses `debug`
+- `spn build --mode release` uses `release`
+- `spn build --profile NAME` uses the named `[[profile]]`
 
 ### Modes and optimization
 

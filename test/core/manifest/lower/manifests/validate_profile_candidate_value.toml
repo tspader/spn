@@ -1,0 +1,10 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[profile.dev]
+linkage = [{ value = "loose" }]
+standard = "c2x"
+mode = [{ value = "fast", when = { os = "linux" } }]
+opt = "9"
+abi = [{ value = "bogus" }]

@@ -30,30 +30,47 @@ static void spn_cg_{{ .object }}_read_array(spn_toml_loader_t* ctx, toml_table_t
 }
 {{ end }}
 {{ for .shorthands }}
+static bool spn_cg_{{ .object }}_read_entry(spn_toml_loader_t* ctx, toml_table_t* element, toml_value_t value, {{ .type }}* entry) {
+  if (element) {
+    spn_cg_{{ .object }}_read(ctx, element, entry);
+    return true;
+  }
+  if (value.ok) {
+    entry->{{ .shorthand }} = spn_toml_loader_intern_value(ctx, value);
+    return true;
+  }
+  return false;
+}
+
 static void spn_cg_{{ .object }}_read_array(spn_toml_loader_t* ctx, toml_table_t* table, const c8* key, sp_da({{ .type }})* out) {
   toml_array_t* array = toml_table_array(table, key);
-  if (!array) {
-    return;
-  }
-  *out = sp_da_new(ctx->mem, {{ .type }});
-  spn_toml_loader_push_key(ctx, key);
-  sp_for(it, (u32)toml_array_len(array)) {
-    spn_toml_loader_push_index(ctx, it);
-    {{ .type }} entry = sp_zero;
-    toml_table_t* element = toml_array_table(array, (s32)it);
-    toml_value_t value = toml_array_string(array, (s32)it);
-    if (element) {
-      spn_cg_{{ .object }}_read(ctx, element, &entry);
-      sp_da_push(*out, entry);
-    } else if (value.ok) {
-      entry.{{ .shorthand }} = spn_toml_loader_intern_value(ctx, value);
-      sp_da_push(*out, entry);
-    } else {
-      spn_toml_loader_issue_at(ctx, SPN_ERR_CODEGEN_EXPECTED_STR, sp_str_lit(""));
+  if (array) {
+    *out = sp_da_new(ctx->mem, {{ .type }});
+    spn_toml_loader_push_key(ctx, key);
+    sp_for(it, (u32)toml_array_len(array)) {
+      spn_toml_loader_push_index(ctx, it);
+      {{ .type }} entry = sp_zero;
+      if (spn_cg_{{ .object }}_read_entry(ctx, toml_array_table(array, (s32)it), toml_array_string(array, (s32)it), &entry)) {
+        sp_da_push(*out, entry);
+      } else {
+        spn_toml_loader_issue_at(ctx, SPN_ERR_CODEGEN_EXPECTED_STR, sp_str_lit(""));
+      }
+      spn_toml_loader_pop(ctx);
     }
     spn_toml_loader_pop(ctx);
+    return;
   }
+
+  {{ .type }} entry = sp_zero;
+  spn_toml_loader_push_key(ctx, key);
+  bool single = spn_cg_{{ .object }}_read_entry(ctx, toml_table_table(table, key), toml_table_string(table, key), &entry);
   spn_toml_loader_pop(ctx);
+  if (single) {
+    *out = sp_da_new(ctx->mem, {{ .type }});
+    sp_da_push(*out, entry);
+  } else if (spn_toml_loader_field_present(table, key)) {
+    spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, key);
+  }
 }
 {{ end }}
 {{ for .keyeds }}

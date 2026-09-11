@@ -25,7 +25,20 @@ struct spn_profile_info {
   spn_path_t libc;
 };
 
-typedef sp_str_ht(spn_profile_info_t) spn_profile_table_t;
+typedef struct {
+  sp_str_t name;
+  spn_os_t os;
+  spn_arch_t arch;
+  spn_gated_list_t toolchain;
+  spn_gated_list_t abi;
+  spn_gated_list_t linkage;
+  spn_gated_list_t standard;
+  spn_gated_list_t mode;
+  spn_gated_list_t opt;
+  spn_sanitizer_set_t sanitizers;
+  bool sanitizers_set;
+  spn_when_t options;
+} spn_profile_decl_t;
 
 static inline spn_triple_t spn_profile_triple(const spn_profile_info_t* profile) {
   return (spn_triple_t) { profile->arch, profile->os, profile->abi };

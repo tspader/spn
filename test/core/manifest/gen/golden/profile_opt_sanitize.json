@@ -5,8 +5,12 @@
   },
   "profile": {
     "fast": {
-      "mode": "release",
-      "opt": "3",
+      "mode": [
+        "release"
+      ],
+      "opt": [
+        "3"
+      ],
       "sanitize": [
         "address",
         "undefined"

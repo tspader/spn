@@ -1,0 +1,7 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[profile.a]
+abi = [{ value = "gnu", when = { os = "plan9" } }]
+opt = [{ value = "3", when = { arch = true } }]

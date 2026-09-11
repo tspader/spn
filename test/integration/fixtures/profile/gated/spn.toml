@@ -1,13 +1,11 @@
 [package]
-name = "window"
+name = "profile_gated"
 version = "0.1.0"
 
 [[bin]]
 name = "main"
 source = ["main.c"]
 
-[deps.package]
-raylib = "6.0.0"
-
 [profile.default]
 abi = { value = "gnu", when = { os = "linux" } }
+opt = { value = "3", when = { os = "macos" } }

@@ -114,15 +114,6 @@ spn_target_info_t* spn_pkg_get_target_ex(spn_pkg_info_t* pkg, sp_str_t name) {
   return SP_NULLPTR;
 }
 
-spn_profile_info_t* spn_pkg_get_default_profile(spn_pkg_info_t* pkg) {
-  sp_str_om_for(pkg->profiles, it) {
-    return sp_str_om_at(pkg->profiles, it);
-  }
-
-  SP_UNREACHABLE_RETURN(SP_NULLPTR);
-}
-
-
 spn_pkg_root_t spn_pkg_upstream(spn_pkg_info_t* info) {
   if (sp_str_empty(info->upstream.url)) {
     return (spn_pkg_root_t) { .kind = SPN_PKG_ROOT_NONE };
