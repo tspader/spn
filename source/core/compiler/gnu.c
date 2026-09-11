@@ -107,7 +107,19 @@ static sp_str_t render_target(sp_mem_t mem, const spn_cc_toolchain_t* toolchain,
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
+static sp_str_t ms_runtime_flag(spn_runtime_t runtime) {
+  switch (runtime) {
+    case SPN_RUNTIME_SHARED: return sp_str_lit("-fms-runtime-lib=dll");
+    case SPN_RUNTIME_STATIC:
+    case SPN_RUNTIME_NONE: return sp_str_lit("-fms-runtime-lib=static");
+  }
+  SP_UNREACHABLE_RETURN(sp_str_lit("-fms-runtime-lib=static"));
+}
+
 void spn_gnu_render_flags(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, spn_cc_flags_t* flags) {
+  if (profile->abi == SPN_ABI_MSVC && toolchain->driver == SPN_CC_DRIVER_CLANG) {
+    sp_da_push(flags->compile, ms_runtime_flag(profile->runtime));
+  }
   if (profile->mode == SPN_MODE_DEBUG) {
     sp_da_push(flags->compile, sp_str_lit("-g"));
   }

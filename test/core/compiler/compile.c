@@ -133,7 +133,7 @@ static const compile_test_t tests [] = {
     },
     .expect = {
       .command = "cc",
-      .args = { "--target=x86_64-windows-msvc", "-std=c99", "-c", "-gno-codeview-command-line", "-Werror=return-type", "main.c", "-Xclang", "-object-file-name=main.o", "-o", "main.o" },
+      .args = { "--target=x86_64-windows-msvc", "-std=c99", "-fms-runtime-lib=static", "-c", "-gno-codeview-command-line", "-Werror=return-type", "main.c", "-Xclang", "-object-file-name=main.o", "-o", "main.o" },
     },
   },
   {
@@ -302,7 +302,7 @@ static const compile_test_t tests [] = {
     },
     .expect = {
       .command = "/X/bin/arm64/cl.exe",
-      .args = { "/nologo", "/utf-8", "/Brepro", "/c", "/I/X/crt/include", "/I/X/sdk/include/ucrt", "/I/X/sdk/include/um", "/I/X/sdk/include/shared", "/we4715", "/Fomain.o", "main.c" },
+      .args = { "/nologo", "/utf-8", "/Brepro", "/MT", "/c", "/I/X/crt/include", "/I/X/sdk/include/ucrt", "/I/X/sdk/include/um", "/I/X/sdk/include/shared", "/we4715", "/Fomain.o", "main.c" },
       .env = { "INCLUDE=/X/crt/include;/X/sdk/include/ucrt;/X/sdk/include/um;/X/sdk/include/shared" },
     },
   },
@@ -440,7 +440,7 @@ static const compile_test_t tests [] = {
     .expect = {
       .command = "cc",
       .args = {
-        "--target=x86_64-windows-msvc", "-std=c99", "-c",
+        "--target=x86_64-windows-msvc", "-std=c99", "-fms-runtime-lib=static", "-c",
         "-nostdlibinc",
         "-isystem", "/X/crt/include",
         "-isystem", "/X/sdk/include/ucrt",

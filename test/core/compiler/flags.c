@@ -95,6 +95,28 @@ static const flags_test_t tests [] = {
     .expect = { .compile = { "/MD" } },
   },
   {
+    .name = "render_clang_msvc_static_runtime",
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_MSVC,
+      .runtime = SPN_RUNTIME_STATIC,
+    },
+    .driver = SPN_CC_DRIVER_CLANG,
+    .expect = { .compile = { "-fms-runtime-lib=static" } },
+  },
+  {
+    .name = "render_clang_msvc_shared_runtime",
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_MSVC,
+      .runtime = SPN_RUNTIME_SHARED,
+    },
+    .driver = SPN_CC_DRIVER_CLANG,
+    .expect = { .compile = { "-fms-runtime-lib=dll" } },
+  },
+  {
     .name = "freestanding_zig_strips_runtime",
     .profile = {
       .arch = SPN_ARCH_ARM64,
