@@ -11,8 +11,8 @@ add_executable(core
   identity.c
   intern.c
   lazy.c
-  os.c
   stable_map.c
+  str.c
   triple.c
   version.c
   when.c

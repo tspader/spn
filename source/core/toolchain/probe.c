@@ -129,15 +129,10 @@ SP_PRIVATE spn_err_t probe_hash(spn_probe_cache_t* cache, sp_str_t path, sp_hash
   return SPN_OK;
 }
 
-static sp_str_t locate(const spn_path_roots_t* roots, sp_da(sp_str_t) dirs, sp_mem_t mem, spn_arg_t program) {
-  if (spn_path_empty(program.path)) {
-    return spn_search_program(mem, program.prefix, dirs);
-  }
-  return spn_search_file(mem, spn_path_str(roots, mem, program.path));
-}
-
-static bool probe_program(spn_probe_cache_t* cache, const spn_path_roots_t* roots, sp_da(sp_str_t) dirs, sp_mem_t mem, spn_arg_t* program, sp_hash_t* hash) {
-  sp_str_t found = locate(roots, dirs, mem, *program);
+static bool probe_program(spn_probe_cache_t* cache, const spn_path_roots_t* roots, spn_search_rules_t rules, sp_da(sp_str_t) dirs, sp_mem_t mem, spn_arg_t* program, sp_hash_t* hash) {
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch_for(mem);
+  sp_str_t found = sp_str_copy(mem, spn_search_program(rules, s.mem, roots, *program, dirs));
+  sp_mem_end_scratch(s);
   if (sp_str_empty(found) || probe_hash(cache, found, hash)) {
     return false;
   }
@@ -155,28 +150,36 @@ static spn_err_t probe_missing(const spn_cc_toolchain_t* cc, const spn_path_root
   });
 }
 
-spn_err_t spn_toolchain_probe(spn_cc_toolchain_t* cc, const spn_path_roots_t* roots, sp_da(sp_str_t) dirs, spn_probe_cache_t* cache, sp_mem_t mem, sp_hash_t* identity) {
+static sp_da(sp_str_t) beside(sp_mem_t mem, const spn_path_roots_t* roots, spn_path_t compiler, sp_da(sp_str_t) dirs) {
+  sp_da(sp_str_t) result = sp_da_new(mem, sp_str_t);
+  sp_da_push(result, spn_path_str(roots, mem, spn_path_parent(compiler)));
+  sp_da_for(dirs, it) {
+    sp_da_push(result, dirs[it]);
+  }
+  return result;
+}
+
+spn_err_t spn_toolchain_probe(spn_cc_toolchain_t* cc, const spn_path_roots_t* roots, spn_search_rules_t rules, sp_str_t path, spn_probe_cache_t* cache, sp_mem_t mem, sp_hash_t* identity) {
   *identity = 0;
-
   sp_hash_t hashes [3] = sp_zero;
-  u32 num_hashes = 0;
 
-  if (!probe_program(cache, roots, dirs, mem, &cc->compiler.program, &hashes[num_hashes])) {
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch_for(mem);
+  sp_da(sp_str_t) dirs = spn_search_dirs(rules, s.mem, path);
+  if (!probe_program(cache, roots, rules, dirs, mem, &cc->compiler.program, &hashes[0])) {
+    sp_mem_end_scratch(s);
     return probe_missing(cc, roots, mem, cc->compiler.program);
   }
-  num_hashes++;
-  if (!probe_program(cache, roots, dirs, mem, &cc->archiver.program, &hashes[num_hashes])) {
+  dirs = beside(s.mem, roots, cc->compiler.program.path, dirs);
+  bool archiver = probe_program(cache, roots, rules, dirs, mem, &cc->archiver.program, &hashes[1]);
+  bool cxx = !spn_arg_empty(cc->cxx.program) && probe_program(cache, roots, rules, dirs, mem, &cc->cxx.program, &hashes[2]);
+  sp_mem_end_scratch(s);
+
+  if (!archiver) {
     return probe_missing(cc, roots, mem, cc->archiver.program);
   }
-  num_hashes++;
-  if (!spn_arg_empty(cc->cxx.program)) {
-    if (probe_program(cache, roots, dirs, mem, &cc->cxx.program, &hashes[num_hashes])) {
-      num_hashes++;
-    }
-    else {
-      cc->cxx = sp_zero_s(spn_toolchain_launcher_t);
-    }
+  if (!cxx) {
+    cc->cxx = sp_zero_s(spn_toolchain_launcher_t);
   }
-  *identity = spn_digest_hash_combine(hashes, num_hashes);
+  *identity = spn_digest_hash_combine(hashes, cxx ? 3 : 2);
   return SPN_OK;
 }

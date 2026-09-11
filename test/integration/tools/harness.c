@@ -465,6 +465,7 @@ static sp_ps_output_t run_fixture_bin(fixture_t* fixture, sp_str_t path) {
     .cwd = fixture->root,
     .env = {
       .extra = {
+        { sp_str_lit("PATH"), test_toolchain_path(fixture->mem) },
         { sp_str_lit("ASAN_OPTIONS"), sp_str_lit("abort_on_error=0:exitcode=1") },
         { sp_str_lit("UBSAN_OPTIONS"), sp_str_lit("halt_on_error=1:abort_on_error=0:exitcode=1") },
       },

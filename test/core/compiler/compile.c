@@ -3,6 +3,7 @@
 typedef struct {
   const c8* name;
   spn_cc_driver_t driver;
+  const c8* compiler;
   spn_wasi_spelling_t wasi;
   test_profile_t profile;
   spn_lang_t lang;
@@ -251,8 +252,9 @@ static const compile_test_t tests [] = {
     },
   },
   {
-    .name = "msvc_asm_uses_masm",
+    .name = "msvc_asm_uses_masm_beside_cl",
     .driver = SPN_CC_DRIVER_MSVC,
+    .compiler = "vc/bin/cl.exe",
     .lang = SPN_LANG_ASM,
     .profile = {
       .arch = SPN_ARCH_X64,
@@ -264,7 +266,7 @@ static const compile_test_t tests [] = {
     .include = "inc",
     .define = "SPUM=1",
     .expect = {
-      .command = "ml64",
+      .command = "vc/bin/ml64.exe",
       .args = { "/nologo", "/c", "/Fomain.o", "main.c" },
     },
   },
@@ -556,6 +558,9 @@ sp_test_each(render_compile, render, compile_test_t, tests, .setup = spn_test_ct
   sp_mem_t mem = sp_test_arena(t);
   spn_cc_toolchain_t toolchain = test_toolchain(it->driver);
   toolchain.wasi = it->wasi;
+  if (it->compiler) {
+    toolchain.compiler.program = spn_arg_path(test_arg_path(it->compiler));
+  }
   spn_cc_compile_t compile = {
     .lang = it->lang,
     .cxx = it->cxx,

@@ -122,16 +122,41 @@ static bool toolchain_deterministic_objects(const test_toolchain_t* toolchain) {
   return toolchain->info->driver != SPN_CC_DRIVER_MSVC;
 }
 
-static bool installed(sp_mem_t mem, sp_str_t program) {
-  sp_da(sp_str_t) dirs = spn_search_split_path(mem, sp_os_env_get(sp_str_lit("PATH")));
-  return !sp_str_empty(spn_search_program(mem, program, dirs));
+static spn_search_rules_t host_rules() {
+  return spn_search_rules(spn_triple_host().os);
 }
 
-static bool present(sp_mem_t mem, spn_arg_t program) {
-  if (!sp_str_empty(program.prefix)) {
-    return installed(mem, program.prefix);
+static sp_str_t program_existing(sp_mem_t mem, spn_arg_t program) {
+  spn_search_rules_t rules = host_rules();
+  spn_path_roots_t roots = sp_zero;
+  sp_da(sp_str_t) dirs = spn_search_dirs(rules, mem, sp_os_env_get(sp_str_lit("PATH")));
+  return spn_search_program(rules, mem, &roots, program, dirs);
+}
+
+static bool present(spn_arg_t program) {
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  bool found = !sp_str_empty(program_existing(scratch.mem, program));
+  sp_mem_end_scratch(scratch);
+  return found;
+}
+
+static sp_str_t toolchain_dir(sp_mem_t mem, const spn_toolchain_info_t* info) {
+  return sp_fs_parent_path(program_existing(mem, info->compiler.program));
+}
+
+sp_str_t test_toolchain_path(sp_mem_t mem) {
+  const spn_toolchain_info_t* info = test_toolchain()->info;
+  sp_str_t path = sp_os_env_get(sp_str_lit("PATH"));
+  switch (info->support.kind) {
+    case SPN_TOOLCHAIN_SUPPORT_LOCAL: {
+      return spn_search_prepend(host_rules(), mem, toolchain_dir(mem, info), path);
+    }
+    case SPN_TOOLCHAIN_SUPPORT_ARTIFACT:
+    case SPN_TOOLCHAIN_SUPPORT_NONE: {
+      return path;
+    }
   }
-  return sp_fs_is_target_file(program.path.sub);
+  sp_unreachable_return(path);
 }
 
 typedef struct {
@@ -167,7 +192,7 @@ static sp_str_t missing_lane_program(sp_mem_t mem, const spn_toolchain_info_t* i
     if (!sp_str_equal_cstr(info->name, row->lane) || !links_dialect(info, row->dialect)) {
       continue;
     }
-    if (!installed(mem, sp_cstr_as_str(row->program))) {
+    if (!present(spn_arg_lit(sp_cstr_as_str(row->program)))) {
       return sp_cstr_as_str(row->program);
     }
   }
@@ -180,7 +205,7 @@ static sp_str_t missing_toolchain_program(sp_mem_t mem, const spn_toolchain_info
     info->archiver.program,
   };
   sp_carr_for(programs, it) {
-    if (!present(mem, programs[it])) {
+    if (!present(programs[it])) {
       return sp_str_empty(programs[it].prefix) ? programs[it].path.sub : programs[it].prefix;
     }
   }
@@ -348,7 +373,7 @@ sp_str_t test_when_blocked(test_when_t when) {
     if (!when.programs[it]) {
       break;
     }
-    if (!installed(mem, sp_cstr_as_str(when.programs[it]))) {
+    if (!present(spn_arg_lit(sp_cstr_as_str(when.programs[it])))) {
       return sp_fmt(mem, "{} isn't installed", sp_fmt_cstr(when.programs[it])).value;
     }
   }

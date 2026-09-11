@@ -57,6 +57,18 @@ sp_test(platform, win32_msvc) {
   });
 }
 
+sp_test(platform, masm) {
+  return run_test(t, (test_t) {
+    .project = "test/integration/fixtures/platform/masm",
+    .copy = { "main.c", "answer.asm" },
+    .when.driver = SPN_CC_DRIVER_MSVC,
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_RUN_BIN, .bin.name = "main" },
+    },
+  });
+}
+
 sp_test(platform, subsystem) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/platform/subsystem",

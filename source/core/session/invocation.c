@@ -11,6 +11,7 @@
 #include "session/session.h"
 #include "unit/unit.h"
 #include "graph/build.h"
+#include "toolchain/search.h"
 #include "triple/triple.h"
 
 static spn_cc_compile_t compile_desc(sp_mem_t mem, spn_compile_unit_t* unit) {
@@ -196,6 +197,16 @@ sp_str_t spn_invocation_to_str(sp_mem_t mem, const spn_invocation_t* invocation)
   return command;
 }
 
+static sp_env_var_t path_var(sp_mem_t mem, sp_str_t program) {
+  sp_assert(sp_fs_is_absolute(program));
+  spn_search_rules_t rules = spn_search_rules(spn.host.os);
+  sp_str_t path = sp_env_get(spn.env, sp_str_lit("PATH"));
+  return (sp_env_var_t) {
+    .key = sp_str_lit("PATH"),
+    .value = spn_search_prepend(rules, mem, sp_fs_parent_path(program), path),
+  };
+}
+
 spn_invocation_result_t spn_invocation_run(spn_invocation_t* invocation) {
   const spn_path_roots_t* roots = &spn.roots;
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
@@ -212,10 +223,11 @@ spn_invocation_result_t spn_invocation_run(spn_invocation_t* invocation) {
       .err.mode = SP_PS_IO_MODE_REDIRECT,
     }
   };
-  sp_assert(sp_da_size(invocation->env) <= SP_PS_MAX_ENV);
+  sp_assert(sp_da_size(invocation->env) < SP_PS_MAX_ENV);
   sp_da_for(invocation->env, it) {
     ps.env.extra[it] = spn_invocation_env_var(roots, scratch.mem, invocation->env[it]);
   }
+  ps.env.extra[sp_da_size(invocation->env)] = path_var(scratch.mem, ps.command);
 
   sp_tm_timer_t timer = sp_tm_start_timer();
   sp_ps_output_t result = sp_ps_run(spn.mem, ps);

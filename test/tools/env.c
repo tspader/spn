@@ -480,11 +480,7 @@ static sp_ps_output_t run_spn_ex(sp_test_t* t, fixture_t* fixture, const c8* for
     env_slot++;
   }
   if (fixture->path) {
-    c8 sep = SPN_SEARCH_PATH_SEP;
-    sp_str_t prefixed = sp_fmt(mem, "{}{}{}",
-      sp_fmt_str(fixture_path(fixture, sp_cstr_as_str(fixture->path))),
-      sp_fmt_char(sep),
-      sp_fmt_str(sp_os_env_get(sp_str_lit("PATH")))).value;
+    sp_str_t prefixed = spn_search_prepend(spn_search_rules(spn_triple_host().os), mem, fixture_path(fixture, sp_cstr_as_str(fixture->path)), sp_os_env_get(sp_str_lit("PATH")));
     config.env.extra[env_slot++] = (sp_env_var_t) { .key = sp_str_lit("PATH"), .value = prefixed };
   }
   if (env) {

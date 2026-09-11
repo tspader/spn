@@ -1,5 +1,6 @@
 #include "toolchain.h"
 #include "toolchain/probe.h"
+#include "toolchain/search.h"
 
 #define PROBE_MAX_FILES 6
 #define PROBE_MAX_ACTIONS 6
@@ -167,6 +168,15 @@ static const test_t tests [] = {
     },
   },
   {
+    .name = "archiver_beside_compiler",
+    .programs = { .compiler = { .path = "B/cc" } },
+    .files = { { "B/cc" }, { "B/ar" }, { "A/ar" }, { "A/c++" } },
+    .actions = {
+      { .kind = PROBE_ACTION_PROBE, .probe = { .slot = 1, .resolved = { { "B/cc" }, { "B/ar" }, { "A/c++" } } } },
+    },
+    .expect = { .entries = 3 },
+  },
+  {
     .name = "first_dir_wins",
     .files = { { "A/cc", "1" }, { "B/cc", "2" }, { "A/ar" }, { "B/ar" }, { "A/c++" }, { "B/c++" } },
     .actions = {
@@ -287,7 +297,7 @@ static void write_file(sp_mem_t mem, sp_str_t root, file_t file) {
   sp_fs_create_file_str(file_path(mem, root, file.path), content);
 }
 
-static sp_da(sp_str_t) search_dirs(sp_mem_t mem, sp_str_t root, const c8* const* dirs) {
+static sp_str_t search_path(sp_mem_t mem, sp_str_t root, const c8* const* dirs) {
   sp_da(sp_str_t) result = sp_da_new(mem, sp_str_t);
   bool any = false;
   sp_for(it, PROBE_MAX_DIRS) {
@@ -300,7 +310,8 @@ static sp_da(sp_str_t) search_dirs(sp_mem_t mem, sp_str_t root, const c8* const*
   if (!any) {
     sp_da_push(result, sp_fs_join_path(mem, root, sp_str_lit("A")));
   }
-  return result;
+  c8 sep = spn_search_rules(spn_triple_host().os).sep;
+  return sp_str_join_n(mem, result, sp_da_size(result), sp_str(&sep, 1));
 }
 
 static spn_cc_toolchain_t make_cc(sp_mem_t mem, sp_str_t root, const test_t* it) {
@@ -375,7 +386,7 @@ sp_test_each(probe, resolve, test_t, tests, .setup = spn_test_ctx_setup) {
         spn_cc_toolchain_t declared = make_cc(mem, root, it);
         spn_cc_toolchain_t cc = declared;
         sp_hash_t identity = sp_zero;
-        spn_err_t err = spn_toolchain_probe(&cc, &roots, search_dirs(mem, root, action.probe.dirs), &cache, mem, &identity);
+        spn_err_t err = spn_toolchain_probe(&cc, &roots, spn_search_rules(spn_triple_host().os), search_path(mem, root, action.probe.dirs), &cache, mem, &identity);
         sp_must_eq(t, (u32)action.probe.err, (u32)err);
         if (err) {
           sp_da(spn_event_t) errs = spn_test_drain_errs(mem);

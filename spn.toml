@@ -45,6 +45,7 @@ yyjson = "0.14.0"
 files = [
   "tools/patches/sp-test-num-cpus.patch",
   "tools/patches/sp-prompt-external-wake.patch",
+  "tools/patches/sp-env-host-keys.patch",
 ]
 
 [patch.wamr]
@@ -727,6 +728,7 @@ source = [
   "source/core/target/target.c",
   "source/core/toolchain/catalog.c",
   "source/core/toolchain/select.c",
+  "source/core/toolchain/search.c",
   "source/core/toolchain/toolchain.c",
   "source/core/toolchain/sdk.c",
   "source/core/toolchain/libc.c",

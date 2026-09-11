@@ -36,7 +36,6 @@ static sp_str_t c_standard_switch(spn_c_standard_t standard) {
 
 static sp_str_t cxx_standard_switch(spn_cxx_standard_t standard) {
   switch (standard) {
-    // cl bottoms out at c++14
     case SPN_CXX11:
     case SPN_CXX14: return sp_str_lit("/std:c++14");
     case SPN_CXX17: return sp_str_lit("/std:c++17");
@@ -89,18 +88,32 @@ static void add_launcher(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, spn_
   spn_cc_push_c(mem, invocation, "/nologo");
 }
 
+static sp_str_t assembler_name(spn_arch_t arch) {
+  switch (arch) {
+    case SPN_ARCH_X64: return sp_str_lit("ml64.exe");
+    case SPN_ARCH_ARM64: return sp_str_lit("armasm64.exe");
+    case SPN_ARCH_WASM32:
+    case SPN_ARCH_NONE: {
+      sp_unreachable_case();
+    }
+  }
+  sp_unreachable_return(sp_str_lit(""));
+}
+
+static spn_arg_t assembler(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, spn_arch_t arch) {
+  spn_path_t compiler = toolchain->compiler.program.path;
+  sp_assert(!spn_path_empty(compiler));
+  return spn_arg_path(spn_path_join(mem, spn_path_parent(compiler), assembler_name(arch)));
+}
+
 void spn_msvc_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_compile_t* compile, spn_invocation_t* invocation) {
   if (compile->lang == SPN_LANG_ASM) {
-    // cl neither assembles nor errors on assembly sources; it warns and
-    // exits zero, so these must go to MASM directly
-    invocation->program = spn_arg_lit(sp_str_lit("ml64"));
+    invocation->program = assembler(mem, toolchain, profile->arch);
     spn_cc_push_c(mem, invocation, "/nologo");
     spn_cc_push_c(mem, invocation, "/c");
     return;
   }
   add_launcher(mem, toolchain, compile->lang, invocation);
-  // cl reads sources in the system ANSI codepage by default; non-ASCII
-  // string literals are mangled without this
   spn_cc_push_c(mem, invocation, "/utf-8");
   spn_cc_push_c(mem, invocation, "/Brepro");
   spn_cc_flags_t flags = sp_zero;
@@ -132,8 +145,6 @@ void spn_msvc_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, 
       spn_cc_push_c(mem, invocation, "/GR-");
     }
   }
-  // PIC and symbol visibility have no cl equivalents; code is always
-  // relocatable and symbols are hidden unless exported
   spn_cc_push_strs(mem, invocation, compile->args);
   // Parity with -Werror=return-type: C4715 is "not all control paths
   // return a value"
@@ -200,7 +211,6 @@ void spn_msvc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, con
     add_sdk_link(mem, &profile->sdk.msvc, invocation);
   }
 
-  // Everything past /link goes to link.exe verbatim
   sp_da(spn_arg_t) linker = sp_da_new(mem, spn_arg_t);
   if (profile->mode == SPN_MODE_DEBUG) {
     sp_da_push(linker, spn_arg_lit(sp_str_lit("/DEBUG")));
