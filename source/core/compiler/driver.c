@@ -286,7 +286,7 @@ spn_err_t spn_cc_render_archive(sp_mem_t mem, const spn_cc_toolchain_t* toolchai
       return SPN_OK;
     }
     case SPN_AR_DRIVER_MSVC: {
-      spn_msvc_render_archive(mem, toolchain, files, invocation);
+      spn_msvc_render_archive(mem, toolchain, profile, files, invocation);
       return SPN_OK;
     }
   }

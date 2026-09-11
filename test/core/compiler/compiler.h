@@ -48,6 +48,7 @@ typedef struct {
   spn_opt_level_t opt;
   spn_sanitizer_set_t sanitizers;
   const c8* sdk;
+  const c8* bin;
   const c8* libc;
 } test_profile_t;
 

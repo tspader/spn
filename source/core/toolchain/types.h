@@ -43,6 +43,7 @@ typedef enum {
 
 typedef struct {
   spn_arch_t arch;
+  spn_path_t bin;
   struct {
     spn_path_t vc;
     spn_path_t ucrt;

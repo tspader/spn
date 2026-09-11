@@ -46,6 +46,7 @@ typedef struct {
   spn_sdk_kind_t kind;
   test_path_t root;
   spn_arch_t arch;
+  test_path_t bin;
 } fixture_sdk_t;
 
 typedef struct {
@@ -113,7 +114,11 @@ static spn_sdk_t fixture_sdk(sp_mem_t mem, fixture_sdk_t sdk) {
     case SPN_SDK_NONE: return sp_zero_struct(spn_sdk_t);
     case SPN_SDK_SYSROOT: return spn_sdk_sysroot(fixture_path(sdk.root));
     case SPN_SDK_MACOS: return spn_sdk_macos(mem, fixture_path(sdk.root));
-    case SPN_SDK_MSVC: return spn_sdk_msvc(mem, fixture_path(sdk.root), sdk.arch);
+    case SPN_SDK_MSVC: {
+      spn_sdk_t msvc = spn_sdk_msvc(mem, fixture_path(sdk.root), sdk.arch);
+      msvc.msvc.bin = fixture_path(sdk.bin);
+      return msvc;
+    }
   }
   sp_unreachable_return(sp_zero_struct(spn_sdk_t));
 }

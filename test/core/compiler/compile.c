@@ -271,6 +271,42 @@ static const compile_test_t tests [] = {
     },
   },
   {
+    .name = "msvc_asm_arm64_uses_sdk_bin",
+    .driver = SPN_CC_DRIVER_MSVC,
+    .compiler = "vc/bin/cl.exe",
+    .lang = SPN_LANG_ASM,
+    .profile = {
+      .arch = SPN_ARCH_ARM64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_MSVC,
+      .standard = SPN_C11,
+      .mode = SPN_MODE_DEBUG,
+      .sdk = "/X",
+      .bin = "/X/bin/arm64",
+    },
+    .expect = {
+      .command = "/X/bin/arm64/armasm64.exe",
+      .args = { "/nologo", "/c", "/Fomain.o", "main.c" },
+    },
+  },
+  {
+    .name = "msvc_sdk_bin_selects_cl",
+    .driver = SPN_CC_DRIVER_MSVC,
+    .compiler = "vc/bin/cl.exe",
+    .profile = {
+      .arch = SPN_ARCH_ARM64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_MSVC,
+      .sdk = "/X",
+      .bin = "/X/bin/arm64",
+    },
+    .expect = {
+      .command = "/X/bin/arm64/cl.exe",
+      .args = { "/nologo", "/utf-8", "/Brepro", "/c", "/I/X/crt/include", "/I/X/sdk/include/ucrt", "/I/X/sdk/include/um", "/I/X/sdk/include/shared", "/we4715", "/Fomain.o", "main.c" },
+      .env = { "INCLUDE=/X/crt/include;/X/sdk/include/ucrt;/X/sdk/include/um;/X/sdk/include/shared" },
+    },
+  },
+  {
     .name = "msvc_gnu11_takes_c11_switch",
     .driver = SPN_CC_DRIVER_MSVC,
     .profile = {

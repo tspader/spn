@@ -71,6 +71,7 @@ spn_sdk_msvc_t spn_sdk_from_msvc(sp_mem_t mem, const sp_msvc_sdk_t* kits, const 
   sp_msvc_vs_paths_t tools = sp_msvc_vs_render(mem, vs);
   return (spn_sdk_msvc_t) {
     .arch = arch,
+    .bin = absolute(tools.bin),
     .include = {
       .vc = absolute(tools.include),
       .ucrt = absolute(kit.include_ucrt),
@@ -223,6 +224,7 @@ sp_hash_t spn_sdk_hash(const spn_sdk_t* sdk) {
       sp_hash_t parts [] = {
         (sp_hash_t)sdk->kind,
         (sp_hash_t)sdk->msvc.arch,
+        spn_path_hash(sdk->msvc.bin),
         spn_path_hash(sdk->msvc.include.vc),
         spn_path_hash(sdk->msvc.include.ucrt),
         spn_path_hash(sdk->msvc.include.um),

@@ -218,6 +218,7 @@ static sp_cli_result_t up(sp_cli_t* cli, app_t* app, const winvm_variant_t* vari
     return SP_CLI_OK;
   }
 
+  winvm_undefine(vm, variant);
   winvm_lease(vm, variant);
   sp_str_t work = winvm_work(vm, variant);
   if (!sp_fs_is_file(work) && winvm_overlay(vm, image, work)) {

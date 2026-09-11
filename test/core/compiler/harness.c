@@ -33,6 +33,10 @@ spn_profile_info_t test_profile(test_profile_t desc) {
   if (desc.sdk) {
     profile.sdk = spn_sdk_at(spn.mem, (spn_triple_t) { desc.arch, desc.os, desc.abi }, test_arg_path(desc.sdk));
   }
+  if (desc.bin) {
+    sp_assert(profile.sdk.kind == SPN_SDK_MSVC);
+    profile.sdk.msvc.bin = test_arg_path(desc.bin);
+  }
   if (desc.libc) {
     profile.libc = test_arg_path(desc.libc);
   }
