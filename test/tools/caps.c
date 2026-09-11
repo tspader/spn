@@ -1,77 +1,72 @@
 #include "caps.h"
+#include "sp/sp_test.h"
+#include "fixture.h"
 
 #include "enum/enum.h"
+#include "ctx/types.h"
+#include "event/event.h"
+#include "profile/profile.h"
+#include "paths/paths.h"
+#include "toolchain/catalog.h"
+#include "toolchain/linker.h"
+#include "toolchain/search.h"
+#include "toolchain/toolchain.h"
 #include "triple/triple.h"
+#include "lanes.h"
+#include "toml/issue.h"
 
-static const test_toolchain_t toolchains [] = {
-  {
-    .name = "zig",
-    .driver = SPN_CC_DRIVER_ZIG,
-    .abi = SPN_ABI_GNU,
-    .targets = {
-      "wasm32-wasi-musl",
-      "x86_64-linux-gnu",
-      "aarch64-linux-gnu",
-      "x86_64-linux-musl",
-      "aarch64-linux-musl",
-      "x86_64-macos-apple",
-      "aarch64-macos-apple",
-      "x86_64-windows-gnu",
-      "aarch64-windows-gnu",
-      "x86_64-freestanding-none",
-      "aarch64-freestanding-none",
-    },
-  },
-  {
-    .name = "msvc",
-    .driver = SPN_CC_DRIVER_MSVC,
-    .abi = SPN_ABI_MSVC,
-    .targets = {
-      "x86_64-windows-msvc",
-      "aarch64-windows-msvc",
-    },
-  },
-  {
-    .name = "clang",
-    .driver = SPN_CC_DRIVER_CLANG,
-    .targets = { SPN_TEST_HOST_TARGETS },
-  },
-  {
-    .name = "gcc",
-    .driver = SPN_CC_DRIVER_GCC,
-    .targets = { SPN_TEST_HOST_TARGETS },
-  },
-};
+static sp_test_once_t once;
+static test_toolchain_t cached;
+static spn_toolchain_catalog_t catalog;
+static lanes_t builtin;
+static lanes_t lanes;
+static sp_str_t toml;
 
-const test_toolchain_t* test_toolchain(void) {
-  static const test_toolchain_t* cached = SP_NULLPTR;
-  if (cached) {
-    return cached;
-  }
-
-  sp_str_t name = sp_os_env_get(sp_str_lit("SPN_TEST_TOOLCHAIN"));
-  if (sp_str_empty(name)) {
-    name = sp_str_lit("zig");
-  }
-
-  sp_carr_for(toolchains, it) {
-    if (sp_str_equal_cstr(name, toolchains[it].name)) {
-      cached = &toolchains[it];
-      return cached;
+static void read_lanes(sp_mem_t mem, const c8* rel, lanes_t* lanes) {
+  switch (lanes_read(mem, test_repo_path(mem, sp_cstr_as_str(rel)), lanes)) {
+    case LANES_READ_OK: {
+      return;
+    }
+    case LANES_READ_UNREADABLE: {
+      sp_log("{.red}: unreadable", sp_fmt_cstr(rel));
+      break;
+    }
+    case LANES_READ_PARSE: {
+      sp_log("{.red}: {}", sp_fmt_cstr(rel), sp_fmt_str(spn_codegen_issues_to_json(mem, lanes->issues)));
+      break;
     }
   }
+  sp_sys_exit(1);
+}
 
-  SP_ASSERT(cached);
-  return SP_NULLPTR;
+static bool declared(sp_str_t name) {
+  return lanes_find(&lanes, name) || lanes_find(&builtin, name);
+}
+
+static bool targets(const spn_toolchain_info_t* info, spn_triple_t triple) {
+  sp_da_for(info->rows, it) {
+    if (spn_triple_equal(info->rows[it].triple, triple)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static spn_triple_t host_for(const spn_toolchain_info_t* info) {
+  spn_triple_t host = spn_triple_host();
+  if (targets(info, host)) {
+    return host;
+  }
+  sp_da_for(info->rows, it) {
+    if (info->rows[it].triple.arch == host.arch && info->rows[it].triple.os == host.os) {
+      return info->rows[it].triple;
+    }
+  }
+  return host;
 }
 
 spn_triple_t test_host(void) {
-  spn_triple_t host = spn_triple_host();
-  const test_toolchain_t* toolchain = test_toolchain();
-  if (toolchain->abi && host.os == SPN_OS_WINDOWS) {
-    host.abi = toolchain->abi;
-  }
-  return host;
+  return host_for(test_toolchain()->info);
 }
 
 static spn_triple_t parse_triple(const c8* str) {
@@ -93,56 +88,254 @@ static spn_triple_t when_target(const test_when_t* when) {
   };
 }
 
-static bool triple_agrees(spn_triple_t a, spn_triple_t b) {
-  bool arch = !a.arch || !b.arch || a.arch == b.arch;
-  bool os = !a.os || !b.os || a.os == b.os;
-  bool abi = !a.abi || !b.abi || a.abi == b.abi;
-  return arch && os && abi;
-}
-
-static bool toolchain_targets(const test_toolchain_t* toolchain, spn_triple_t target) {
-  sp_carr_for(toolchain->targets, it) {
-    if (!toolchain->targets[it]) {
-      break;
-    }
-    if (triple_agrees(parse_triple(toolchain->targets[it]), target)) {
-      return true;
-    }
-  }
-  return false;
+const c8* test_host_triple(void) {
+  sp_mem_t mem = sp_mem_os_new();
+  return sp_str_to_cstr(mem, spn_triple_to_str(mem, test_host()));
 }
 
 const c8* test_target_alternate(void) {
-  const test_toolchain_t* toolchain = test_toolchain();
+  const spn_toolchain_info_t* info = test_toolchain()->info;
   spn_triple_t host = test_host();
 
-  sp_carr_for(toolchain->targets, it) {
-    if (!toolchain->targets[it]) {
-      break;
-    }
-    spn_triple_t target = parse_triple(toolchain->targets[it]);
+  sp_da_for(info->rows, it) {
+    spn_triple_t target = info->rows[it].triple;
     if (target.os == SPN_OS_FREESTANDING) {
       continue;
     }
     if (target.os != host.os || target.arch != host.arch) {
-      return toolchain->targets[it];
+      sp_mem_t mem = sp_mem_os_new();
+      return sp_str_to_cstr(mem, spn_triple_to_str(mem, target));
     }
   }
 
   return SP_NULLPTR;
 }
 
-spn_sanitizer_set_t get_supported_sanitizers(const spn_cc_toolchain_t* toolchain, spn_triple_t target);
-
 static bool toolchain_enforces_exports(const test_toolchain_t* toolchain, spn_triple_t target) {
-  if (sp_cstr_equal(toolchain->name, "zig") && target.os == SPN_OS_MACOS) {
+  if (toolchain->info->driver == SPN_CC_DRIVER_ZIG && target.os == SPN_OS_MACOS) {
     return false;
   }
   return true;
 }
 
 static bool toolchain_deterministic_objects(const test_toolchain_t* toolchain) {
-  return toolchain->driver != SPN_CC_DRIVER_MSVC;
+  return toolchain->info->driver != SPN_CC_DRIVER_MSVC;
+}
+
+static spn_search_rules_t host_rules() {
+  return spn_search_rules(spn_triple_host().os);
+}
+
+static sp_str_t program_existing(sp_mem_t mem, spn_arg_t program) {
+  spn_search_rules_t rules = host_rules();
+  spn_path_roots_t roots = sp_zero;
+  sp_da(sp_str_t) dirs = spn_search_dirs(rules, mem, sp_os_env_get(sp_str_lit("PATH")));
+  return spn_search_program(rules, mem, &roots, program, dirs);
+}
+
+static bool present(spn_arg_t program) {
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  bool found = !sp_str_empty(program_existing(scratch.mem, program));
+  sp_mem_end_scratch(scratch);
+  return found;
+}
+
+static sp_str_t toolchain_dir(sp_mem_t mem, const spn_toolchain_info_t* info) {
+  return sp_fs_parent_path(program_existing(mem, info->compiler.program));
+}
+
+sp_str_t test_toolchain_path(sp_mem_t mem) {
+  const spn_toolchain_info_t* info = test_toolchain()->info;
+  sp_str_t path = sp_os_env_get(sp_str_lit("PATH"));
+  switch (info->support.kind) {
+    case SPN_TOOLCHAIN_SUPPORT_LOCAL: {
+      return spn_search_prepend(host_rules(), mem, toolchain_dir(mem, info), path);
+    }
+    case SPN_TOOLCHAIN_SUPPORT_ARTIFACT:
+    case SPN_TOOLCHAIN_SUPPORT_NONE: {
+      return path;
+    }
+  }
+  sp_unreachable_return(path);
+}
+
+typedef struct {
+  const c8* lane;
+  spn_ld_dialect_t dialect;
+  const c8* program;
+} lane_program_t;
+
+static const lane_program_t lane_programs [] = {
+  { "llvm",            SPN_LD_DIALECT_GNU,    "ld.lld" },
+  { "llvm",            SPN_LD_DIALECT_DARWIN, "ld64.lld" },
+  { "gcc-lld",         SPN_LD_DIALECT_GNU,    "ld.lld" },
+  { "clang-msvc",      SPN_LD_DIALECT_LINK,   "lld-link" },
+  { "clang-xwin",      SPN_LD_DIALECT_LINK,   "lld-link-16" },
+  { "clang-mingw",     SPN_LD_DIALECT_GNU,    "x86_64-w64-mingw32-ld" },
+  { "clang-mingw-lld", SPN_LD_DIALECT_GNU,    "ld.lld" },
+  { "clang-sysroot",   SPN_LD_DIALECT_GNU,    "ld.lld" },
+  { "clang-wasi",      SPN_LD_DIALECT_WASM,   "wasm-ld" },
+};
+
+static bool links_dialect(const spn_toolchain_info_t* info, spn_ld_dialect_t dialect) {
+  sp_da_for(info->rows, it) {
+    if (spn_ld_dialect(info->rows[it].triple) == dialect) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static sp_str_t missing_lane_program(sp_mem_t mem, const spn_toolchain_info_t* info) {
+  sp_carr_for(lane_programs, it) {
+    const lane_program_t* row = &lane_programs[it];
+    if (!sp_str_equal_cstr(info->name, row->lane) || !links_dialect(info, row->dialect)) {
+      continue;
+    }
+    if (!present(spn_arg_lit(sp_cstr_as_str(row->program)))) {
+      return sp_cstr_as_str(row->program);
+    }
+  }
+  return sp_str_lit("");
+}
+
+static sp_str_t missing_toolchain_program(sp_mem_t mem, const spn_toolchain_info_t* info) {
+  spn_arg_t programs [] = {
+    info->compiler.program,
+    info->archiver.program,
+  };
+  sp_carr_for(programs, it) {
+    if (!present(programs[it])) {
+      return sp_str_empty(programs[it].prefix) ? programs[it].path.sub : programs[it].prefix;
+    }
+  }
+  return missing_lane_program(mem, info);
+}
+
+static sp_str_t lane_broken(sp_mem_t mem, const spn_toolchain_info_t* info) {
+  switch (info->support.kind) {
+    case SPN_TOOLCHAIN_SUPPORT_NONE: {
+      return sp_fmt(mem, "doesn't support {}", sp_fmt_str(spn_triple_to_str(mem, spn_triple_host()))).value;
+    }
+    case SPN_TOOLCHAIN_SUPPORT_ARTIFACT: {
+      return sp_str_lit("");
+    }
+    case SPN_TOOLCHAIN_SUPPORT_LOCAL: {
+      sp_str_t missing = missing_toolchain_program(mem, info);
+      if (!sp_str_empty(missing)) {
+        return sp_fmt(mem, "{} isn't installed", sp_fmt_str(missing)).value;
+      }
+      return sp_str_lit("");
+    }
+  }
+  sp_unreachable_return(sp_str_lit(""));
+}
+
+static sp_err_t load_lanes(void* user) {
+  sp_mem_t mem = sp_mem_os_new();
+  sp_str_t name = sp_os_env_get(sp_str_lit("SPN_TEST_TOOLCHAIN"));
+  if (sp_str_empty(name)) {
+    name = sp_str_lit("zig");
+  }
+
+  spn.mem = mem;
+  spn.events = spn_event_buffer_new(mem);
+  read_lanes(mem, SPN_LANES_BUILTIN, &builtin);
+  read_lanes(mem, SPN_LANES_TEST, &lanes);
+  sp_env_t env = sp_env_capture(mem);
+  spn_path_roots_t roots = sp_zero;
+  spn_toolchain_catalog_init(&catalog, spn_triple_host(), spn_sdk_detect(mem, &roots, &env, spn_triple_host()), mem);
+
+  sp_da_for(builtin.config.toolchain, it) {
+    spn_toolchain_decl_t decl = sp_zero;
+    sp_da(spn_codegen_issue_t) issues = lanes_lower(&builtin, it, SPN_PATH_ROOT_NONE, &decl);
+    sp_assert(sp_da_empty(issues));
+    spn_toolchain_catalog_add(&catalog, decl);
+  }
+
+  sp_da_for(lanes.config.toolchain, it) {
+    spn_toolchain_decl_t decl = sp_zero;
+    sp_da(spn_codegen_issue_t) issues = lanes_lower(&lanes, it, SPN_PATH_ROOT_NONE, &decl);
+    if (sp_da_empty(issues)) {
+      if (sp_str_equal(decl.name, name)) {
+        spn_toolchain_catalog_add(&catalog, decl);
+      }
+    }
+    else if (sp_str_equal(decl.name, name)) {
+      sp_log("lane {.red} is broken: {}", sp_fmt_str(name), sp_fmt_str(spn_codegen_issues_to_json(mem, issues)));
+      sp_sys_exit(1);
+    }
+  }
+
+  spn_toolchain_info_t* info = spn_toolchain_catalog_get(&catalog, name);
+  if (!info) {
+    sp_log("unknown lane {.red}", sp_fmt_str(name));
+    sp_sys_exit(1);
+  }
+  sp_str_t broken = lane_broken(mem, info);
+  if (!sp_str_empty(broken)) {
+    sp_log("lane {.red} is broken: {}", sp_fmt_str(name), sp_fmt_str(broken));
+    sp_sys_exit(1);
+  }
+  toml = lanes_text(&lanes, name);
+  cached = (test_toolchain_t) { .name = sp_str_to_cstr(mem, info->name), .info = info };
+  return SP_OK;
+}
+
+const test_toolchain_t* test_toolchain(void) {
+  sp_test_once(&once, load_lanes, SP_NULLPTR);
+  return &cached;
+}
+
+const c8* test_lane_toolchain_arg(void) {
+  const test_toolchain_t* toolchain = test_toolchain();
+  return sp_cstr_equal(toolchain->name, "zig") ? SP_NULLPTR : toolchain->name;
+}
+
+static const c8* select_reason(spn_err_t err) {
+  switch (err) {
+    case SPN_ERR_TOOLCHAIN_NONE: return "no toolchain can";
+    case SPN_ERR_TOOLCHAIN_HOST: return "doesn't run on this host";
+    case SPN_ERR_TOOLCHAIN_TARGET: return "doesn't target it";
+    case SPN_ERR_TOOLCHAIN_SYSROOT: return "needs a sysroot";
+    case SPN_ERR_TOOLCHAIN_SDK_MACOS: return "needs the macOS SDK";
+    case SPN_ERR_TOOLCHAIN_SDK_MSVC: return "needs the MSVC SDK";
+    case SPN_ERR_TARGET_ABI: return "needs an abi";
+    case SPN_ERR_SANITIZER_UNSUPPORTED: return "doesn't ship those sanitizers";
+    case SPN_ERR_SANITIZER_STATIC: return "links it statically";
+    default: return "can't select it";
+  }
+}
+
+static spn_err_t lane_selects(sp_mem_t mem, const test_when_t* when, spn_triple_t target, spn_profile_info_t* profile, spn_toolchain_selection_t* selection) {
+  const c8* named = test_lane_toolchain_arg();
+  *profile = (spn_profile_info_t) {
+    .toolchain = spn_toolchain_ref_from_str(sp_cstr_as_str(named ? named : "auto")),
+    .arch = target.arch,
+    .os = target.os,
+    .abi = when->target ? target.abi : SPN_ABI_NONE,
+    .sanitizers = when->sanitize,
+  };
+  spn_toolchain_query_t query = spn_profile_query(profile, spn_triple_host());
+  spn_err_t err = query.abis.count ? spn_toolchain_select(&catalog, query, selection) : spn_toolchain_incomplete(&catalog, query);
+  spn_event_buffer_drain(mem, spn.events);
+  if (!err) {
+    spn_profile_finalize(profile, selection);
+  }
+  return err;
+}
+
+static sp_str_t not_in_lanes(sp_mem_t mem, const test_toolchain_t* toolchain, const c8* const* names, u32 count) {
+  sp_for(it, count) {
+    if (!declared(sp_cstr_as_str(names[it]))) {
+      sp_log("unknown lane {.red}", sp_fmt_cstr(names[it]));
+      sp_sys_exit(1);
+    }
+    if (sp_cstr_equal(names[it], toolchain->name)) {
+      return sp_str_lit("");
+    }
+  }
+  return sp_fmt(mem, "not in lane {}", sp_fmt_str(sp_str_join_cstr_n(mem, names, count, sp_str_lit(", ")))).value;
 }
 
 sp_str_t test_when_blocked(test_when_t when) {
@@ -150,29 +343,72 @@ sp_str_t test_when_blocked(test_when_t when) {
   const test_toolchain_t* toolchain = test_toolchain();
   spn_triple_t target = when_target(&when);
 
+  u32 num_lanes = 0;
+  sp_carr_detect_len(when.lanes, num_lanes, when.lanes[num_lanes]);
+  if (num_lanes) {
+    sp_str_t blocked = not_in_lanes(mem, toolchain, when.lanes, num_lanes);
+    if (!sp_str_empty(blocked)) {
+      return blocked;
+    }
+  }
+
   if (when.os && when.os != target.os) {
     return sp_fmt(mem, "target os is {}, test needs {}",
       sp_fmt_str(spn_os_to_str(target.os)),
       sp_fmt_str(spn_os_to_str(when.os))).value;
   }
 
-  if (!toolchain_targets(toolchain, target)) {
-    return sp_fmt(mem, "{} can't target {}",
-      sp_fmt_cstr(toolchain->name),
-      sp_fmt_str(spn_triple_to_str(mem, target))).value;
+  spn_triple_t host = spn_triple_host();
+  if (when.host && when.host != host.os) {
+    return sp_fmt(mem, "host os is {}, test needs {}",
+      sp_fmt_str(spn_os_to_str(host.os)),
+      sp_fmt_str(spn_os_to_str(when.host))).value;
   }
 
-  if (when.sanitize) {
-    spn_cc_toolchain_t cc = {
-      .name = sp_str_view(toolchain->name),
-      .driver = toolchain->driver,
-    };
-    if (when.sanitize & ~get_supported_sanitizers(&cc, target)) {
-      return sp_fmt(mem, "{} targeting {} can't build sanitize={}",
-        sp_fmt_cstr(toolchain->name),
-        sp_fmt_str(spn_triple_to_str(mem, target)),
-        sp_fmt_str(spn_sanitizer_set_to_str(mem, when.sanitize))).value;
+  if (when.shell && host.os == SPN_OS_WINDOWS) {
+    return sp_str_lit("fixture needs a posix shell");
+  }
+
+  sp_carr_for(when.programs, it) {
+    if (!when.programs[it]) {
+      break;
     }
+    if (!present(spn_arg_lit(sp_cstr_as_str(when.programs[it])))) {
+      return sp_fmt(mem, "{} isn't installed", sp_fmt_cstr(when.programs[it])).value;
+    }
+  }
+
+  if (when.driver && when.driver != toolchain->info->driver) {
+    return sp_fmt(mem, "{} isn't a {} driver",
+      sp_fmt_cstr(toolchain->name),
+      sp_fmt_str(spn_cc_driver_to_str(when.driver))).value;
+  }
+
+  spn_profile_info_t profile = sp_zero;
+  spn_toolchain_selection_t selection = sp_zero;
+  spn_err_t select = lane_selects(mem, &when, target, &profile, &selection);
+  if (select) {
+    sp_str_t request = when.sanitize ? sp_fmt(mem, " with sanitize={}", sp_fmt_str(spn_sanitizer_set_to_str(mem, when.sanitize))).value : sp_str_lit("");
+    return sp_fmt(mem, "{} can't build {}{}: {}",
+      sp_fmt_cstr(toolchain->name),
+      sp_fmt_str(spn_triple_to_str(mem, target)),
+      sp_fmt_str(request),
+      sp_fmt_cstr(select_reason(select))).value;
+  }
+  if (when.linker && when.linker != profile.linker) {
+    return sp_fmt(mem, "{} links {} with {}, test needs {}",
+      sp_fmt_cstr(toolchain->name),
+      sp_fmt_str(spn_triple_to_str(mem, target)),
+      sp_fmt_str(spn_ld_family_to_str(profile.linker)),
+      sp_fmt_str(spn_ld_family_to_str(when.linker))).value;
+  }
+  sp_str_t broken = lane_broken(mem, selection.toolchain);
+  if (!sp_str_empty(broken)) {
+    return sp_fmt(mem, "{} {}", sp_fmt_str(selection.toolchain->name), sp_fmt_str(broken)).value;
+  }
+
+  if (when.cxx && spn_arg_empty(toolchain->info->cxx.program)) {
+    return sp_fmt(mem, "{} has no C++ compiler", sp_fmt_cstr(toolchain->name)).value;
   }
 
   if (when.exports && !toolchain_enforces_exports(toolchain, target)) {
@@ -186,7 +422,7 @@ sp_str_t test_when_blocked(test_when_t when) {
       sp_fmt_cstr(toolchain->name)).value;
   }
 
-  if (when.msvc_todo && toolchain->driver == SPN_CC_DRIVER_MSVC) {
+  if (when.msvc_todo && toolchain->info->driver == SPN_CC_DRIVER_MSVC) {
     return sp_str_lit("not yet implemented for the msvc toolchain");
   }
 
@@ -197,4 +433,9 @@ bool test_when_runs(const test_when_t* when) {
   spn_triple_t host = spn_triple_host();
   spn_triple_t target = when_target(when);
   return target.os == host.os && target.arch == host.arch;
+}
+
+sp_str_t test_lanes_toml(void) {
+  sp_test_once(&once, load_lanes, SP_NULLPTR);
+  return toml;
 }

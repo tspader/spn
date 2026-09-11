@@ -7,9 +7,11 @@
 #include "target/types.h"
 #include "profile/types.h"
 #include "index/types.h"
+#include "arg.h"
 #include "toolchain/types.h"
 #include "toml/loader.h"
 #include "semver/compare.h"
+#include "triple/triple.h"
 #include "when/when.h"
 
 ////////////////
@@ -37,6 +39,8 @@ typedef struct {
   gated_t include [4];
   gated_t define [4];
   gated_t flags [4];
+  gated_t link_flags [4];
+  gated_t linker_script [4];
   gated_t system_deps [4];
   gated_t deps [4];
   gated_t frameworks [4];
@@ -70,19 +74,27 @@ typedef struct {
 } option_t;
 
 typedef struct {
+  spn_triple_t triple;
+  test_path_t sdk;
+  spn_sanitizer_set_t sanitizers;
+} toolchain_target_t;
+
+typedef struct {
   const c8* name;
   const c8* url;
   const c8* sha256;
   const c8* mirrors;
-  const c8* compiler;
+  test_arg_t compiler;
   const c8* args [8];
-  const c8* linker;
-  const c8* archiver;
-  const c8* cxx;
+  test_arg_t archiver;
+  test_arg_t cxx;
   const c8* cxx_args [8];
   spn_cc_driver_t driver;
+  bool lld;
+  bool host_row;
+  const c8* link_args [2];
   spn_triple_t hosts [2];
-  spn_triple_t targets [4];
+  toolchain_target_t targets [5];
 } toolchain_t;
 
 typedef struct {
@@ -209,12 +221,14 @@ static const test_t tests [] = {
     .libs = {
       {
         .name = "t",
-        .linkages = { .static_lib = true },
+        .linkages = { .static_lib = true, .shared = true },
         .source = { { "main.c" } },
         .headers = { { "header.h" } },
         .include = { { "include/dir" } },
         .define = { { "SPUM" } },
         .flags = { { "-flag" } },
+        .link_flags = { { "-A" } },
+        .linker_script = { { "a.ld" } },
         .deps = { { "spum" } },
       }
     }
@@ -394,10 +408,9 @@ static const test_t tests [] = {
     .toolchains = {
       {
         .name = "custom",
-        .compiler = "cc",
-        .linker = "cc",
-        .archiver = "ar",
-        .cxx = "g++",
+        .compiler = { .name = "cc" },
+        .archiver = { .name = "ar" },
+        .cxx = { .name = "g++" },
         .cxx_args = { "-pthread" },
         .driver = SPN_CC_DRIVER_GCC,
       },
@@ -408,6 +421,14 @@ static const test_t tests [] = {
     .manifest = "validate_object_mixed",
     .issues = {
       { SPN_ERR_CODEGEN_INVALID, "lib[0].kinds" }
+    }
+  },
+  {
+    .name = "validate_link_inputs_on_static_lib",
+    .manifest = "validate_link_inputs_on_static_lib",
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "lib[0].link_flags" },
+      { SPN_ERR_CODEGEN_INVALID, "lib[0].linker_script" },
     }
   },
   {
@@ -435,77 +456,287 @@ static const test_t tests [] = {
     .name = "validate_toolchain_incomplete",
     .manifest = "toolchain_incomplete",
     .issues = {
-      { SPN_ERR_CODEGEN_MISSING_KEY, "toolchain[0].compiler" }
+      { SPN_ERR_CODEGEN_MISSING_KEY, "compiler" }
     }
   },
   {
     .name = "validate_toolchain_name_auto",
     .manifest = "toolchain_name_auto",
     .issues = {
-      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].name" }
+      { SPN_ERR_CODEGEN_INVALID, "name" }
     }
   },
   {
     .name = "validate_toolchain_target_abi",
     .manifest = "toolchain_target_abi",
     .issues = {
-      { SPN_ERR_CODEGEN_MISSING_KEY, "toolchain[0].target[0].abi" }
+      { SPN_ERR_CODEGEN_MISSING_KEY, "target[0].abi" }
     }
   },
   {
     .name = "validate_toolchain_target_os",
     .manifest = "toolchain_target_os",
     .issues = {
-      { SPN_ERR_CODEGEN_MISSING_KEY, "toolchain[0].target[0].os" }
+      { SPN_ERR_CODEGEN_MISSING_KEY, "target[0].os" }
     }
   },
   {
     .name = "validate_toolchain_target_foreign_arch",
     .manifest = "toolchain_target_arch",
     .issues = {
-      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].target[0].arch" }
+      { SPN_ERR_CODEGEN_INVALID, "target[0].arch" }
     }
   },
   {
     .name = "validate_toolchain_target_beyond_driver",
     .manifest = "toolchain_target_driver",
     .issues = {
-      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].target[0].os" }
+      { SPN_ERR_CODEGEN_INVALID, "target[0]" }
     }
+  },
+  {
+    .name = "validate_toolchain_linker_rejected",
+    .manifest = "toolchain_linker_rejected",
+    .issues = {
+      { SPN_ERR_CODEGEN_LINKER, "linker" },
+    }
+  },
+  {
+    .name = "validate_toolchain_without_driver_skips_targets",
+    .manifest = "toolchain_no_driver",
+    .issues = {
+      { SPN_ERR_CODEGEN_MISSING_KEY, "driver" }
+    }
+  },
+  {
+    .name = "toolchain_linker_lld",
+    .manifest = "toolchain_linkers",
+    .toolchains = {
+      {
+        .name = "llvm",
+        .compiler = { .name = "clang" },
+        .archiver = { .name = "llvm-ar" },
+        .driver = SPN_CC_DRIVER_CLANG,
+        .lld = true,
+        .targets = {
+          { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU },
+          { .triple = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU } },
+          { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MSVC },
+          { SPN_ARCH_ARM64, SPN_OS_MACOS, SPN_ABI_APPLE },
+          { .triple = { SPN_ARCH_WASM32, SPN_OS_WASI, SPN_ABI_MUSL } },
+        },
+      },
+    },
+  },
+  {
+    .name = "toolchain_link_args",
+    .manifest = "toolchain_link_args",
+    .toolchains = {
+      {
+        .name = "custom",
+        .compiler = { .name = "gcc" },
+        .archiver = { .name = "ar" },
+        .driver = SPN_CC_DRIVER_GCC,
+        .link_args = { "-fuse-ld=mold", "-A" },
+      },
+    },
+  },
+  {
+    .name = "toolchain_program_project",
+    .manifest = "toolchain_program_project",
+    .toolchains = {
+      {
+        .name = "T",
+        .compiler = { .path = "T/cc", .root = SPN_PATH_ROOT_PROJECT },
+        .archiver = { .name = "ar" },
+        .driver = SPN_CC_DRIVER_GCC,
+      },
+    },
+  },
+  {
+    .name = "toolchain_program_artifact",
+    .manifest = "toolchain_program_artifact",
+    .toolchains = {
+      {
+        .name = "T",
+        .compiler = { .path = "bin/cc" },
+        .archiver = { .path = "bin/ar" },
+        .driver = SPN_CC_DRIVER_GCC,
+        .url = "https://tc",
+        .sha256 = "deadbeef",
+      },
+    },
+  },
+  {
+    .name = "toolchain_sdk",
+    .manifest = "toolchain_sdk",
+    .toolchains = {
+      {
+        .name = "L",
+        .compiler = { .name = "cc" },
+        .archiver = { .name = "ar" },
+        .driver = SPN_CC_DRIVER_GCC,
+        .targets = { { .triple = { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_GNU }, .sdk = { "S", SPN_PATH_ROOT_PROJECT } } },
+      },
+      {
+        .name = "D",
+        .compiler = { .path = "cc" },
+        .archiver = { .path = "ar" },
+        .driver = SPN_CC_DRIVER_CLANG,
+        .url = "https://tc",
+        .sha256 = "deadbeef",
+        .targets = {
+          { .triple = { SPN_ARCH_ARM64, SPN_OS_LINUX, SPN_ABI_GNU }, .sdk = { "S" } },
+          { .triple = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MSVC }, .sdk = { "X" } },
+        },
+      },
+    },
+  },
+  {
+    .name = "toolchain_sdk_on_elf",
+    .manifest = "toolchain_sdk_elf",
+    .toolchains = {
+      {
+        .name = "T",
+        .compiler = { .name = "clang" },
+        .archiver = { .name = "ar" },
+        .driver = SPN_CC_DRIVER_CLANG,
+        .targets = { { .triple = { SPN_ARCH_X64, SPN_OS_FREESTANDING, SPN_ABI_ELF }, .sdk = { "/S" } } },
+      },
+    },
+  },
+  {
+    .name = "toolchain_target_caps",
+    .manifest = "toolchain_caps",
+    .toolchains = {
+      {
+        .name = "T",
+        .compiler = { .name = "clang" },
+        .archiver = { .name = "ar" },
+        .driver = SPN_CC_DRIVER_CLANG,
+        .targets = {
+          { .triple = { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU }, .sanitizers = SPN_SANITIZER_ADDRESS | SPN_SANITIZER_UNDEFINED },
+          { .triple = { SPN_ARCH_WASM32, SPN_OS_WASI, SPN_ABI_MUSL } },
+        },
+      },
+    },
+  },
+  {
+    .name = "toolchain_sdk_absent_off_host",
+    .manifest = "toolchain_sdk_absent",
+    .toolchains = {
+      {
+        .name = "T",
+        .compiler = { .name = "clang" },
+        .archiver = { .name = "ar" },
+        .driver = SPN_CC_DRIVER_CLANG,
+        .targets = { { .triple = { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_GNU } } },
+      },
+    },
+  },
+  {
+    .name = "toolchain_without_target_is_host",
+    .manifest = "toolchain_no_target",
+    .toolchains = {
+      {
+        .name = "T",
+        .compiler = { .name = "clang" },
+        .archiver = { .name = "ar" },
+        .driver = SPN_CC_DRIVER_CLANG,
+        .host_row = true,
+      },
+    },
+  },
+  {
+    .name = "toolchain_host_beside_a_list",
+    .manifest = "toolchain_host",
+    .toolchains = {
+      {
+        .name = "T",
+        .compiler = { .name = "clang" },
+        .archiver = { .name = "ar" },
+        .driver = SPN_CC_DRIVER_CLANG,
+        .host_row = true,
+        .targets = { { .triple = { SPN_ARCH_X64, SPN_OS_FREESTANDING, SPN_ABI_BARE } } },
+      },
+    },
+  },
+  {
+    .name = "validate_toolchain_host_with_fields",
+    .manifest = "toolchain_host_fields",
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "target[0].kind" }
+    },
+  },
+  {
+    .name = "validate_toolchain_row_kind_unknown",
+    .manifest = "toolchain_kind_unknown",
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "target[0].kind" }
+    },
+  },
+  {
+    .name = "validate_toolchain_target_duplicate",
+    .manifest = "toolchain_target_duplicate",
+    .issues = {
+      { SPN_ERR_CODEGEN_DUPLICATE_KEY, "target[1]" },
+    },
+  },
+  {
+    .name = "validate_toolchain_bare_reports_every_field",
+    .manifest = "toolchain_bare_fields",
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "target[0].sanitizers" },
+      { SPN_ERR_CODEGEN_INVALID, "target[0].sdk" },
+    },
+  },
+  {
+    .name = "validate_toolchain_sdk_malformed",
+    .manifest = "toolchain_sdk_malformed",
+    .issues = {
+      { SPN_ERR_CODEGEN_PATH, "target[0].sdk" }
+    },
+  },
+  {
+    .name = "validate_toolchain_program_malformed",
+    .manifest = "toolchain_program_malformed",
+    .issues = {
+      { SPN_ERR_CODEGEN_PATH, "compiler" }
+    },
   },
   {
     .name = "validate_toolchain_url_without_sha",
     .manifest = "toolchain_no_sha",
     .issues = {
-      { SPN_ERR_CODEGEN_MISSING_KEY, "toolchain[0].sha256" }
+      { SPN_ERR_CODEGEN_MISSING_KEY, "host.x86_64-linux.sha256" }
     }
   },
   {
     .name = "validate_toolchain_sha_without_url",
     .manifest = "toolchain_sha_without_url",
     .issues = {
-      { SPN_ERR_CODEGEN_MISSING_KEY, "toolchain[0].url" }
+      { SPN_ERR_CODEGEN_MISSING_KEY, "host.x86_64-linux.url" }
     }
   },
   {
     .name = "validate_toolchain_host_invalid",
     .manifest = "toolchain_host_invalid",
     .issues = {
-      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].host" }
+      { SPN_ERR_CODEGEN_INVALID, "host.x86-linux" }
     }
   },
   {
     .name = "validate_toolchain_host_mixed",
     .manifest = "toolchain_host_mixed",
     .issues = {
-      { SPN_ERR_CODEGEN_MISSING_KEY, "toolchain[0].host.aarch64-macos.url" }
+      { SPN_ERR_CODEGEN_MISSING_KEY, "host.aarch64-macos.url" }
     }
   },
   {
     .name = "validate_toolchain_target_foreign_abi",
     .manifest = "toolchain_target_foreign_abi",
     .issues = {
-      { SPN_ERR_CODEGEN_INVALID, "toolchain[0].target[0].abi" }
+      { SPN_ERR_CODEGEN_INVALID, "target[0].abi" }
     }
   },
   {
@@ -514,9 +745,8 @@ static const test_t tests [] = {
     .toolchains = {
       {
         .name = "pin",
-        .compiler = "cc",
-        .linker = "cc",
-        .archiver = "ar",
+        .compiler = { .name = "cc" },
+        .archiver = { .name = "ar" },
         .driver = SPN_CC_DRIVER_GCC,
         .hosts = { { SPN_ARCH_X64, SPN_OS_LINUX } },
       },
@@ -549,10 +779,11 @@ static const test_t tests [] = {
     .libs = {
       {
         .name = "t",
-        .linkages = { .static_lib = true },
+        .linkages = { .static_lib = true, .shared = true },
         .source = { { "a.c" }, { "b.c", .tree = SPN_TREE_MANIFEST }, { "c.c", .tree = SPN_TREE_SOURCE } },
         .headers = { { "a.h" }, { "b.h", .tree = SPN_TREE_MANIFEST } },
         .include = { { "inc", .tree = SPN_TREE_MANIFEST } },
+        .linker_script = { { "a.ld", .tree = SPN_TREE_MANIFEST } },
       }
     }
   },
@@ -564,6 +795,7 @@ static const test_t tests [] = {
     .issues = {
       { SPN_ERR_CODEGEN_INVALID, "lib[0].source[0].tree" },
       { SPN_ERR_CODEGEN_INVALID, "lib[0].headers[0].tree" },
+      { SPN_ERR_CODEGEN_INVALID, "lib[0].linker_script[0].tree" },
       { SPN_ERR_CODEGEN_INVALID, "package.include[0].tree" },
       { SPN_ERR_CODEGEN_INVALID, "package.build.source[0].tree" },
       { SPN_ERR_CODEGEN_INVALID, "package.configure.include[0].tree" },
@@ -657,11 +889,11 @@ static const test_t tests [] = {
         .url = "https://tc",
         .sha256 = "deadbeef",
         .mirrors = "https://mirrors",
-        .compiler = "zig",
+        .compiler = { .path = "zig" },
         .args = { "cc", "-target", "x86_64-linux-gnu" },
-        .linker = "zig",
-        .archiver = "ar",
+        .archiver = { .path = "ar" },
         .driver = SPN_CC_DRIVER_CLANG,
+        .lld = true,
         .targets = { { SPN_ARCH_ARM64, SPN_OS_MACOS, SPN_ABI_APPLE } },
       },
     },
@@ -754,6 +986,7 @@ static const test_t tests [] = {
       { .name = "core/fast", .source = SPN_PKG_SOURCE_INDEX, .when = "opt = \"3\"" },
       { .name = "core/asan", .source = SPN_PKG_SOURCE_INDEX, .when = "sanitize_address = true" },
       { .name = "core/tidy", .source = SPN_PKG_SOURCE_INDEX, .when = "driver = \"clang\"" },
+      { .name = "core/icf", .source = SPN_PKG_SOURCE_INDEX, .when = "linker = \"lld\"" },
     },
   },
   {
@@ -763,6 +996,7 @@ static const test_t tests [] = {
       { SPN_ERR_CODEGEN_INVALID, "deps.package[0].when.opt" },
       { SPN_ERR_CODEGEN_INVALID, "deps.package[1].when.sanitize_address" },
       { SPN_ERR_CODEGEN_INVALID, "deps.package[2].when.driver" },
+      { SPN_ERR_CODEGEN_INVALID, "deps.package[3].when.linker" },
     },
   },
   {
@@ -815,10 +1049,12 @@ static const test_t tests [] = {
     .libs = {
       {
         .name = "t",
-        .linkages = { .static_lib = true },
+        .linkages = { .static_lib = true, .shared = true },
         .source = { { "a.c" }, { "b.c", "os = \"linux\"" } },
         .define = { { "X" }, { "Y", "os = \"windows\"" } },
         .flags = { { "-g", "mode = \"debug\"" } },
+        .link_flags = { { "-A", "os = \"linux\"" } },
+        .linker_script = { { "a.ld", "arch = \"x86_64\"" } },
         .system_deps = { { "ws2_32", "os = \"windows\"" } },
       },
     },
@@ -942,7 +1178,9 @@ static const test_t tests [] = {
     .issues = {
       { SPN_ERR_CODEGEN_INVALID, "lib[0].source[0].when.os" },
       { SPN_ERR_CODEGEN_INVALID, "lib[0].source[1].when.mode" },
-      { SPN_ERR_CODEGEN_INVALID, "lib[0].source[2].when.abi" }
+      { SPN_ERR_CODEGEN_INVALID, "lib[0].source[2].when.abi" },
+      { SPN_ERR_CODEGEN_INVALID, "lib[0].link_flags[0].when.os" },
+      { SPN_ERR_CODEGEN_INVALID, "lib[0].linker_script[0].when.os" },
     },
   },
   {
@@ -1156,6 +1394,8 @@ static sp_err_t check_targets(sp_test_t* t, spn_target_map_t om, const target_t*
     sp_expect_eq(t, (u32)0, (u32)sp_da_size(info->include));
     sp_expect_eq(t, (u32)0, (u32)sp_da_size(info->define));
     sp_expect_eq(t, (u32)0, (u32)sp_da_size(info->flags));
+    sp_expect_eq(t, (u32)0, (u32)sp_da_size(info->link_flags));
+    sp_expect_eq(t, (u32)0, (u32)sp_da_size(info->linker_script));
     sp_expect_eq(t, (u32)0, (u32)sp_da_size(info->system_deps));
     sp_expect_eq(t, (u32)0, (u32)sp_da_size(info->deps));
     check_gated_paths(t, info->gated.source, arr[i].source);
@@ -1164,6 +1404,8 @@ static sp_err_t check_targets(sp_test_t* t, spn_target_map_t om, const target_t*
     check_gated_paths(t, info->gated.include, arr[i].include);
     check_gated(t, info->gated.define, arr[i].define);
     check_gated(t, info->gated.flags, arr[i].flags);
+    check_gated(t, info->gated.link_flags, arr[i].link_flags);
+    check_gated_paths(t, info->gated.linker_script, arr[i].linker_script);
     check_gated(t, info->gated.system_deps, arr[i].system_deps);
     check_gated(t, info->gated.deps, arr[i].deps);
     sp_expect_eq(t, (u32)0, (u32)sp_da_size(info->macos.frameworks));
@@ -1312,22 +1554,24 @@ sp_test_each(lower, cases, test_t, tests) {
     if (expected.url)      sp_expect_str_eq_c(t, tc->hosts[0].artifact.url, expected.url);
     if (expected.sha256)   sp_expect_str_eq_c(t, tc->hosts[0].artifact.sha256, expected.sha256);
     if (expected.mirrors)  sp_expect_str_eq_c(t, tc->hosts[0].artifact.mirror_list, expected.mirrors);
-    if (expected.compiler) sp_expect_str_eq_c(t, tc->compiler.program.prefix, expected.compiler);
-    if (expected.linker)   sp_expect_str_eq_c(t, tc->linker.program.prefix, expected.linker);
-    if (expected.archiver) sp_expect_str_eq_c(t, tc->archiver.program.prefix, expected.archiver);
-    if (expected.cxx)      sp_expect_str_eq_c(t, tc->cxx.program.prefix, expected.cxx);
+    if (test_check_arg(t, tc->compiler.program, expected.compiler)) return SP_ERR;
+    if (test_check_arg(t, tc->archiver.program, expected.archiver)) return SP_ERR;
+    sp_expect_eq(t, expected.lld, tc->lld);
+    sp_expect_eq(t, expected.host_row, tc->host_row);
+    sp_must_strs_eq(t, tc->link_args, sp_da_size(tc->link_args), expected.link_args);
+    if (test_check_arg(t, tc->cxx.program, expected.cxx)) return SP_ERR;
     if (expected.driver)   sp_expect_eq(t, (u32)expected.driver, (u32)tc->driver);
 
     sp_must_strs_eq(t, tc->compiler.args, sp_da_size(tc->compiler.args), expected.args);
     sp_must_strs_eq(t, tc->cxx.args, sp_da_size(tc->cxx.args), expected.cxx_args);
 
     sp_carr_for(expected.targets, r) {
-      spn_triple_t triple = expected.targets[r];
-      if (triple.arch == SPN_ARCH_NONE) break;
+      toolchain_target_t target = expected.targets[r];
+      if (target.triple.arch == SPN_ARCH_NONE) break;
       sp_must(t, r < sp_da_size(tc->targets));
-      sp_expect_eq(t, (u32)triple.arch, (u32)tc->targets[r].arch);
-      sp_expect_eq(t, (u32)triple.os, (u32)tc->targets[r].os);
-      sp_expect_eq(t, (u32)triple.abi, (u32)tc->targets[r].abi);
+      sp_expect(t, spn_triple_equal(target.triple, tc->targets[r].triple));
+      sp_expect_eq(t, target.sanitizers, tc->targets[r].sanitizers);
+      if (test_check_path(t, tc->targets[r].sdk, target.sdk)) return SP_ERR;
     }
 
     sp_carr_for(expected.hosts, r) {

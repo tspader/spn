@@ -14,7 +14,13 @@
       "kind": "manifest_issues",
       "namespace": "core",
       "name": "A",
-      "detail": "not valid toml: at 1:5: missing '='"
+      "issues": [
+        {
+          "code": "codegen_parse",
+          "path": "",
+          "detail": "at 1:5: missing '='"
+        }
+      ]
     }
   ]
 }

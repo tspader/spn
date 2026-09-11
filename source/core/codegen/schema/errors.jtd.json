@@ -12,10 +12,15 @@
     "toolchain_unknown": { "ref": "toolchain" },
     "toolchain_none": { "ref": "toolchain" },
     "toolchain_target": { "ref": "toolchain" },
+    "toolchain_sysroot": { "ref": "toolchain" },
+    "toolchain_sdk_macos": { "ref": "toolchain" },
+    "toolchain_sdk_msvc": { "ref": "toolchain" },
+    "toolchain_msvc_linker_host": { "ref": "toolchain" },
     "target_abi": { "ref": "completion" },
     "toolchain_host": { "ref": "toolchain" },
     "toolchain_fetch": { "ref": "artifact" },
     "toolchain_sha": { "ref": "artifact" },
+    "toolchain_read": { "ref": "artifact" },
     "toolchain_extract": { "ref": "artifact" },
     "toolchain_no_cxx": { "ref": "toolchain" },
     "toolchain_missing": { "ref": "program" },
@@ -30,8 +35,11 @@
     "codegen_parse": { "properties": {} },
     "codegen_file_missing": { "properties": {} },
     "codegen_invalid": { "properties": {} },
+    "codegen_linker": { "properties": {} },
     "codegen_root_only": { "properties": {} },
     "codegen_path": { "properties": {} },
+    "codegen_unrooted": { "properties": {} },
+    "codegen_absolute": { "properties": {} },
     "wasm_init_failed": { "ref": "wasm" },
     "wasm_register_failed": { "ref": "wasm" },
     "wasm_module_load_failed": { "ref": "wasm" },
@@ -138,10 +146,13 @@
     "issue": {
       "properties": {
         "code": { "metadata": { "extern": "err" } },
-        "path": { "type": "string" }
+        "path": { "type": "string" },
+        "choices": { "elements": { "type": "string" } }
       },
       "optionalProperties": {
-        "detail": { "type": "string" }
+        "detail": { "type": "string" },
+        "value": { "type": "string" },
+        "scope": { "type": "string" }
       }
     },
     "no_manifest": {
@@ -180,8 +191,10 @@
         "name": { "type": "string" },
         "target": { "metadata": { "extern": "triple" } },
         "host": { "metadata": { "extern": "triple" } },
+        "sanitizers": { "metadata": { "extern": "sanitizer_set" } },
         "candidates": { "elements": { "type": "string" } },
-        "targets": { "elements": { "metadata": { "extern": "triple" } } }
+        "targets": { "elements": { "metadata": { "extern": "triple" } } },
+        "query": { "metadata": { "extern": "triple" } }
       }
     },
     "completion": {
@@ -197,13 +210,15 @@
         "program": { "type": "string" }
       }
     },
-    "cc_feature": { "enum": ["link_exe", "link_shared", "link_reactor", "archive", "frameworks"] },
+    "cc_feature": { "enum": ["link_exe", "link_shared", "link_reactor", "archive", "frameworks", "linker_script"] },
+    "linkage_requester": { "enum": ["profile", "root_manifest"] },
     "artifact": {
       "properties": {
         "name": { "type": "string" },
         "url": { "type": "string" },
         "expected": { "type": "string" },
-        "actual": { "type": "string" }
+        "actual": { "type": "string" },
+        "output": { "type": "string" }
       }
     },
     "wasm": {
@@ -216,7 +231,8 @@
     "profile": {
       "properties": {
         "name": { "type": "string" },
-        "target": { "metadata": { "extern": "triple" } }
+        "target": { "metadata": { "extern": "triple" } },
+        "targets": { "elements": { "metadata": { "extern": "triple" } } }
       }
     },
     "sanitizer": {
@@ -231,7 +247,10 @@
       "properties": {
         "toolchain": { "type": "string" },
         "target": { "metadata": { "extern": "triple" } },
-        "feature": { "ref": "cc_feature" }
+        "feature": { "ref": "cc_feature" },
+        "pkg": { "type": "string" },
+        "name": { "type": "string" },
+        "frameworks": { "elements": { "type": "string" } }
       }
     },
     "fs": {
@@ -332,7 +351,8 @@
         "pkg": { "type": "string" },
         "name": { "type": "string" },
         "requested": { "type": "string" },
-        "requester": { "type": "string" }
+        "requester": { "ref": "linkage_requester" },
+        "supported": { "elements": { "metadata": { "extern": "linkage" } } }
       }
     },
     "script": {

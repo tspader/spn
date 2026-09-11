@@ -12,10 +12,13 @@
 #include "ctx/types.h"
 #include "event/types.h"
 #include "toolchain/types.h"
+#include "codegen/types.h"
+#include "paths/types.h"
 
 sp_err_t spn_test_ctx_setup(sp_test_t* t);
 sp_da(spn_event_t) spn_test_drain_errs(sp_mem_t mem);
-sp_err_t spn_test_builtin_json(sp_test_t* t, sp_str_t* json);
+void     spn_test_lower_toolchains(sp_test_t* t, sp_str_t toml, spn_path_root_t base, sp_da(spn_toolchain_decl_t)* decls, sp_da(spn_codegen_issue_t)* issues);
+sp_err_t spn_test_builtin_toml(sp_test_t* t, sp_str_t* toml);
 sp_err_t spn_test_builtin_catalog(sp_test_t* t, spn_toolchain_catalog_t* catalog, spn_triple_t host);
 
 #endif

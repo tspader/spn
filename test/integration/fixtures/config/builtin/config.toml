@@ -1,0 +1,5 @@
+[[toolchain]]
+name = "gcc"
+driver = "gcc"
+compiler = "/Q"
+archiver = "/Q"

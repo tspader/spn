@@ -26,6 +26,7 @@ typedef enum {
   SPN_ABI_MSVC,
   SPN_ABI_APPLE,
   SPN_ABI_BARE,
+  SPN_ABI_ELF,
   SPN_ABI_COUNT,
 } spn_abi_t;
 
@@ -59,6 +60,22 @@ typedef enum {
   SPN_CC_DRIVER_ZIG,
 } spn_cc_driver_t;
 
+typedef enum {
+  SPN_LD_FAMILY_NONE,
+  SPN_LD_FAMILY_GNU,
+  SPN_LD_FAMILY_LLD,
+  SPN_LD_FAMILY_LD64,
+  SPN_LD_FAMILY_MSVC,
+} spn_ld_family_t;
+
+typedef enum {
+  SPN_FORMAT_ELF,
+  SPN_FORMAT_COFF,
+  SPN_FORMAT_MACHO,
+  SPN_FORMAT_WASM,
+  SPN_FORMAT_COUNT,
+} spn_format_t;
+
 typedef struct {
   u16 major;
   u16 minor;
@@ -78,6 +95,7 @@ typedef enum {
   SPN_CC_FEATURE_LINK_REACTOR,
   SPN_CC_FEATURE_ARCHIVE,
   SPN_CC_FEATURE_FRAMEWORKS,
+  SPN_CC_FEATURE_LINKER_SCRIPT,
 } spn_cc_feature_t;
 
 typedef enum {
@@ -88,6 +106,11 @@ typedef enum {
   SPN_OPTION_SETTER_UNION,
   SPN_OPTION_SETTER_CONSUMER,
 } spn_option_setter_kind_t;
+
+typedef enum {
+  SPN_LINKAGE_REQUESTER_PROFILE,
+  SPN_LINKAGE_REQUESTER_ROOT_MANIFEST,
+} spn_linkage_requester_t;
 
 typedef enum {
   SPN_MODE_NONE,

@@ -7,7 +7,7 @@
     {
       "name": "gcc",
       "compiler": "gcc",
-      "linker": "ld",
+      "linker": "lld",
       "archiver": "ar",
       "driver": "gcc",
       "host": {

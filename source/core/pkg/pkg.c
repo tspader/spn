@@ -33,8 +33,6 @@ sp_hash_t spn_pkg_hash_platform(spn_pkg_info_t* pkg, const spn_profile_info_t* p
 
   switch (profile->os) {
     case SPN_OS_MACOS: {
-      hash = hash_push(hash, (sp_hash_t)profile->sysroot.root);
-      hash = hash_push(hash, spn_digest_hash_str(profile->sysroot.sub));
       hash = hash_push(hash, spn_digest_hash(&pkg->macos.min_os, sizeof(pkg->macos.min_os)));
       hash = hash_gated(hash, pkg->gated.frameworks);
       sp_carr_for(maps, mt) {

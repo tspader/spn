@@ -48,15 +48,16 @@ typedef struct {
   spn_err_t err;
 } toolchain_job_t;
 
-static spn_cc_toolchain_t cc_toolchain(spn_toolchain_info_t* toolchain, spn_toolchain_launcher_t compiler, spn_toolchain_launcher_t cxx, spn_toolchain_launcher_t linker, spn_toolchain_launcher_t archiver) {
+static spn_cc_toolchain_t cc_toolchain(spn_toolchain_info_t* toolchain, spn_toolchain_launcher_t compiler, spn_toolchain_launcher_t cxx, spn_toolchain_launcher_t archiver) {
   return (spn_cc_toolchain_t) {
     .name = toolchain->name,
     .driver = toolchain->driver,
     .compiler = compiler,
     .cxx = cxx,
-    .linker = linker,
     .archiver = archiver,
+    .link_args = toolchain->link_args,
     .archiver_driver = toolchain->driver == SPN_CC_DRIVER_MSVC ? SPN_AR_DRIVER_MSVC : SPN_AR_DRIVER_GNU,
+    .wasi = spn_toolchain_wasi_spelling(&spn.roots, spn.mem, toolchain),
   };
 }
 
@@ -64,8 +65,8 @@ static spn_err_t setup_local(spn_toolchain_store_t* store, spn_toolchain_unit_t*
   spn_toolchain_info_t* toolchain = unit->info;
   sp_tm_timer_t timer = sp_tm_start_timer();
 
-  unit->cc = cc_toolchain(toolchain, toolchain->compiler, toolchain->cxx, toolchain->linker, toolchain->archiver);
-  spn_try(spn_toolchain_probe(&unit->cc, spn_probe_split_path(spn.mem, sp_env_get_path(spn.env)), &store->probes, spn.mem, &unit->identity));
+  unit->cc = cc_toolchain(toolchain, toolchain->compiler, toolchain->cxx, toolchain->archiver);
+  spn_try(spn_toolchain_probe(&unit->cc, &spn.roots, spn_search_rules(spn.host.os), sp_env_get(spn.env, sp_str_lit("PATH")), &store->probes, spn.mem, &unit->identity));
   spn_probe_cache_flush(&store->probes);
 
   spn_event_buffer_push(spn.events, (spn_event_t) {
@@ -96,7 +97,7 @@ static spn_err_t setup_artifact(spn_toolchain_store_t* store, spn_toolchain_unit
     spn_try(spn_toolchain_provision(store, toolchain->name, artifact));
   }
 
-  spn_path_t root = spn_path_make(&spn.roots, dest);
+  spn_path_t root = spn_toolchain_artifact_root(artifact);
   spn_toolchain_launcher_t cxx = toolchain->cxx;
   if (spn_toolchain_has_cxx(toolchain)) {
     cxx = spn_toolchain_launcher_with_root(spn.mem, toolchain->cxx, root);
@@ -106,7 +107,6 @@ static spn_err_t setup_artifact(spn_toolchain_store_t* store, spn_toolchain_unit
     toolchain,
     spn_toolchain_launcher_with_root(spn.mem, toolchain->compiler, root),
     cxx,
-    spn_toolchain_launcher_with_root(spn.mem, toolchain->linker, root),
     spn_toolchain_launcher_with_root(spn.mem, toolchain->archiver, root)
   );
 
@@ -566,7 +566,6 @@ spn_err_t sync_packages(spn_op_t* op, bool* reresolve) {
   }
 
   spn_session_export_toolchain_env(session);
-  spn_try(spn_session_validate_flags(session));
   spn_try(check_unused_patches(session));
 
   spn_event_buffer_push(spn.events, (spn_event_t) {

@@ -2,6 +2,7 @@
 
 #include "paths/paths.h"
 #include "profile/profile.h"
+#include "toolchain/toolchain.h"
 #include "when/when.h"
 
 
@@ -53,6 +54,8 @@ static spn_target_info_t lib_info(sp_mem_t mem, spn_tree_roots_t trees, const un
   info.system_deps = test_str_list(mem, spec->system_deps, UNIT_TEST_MAX_STRS);
   info.macos.frameworks = test_str_list(mem, spec->frameworks, UNIT_TEST_MAX_STRS);
   info.macos.min_os = spec->min_os;
+  info.link_flags = test_str_list(mem, spec->link_flags, UNIT_TEST_MAX_STRS);
+  info.linker_script = test_path_list(mem, trees, spec->linker_script, UNIT_TEST_MAX_STRS);
   return info;
 }
 
@@ -71,7 +74,6 @@ static spn_build_unit_t* add_build(spn_session_t* s, spn_build_id_t id, const c8
   info->driver = SPN_CC_DRIVER_GCC;
   info->compiler.program = spn_arg_lit(sp_str_lit("cc"));
   info->cxx.program = spn_arg_lit(sp_str_lit("c++"));
-  info->linker.program = spn_arg_lit(sp_str_lit("cc"));
   info->archiver.program = spn_arg_lit(sp_str_lit("ar"));
 
   spn_toolchain_unit_t* toolchain = sp_alloc_type(s->mem, spn_toolchain_unit_t);
@@ -81,7 +83,6 @@ static spn_build_unit_t* add_build(spn_session_t* s, spn_build_id_t id, const c8
     .driver = SPN_CC_DRIVER_GCC,
     .compiler = info->compiler,
     .cxx = info->cxx,
-    .linker = info->linker,
     .archiver = info->archiver,
     .archiver_driver = SPN_AR_DRIVER_GNU,
   };
@@ -111,9 +112,12 @@ spn_session_t* build_session(sp_mem_t mem, unit_graph_test_t* g) {
     .mode = SPN_MODE_DEBUG,
     .os = g->os ? g->os : SPN_OS_LINUX,
     .arch = SPN_ARCH_X64,
-    .abi = g->os == SPN_OS_MACOS ? SPN_ABI_NONE : SPN_ABI_GNU,
-    .sysroot = { .sub = g->sysroot ? sp_str_view(g->sysroot) : sp_str_lit("") },
+    .abi = g->abi ? g->abi : (g->os == SPN_OS_MACOS ? SPN_ABI_NONE : SPN_ABI_GNU),
   };
+  profile.linker = spn_ld_native(profile.driver, (spn_triple_t) { profile.arch, profile.os, profile.abi });
+  if (g->sdk) {
+    profile.sdk = spn_sdk_at(mem, (spn_triple_t) { profile.arch, profile.os, profile.abi }, (spn_path_t) { .sub = sp_cstr_as_str(g->sdk) });
+  }
 
   s->units.target = add_build(s, 1, "/build/debug", profile);
   s->units.metaprogram = add_build(s, 2, "/build/wasm32-wasi", profile);

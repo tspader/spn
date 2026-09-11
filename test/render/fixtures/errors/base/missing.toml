@@ -1,0 +1,7 @@
+
+[[toolchain]]
+name = "no-program"
+driver = "gcc"
+compiler = "definitely-not-a-program"
+archiver = "ar"
+target = [{ arch = "x86_64", os = "linux", abi = "gnu" }]

@@ -1,0 +1,8 @@
+[package]
+name = "platform_win32"
+version = "0.1.0"
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+system_deps = ["user32"]

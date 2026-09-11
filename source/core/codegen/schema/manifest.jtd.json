@@ -9,7 +9,7 @@
     "script": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
     "test": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
     "example": { "elements": { "ref": "target" }, "metadata": { "key": "name" } },
-    "toolchain": { "elements": { "ref": "manifest_toolchain" } },
+    "toolchain": { "elements": { "ref": "toolchain_decl" } },
     "index": { "elements": { "ref": "index" } },
     "profile": { "values": { "ref": "profile" } },
     "options": { "values": { "ref": "option" } },
@@ -23,7 +23,6 @@
     "cxx_standard": { "enum": ["c++11", "c++14", "c++17", "c++20", "c++23"] },
     "mode": { "enum": ["release", "debug"] },
     "opt_level": { "enum": ["0", "1", "2", "3", "s", "z"] },
-    "sanitizer": { "enum": ["address", "thread", "undefined", "memory", "leak"] },
     "win_subsystem": { "enum": ["console", "windows"] },
     "tree": { "enum": ["manifest", "source"] },
 
@@ -153,6 +152,8 @@
         "include": { "elements": { "ref": "source_entry" }, "metadata": { "shorthand": "path" } },
         "define": { "elements": { "ref": "value_entry" }, "metadata": { "shorthand": "value" } },
         "flags": { "elements": { "ref": "value_entry" }, "metadata": { "shorthand": "value" } },
+        "link_flags": { "elements": { "ref": "value_entry" }, "metadata": { "shorthand": "value" } },
+        "linker_script": { "elements": { "ref": "source_entry" }, "metadata": { "shorthand": "path" } },
         "system_deps": { "elements": { "ref": "value_entry" }, "metadata": { "shorthand": "value" } },
         "deps": { "elements": { "ref": "target_dep_entry" }, "metadata": { "shorthand": "pkg" } },
         "link": { "type": "boolean" },
@@ -167,20 +168,6 @@
         "standard": { "ref": "cxx_standard" },
         "exceptions": { "type": "boolean" },
         "rtti": { "type": "boolean" }
-      }
-    },
-
-    "manifest_toolchain": {
-      "optionalProperties": {
-        "name": { "type": "string" },
-        "compiler": { "type": "string" },
-        "linker": { "type": "string" },
-        "archiver": { "type": "string" },
-        "driver": { "ref": "cc_driver" },
-        "cxx": { "type": "string" },
-        "host": { "values": { "ref": "artifact" } },
-        "mirrors": { "type": "string" },
-        "target": { "elements": { "ref": "triple" } }
       }
     },
 

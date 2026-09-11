@@ -21,6 +21,7 @@
 #include "session/session.h"
 #include "target/select.h"
 #include "graph/build.h"
+#include "profile/types.h"
 #include "toolchain/toolchain.h"
 #include "triple/triple.h"
 
@@ -68,6 +69,23 @@ static spn_target_unit_t* add_target(spn_session_t* s, spn_pkg_unit_t* pkg, spn_
   return target;
 }
 
+static sp_da(spn_linkage_t) linkage_list(sp_mem_t mem, spn_linkage_set_t set) {
+  sp_da(spn_linkage_t) list = sp_da_new(mem, spn_linkage_t);
+  if (set.shared) {
+    sp_da_push(list, SPN_LIB_KIND_SHARED);
+  }
+  if (set.static_lib) {
+    sp_da_push(list, SPN_LIB_KIND_STATIC);
+  }
+  if (set.source) {
+    sp_da_push(list, SPN_LIB_KIND_SOURCE);
+  }
+  if (set.object) {
+    sp_da_push(list, SPN_LIB_KIND_OBJECT);
+  }
+  return list;
+}
+
 static spn_err_t set_target_kind(spn_session_t* s, spn_target_unit_t* target) {
   spn_target_info_t* info = target->info;
 
@@ -99,8 +117,10 @@ static spn_err_t set_target_kind(spn_session_t* s, spn_target_unit_t* target) {
             .kind = SPN_ERR_TARGET_LINKAGE,
             .target = {
               .pkg = target->pkg->info->name,
+              .name = info->name,
               .requested = spn_linkage_to_str(query.config.some ? query.config.value : query.linkage),
-              .requester = query.config.some ? sp_str_lit("the root manifest") : sp_str_lit("the profile"),
+              .requester = query.config.some ? SPN_LINKAGE_REQUESTER_ROOT_MANIFEST : SPN_LINKAGE_REQUESTER_PROFILE,
+              .supported = linkage_list(s->mem, info->linkages),
             },
           });
         }
@@ -257,8 +277,7 @@ static bool is_target_dynamic(spn_target_unit_t* target) {
 }
 
 static spn_path_t static_archive_path(sp_mem_t mem, spn_target_unit_t* lib) {
-  spn_profile_info_t* profile = &lib->pkg->build->profile;
-  spn_triple_t triple = { profile->arch, profile->os, profile->abi };
+  spn_triple_t triple = spn_profile_triple(&lib->pkg->build->profile);
   sp_mem_arena_marker_t s = sp_mem_begin_scratch_for(mem);
   sp_str_t file_name = spn_triple_lib_file_name(s.mem, triple, lib->info->name, SP_OS_LIB_STATIC);
   spn_path_t path = spn_path_join(mem, lib->pkg->paths.lib, file_name);
@@ -396,10 +415,11 @@ static spn_link_plan_t link_plan(spn_target_unit_t* target) {
   spn_link_plan_t plan = {
     .libs = spn_closure_get_linked_libs(mem, closure),
     .cc = {
+      .pkg = pkg->info->name,
+      .name = target->info->name,
       .kind = target->kind,
       .min_os = link_plan_min_os(target, closure),
       .subsystem = target->info->windows.subsystem,
-      .rpath = true,
     },
   };
   plan.cc.lang = link_plan_lang(target, plan.libs);
@@ -412,6 +432,21 @@ static spn_link_plan_t link_plan(spn_target_unit_t* target) {
 
   link_plan_frameworks(target, closure, &plan.cc.frameworks);
   link_plan_system_libs(target, closure, &plan.cc.system_libs);
+  switch (target->kind) {
+    case SPN_CC_OUTPUT_EXE:
+    case SPN_CC_OUTPUT_SHARED_LIB:
+    case SPN_CC_OUTPUT_REACTOR: {
+      plan.cc.args = target->info->link_flags;
+      plan.cc.scripts = target->info->linker_script;
+      break;
+    }
+    case SPN_CC_OUTPUT_STATIC_LIB:
+    case SPN_CC_OUTPUT_OBJECT: {
+      sp_da_init(mem, plan.cc.args);
+      sp_da_init(mem, plan.cc.scripts);
+      break;
+    }
+  }
 
   sp_da_for(plan.libs, it) {
     spn_link_lib_t* lib = &plan.libs[it];
@@ -458,7 +493,7 @@ spn_err_t spn_target_link_invocation(sp_mem_t mem, spn_target_unit_t* target, co
     case SPN_CC_OUTPUT_REACTOR: {
       spn_cc_link_files_t linked = *files;
       linked.whole_archives = target->link.archives;
-      spn_try(spn_cc_render_link(mem, toolchain, profile, &target->link.cc, &linked, invocation));
+      spn_try(spn_cc_render_link(mem, toolchain, spn.host, profile, &target->link.cc, &linked, invocation));
       break;
     }
     case SPN_CC_OUTPUT_OBJECT: {
@@ -485,10 +520,10 @@ static spn_err_t build_target_plan(spn_target_unit_t* target) {
     case SPN_CC_OUTPUT_SHARED_LIB:
     case SPN_CC_OUTPUT_REACTOR: {
       spn_try(spn_cc_validate_archive(toolchain, profile));
-      return spn_cc_validate_link(toolchain, profile, &target->link.cc);
+      return spn_cc_validate_link(toolchain, spn.host, profile, &target->link.cc);
     }
     case SPN_CC_OUTPUT_EXE: {
-      return spn_cc_validate_link(toolchain, profile, &target->link.cc);
+      return spn_cc_validate_link(toolchain, spn.host, profile, &target->link.cc);
     }
     case SPN_CC_OUTPUT_OBJECT: {
       return SPN_OK;

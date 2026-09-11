@@ -1,0 +1,6 @@
+[[toolchain]]
+name = "T"
+driver = "gcc"
+target = [{ arch = "x86_64", os = "linux", abi = "gnu" }]
+compiler = "C"
+archiver = "A"

@@ -52,9 +52,9 @@ add_custom_command(
     ${CMAKE_SOURCE_DIR}/include/spn.h=include/spn.h
     ${CMAKE_SOURCE_DIR}/include/spn/core.h=include/spn/core.h
     ${CMAKE_SOURCE_DIR}/include/spn/err.h=include/spn/err.h
-    ${CMAKE_SOURCE_DIR}/source/core/toolchain/toolchains.json=toolchains.json
+    ${CMAKE_SOURCE_DIR}/source/core/toolchain/toolchains.toml=toolchains.toml
     ${CMAKE_SOURCE_DIR}/assets/init=init
-  DEPENDS embed ${CMAKE_SOURCE_DIR}/include/spn.h ${CMAKE_SOURCE_DIR}/include/spn/core.h ${CMAKE_SOURCE_DIR}/include/spn/err.h ${CMAKE_SOURCE_DIR}/source/core/toolchain/toolchains.json ${SPN_INIT_TEMPLATES}
+  DEPENDS embed ${CMAKE_SOURCE_DIR}/include/spn.h ${CMAKE_SOURCE_DIR}/include/spn/core.h ${CMAKE_SOURCE_DIR}/include/spn/err.h ${CMAKE_SOURCE_DIR}/source/core/toolchain/toolchains.toml ${SPN_INIT_TEMPLATES}
   COMMENT "spn.embed.o"
   VERBATIM)
 add_custom_target(spn_embed ALL DEPENDS ${EMBED_OBJ} ${EMBED_HDR})
@@ -62,7 +62,7 @@ add_custom_target(spn_embed ALL DEPENDS ${EMBED_OBJ} ${EMBED_HDR})
 add_executable(toolchain toolchain.c)
 set_target_properties(toolchain PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${STORE}/bin)
 target_include_directories(toolchain PRIVATE ${STORE}/include ${UTIL})
-target_link_libraries(toolchain PRIVATE yyjson m)
+target_link_libraries(toolchain PRIVATE m)
 add_dependencies(toolchain headers)
 
 set(GEN_DIR ${CMAKE_SOURCE_DIR}/source/core/codegen/gen)
@@ -87,9 +87,6 @@ set(GEN_FILES
   ${GEN_DIR}/source_deps.gen.h
   ${GEN_DIR}/source_deps.gen.c
   ${GEN_DIR}/source_deps.jtd.json
-  ${GEN_DIR}/toolchains.gen.h
-  ${GEN_DIR}/toolchains.gen.c
-  ${GEN_DIR}/toolchains.jtd.json
   ${GEN_DIR}/abi.gen.h
   ${GEN_DIR}/abi.gen.c
   ${GEN_DIR}/fuzz.gen.h

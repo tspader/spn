@@ -1,0 +1,11 @@
+[[toolchain]]
+name = "A"
+driver = "gcc"
+compiler = "A"
+archiver = "ar"
+
+[[toolchain]]
+name = "B"
+driver = "clang"
+compiler = "B"
+archiver = "ar"

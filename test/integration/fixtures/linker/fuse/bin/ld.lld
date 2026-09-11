@@ -1,0 +1,3 @@
+#!/bin/sh
+touch "$(dirname "$0")/../witness"
+exit 1

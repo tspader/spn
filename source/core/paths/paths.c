@@ -153,6 +153,10 @@ spn_path_t spn_path_join(sp_mem_t mem, spn_path_t base, sp_str_t sub) {
   };
 }
 
+spn_path_t spn_path_parent(spn_path_t path) {
+  return (spn_path_t) { .root = path.root, .sub = sp_fs_parent_path(path.sub) };
+}
+
 spn_path_t spn_path_suffix(sp_mem_t mem, spn_path_t path, sp_str_t suffix) {
   return (spn_path_t) {
     .root = path.root,
@@ -232,6 +236,10 @@ spn_arg_t spn_arg_path(spn_path_t path) {
 
 spn_arg_t spn_arg_glue(sp_str_t prefix, spn_path_t path) {
   return (spn_arg_t) { .prefix = prefix, .path = path };
+}
+
+spn_arg_t spn_arg_prepend(sp_mem_t mem, sp_str_t prefix, spn_arg_t arg) {
+  return (spn_arg_t) { .prefix = sp_str_concat(mem, prefix, arg.prefix), .path = arg.path };
 }
 
 bool spn_arg_empty(spn_arg_t arg) {

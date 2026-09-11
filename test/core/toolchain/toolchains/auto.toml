@@ -1,0 +1,38 @@
+[[toolchain]]
+name = "A"
+driver = "gcc"
+compiler = "A"
+archiver = "ar"
+target = [{ arch = "x86_64", os = "windows", abi = "gnu" }]
+
+[[toolchain]]
+name = "B"
+version = "1.0.0"
+driver = "clang"
+compiler = "B"
+archiver = "B"
+mirrors = "https://example.com/mirrors.txt"
+host = { x86_64-linux = { url = "https://example.com/linux.tar.xz", sha256 = "aa" } }
+target = [
+  { arch = "x86_64", os = "linux", abi = "gnu" },
+  { arch = "x86_64", os = "linux", abi = "musl" },
+  { arch = "aarch64", os = "linux", abi = "gnu" },
+  { arch = "aarch64", os = "linux", abi = "musl" }
+]
+
+[[toolchain]]
+name = "C"
+driver = "gcc"
+compiler = "C"
+archiver = "ar"
+target = [
+  { arch = "aarch64", os = "linux", abi = "gnu" },
+  { arch = "aarch64", os = "linux", abi = "musl" },
+  { arch = "x86_64", os = "windows", abi = "gnu" }
+]
+
+[[toolchain]]
+name = "D"
+driver = "gcc"
+compiler = "D"
+archiver = "ar"

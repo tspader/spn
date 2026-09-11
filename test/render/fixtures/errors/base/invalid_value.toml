@@ -1,0 +1,7 @@
+
+[[toolchain]]
+name = "T"
+driver = "gcc"
+compiler = "gcc"
+archiver = "ar"
+linker = "msvc"

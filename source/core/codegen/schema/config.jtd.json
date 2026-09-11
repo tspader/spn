@@ -1,6 +1,7 @@
 {
   "metadata": { "format": "toml" },
   "optionalProperties": {
-    "index": { "elements": { "ref": "index" } }
+    "index": { "elements": { "ref": "index" } },
+    "toolchain": { "elements": { "ref": "toolchain_decl" } }
   }
 }

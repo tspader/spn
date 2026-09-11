@@ -24,6 +24,8 @@ typedef struct {
   const c8* include [4];
   const c8* define [4];
   const c8* flags [4];
+  const c8* link_flags [4];
+  const c8* linker_script [4];
   const c8* sys_target [4];
   const c8* deps [4];
   const c8* sys [4];
@@ -44,6 +46,8 @@ typedef struct {
   apply_list_t include;
   apply_list_t define;
   apply_list_t flags;
+  apply_list_t link_flags;
+  apply_list_t linker_script;
   apply_list_t sys_target;
   apply_list_t deps;
   apply_list_t sys;
@@ -272,6 +276,30 @@ static const apply_test_t list_tests [] = {
     },
   },
   {
+    .name = "link_flags",
+    .facts = { .os = SPN_OS_LINUX },
+    .link_flags = {
+      .values = {
+        { .value = "A", .when = { { "os", "linux" } } },
+      },
+    },
+    .expect = {
+      .link_flags = { "A" },
+    },
+  },
+  {
+    .name = "linker_script",
+    .facts = { .os = SPN_OS_LINUX },
+    .linker_script = {
+      .values = {
+        { .value = "A", .when = { { "os", "linux" } } },
+      },
+    },
+    .expect = {
+      .linker_script = { "A" },
+    },
+  },
+  {
     .name = "target_system_deps",
     .facts = { .os = SPN_OS_LINUX },
     .sys_target = {
@@ -387,6 +415,7 @@ sp_test_each(options_apply, lists, apply_test_t, list_tests) {
     { it->script_source, &script->source, &script->gated.source, it->expect.script_source },
     { it->test_source, &unit_test->source, &unit_test->gated.source, it->expect.test_source },
     { it->include, &exe->include, &exe->gated.include, it->expect.include },
+    { it->linker_script, &exe->linker_script, &exe->gated.linker_script, it->expect.linker_script },
   };
   struct {
     apply_list_t test;
@@ -396,6 +425,7 @@ sp_test_each(options_apply, lists, apply_test_t, list_tests) {
   } lists [] = {
     { it->define, &exe->define, &exe->gated.define, it->expect.define },
     { it->flags, &exe->flags, &exe->gated.flags, it->expect.flags },
+    { it->link_flags, &exe->link_flags, &exe->gated.link_flags, it->expect.link_flags },
     { it->sys_target, &exe->system_deps, &exe->gated.system_deps, it->expect.sys_target, },
     { it->deps, &exe->deps, &exe->gated.deps, it->expect.deps },
     { it->sys, &info.system_deps, &info.gated.system_deps, it->expect.sys, },

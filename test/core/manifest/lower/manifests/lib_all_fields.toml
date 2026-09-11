@@ -4,10 +4,12 @@ version = "1.0.0"
 
 [[lib]]
 name = "t"
-kinds = ["static"]
+kinds = ["static", "shared"]
 source = ["main.c"]
 headers = ["header.h"]
 include = ["include/dir"]
 define = ["SPUM"]
 flags = ["-flag"]
+link_flags = ["-A"]
+linker_script = ["a.ld"]
 deps = ["spum"]

@@ -23,29 +23,12 @@
 #include "toolchain/toolchain.h"
 #include "triple/triple.h"
 
-static sp_str_t resolve_macos_sdk(sp_mem_t mem, sp_env_t* env) {
-  sp_str_t sdk = sp_env_get(env, sp_str_lit("SPN_MACOS_SDK"));
-  if (!sp_str_empty(sdk)) {
-    return sdk;
+static spn_err_t finalize_profile(spn_session_t* s, spn_profile_info_t* profile, const spn_toolchain_selection_t* selection) {
+  spn_profile_finalize(profile, selection);
+  if (spn_toolchain_driver_caps(profile->driver) & SPN_CC_CAP_LIBC_FILE) {
+    spn_try(spn_libc_write(s->mem, &s->ctx->roots, &profile->sdk, &profile->libc));
   }
-  if (spn_triple_host().os != SPN_OS_MACOS) {
-    return sp_str_lit("");
-  }
-
-  sp_ps_output_t result = sp_ps_run(mem, (sp_ps_config_t) {
-    .command = sp_str_lit("xcrun"),
-    .args = {
-      sp_str_lit("--show-sdk-path"),
-    },
-    .io = {
-      .in = { .mode = SP_PS_IO_MODE_NULL },
-      .err = { .mode = SP_PS_IO_MODE_NULL },
-    },
-  });
-  if (result.status.exit_code) {
-    return sp_str_lit("");
-  }
-  return sp_str_trim(result.out);
+  return SPN_OK;
 }
 
 static spn_target_rule_t copy_rule(sp_mem_t mem, spn_target_rule_t rule) {
@@ -118,22 +101,12 @@ spn_err_t spn_session_init(spn_session_t* s, spn_ctx_t* ctx, sp_mem_t mem, spn_p
   }
   spn_toolchain_selection_t target = sp_zero;
   spn_try(spn_toolchain_select(&ctx->catalog, query, &target));
-  spn_profile_finalize(&s->profile, target.triple.abi, target.toolchain->driver);
-
-  switch (s->profile.os) {
-    case SPN_OS_MACOS: {
-      s->profile.sysroot = spn_path_canonicalize(s->mem, &ctx->roots, spn_path_join(s->mem, spn_path_from_root(SPN_PATH_ROOT_NONE), resolve_macos_sdk(s->mem, ctx->env)));
-      break;
-    }
-    default: {
-      break;
-    }
-  }
+  spn_try(finalize_profile(s, &s->profile, &target));
 
   spn_profile_info_t metaprogram = spn_profile_metaprogram();
   spn_toolchain_selection_t script = sp_zero;
   spn_try(spn_toolchain_select(&ctx->catalog, spn_profile_query(&metaprogram, host), &script));
-  spn_profile_finalize(&metaprogram, script.triple.abi, script.toolchain->driver);
+  spn_try(finalize_profile(s, &metaprogram, &script));
 
   spn_path_t target_root = spn_path_join(s->mem, s->paths.build, spn_profile_build_dir(s->mem, &s->profile));
   s->units.target = spn_build_add(s, s->profile, target_root, target.toolchain);
@@ -178,22 +151,10 @@ void spn_session_export_toolchain_env(spn_session_t* s) {
   spn_toolchain_unit_t* toolchain = s->units.target->toolchain;
   sp_env_insert(&s->env, sp_str_lit("CC"), spn_toolchain_launcher_to_str(&spn.roots, s->mem, toolchain->cc.compiler));
   sp_env_insert(&s->env, sp_str_lit("AR"), spn_toolchain_launcher_to_str(&spn.roots, s->mem, toolchain->cc.archiver));
-  sp_env_insert(&s->env, sp_str_lit("LD"), spn_toolchain_launcher_to_str(&spn.roots, s->mem, toolchain->cc.linker));
+  sp_env_insert(&s->env, sp_str_lit("LD"), spn_toolchain_launcher_to_str(&spn.roots, s->mem, toolchain->cc.compiler));
   if (!spn_arg_empty(toolchain->cc.cxx.program)) {
     sp_env_insert(&s->env, sp_str_lit("CXX"), spn_toolchain_launcher_to_str(&spn.roots, s->mem, toolchain->cc.cxx));
   }
-}
-
-spn_err_t spn_session_validate_flags(spn_session_t* s) {
-  sp_om_for(s->units.builds, it) {
-    spn_build_unit_t* build = sp_om_at(s->units.builds, it);
-    sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-    spn_cc_flags_t flags = sp_zero;
-    spn_err_t err = spn_cc_render_flags(scratch.mem, &build->toolchain->cc, &build->profile, &flags);
-    sp_mem_end_scratch(scratch);
-    spn_try(err);
-  }
-  return SPN_OK;
 }
 
 spn_pkg_id_t spn_session_root_pkg(spn_session_t* session) {

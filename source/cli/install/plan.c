@@ -90,22 +90,17 @@ static void resolve_shells(sp_mem_t mem, sp_env_t* env, sp_str_t home, spn_insta
 }
 
 static void resolve_path(sp_mem_t mem, spn_install_os_t os, sp_env_t* env, spn_install_layout_t* layout) {
-  c8 sep = os == SPN_INSTALL_OS_WINDOWS ? ';' : ':';
   sp_str_t exe_name = os == SPN_INSTALL_OS_WINDOWS ? sp_str_lit("spn.exe") : sp_str_lit("spn");
+  c8 sep = os == SPN_INSTALL_OS_WINDOWS ? ';' : ':';
 
   layout->shadows = sp_da_new(mem, sp_str_t);
-  sp_da(sp_str_t) entries = sp_str_split_c8(mem, sp_env_get_path(env), sep);
-  sp_da_for(entries, it) {
-    if (sp_str_empty(entries[it])) {
-      continue;
-    }
-    sp_str_t entry = sp_fs_normalize_path(mem, entries[it]);
+  sp_str_for_word(sp_env_get(env, sp_str_lit("PATH")), sep, it) {
+    sp_str_t entry = sp_fs_normalize_path(mem, it.entry);
     if (path_equal(os, entry, layout->bin)) {
       layout->on_path = true;
+      break;
     }
-    else if (!layout->on_path) {
-      sp_da_push(layout->shadows, sp_fs_join_path(mem, entry, exe_name));
-    }
+    sp_da_push(layout->shadows, sp_fs_join_path(mem, entry, exe_name));
   }
 }
 
@@ -140,17 +135,10 @@ spn_install_layout_t spn_install_resolve(sp_mem_t mem, spn_install_os_t os, sp_e
 #define RC_APPEND "\n" SPN_INSTALL_RC_LINE "\n"
 
 static bool registry_contains(sp_str_t value, sp_str_t bin_native) {
-  sp_str_t remaining = value;
-  while (remaining.len) {
-    s32 sep = sp_str_find_c8(remaining, ';');
-    sp_str_t entry = sep < 0 ? remaining : sp_str_prefix(remaining, sep);
-    if (sp_str_iequal(entry, bin_native)) {
+  sp_str_for_word(value, ';', it) {
+    if (sp_str_iequal(it.entry, bin_native)) {
       return true;
     }
-    if (sep < 0) {
-      break;
-    }
-    remaining = sp_str_sub(remaining, sep + 1, (s32)remaining.len - sep - 1);
   }
   return false;
 }

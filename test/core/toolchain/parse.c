@@ -17,7 +17,7 @@ typedef struct {
 static const parse_test_t tests [] = {
   {
     .name = "distribution",
-    .file = "distribution.json",
+    .file = "distribution.toml",
     .expect = {
       .entries = 1,
       .toolchains = {
@@ -25,10 +25,11 @@ static const parse_test_t tests [] = {
           .name = "A",
           .version = "1.0.0",
           .driver = SPN_CC_DRIVER_CLANG,
-          .compiler = { .program = "A", .args = { "cc" } },
-          .cxx = { .program = "A", .args = { "c++" } },
-          .linker = { .program = "A", .args = { "cc" } },
-          .archiver = { .program = "A", .args = { "ar" } },
+          .compiler = { .path = "A", .args = { "cc" } },
+          .cxx = { .path = "A", .args = { "c++" } },
+          .archiver = { .path = "A", .args = { "ar" } },
+          .lld = true,
+          .link_args = { "-fuse-ld=lld" },
           .hosts = {
             {
               .triple = { SPN_ARCH_X64, SPN_OS_LINUX },
@@ -44,7 +45,7 @@ static const parse_test_t tests [] = {
             },
           },
           .targets = {
-            { SPN_ARCH_WASM32, SPN_OS_WASI, SPN_ABI_MUSL },
+            { .triple = { SPN_ARCH_WASM32, SPN_OS_WASI, SPN_ABI_MUSL } },
             { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_MUSL },
           },
         },
@@ -53,33 +54,34 @@ static const parse_test_t tests [] = {
   },
   {
     .name = "local",
-    .file = "local.json",
+    .file = "local.toml",
     .expect = {
       .entries = 1,
       .toolchains = {
         {
           .name = "A",
+          .host = true,
           .version = "",
           .driver = SPN_CC_DRIVER_GCC,
-          .compiler = { .program = "cc" },
-          .cxx = { .program = "" },
-          .linker = { .program = "cc" },
-          .archiver = { .program = "ar" },
+          .compiler = { .name = "cc" },
+          .cxx = { .name = "" },
+          .archiver = { .name = "ar" },
         },
       },
     },
   },
   {
     .name = "host_restricted_local",
-    .file = "restricted.json",
+    .file = "restricted.toml",
     .expect = {
       .entries = 2,
       .toolchains = {
         {
           .name = "A",
+          .host = true,
           .version = "",
           .driver = SPN_CC_DRIVER_GCC,
-          .compiler = { .program = "A" },
+          .compiler = { .name = "A" },
           .hosts = {
             {
               .triple = { SPN_ARCH_X64, SPN_OS_LINUX },
@@ -90,34 +92,37 @@ static const parse_test_t tests [] = {
         },
         {
           .name = "B",
+          .host = true,
           .driver = SPN_CC_DRIVER_GCC,
-          .compiler = { .program = "B" },
+          .compiler = { .name = "B" },
         },
       },
     },
   },
   {
     .name = "multiple_toolchains",
-    .file = "multiple.json",
+    .file = "multiple.toml",
     .expect = {
       .entries = 2,
       .toolchains = {
         {
           .name = "A",
+          .host = true,
           .driver = SPN_CC_DRIVER_GCC,
-          .compiler = { .program = "A" },
+          .compiler = { .name = "A" },
         },
         {
           .name = "B",
+          .host = true,
           .driver = SPN_CC_DRIVER_CLANG,
-          .compiler = { .program = "B" },
+          .compiler = { .name = "B" },
         },
       },
     },
   },
   {
     .name = "empty_document",
-    .file = "empty.json",
+    .file = "empty.toml",
     .expect = {
       .toolchains = {
         { .name = "A", .absent = true },
@@ -125,33 +130,225 @@ static const parse_test_t tests [] = {
     },
   },
   {
-    .name = "malformed_json",
-    .file = "malformed.json",
+    .name = "malformed_toml",
+    .file = "malformed.toml",
     .expect = { .err = SPN_ERROR },
   },
   {
     .name = "invalid_host_key",
-    .file = "bad_host.json",
+    .file = "bad_host.toml",
     .expect = { .err = SPN_ERROR },
   },
   {
     .name = "mixed_hosts",
-    .file = "mixed.json",
+    .file = "mixed.toml",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "linker_rejected",
+    .file = "linker_rejected.toml",
     .expect = { .err = SPN_ERROR },
   },
   {
     .name = "target_beyond_driver",
-    .file = "bad_target_driver.json",
+    .file = "bad_target_driver.toml",
     .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "linker_lld",
+    .file = "linkers.toml",
+    .expect = {
+      .entries = 1,
+      .toolchains = {
+        {
+          .name = "A",
+          .driver = SPN_CC_DRIVER_CLANG,
+          .compiler = { .name = "A" },
+          .archiver = { .name = "llvm-ar" },
+          .lld = true,
+          .targets = {
+            { SPN_ARCH_X64, SPN_OS_LINUX, SPN_ABI_GNU },
+            { .triple = TARGET_WIN_GNU },
+            { SPN_ARCH_X64, SPN_OS_WINDOWS, SPN_ABI_MSVC },
+            HOST_ARM_MACOS,
+            { .triple = TARGET_WASM },
+          },
+        },
+      },
+    },
+  },
+  {
+    .name = "program_absolute",
+    .file = "program_absolute.toml",
+    .expect = {
+      .entries = 1,
+      .toolchains = {
+        {
+          .name = "A",
+          .host = true,
+          .driver = SPN_CC_DRIVER_GCC,
+          .compiler = { .path = "/A" },
+          .archiver = { .name = "ar" },
+        },
+      },
+    },
+  },
+  {
+    .name = "program_relative",
+    .file = "program_relative.toml",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "sdk_per_target",
+    .file = "sdk.toml",
+    .expect = {
+      .entries = 1,
+      .toolchains = {
+        {
+          .name = "A",
+          .driver = SPN_CC_DRIVER_CLANG,
+          .compiler = { .path = "A" },
+          .archiver = { .path = "A" },
+          .hosts = {
+            { .triple = { SPN_ARCH_X64, SPN_OS_LINUX }, .url = "https://example.com/linux.tar.xz", .sha256 = "aa" },
+          },
+          .targets = {
+            { .triple = HOST_ARM_LINUX, .sdk = { "S/linux" } },
+            { .triple = HOST_ARM_MACOS, .sdk = { "S/macos" } },
+            { .triple = TARGET_WASM, .sdk = { "S/wasi" } },
+            { .triple = TARGET_WIN_GNU, .sdk = { "S/windows" } },
+            { .triple = TARGET_WIN_MSVC, .sdk = { "S/msvc" } },
+            { .triple = HOST_X64_LINUX },
+          },
+        },
+      },
+    },
+  },
+  {
+    .name = "sdk_on_none_target",
+    .file = "sdk_none.toml",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "sdk_on_elf_target",
+    .file = "sdk_elf.toml",
+    .expect = {
+      .entries = 1,
+      .toolchains = {
+        {
+          .name = "A",
+          .driver = SPN_CC_DRIVER_CLANG,
+          .compiler = { .name = "A" },
+          .archiver = { .name = "A" },
+          .targets = {
+            { .triple = { SPN_ARCH_X64, SPN_OS_FREESTANDING, SPN_ABI_ELF }, .sdk = { "/S" } },
+          },
+        },
+      },
+    },
+  },
+  {
+    .name = "sdk_absolute_in_distribution_is_a_host_path",
+    .file = "sdk_absolute.toml",
+    .expect = {
+      .entries = 1,
+      .toolchains = {
+        {
+          .name = "A",
+          .driver = SPN_CC_DRIVER_CLANG,
+          .compiler = { .path = "A" },
+          .archiver = { .path = "A" },
+          .hosts = {
+            { .triple = { SPN_ARCH_X64, SPN_OS_LINUX }, .url = "https://example.com/linux.tar.xz", .sha256 = "aa" },
+          },
+          .targets = {
+            { .triple = HOST_ARM_LINUX, .sdk = { "/S" } },
+          },
+        },
+      },
+    },
+  },
+  {
+    .name = "sanitizers_and_toolchain_sdk",
+    .file = "caps.toml",
+    .expect = {
+      .entries = 1,
+      .toolchains = {
+        {
+          .name = "A",
+          .driver = SPN_CC_DRIVER_CLANG,
+          .compiler = { .name = "A" },
+          .archiver = { .name = "A" },
+          .targets = {
+            { .triple = HOST_X64_LINUX, .sanitizers = SPN_SANITIZER_ADDRESS | SPN_SANITIZER_UNDEFINED },
+            { .triple = TARGET_WASM },
+            { .triple = TARGET_WIN_GNU },
+          },
+        },
+      },
+    },
+  },
+  {
+    .name = "host_row_beside_a_list",
+    .file = "host.toml",
+    .expect = {
+      .entries = 1,
+      .toolchains = {
+        {
+          .name = "A",
+          .host = true,
+          .driver = SPN_CC_DRIVER_CLANG,
+          .compiler = { .name = "A" },
+          .archiver = { .name = "A" },
+          .targets = { { TARGET_X64_BARE } },
+        },
+      },
+    },
+  },
+  {
+    .name = "host_row_named_twice",
+    .file = "host_twice.toml",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "host_row_with_fields",
+    .file = "host_fields.toml",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "unknown_row_kind",
+    .file = "kind_unknown.toml",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "sanitizers_on_none_target",
+    .file = "sanitizers_none.toml",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "sdk_absent_off_host_is_the_toolchains",
+    .file = "sdk_absent.toml",
+    .expect = {
+      .entries = 1,
+      .toolchains = {
+        {
+          .name = "A",
+          .driver = SPN_CC_DRIVER_CLANG,
+          .compiler = { .name = "A" },
+          .archiver = { .name = "A" },
+          .targets = { { TARGET_WIN_GNU } },
+        },
+      },
+    },
   },
 };
 
 sp_test_each(parse, decls, parse_test_t, tests) {
-  sp_str_t json = sp_zero;
-  if (fixture_read_json(t, it->file, &json)) return SP_ERR;
-
   sp_da(spn_toolchain_decl_t) decls = SP_NULLPTR;
-  sp_must_eq(t, (u32)it->expect.err, (u32)spn_toolchain_decls_parse(sp_test_arena(t), json, &decls));
+  sp_da(spn_codegen_issue_t) issues = SP_NULLPTR;
+  if (fixture_decls(t, it->file, &decls, &issues)) return SP_ERR;
+
+  sp_must_eq(t, it->expect.err != SPN_OK, !sp_da_empty(issues));
   if (it->expect.err) {
     return SP_OK;
   }

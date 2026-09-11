@@ -1,0 +1,10 @@
+[package]
+name = "A"
+version = "0.1.0"
+
+[[bin]]
+name = "A"
+source = ["main.c"]
+
+[bin.macos]
+frameworks = ["CoreFoundation"]

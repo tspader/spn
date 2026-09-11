@@ -1,4 +1,5 @@
 #include "harness.h"
+#include "elf/elf.h"
 #include "error/error.h"
 #include "triple/triple.h"
 #include "yyjson.h"
@@ -166,6 +167,54 @@ static sp_err_t expect_no_interp(sp_test_t* t, fixture_t* fixture, sp_str_t path
     .line = line,
     .expected = sp_cstr_as_str("a static elf64 with no program interpreter"),
     .actual = err ? sp_cstr_as_str("not an elf64 image") : interp,
+  });
+  return SP_ERR;
+}
+
+static sp_err_t expect_elf_entry(sp_test_t* t, fixture_t* fixture, sp_str_t path, u64 expected, const c8* file, u32 line) {
+  sp_io_file_reader_t reader = sp_zero;
+  sp_must_ok(t, sp_io_file_reader_from_path(&reader, path));
+  sp_io_seeking_reader_t elf = sp_zero;
+  sp_io_seeking_reader_from_file_reader(&elf, &reader);
+  u64 entry = 0;
+  spn_err_t err = spn_elf_entry(&elf, &entry);
+  sp_io_file_reader_close(&reader);
+  if (!err && entry == expected) {
+    return SP_OK;
+  }
+
+  sp_mem_t mem = harness_mem();
+  sp_test_kv(t, "root", fixture->root);
+  sp_test_kv(t, "path", display_path(fixture, path));
+  sp_test_record(t, (sp_test_failure_t) {
+    .file = sp_cstr_as_str(file),
+    .line = line,
+    .expected = sp_fmt(mem, "an elf64 image with entry {:x}", sp_fmt_uint(expected)).value,
+    .actual = err ? sp_cstr_as_str("not an elf64 image") : sp_fmt(mem, "entry {:x}", sp_fmt_uint(entry)).value,
+  });
+  return SP_ERR;
+}
+
+static sp_err_t expect_elf_no_symbol(sp_test_t* t, fixture_t* fixture, sp_str_t path, const c8* prefix, const c8* file, u32 line) {
+  sp_io_file_reader_t reader = sp_zero;
+  sp_must_ok(t, sp_io_file_reader_from_path(&reader, path));
+  sp_io_seeking_reader_t elf = sp_zero;
+  sp_io_seeking_reader_from_file_reader(&elf, &reader);
+  bool defined = false;
+  spn_err_t err = spn_elf_defines_prefix(&elf, sp_cstr_as_str(prefix), &defined);
+  sp_io_file_reader_close(&reader);
+  if (!err && !defined) {
+    return SP_OK;
+  }
+
+  sp_mem_t mem = harness_mem();
+  sp_test_kv(t, "root", fixture->root);
+  sp_test_kv(t, "path", display_path(fixture, path));
+  sp_test_record(t, (sp_test_failure_t) {
+    .file = sp_cstr_as_str(file),
+    .line = line,
+    .expected = sp_fmt(mem, "an elf64 image defining no symbol starting with {}", sp_fmt_cstr(prefix)).value,
+    .actual = err ? sp_cstr_as_str("not an elf64 image with a symbol table") : sp_fmt(mem, "a symbol starting with {}", sp_fmt_cstr(prefix)).value,
   });
   return SP_ERR;
 }
@@ -416,6 +465,7 @@ static sp_ps_output_t run_fixture_bin(fixture_t* fixture, sp_str_t path) {
     .cwd = fixture->root,
     .env = {
       .extra = {
+        { sp_str_lit("PATH"), test_toolchain_path(fixture->mem) },
         { sp_str_lit("ASAN_OPTIONS"), sp_str_lit("abort_on_error=0:exitcode=1") },
         { sp_str_lit("UBSAN_OPTIONS"), sp_str_lit("halt_on_error=1:abort_on_error=0:exitcode=1") },
       },
@@ -518,6 +568,11 @@ sp_err_t test_when(sp_test_t* t, test_when_t when) {
   return SP_OK;
 }
 
+static sp_err_t begin_test(sp_test_t* t, fixture_t* fixture, test_when_t when) {
+  sp_try(fixture_init(t, fixture));
+  return test_when(t, when);
+}
+
 sp_err_t run_command(sp_test_t* t, fixture_t* fixture, command_test_t test) {
   if (test.project) {
     sp_try(prepare_test(t, fixture, test.project, test.copy));
@@ -595,8 +650,7 @@ sp_err_t run_command(sp_test_t* t, fixture_t* fixture, command_test_t test) {
 
 sp_err_t run_command_test(sp_test_t* t, command_test_t test) {
   fixture_t fixture = sp_zero;
-  sp_try(fixture_init(t, &fixture));
-  sp_try(test_when(t, test.when));
+  sp_try(begin_test(t, &fixture, test.when));
   if (!test.project) {
     sp_try(prepare_test(t, &fixture, SP_NULLPTR, SP_NULLPTR));
   }
@@ -646,9 +700,8 @@ static sp_err_t apply_rebuild_change(sp_test_t* t, fixture_t* fixture, rebuild_c
 
 sp_err_t run_rebuild_test(sp_test_t* t, rebuild_test_t test) {
   fixture_t fixture = sp_zero;
-  sp_try(fixture_init(t, &fixture));
-
-  sp_try(test_when(t, test.when));
+  sp_try(begin_test(t, &fixture, test.when));
+  fixture.toolchain = test.toolchain;
 
   sp_try(prepare_test(t, &fixture, test.project, test.copy));
   sp_try(run_command(t, &fixture, test.first));
@@ -736,6 +789,16 @@ sp_err_t run_actions(sp_test_t* t, fixture_t* fixture, const action_t* actions) 
         expect_static_elf(t, fixture, path);
         break;
       }
+      case ACTION_VERIFY_ELF_ENTRY: {
+        sp_str_t path = fixture_path(fixture, action.verify_elf_entry.file);
+        expect_elf_entry(t, fixture, path, action.verify_elf_entry.entry, __FILE__, __LINE__);
+        break;
+      }
+      case ACTION_VERIFY_ELF_NO_SYMBOL: {
+        sp_str_t path = fixture_path(fixture, action.verify_elf_no_symbol.file);
+        expect_elf_no_symbol(t, fixture, path, action.verify_elf_no_symbol.prefix, __FILE__, __LINE__);
+        break;
+      }
       case ACTION_VERIFY_DIR_COUNT: {
         sp_str_t path = fixture_path(fixture, sp_str_view(action.verify_dir_count.dir));
         sp_da(sp_fs_entry_t) entries = sp_zero;
@@ -790,7 +853,9 @@ sp_err_t run_actions(sp_test_t* t, fixture_t* fixture, const action_t* actions) 
           }
           args[it + 1] = action.cli.args[it];
         }
+        fixture->path = action.cli.path;
         sp_ps_output_t output = run_spn_json(t, fixture, args, action.cli.env);
+        fixture->path = SP_NULLPTR;
         sp_expect_eq(t, action.cli.rc, output.status.exit_code);
         break;
       }
@@ -841,9 +906,8 @@ sp_err_t run_actions(sp_test_t* t, fixture_t* fixture, const action_t* actions) 
 
 sp_err_t run_test(sp_test_t* t, test_t test) {
   fixture_t fixture = sp_zero;
-  sp_try(fixture_init(t, &fixture));
-
-  sp_try(test_when(t, test.when));
+  sp_try(begin_test(t, &fixture, test.when));
+  fixture.toolchain = test.toolchain;
 
   if (!test_when_runs(&test.when)) {
     u32 kept = 0;
@@ -860,6 +924,9 @@ sp_err_t run_test(sp_test_t* t, test_t test) {
   }
 
   sp_try(prepare_test(t, &fixture, test.project, test.copy));
+  if (test.config) {
+    sp_try(fixture_config_append(t, &fixture, test.project, test.config));
+  }
   return run_actions(t, &fixture, test.actions);
 }
 
@@ -881,9 +948,7 @@ static sp_err_t opt_set_manifest(sp_test_t* t, fixture_t* fixture, const c8* man
 
 sp_err_t run_opt_test(sp_test_t* t, opt_test_t test) {
   fixture_t fixture = sp_zero;
-  sp_try(fixture_init(t, &fixture));
-
-  sp_try(test_when(t, test.when));
+  sp_try(begin_test(t, &fixture, test.when));
 
   sp_try(prepare_test(t, &fixture, test.project, test.copy));
 

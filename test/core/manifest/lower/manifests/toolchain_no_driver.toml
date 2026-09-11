@@ -1,0 +1,9 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[[toolchain]]
+name = "custom"
+compiler = "gcc"
+archiver = "ar"
+target = [{ arch = "x86_64", os = "linux" }]

@@ -16,18 +16,18 @@ typedef struct {
 static const launcher_test_t tests [] = {
   {
     .name = "root_prefixes_program",
-    .launcher = { .program = "B/A", .args = { "C" } },
+    .launcher = { .path = "B/A", .args = { "C" } },
     .root = "/R",
     .expect = { .program = "/R/B/A", .program_win = "/R/B/A.exe" },
   },
   {
     .name = "to_str_program_only",
-    .launcher = { .program = "A" },
+    .launcher = { .name = "A" },
     .expect = { .str = "A" },
   },
   {
     .name = "to_str_joins_args",
-    .launcher = { .program = "A", .args = { "B", "C" } },
+    .launcher = { .name = "A", .args = { "B", "C" } },
     .expect = { .str = "A B C" },
   },
 };
@@ -60,13 +60,13 @@ sp_test_each(launcher, resolve, launcher_test_t, tests) {
   sp_mem_t mem = sp_test_arena(t);
   spn_path_roots_t roots = sp_zero;
 
-  spn_toolchain_launcher_t launcher = { .program = spn_arg_lit(sp_str_view(it->launcher.program)) };
+  spn_toolchain_launcher_t launcher = { .program = fixture_arg(it->launcher) };
   launcher.args = sp_da_new(mem, sp_str_t);
   sp_carr_for(it->launcher.args, at) {
     if (!it->launcher.args[at]) {
       break;
     }
-    sp_da_push(launcher.args, sp_str_view(it->launcher.args[at]));
+    sp_da_push(launcher.args, sp_cstr_as_str(it->launcher.args[at]));
   }
 
   if (it->expect.program) {
@@ -91,7 +91,7 @@ sp_test_each(launcher, resolve, launcher_test_t, tests) {
 sp_test(launcher, has_cxx_requires_program) {
   spn_toolchain_info_t toolchain = sp_zero;
   sp_expect(t, !spn_toolchain_has_cxx(&toolchain));
-  toolchain.cxx.program = spn_arg_lit(sp_str_view("A"));
+  toolchain.cxx.program = spn_arg_lit(sp_cstr_as_str("A"));
   sp_expect(t, spn_toolchain_has_cxx(&toolchain));
   return SP_OK;
 }

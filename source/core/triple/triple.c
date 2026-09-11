@@ -1,5 +1,6 @@
 #include "spn/host.h"
 #include "triple/triple.h"
+#include "elf/elf.h"
 #include "enum/enum.h"
 
 spn_err_t spn_triple_parse(sp_str_t str, spn_triple_t* triple) {
@@ -60,92 +61,6 @@ sp_str_t spn_triple_to_str(sp_mem_t mem, spn_triple_t triple) {
   return arch;
 }
 
-typedef struct {
-  u8 e_ident [16];
-  u16 e_type;
-  u16 e_machine;
-  u32 e_version;
-  u64 e_entry;
-  u64 e_phoff;
-  u64 e_shoff;
-  u32 e_flags;
-  u16 e_ehsize;
-  u16 e_phentsize;
-  u16 e_phnum;
-  u16 e_shentsize;
-  u16 e_shnum;
-  u16 e_shstrndx;
-} elf_ehdr_t;
-
-typedef struct {
-  u32 p_type;
-  u32 p_flags;
-  u64 p_offset;
-  u64 p_vaddr;
-  u64 p_paddr;
-  u64 p_filesz;
-  u64 p_memsz;
-  u64 p_align;
-} elf_phdr_t;
-
-#define SPN_ELF_PT_INTERP 3
-#define SPN_ELF_CLASS_64 2
-
-spn_err_t spn_elf_interp(sp_mem_t mem, sp_io_seeking_reader_t* elf, sp_str_t* interp) {
-  *interp = sp_str_lit("");
-  s64 position = 0;
-  u64 bytes = 0;
-
-  elf_ehdr_t ehdr = sp_zero;
-  if (sp_io_seeking_reader_seek(elf, 0, SP_IO_SEEK_SET, &position)) {
-    return SPN_ERROR;
-  }
-  if (sp_io_read_all(elf->reader, &ehdr, sizeof(ehdr), &bytes) || bytes != sizeof(ehdr)) {
-    return SPN_ERROR;
-  }
-  if (ehdr.e_ident[0] != 0x7f || ehdr.e_ident[1] != 'E' || ehdr.e_ident[2] != 'L' || ehdr.e_ident[3] != 'F') {
-    return SPN_ERROR;
-  }
-  if (ehdr.e_ident[4] != SPN_ELF_CLASS_64) {
-    return SPN_ERROR;
-  }
-
-  u64 interp_offset = 0;
-  u64 interp_size = 0;
-  sp_for(it, ehdr.e_phnum) {
-    elf_phdr_t phdr = sp_zero;
-    if (sp_io_seeking_reader_seek(elf, (s64)(ehdr.e_phoff + it * ehdr.e_phentsize), SP_IO_SEEK_SET, &position)) {
-      return SPN_ERROR;
-    }
-    if (sp_io_read_all(elf->reader, &phdr, sizeof(phdr), &bytes) || bytes != sizeof(phdr)) {
-      return SPN_ERROR;
-    }
-    if (phdr.p_type == SPN_ELF_PT_INTERP && !interp_size) {
-      interp_offset = phdr.p_offset;
-      interp_size = phdr.p_filesz;
-    }
-  }
-
-  if (!interp_size) {
-    return SPN_OK;
-  }
-
-  c8* data = sp_alloc(mem, interp_size);
-  if (sp_io_seeking_reader_seek(elf, (s64)interp_offset, SP_IO_SEEK_SET, &position)) {
-    return SPN_ERROR;
-  }
-  if (sp_io_read_all(elf->reader, data, interp_size, &bytes) || bytes != interp_size) {
-    return SPN_ERROR;
-  }
-
-  u32 len = 0;
-  while (len < interp_size && data[len]) {
-    len++;
-  }
-  *interp = sp_str(data, len);
-  return SPN_OK;
-}
-
 spn_abi_t spn_abi_from_interp(sp_str_t interp) {
   if (sp_str_find(interp, sp_str_lit("ld-musl")) >= 0) {
     return SPN_ABI_MUSL;
@@ -164,40 +79,52 @@ spn_abi_t spn_host_libc(sp_mem_t mem, sp_io_seeking_reader_t* elf) {
   return spn_abi_from_interp(interp);
 }
 
-u32 spn_os_abis(spn_os_t os, const spn_abi_t** abis) {
-  static const spn_abi_t linux_abis [] = { SPN_ABI_GNU, SPN_ABI_MUSL };
+typedef struct {
+  const spn_abi_t* abis;
+  u32 count;
+  u32 completions;
+} os_abis_t;
+
+static os_abis_t os_abis(spn_os_t os) {
+  static const spn_abi_t linux_abis [] = { SPN_ABI_GNU, SPN_ABI_MUSL, SPN_ABI_BARE };
   static const spn_abi_t windows_abis [] = { SPN_ABI_GNU, SPN_ABI_MSVC };
   static const spn_abi_t macos_abis [] = { SPN_ABI_APPLE };
   static const spn_abi_t wasi_abis [] = { SPN_ABI_MUSL };
-  static const spn_abi_t freestanding_abis [] = { SPN_ABI_BARE };
+  static const spn_abi_t freestanding_abis [] = { SPN_ABI_BARE, SPN_ABI_ELF };
 
   switch (os) {
     case SPN_OS_LINUX: {
-      *abis = linux_abis;
-      return sp_carr_len(linux_abis);
+      return (os_abis_t) { .abis = linux_abis, .count = sp_carr_len(linux_abis), .completions = 2 };
     }
     case SPN_OS_WINDOWS: {
-      *abis = windows_abis;
-      return sp_carr_len(windows_abis);
+      return (os_abis_t) { .abis = windows_abis, .count = sp_carr_len(windows_abis), .completions = sp_carr_len(windows_abis) };
     }
     case SPN_OS_MACOS: {
-      *abis = macos_abis;
-      return sp_carr_len(macos_abis);
+      return (os_abis_t) { .abis = macos_abis, .count = sp_carr_len(macos_abis), .completions = sp_carr_len(macos_abis) };
     }
     case SPN_OS_WASI: {
-      *abis = wasi_abis;
-      return sp_carr_len(wasi_abis);
+      return (os_abis_t) { .abis = wasi_abis, .count = sp_carr_len(wasi_abis), .completions = sp_carr_len(wasi_abis) };
     }
     case SPN_OS_FREESTANDING: {
-      *abis = freestanding_abis;
-      return sp_carr_len(freestanding_abis);
+      return (os_abis_t) { .abis = freestanding_abis, .count = sp_carr_len(freestanding_abis), .completions = sp_carr_len(freestanding_abis) };
     }
     case SPN_OS_NONE: {
-      *abis = SP_NULLPTR;
-      return 0;
+      return sp_zero_struct(os_abis_t);
     }
   }
-  SP_UNREACHABLE_RETURN(0);
+  sp_unreachable_return(sp_zero_struct(os_abis_t));
+}
+
+u32 spn_os_abis(spn_os_t os, const spn_abi_t** abis) {
+  os_abis_t row = os_abis(os);
+  *abis = row.abis;
+  return row.count;
+}
+
+u32 spn_os_completions(spn_os_t os, const spn_abi_t** abis) {
+  os_abis_t row = os_abis(os);
+  *abis = row.abis;
+  return row.completions;
 }
 
 u32 spn_os_archs(spn_os_t os, const spn_arch_t** archs) {
@@ -246,8 +173,49 @@ static bool os_has_abi(spn_os_t os, spn_abi_t abi) {
   return false;
 }
 
-bool spn_os_dynamic(spn_os_t os) {
+sp_da(spn_triple_t) spn_os_triples(sp_mem_t mem, spn_arch_t arch, spn_os_t os) {
+  sp_da(spn_triple_t) triples = sp_da_new(mem, spn_triple_t);
+  const spn_abi_t* abis = SP_NULLPTR;
+  u32 count = spn_os_abis(os, &abis);
+  sp_for(it, count) {
+    sp_da_push(triples, ((spn_triple_t) { arch, os, abis[it] }));
+  }
+  return triples;
+}
+
+sp_da(spn_triple_t) spn_arch_triples(sp_mem_t mem, spn_arch_t arch) {
+  static const spn_os_t oses [] = { SPN_OS_LINUX, SPN_OS_WINDOWS, SPN_OS_MACOS, SPN_OS_WASI, SPN_OS_FREESTANDING };
+  sp_da(spn_triple_t) triples = sp_da_new(mem, spn_triple_t);
+  sp_carr_for(oses, it) {
+    if (!os_has_arch(oses[it], arch)) {
+      continue;
+    }
+    const spn_abi_t* abis = SP_NULLPTR;
+    u32 count = spn_os_abis(oses[it], &abis);
+    sp_for(at, count) {
+      sp_da_push(triples, ((spn_triple_t) { arch, oses[it], abis[at] }));
+    }
+  }
+  return triples;
+}
+
+spn_format_t spn_os_format(spn_os_t os) {
   switch (os) {
+    case SPN_OS_LINUX:
+    case SPN_OS_FREESTANDING: return SPN_FORMAT_ELF;
+    case SPN_OS_WINDOWS: return SPN_FORMAT_COFF;
+    case SPN_OS_MACOS: return SPN_FORMAT_MACHO;
+    case SPN_OS_WASI: return SPN_FORMAT_WASM;
+    case SPN_OS_NONE: sp_unreachable_case();
+  }
+  SP_UNREACHABLE_RETURN(SPN_FORMAT_ELF);
+}
+
+bool spn_triple_dynamic(spn_triple_t triple) {
+  if (triple.abi == SPN_ABI_BARE) {
+    return false;
+  }
+  switch (triple.os) {
     case SPN_OS_LINUX:
     case SPN_OS_WINDOWS:
     case SPN_OS_MACOS: {
@@ -260,6 +228,10 @@ bool spn_os_dynamic(spn_os_t os) {
     }
   }
   SP_UNREACHABLE_RETURN(false);
+}
+
+bool spn_triple_pic(spn_triple_t triple) {
+  return spn_triple_dynamic(triple) && spn_os_format(triple.os) != SPN_FORMAT_COFF;
 }
 
 spn_triple_entry_t spn_triple_entry(spn_triple_t partial, spn_triple_t* full) {
@@ -283,7 +255,7 @@ spn_triple_entry_t spn_triple_entry(spn_triple_t partial, spn_triple_t* full) {
   }
 
   const spn_abi_t* abis = SP_NULLPTR;
-  u32 count = spn_os_abis(partial.os, &abis);
+  u32 count = spn_os_completions(partial.os, &abis);
   if (count != 1) {
     return SPN_TRIPLE_ENTRY_MISSING_ABI;
   }
@@ -323,8 +295,6 @@ spn_triple_t spn_triple_host() {
   }
 #elif defined(SP_MACOS)
   host.abi = SPN_ABI_APPLE;
-#elif defined(SP_WIN32)
-  host.abi = SPN_ABI_GNU;
 #endif
 
   return host;
@@ -347,6 +317,15 @@ bool spn_triple_match(spn_triple_t entry, spn_triple_t target) {
 
 bool spn_triple_equal(spn_triple_t a, spn_triple_t b) {
   return a.arch == b.arch && a.os == b.os && a.abi == b.abi;
+}
+
+bool spn_triple_in(sp_da(spn_triple_t) triples, spn_triple_t triple) {
+  sp_da_for(triples, it) {
+    if (spn_triple_equal(triples[it], triple)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 sp_str_t spn_triple_lib_file_name(sp_mem_t mem, spn_triple_t triple, sp_str_t name, sp_os_lib_kind_t kind) {

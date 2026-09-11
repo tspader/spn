@@ -1,0 +1,6 @@
+[[toolchain]]
+name = "A"
+driver = "clang"
+compiler = "A"
+archiver = "A"
+target = ["host", "host"]

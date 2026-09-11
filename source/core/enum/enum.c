@@ -108,6 +108,58 @@ sp_str_t spn_cc_driver_to_str(spn_cc_driver_t driver) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
+spn_ld_family_t spn_ld_family_from_str(sp_str_t str) {
+  if (sp_str_equal_cstr(str, "gnu")) {
+    return SPN_LD_FAMILY_GNU;
+  }
+  if (sp_str_equal_cstr(str, "lld")) {
+    return SPN_LD_FAMILY_LLD;
+  }
+  if (sp_str_equal_cstr(str, "ld64")) {
+    return SPN_LD_FAMILY_LD64;
+  }
+  if (sp_str_equal_cstr(str, "msvc")) {
+    return SPN_LD_FAMILY_MSVC;
+  }
+
+  return SPN_LD_FAMILY_NONE;
+}
+
+sp_str_t spn_ld_family_to_str(spn_ld_family_t family) {
+  switch (family) {
+    case SPN_LD_FAMILY_NONE: return sp_str_lit("");
+    case SPN_LD_FAMILY_GNU:  return sp_str_lit("gnu");
+    case SPN_LD_FAMILY_LLD:  return sp_str_lit("lld");
+    case SPN_LD_FAMILY_LD64: return sp_str_lit("ld64");
+    case SPN_LD_FAMILY_MSVC: return sp_str_lit("msvc");
+  }
+
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
+sp_str_t spn_ld_dialect_to_str(spn_ld_dialect_t dialect) {
+  switch (dialect) {
+    case SPN_LD_DIALECT_GNU:    return sp_str_lit("gnu");
+    case SPN_LD_DIALECT_LINK:   return sp_str_lit("link");
+    case SPN_LD_DIALECT_DARWIN: return sp_str_lit("darwin");
+    case SPN_LD_DIALECT_WASM:   return sp_str_lit("wasm");
+    case SPN_LD_DIALECT_COUNT:  sp_unreachable_case();
+  }
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
+sp_str_t spn_format_to_str(spn_format_t format) {
+  switch (format) {
+    case SPN_FORMAT_ELF:   return sp_str_lit("elf");
+    case SPN_FORMAT_COFF:  return sp_str_lit("coff");
+    case SPN_FORMAT_MACHO: return sp_str_lit("macho");
+    case SPN_FORMAT_WASM:  return sp_str_lit("wasm");
+    case SPN_FORMAT_COUNT: sp_unreachable_case();
+  }
+
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
 spn_abi_t spn_abi_from_str(sp_str_t str) {
   if (sp_str_equal_cstr(str, "gnu")) {
     return SPN_ABI_GNU;
@@ -123,6 +175,9 @@ spn_abi_t spn_abi_from_str(sp_str_t str) {
   }
   if (sp_str_equal_cstr(str, "none")) {
     return SPN_ABI_BARE;
+  }
+  if (sp_str_equal_cstr(str, "elf")) {
+    return SPN_ABI_ELF;
   }
 
   return SPN_ABI_NONE;
@@ -144,6 +199,9 @@ sp_str_t spn_abi_to_str(spn_abi_t abi) {
     }
     case SPN_ABI_BARE: {
       return sp_str_lit("none");
+    }
+    case SPN_ABI_ELF: {
+      return sp_str_lit("elf");
     }
     case SPN_ABI_NONE: {
       return sp_str_lit("");
@@ -376,6 +434,14 @@ sp_str_t spn_sanitizer_set_to_str(sp_mem_t mem, spn_sanitizer_set_t set) {
   return sp_io_dyn_mem_writer_as_str(&out);
 }
 
+spn_sanitizer_set_t spn_sanitizer_set_from_list(sp_da(spn_sanitizer_t) list) {
+  spn_sanitizer_set_t set = 0;
+  sp_da_for(list, it) {
+    set |= list[it];
+  }
+  return set;
+}
+
 bool spn_sanitizer_set_has_conflict(spn_sanitizer_set_t set) {
   if ((set & SPN_SANITIZER_THREAD) && (set & (SPN_SANITIZER_ADDRESS | SPN_SANITIZER_MEMORY | SPN_SANITIZER_LEAK))) {
     return true;
@@ -458,6 +524,18 @@ sp_str_t spn_option_setter_kind_to_str(spn_option_setter_kind_t kind) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
+sp_str_t spn_linkage_requester_to_str(spn_linkage_requester_t requester) {
+  switch (requester) {
+    case SPN_LINKAGE_REQUESTER_PROFILE: {
+      return sp_str_lit("profile");
+    }
+    case SPN_LINKAGE_REQUESTER_ROOT_MANIFEST: {
+      return sp_str_lit("root_manifest");
+    }
+  }
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
 sp_str_t spn_cc_feature_to_str(spn_cc_feature_t feature) {
   switch (feature) {
     case SPN_CC_FEATURE_LINK_EXE: {
@@ -474,6 +552,9 @@ sp_str_t spn_cc_feature_to_str(spn_cc_feature_t feature) {
     }
     case SPN_CC_FEATURE_FRAMEWORKS: {
       return sp_str_lit("frameworks");
+    }
+    case SPN_CC_FEATURE_LINKER_SCRIPT: {
+      return sp_str_lit("linker_script");
     }
   }
   SP_UNREACHABLE_RETURN(sp_str_lit(""));

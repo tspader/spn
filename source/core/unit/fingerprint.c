@@ -4,6 +4,8 @@
 #include "pkg/pkg.h"
 #include "session/session.h"
 #include "str/str.h"
+#include "profile/types.h"
+#include "toolchain/sdk.h"
 
 typedef struct {
   sp_hash_t qualified;
@@ -20,15 +22,17 @@ typedef struct {
   spn_arch_t arch;
   spn_os_t os;
   spn_abi_t abi;
+  sp_hash_t sdk;
   sp_hash_t platform;
   struct {
     sp_hash_t name;
     sp_hash_t cc;
     sp_hash_t cxx;
-    sp_hash_t ld;
     sp_hash_t ar;
     sp_hash_t url;
     sp_hash_t identity;
+    spn_ld_family_t ld;
+    sp_hash_t link_args;
   } toolchain;
 } fingerprint_input_t;
 
@@ -52,6 +56,20 @@ static sp_hash_t hash_options(spn_session_t* session, spn_pkg_id_t id) {
       (sp_hash_t)option->value.kind,
       option->value.kind == SPN_OPTION_VALUE_STR ? spn_digest_hash_str(option->value.str) : (sp_hash_t)option->value.b,
     };
+    hash = spn_digest_hash_combine(parts, sp_carr_len(parts));
+  }
+  return hash;
+}
+
+static sp_hash_t hash_arg(spn_arg_t arg) {
+  sp_hash_t parts [] = { spn_digest_hash_str(arg.prefix), (sp_hash_t)arg.path.root, spn_digest_hash_str(arg.path.sub) };
+  return spn_digest_hash_combine(parts, sp_carr_len(parts));
+}
+
+static sp_hash_t hash_strs(sp_da(sp_str_t) strs) {
+  sp_hash_t hash = 0;
+  sp_da_for(strs, it) {
+    sp_hash_t parts [] = { hash, spn_digest_hash_str(strs[it]) };
     hash = spn_digest_hash_combine(parts, sp_carr_len(parts));
   }
   return hash;
@@ -120,12 +138,14 @@ sp_hash_t spn_unit_fingerprint(spn_session_t* session, spn_build_unit_t* build, 
   fingerprint.arch = build->profile.arch;
   fingerprint.os = build->profile.os;
   fingerprint.abi = build->profile.abi;
+  fingerprint.sdk = spn_sdk_hash(&build->profile.sdk);
   fingerprint.platform = spn_pkg_hash_platform(pkg, &build->profile);
   fingerprint.toolchain.name = spn_digest_hash_str(toolchain->name);
-  fingerprint.toolchain.cc = spn_digest_hash_str(toolchain->compiler.program.prefix);
-  fingerprint.toolchain.ld = spn_digest_hash_str(toolchain->linker.program.prefix);
-  fingerprint.toolchain.ar = spn_digest_hash_str(toolchain->archiver.program.prefix);
-  fingerprint.toolchain.cxx = spn_digest_hash_str(toolchain->cxx.program.prefix);
+  fingerprint.toolchain.cc = hash_arg(toolchain->compiler.program);
+  fingerprint.toolchain.ar = hash_arg(toolchain->archiver.program);
+  fingerprint.toolchain.cxx = hash_arg(toolchain->cxx.program);
+  fingerprint.toolchain.ld = build->profile.linker;
+  fingerprint.toolchain.link_args = hash_strs(toolchain->link_args);
   fingerprint.toolchain.identity = build->toolchain->identity;
   if (toolchain->support.kind == SPN_TOOLCHAIN_SUPPORT_ARTIFACT) {
     fingerprint.toolchain.url = spn_digest_hash_str(toolchain->support.artifact.sha256);

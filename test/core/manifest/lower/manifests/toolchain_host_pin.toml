@@ -5,8 +5,8 @@ version = "1.0.0"
 [[toolchain]]
 name = "pin"
 compiler = "cc"
-linker = "cc"
 archiver = "ar"
 driver = "gcc"
+target = [{ arch = "x86_64", os = "linux", abi = "gnu" }]
 
 [toolchain.host.x86_64-linux]

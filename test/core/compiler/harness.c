@@ -10,6 +10,12 @@ sp_err_t expect_args(sp_test_t* t, spn_invocation_t* invocation, render_expect_t
   sp_da(sp_str_t) args = spn_invocation_args(roots, mem, invocation);
   sp_expect_str_eq_c(t, spn_arg_str(roots, mem, invocation->program), expect.command);
   sp_must_strs_eq(t, args, sp_da_size(args), expect.args);
+  sp_da(sp_str_t) env = sp_da_new(mem, sp_str_t);
+  sp_da_for(invocation->env, it) {
+    sp_env_var_t var = spn_invocation_env_var(roots, mem, invocation->env[it]);
+    sp_da_push(env, sp_fmt(mem, "{}={}", sp_fmt_str(var.key), sp_fmt_str(var.value)).value);
+  }
+  sp_must_strs_eq(t, env, sp_da_size(env), expect.env);
   return SP_OK;
 }
 
@@ -24,8 +30,15 @@ spn_profile_info_t test_profile(test_profile_t desc) {
     .opt = desc.opt,
     .sanitizers = desc.sanitizers,
   };
-  if (desc.sysroot) {
-    profile.sysroot.sub = sp_cstr_as_str(desc.sysroot);
+  if (desc.sdk) {
+    profile.sdk = spn_sdk_at(spn.mem, (spn_triple_t) { desc.arch, desc.os, desc.abi }, test_arg_path(desc.sdk));
+  }
+  if (desc.bin) {
+    sp_assert(profile.sdk.kind == SPN_SDK_MSVC);
+    profile.sdk.msvc.bin = test_arg_path(desc.bin);
+  }
+  if (desc.libc) {
+    profile.libc = test_arg_path(desc.libc);
   }
   return profile;
 }

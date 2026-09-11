@@ -9,6 +9,8 @@ add_executable(integration
   ${SRC}/codegen/gen/source_deps.gen.c
   ${SRC}/codegen/json.c
   ${SRC}/codegen/loader.c
+  ${SRC}/codegen/toolchain.c
+  ${SRC}/codegen/gen/config.gen.c
   ${SRC}/core/core.c
   ${UTIL}/io/io.c
   ${SRC}/ctx/ctx.c
@@ -21,20 +23,31 @@ add_executable(integration
   ${SRC}/intern/intern.c
   ${SRC}/paths/paths.c
   ${UTIL}/str/str.c
+  ${SRC}/toolchain/catalog.c
+  ${SRC}/toolchain/select.c
+  ${SRC}/profile/profile.c
   ${SRC}/toolchain/toolchain.c
+  ${SRC}/toolchain/sdk.c
+  ${UTIL}/sp/sp_msvc.c
+  ${SRC}/toolchain/linker.c
+  ${SRC}/toolchain/search.c
   ${SRC}/triple/triple.c
+  ${SRC}/elf/elf.c
   main.c
   cli.c
   compile_commands.c
+  config.c
   consume.c
   corrupt.c
   cxx.c
   defines.c
   deps.c
+  example.c
   exports.c
   freshness.c
   harness_test.c
   layout.c
+  linker.c
   log.c
   offline.c
   options.c
@@ -48,6 +61,7 @@ add_executable(integration
   upstream.c
   worlds.c
   ${TEST_TOOLS}/caps.c
+  ${TEST_TOOLS}/lanes.c
   ${TEST_TOOLS}/env.c
   tools/harness.c
   ${TEST_TOOLS}/fixture.c

@@ -1,0 +1,25 @@
+[[toolchain]]
+name = "A"
+driver = "gcc"
+compiler = "A"
+archiver = "ar"
+
+[[toolchain]]
+name = "B"
+driver = "clang"
+compiler = "B"
+archiver = "ar"
+linker = "lld"
+link_args = ["-fuse-ld=lld"]
+
+[[toolchain]]
+name = "C"
+driver = "msvc"
+compiler = "cl"
+archiver = "lib"
+
+[[toolchain]]
+name = "D"
+driver = "zig"
+compiler = "D cc"
+archiver = "D ar"

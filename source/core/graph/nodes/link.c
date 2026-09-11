@@ -146,7 +146,7 @@ static spn_err_t link_exports_exec(sp_mem_t scratch, spn_target_unit_t* target, 
     return spn_err_emit(&spn, (spn_err_union_t) { .kind = SPN_ERR_FS_WRITE, .fs.path = path });
   }
 
-  switch (spn_cc_exports_format(target->kind, profile->os)) {
+  switch (spn_target_exports_format(target)) {
     case SPN_CC_EXPORTS_VERSION_SCRIPT: {
       spn_exports_render_version_script(&writer.base, symbols);
       break;

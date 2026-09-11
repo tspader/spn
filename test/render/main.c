@@ -3,6 +3,7 @@
 #include "sp/sp_test.h"
 
 #include "render.h"
+#include "caps.h"
 
 static s32 sort_cells_by_name(const void* a, const void* b) {
   const sp_fs_entry_t* lhs = (const sp_fs_entry_t*)a;
@@ -10,28 +11,34 @@ static s32 sort_cells_by_name(const void* a, const void* b) {
   return sp_str_sort_kernel_alphabetical(&lhs->name, &rhs->name);
 }
 
-static void view_cell(sp_io_writer_t* io, sp_mem_t mem, sp_fs_entry_t* cell) {
-  sp_str_t exit_code = sp_str_trim_right(test_read_file(mem, sp_fs_join_path(mem, cell->path, sp_str_lit("exit"))));
-  sp_str_t err = test_read_file(mem, sp_fs_join_path(mem, cell->path, sp_str_lit("stderr")));
-  sp_str_t out = test_read_file(mem, sp_fs_join_path(mem, cell->path, sp_str_lit("stdout")));
-
-  sp_fmt_io(io, "{.bold} {.gray}\n", sp_fmt_str(cell->name), sp_fmt_str(sp_fmt(mem, "(exit {})", sp_fmt_str(exit_code)).value));
-  sp_io_write_str(io, err, SP_NULLPTR);
-  if (!sp_str_empty(out)) {
-    sp_fmt_io(io, "{.gray}\n", sp_fmt_cstr("stdout:"));
-    sp_io_write_str(io, out, SP_NULLPTR);
-  }
-  sp_io_write_c8(io, '\n');
+static sp_str_t read_capture(sp_mem_t mem, sp_fs_entry_t* cell, const c8* stream, bool color) {
+  sp_str_t name = color ? sp_fmt(mem, "{}.color", sp_fmt_cstr(stream)).value : sp_cstr_as_str(stream);
+  return test_read_file(mem, sp_fs_join_path(mem, cell->path, name));
 }
 
+static void view_cell(sp_tty_t* tty, sp_mem_t mem, sp_fs_entry_t* cell) {
+  bool color = tty->color == SP_TTY_COLOR_ANSI;
+  sp_str_t exit_code = sp_str_trim_right(test_read_file(mem, sp_fs_join_path(mem, cell->path, sp_str_lit("exit"))));
+  sp_str_t err = read_capture(mem, cell, "stderr", color);
+  sp_str_t out = read_capture(mem, cell, "stdout", color);
+
+  sp_tty_fmt(tty, "{.bold} {.gray}\n", sp_fmt_str(cell->name), sp_fmt_str(sp_fmt(mem, "(exit {})", sp_fmt_str(exit_code)).value));
+  sp_io_write_str(tty->io, err, SP_NULLPTR);
+  if (!sp_str_empty(out)) {
+    sp_tty_fmt(tty, "{.gray}\n", sp_fmt_cstr("stdout:"));
+    sp_io_write_str(tty->io, out, SP_NULLPTR);
+  }
+  sp_io_write_c8(tty->io, '\n');
+}
+
+// Colored when stdout is a tty or CLICOLOR_FORCE is set; NO_COLOR wins.
 static s32 view(void) {
   sp_mem_t mem = sp_mem_os_new();
-  sp_io_stream_writer_t w = sp_zero;
-  sp_io_stream_writer_from_fd(&w, sp_sys_stdout, SP_IO_CLOSE_MODE_NONE);
+  sp_tty_t* tty = sp_tty_std_out();
 
   sp_str_t current = render_out_path(mem, "current");
   if (!sp_fs_exists(current)) {
-    sp_fmt_io(&w.base, "no capture at {}; run render first\n", sp_fmt_str(current));
+    sp_fmt_io(tty->io, "no capture at {}; run render first\n", sp_fmt_str(current));
     return 1;
   }
 
@@ -39,7 +46,7 @@ static s32 view(void) {
   sp_fs_collect(mem, current, &cells);
   sp_da_sort(cells, sort_cells_by_name);
   sp_da_for(cells, it) {
-    view_cell(&w.base, mem, &cells[it]);
+    view_cell(tty, mem, &cells[it]);
   }
   return 0;
 }
@@ -65,6 +72,8 @@ static s32 diff(void) {
   sp_ps_config_add_arg(mem, &config, sp_str_lit("--no-index"));
   sp_ps_config_add_arg(mem, &config, sp_str_lit("previous"));
   sp_ps_config_add_arg(mem, &config, sp_str_lit("current"));
+  sp_ps_config_add_arg(mem, &config, sp_str_lit("--"));
+  sp_ps_config_add_arg(mem, &config, sp_str_lit(":(exclude)*.color"));
 
   sp_ps_output_t output = sp_ps_run(mem, config);
   sp_io_write_str(&w.base, output.out, SP_NULLPTR);
@@ -102,6 +111,7 @@ s32 main(s32 argc, const c8** argv) {
       jobs = true;
     }
   }
+  test_toolchain();
   if (jobs) {
     return sp_test_main(argc, argv, SP_NULLPTR);
   }

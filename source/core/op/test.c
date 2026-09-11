@@ -9,7 +9,14 @@
 #include "paths/paths.h"
 #include "session/session.h"
 #include "session/types.h"
+#include "toolchain/search.h"
 #include "unit/types.h"
+
+static sp_str_t toolchain_path(sp_mem_t mem, spn_target_unit_t* unit) {
+  spn_ctx_t* ctx = unit->pkg->session->ctx;
+  sp_str_t compiler = spn_arg_str(&ctx->roots, mem, unit->pkg->build->toolchain->cc.compiler.program);
+  return spn_search_prepend(spn_search_rules(ctx->host.os), mem, sp_fs_parent_path(compiler), sp_env_get(ctx->env, sp_str_lit("PATH")));
+}
 
 static spn_err_t run_test(spn_session_t* session, spn_target_unit_t* unit, bool* passed) {
   spn_ctx_t* ctx = session->ctx;
@@ -35,6 +42,9 @@ static spn_err_t run_test(spn_session_t* session, spn_target_unit_t* unit, bool*
   sp_ps_output_t output = sp_ps_run(session->mem, (sp_ps_config_t) {
     .command = command,
     .cwd = spn_path_str(&ctx->roots, session->mem, unit->pkg->paths.roots.source),
+    .env.extra = {
+      { sp_str_lit("PATH"), toolchain_path(session->mem, unit) },
+    },
     .io = {
       .in =  { .mode = SP_PS_IO_MODE_NULL },
       .out = { .mode = SP_PS_IO_MODE_CREATE },

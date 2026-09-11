@@ -1,0 +1,11 @@
+[package]
+name = "A"
+version = "0.1.0"
+
+[[lib]]
+name = "L"
+source = ["main.c"]
+kinds = ["static", "shared"]
+
+[config.A]
+kind = "shared"

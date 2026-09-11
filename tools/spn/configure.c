@@ -78,7 +78,7 @@ spn_err_t configure(spn_t* spn, spn_config_t* config) {
   spn_target_embed_file_ex(target, "include/spn.h", "include_spn_h", "u8", "u64");
   spn_target_embed_file_ex(target, "include/spn/core.h", "include_spn_core_h", "u8", "u64");
   spn_target_embed_file_ex(target, "include/spn/err.h", "include_spn_err_h", "u8", "u64");
-  spn_target_embed_file_ex(target, "source/core/toolchain/toolchains.json", "toolchains_json", "u8", "u64");
+  spn_target_embed_file_ex(target, "source/core/toolchain/toolchains.toml", "toolchains_toml", "u8", "u64");
   spn_target_embed_dir_ex(target, "assets/init", "init", "u8", "u64");
 
   add_codegen(spn, config);

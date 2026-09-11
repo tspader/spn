@@ -1,5 +1,7 @@
 #include "env.h"
 #include "caps.h"
+#include "enum/enum.h"
+#include "toolchain/search.h"
 #include "triple/triple.h"
 
 void write_file(sp_str_t path, sp_str_t content) {
@@ -341,12 +343,13 @@ static void setup_fixture_envrc(fixture_t* fixture, sp_str_t storage, sp_str_t t
   write_file(path, content);
 }
 
-static void setup_fixture_config(fixture_t* fixture, sp_str_t config_dir, sp_str_t index_dir, sp_str_t spn_dir) {
-  sp_mem_t mem = fixture->mem;
-  sp_str_t spn_config_dir = sp_fs_join_path(mem, config_dir, sp_str_lit("spn"));
-  sp_fs_create_dir(spn_config_dir);
+static sp_str_t config_toml_path(fixture_t* fixture) {
+  return sp_fs_join_path(fixture->mem, fixture->paths.config, sp_str_lit("spn/spn.toml"));
+}
 
-  sp_str_t config_path = sp_fs_join_path(mem, spn_config_dir, sp_str_lit("spn.toml"));
+static void setup_fixture_config(fixture_t* fixture, sp_str_t index_dir, sp_str_t spn_dir) {
+  sp_mem_t mem = fixture->mem;
+  sp_str_t config_path = config_toml_path(fixture);
   sp_str_t content = sp_fmt(
     mem,
     "spn = \"{}\"\n"
@@ -358,7 +361,7 @@ static void setup_fixture_config(fixture_t* fixture, sp_str_t config_dir, sp_str
     sp_fmt_str(sp_str_replace_c8(mem, spn_dir, '\\', '/')),
     sp_fmt_str(sp_str_replace_c8(mem, index_dir, '\\', '/'))
   ).value;
-  write_file(config_path, content);
+  write_file(config_path, sp_str_concat(mem, content, test_lanes_toml()));
 }
 
 static sp_str_t pick_shared_toolchain_dir(sp_mem_t mem, sp_str_t root) {
@@ -393,6 +396,16 @@ static sp_err_t fixture_copy_project(sp_test_t* t, fixture_t* fixture, sp_str_t 
   return SP_OK;
 }
 
+sp_err_t fixture_config_append(sp_test_t* t, fixture_t* fixture, const c8* project, const c8* config) {
+  sp_mem_t mem = fixture->mem;
+  sp_str_t from = sp_fs_join_path(mem, sp_fs_join_path(mem, fixture->paths.root, sp_cstr_as_str(project)), sp_cstr_as_str(config));
+  sp_must(t, sp_fs_exists(from));
+
+  sp_str_t path = config_toml_path(fixture);
+  write_file(path, sp_str_concat(mem, test_read_file(mem, path), test_read_file(mem, from)));
+  return SP_OK;
+}
+
 sp_err_t prepare_test(sp_test_t* t, fixture_t* fixture, const c8* project, const c8* const* copy) {
   sp_mem_t mem = fixture->mem;
 
@@ -412,7 +425,7 @@ sp_err_t prepare_test(sp_test_t* t, fixture_t* fixture, const c8* project, const
   git_repo_git(fixture->paths.index, sp_str_lit("config"), sp_str_lit("receive.denyCurrentBranch"), sp_str_lit("updateInstead"));
   git_repo_commit(fixture->paths.index, sp_str_lit("init"));
   setup_fixture_envrc(fixture, fixture->paths.storage, fixture->paths.toolchain, fixture->paths.config);
-  setup_fixture_config(fixture, fixture->paths.config, fixture->paths.index, fixture->paths.root);
+  setup_fixture_config(fixture, fixture->paths.index, fixture->paths.root);
 
   sp_fs_copy(sp_fs_join_path(mem, fixture->paths.root, sp_str_lit("include/spn.h")), fixture->paths.include);
   sp_str_t include_spn = sp_fs_join_path(mem, fixture->paths.include, sp_str_lit("spn"));
@@ -434,6 +447,13 @@ sp_err_t prepare_test(sp_test_t* t, fixture_t* fixture, const c8* project, const
     }
   }
   return SP_OK;
+}
+
+static const c8* toolchain_arg(fixture_t* fixture) {
+  if (fixture->toolchain) {
+    return fixture->toolchain;
+  }
+  return test_lane_toolchain_arg();
 }
 
 static sp_ps_output_t run_spn_ex(sp_test_t* t, fixture_t* fixture, const c8* format, const c8* const* args, const c8* const* env) {
@@ -459,6 +479,10 @@ static sp_ps_output_t run_spn_ex(sp_test_t* t, fixture_t* fixture, const c8* for
   while (env_slot < sp_carr_len(config.env.extra) && !sp_str_empty(config.env.extra[env_slot].key)) {
     env_slot++;
   }
+  if (fixture->path) {
+    sp_str_t prefixed = spn_search_prepend(spn_search_rules(spn_triple_host().os), mem, fixture_path(fixture, sp_cstr_as_str(fixture->path)), sp_os_env_get(sp_str_lit("PATH")));
+    config.env.extra[env_slot++] = (sp_env_var_t) { .key = sp_str_lit("PATH"), .value = prefixed };
+  }
   if (env) {
     sp_for(it, SPN_TEST_COMMAND_MAX_ENV) {
       const c8* var = env[it];
@@ -475,17 +499,15 @@ static sp_ps_output_t run_spn_ex(sp_test_t* t, fixture_t* fixture, const c8* for
   }
 
   if (args) {
-    sp_for(it, SPN_TEST_COMMAND_MAX_ARGS) {
-      if (!args[it]) {
-        break;
-      }
-      sp_ps_config_add_arg(mem, &config, sp_str_view(args[it]));
-    }
-    const test_toolchain_t* toolchain = test_toolchain();
+    sp_ps_config_add_arg(mem, &config, sp_str_view(args[0]));
+    const c8* toolchain = toolchain_arg(fixture);
     bool takes_toolchain = sp_cstr_equal(args[0], "build") || sp_cstr_equal(args[0], "test");
-    if (takes_toolchain && !sp_cstr_equal(toolchain->name, "zig")) {
+    if (takes_toolchain && toolchain) {
       sp_ps_config_add_arg(mem, &config, sp_str_lit("--toolchain"));
-      sp_ps_config_add_arg(mem, &config, sp_cstr_as_str(toolchain->name));
+      sp_ps_config_add_arg(mem, &config, sp_cstr_as_str(toolchain));
+    }
+    for (u32 it = 1; it < SPN_TEST_COMMAND_MAX_ARGS && args[it]; it++) {
+      sp_ps_config_add_arg(mem, &config, sp_str_view(args[it]));
     }
   }
 

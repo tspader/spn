@@ -1,0 +1,15 @@
+[package]
+name = "linker_fuse"
+version = "0.1.0"
+
+[[toolchain]]
+name = "G"
+driver = "gcc"
+compiler = "gcc"
+archiver = "ar"
+linker = "lld"
+link_args = ["-fuse-ld=lld"]
+
+[[bin]]
+name = "main"
+source = ["main.c"]

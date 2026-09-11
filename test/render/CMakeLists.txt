@@ -9,6 +9,8 @@ add_executable(render
   ${SRC}/codegen/gen/source_deps.gen.c
   ${SRC}/codegen/json.c
   ${SRC}/codegen/loader.c
+  ${SRC}/codegen/toolchain.c
+  ${SRC}/codegen/gen/config.gen.c
   ${SRC}/core/core.c
   ${UTIL}/io/io.c
   ${SRC}/ctx/ctx.c
@@ -21,11 +23,20 @@ add_executable(render
   ${SRC}/intern/intern.c
   ${SRC}/paths/paths.c
   ${UTIL}/str/str.c
+  ${SRC}/toolchain/catalog.c
+  ${SRC}/toolchain/select.c
+  ${SRC}/profile/profile.c
   ${SRC}/toolchain/toolchain.c
+  ${SRC}/toolchain/sdk.c
+  ${UTIL}/sp/sp_msvc.c
+  ${SRC}/toolchain/linker.c
+  ${SRC}/toolchain/search.c
   ${SRC}/triple/triple.c
+  ${SRC}/elf/elf.c
   main.c
   cases.c
   ${TEST_TOOLS}/caps.c
+  ${TEST_TOOLS}/lanes.c
   ${TEST_TOOLS}/env.c
   ${TEST_TOOLS}/fixture.c
   ${TEST_TOOLS}/toml.c

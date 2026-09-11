@@ -166,6 +166,31 @@ sp_test(target, selection_named_script) {
   });
 }
 
+sp_test(target, gated_test_is_not_defined) {
+  return sp_test_skip(t, "target when");
+  return run_test(t, (test_t) {
+    .project = "test/integration/fixtures/target/gated",
+    .when = { .host = SPN_OS_LINUX, .target = SPN_TEST_ARCH "-linux-none" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "test", .args = { "-p", "nolibc", "G" }, .rc = 1 } },
+      { .kind = ACTION_VERIFY_RESULT, .verify_result = { .err = SPN_ERR_TARGET_SELECTION } },
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--abi", "none" } } },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = target_exe("main", SPN_TEST_ARCH "-linux-none") },
+    },
+  });
+}
+
+sp_test(target, ungated_test_survives_gate) {
+  return sp_test_skip(t, "target when");
+  return run_test(t, (test_t) {
+    .project = "test/integration/fixtures/target/gated",
+    .when = { .host = SPN_OS_LINUX, .target = SPN_TEST_ARCH "-linux-none" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "test", .args = { "-p", "nolibc", "T" } } },
+    },
+  });
+}
+
 sp_test(target, example) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/target/example",
@@ -229,5 +254,29 @@ sp_test(target, lib_system_deps) {
       { .kind = ACTION_VERIFY_EXISTS, .exists = exe("main") },
       { .kind = ACTION_VERIFY_EXISTS, .exists = exe("direct") },
     },
+  });
+}
+
+sp_test(target, link_flags) {
+  return run_test(t, (test_t) {
+    .project = "test/integration/fixtures/target/link_flags",
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_LINK_FAILED } },
+      { .kind = ACTION_VERIFY_NO_CC_ARG, .verify_cc_arg = { "-lmissing", "/DEFAULTLIB:missing" } },
+    },
+  });
+}
+
+sp_test(target, cross_exe) {
+  const c8* triple = test_target_alternate();
+  if (!triple) {
+    return sp_test_skip(t, "lane has no cross target");
+  }
+  return run_command_test(t, (command_test_t) {
+    .project = "test/integration/fixtures/profile/override",
+    .when = { .host = SPN_OS_LINUX, .target = triple },
+    .args = { "build", "--target", triple },
+    .expect = { .exists = { target_exe("main", triple) } },
   });
 }

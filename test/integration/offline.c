@@ -73,7 +73,7 @@ sp_test(offline, no_source_cache) {
 sp_test(offline, shared_store) {
   fixture_t fixture = sp_zero;
   sp_try(fixture_init(t, &fixture));
-  sp_try(test_when(t, (test_when_t) { .msvc_todo = true }));
+  sp_try(test_when(t, (test_when_t) { .driver = SPN_CC_DRIVER_ZIG }));
   sp_mem_t mem = fixture.mem;
 
   sp_try(prepare_test(t, &fixture, "test/integration/fixtures/offline/shared_store", (const c8*[]) {
@@ -107,6 +107,11 @@ sp_test(offline, shared_store) {
     },
   };
   sp_ps_config_add_arg(mem, &config, sp_str_lit("build"));
+  const c8* toolchain = test_lane_toolchain_arg();
+  if (toolchain) {
+    sp_ps_config_add_arg(mem, &config, sp_str_lit("--toolchain"));
+    sp_ps_config_add_arg(mem, &config, sp_cstr_as_str(toolchain));
+  }
 
   sp_ps_output_t output = sp_ps_run(mem, config);
   sp_test_kv(t, "command", config.command);

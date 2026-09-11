@@ -17,7 +17,7 @@ readme: false
 | `[[script]]` | array of [`target`](#target) |
 | `[[test]]` | array of [`target`](#target) |
 | `[[example]]` | array of [`target`](#target) |
-| `[[toolchain]]` | array of [`manifest_toolchain`](#manifest_toolchain) |
+| `[[toolchain]]` | array of [`toolchain_decl`](#toolchain_decl) |
 | `[[index]]` | array of [`index`](#index) |
 | `[profile.<name>]` | map of [`profile`](#profile) |
 | `[options.<name>]` | map of [`option`](#option) |
@@ -38,7 +38,7 @@ readme: false
 | `maintainer` | `string` | |
 | `upstream` | [`upstream`](#upstream) | |
 | `include` | array of [`source_entry`](#source_entry) \| `string` | |
-| `define` | array of `string` | |
+| `define` | array of [`value_entry`](#value_entry) \| `string` | |
 | `system_deps` | array of [`system_dep_entry`](#system_dep_entry) \| `string` | |
 | `macos` | [`platform_macos`](#platform_macos) | |
 | `build` | [`build_script`](#build_script) | |
@@ -55,6 +55,8 @@ readme: false
 | `include` | array of [`source_entry`](#source_entry) \| `string` | |
 | `define` | array of [`value_entry`](#value_entry) \| `string` | |
 | `flags` | array of [`value_entry`](#value_entry) \| `string` | |
+| `link_flags` | array of [`value_entry`](#value_entry) \| `string` | |
+| `linker_script` | array of [`source_entry`](#source_entry) \| `string` | |
 | `system_deps` | array of [`value_entry`](#value_entry) \| `string` | |
 | `deps` | array of [`target_dep_entry`](#target_dep_entry) \| `string` | |
 | `link` | `bool` | |
@@ -62,19 +64,21 @@ readme: false
 | `macos` | [`platform_macos`](#platform_macos) | |
 | `windows` | [`platform_windows`](#platform_windows) | |
 
-## manifest_toolchain
+## toolchain_decl
 
 | Field | Type |
 |---|---|
 | `name` | `string` |
+| `version` | `string` |
 | `compiler` | `string` |
-| `linker` | `string` |
+| `linker` | `gnu` \| `lld` \| `ld64` \| `msvc` |
+| `link_args` | array of `string` |
 | `archiver` | `string` |
 | `driver` | `gcc` \| `clang` \| `msvc` \| `zig` |
 | `cxx` | `string` |
 | `host` | map of [`artifact`](#artifact) |
 | `mirrors` | `string` |
-| `target` | array of [`triple`](#triple) |
+| `target` | array of [`toolchain_target`](#toolchain_target) \| `string` |
 
 ## index
 
@@ -92,14 +96,14 @@ readme: false
 | Field | Type |
 |---|---|
 | `linkage` | `shared` \| `static` \| `source` \| `object` |
-| `standard` | `c89` \| `c99` \| `c11` |
+| `standard` | `c89` \| `c99` \| `c11` \| `gnu89` \| `gnu99` \| `gnu11` |
 | `toolchain` | `string` |
 | `mode` | `release` \| `debug` |
 | `opt` | `0` \| `1` \| `2` \| `3` \| `s` \| `z` |
 | `sanitize` | array of `address` \| `thread` \| `undefined` \| `memory` \| `leak` |
-| `os` | `windows` \| `linux` \| `macos` \| `wasi` |
+| `os` | `windows` \| `linux` \| `macos` \| `wasi` \| `freestanding` |
 | `arch` | `x86_64` \| `aarch64` \| `wasm32` |
-| `abi` | `gnu` \| `musl` \| `msvc` \| `apple` |
+| `abi` | `gnu` \| `musl` \| `msvc` \| `apple` \| `none` \| `elf` |
 | `options` | [`when`](#extern-types) |
 
 ## option
@@ -156,6 +160,13 @@ readme: false
 | `tree` | `manifest` \| `source` | |
 | `when` | [`when`](#extern-types) | |
 
+## value_entry
+
+| Field | Type | Required |
+|---|---|---|
+| `value` | `string` | yes |
+| `when` | [`when`](#extern-types) | |
+
 ## system_dep_entry
 
 | Field | Type | Required |
@@ -167,7 +178,7 @@ readme: false
 
 | Field | Type |
 |---|---|
-| `frameworks` | array of `string` |
+| `frameworks` | array of [`value_entry`](#value_entry) \| `string` |
 | `min_os` | [`os_version`](#extern-types) |
 
 ## build_script
@@ -176,15 +187,8 @@ readme: false
 |---|---|
 | `source` | array of [`source_entry`](#source_entry) \| `string` |
 | `include` | array of [`source_entry`](#source_entry) \| `string` |
-| `define` | array of `string` |
-| `flags` | array of `string` |
-
-## value_entry
-
-| Field | Type | Required |
-|---|---|---|
-| `value` | `string` | yes |
-| `when` | [`when`](#extern-types) | |
+| `define` | array of [`value_entry`](#value_entry) \| `string` |
+| `flags` | array of [`value_entry`](#value_entry) \| `string` |
 
 ## target_dep_entry
 
@@ -214,13 +218,16 @@ readme: false
 | `url` | `string` |
 | `sha256` | `string` |
 
-## triple
+## toolchain_target
 
 | Field | Type |
 |---|---|
+| `kind` | `string` |
 | `arch` | `x86_64` \| `aarch64` \| `wasm32` |
-| `os` | `windows` \| `linux` \| `macos` \| `wasi` |
-| `abi` | `gnu` \| `musl` \| `msvc` \| `apple` |
+| `os` | `windows` \| `linux` \| `macos` \| `wasi` \| `freestanding` |
+| `abi` | `gnu` \| `musl` \| `msvc` \| `apple` \| `none` \| `elf` |
+| `sdk` | `string` |
+| `sanitizers` | array of `address` \| `thread` \| `undefined` \| `memory` \| `leak` |
 
 ## dep
 
@@ -238,6 +245,7 @@ readme: false
 |---|---|---|
 | `from` | `string` | yes |
 | `to` | `string` | yes |
+| `when` | [`when`](#extern-types) | |
 
 ## Extern types
 

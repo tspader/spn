@@ -11,13 +11,78 @@
 typedef enum {
   SPN_CC_CAP_TARGET_TRIPLE  = 1 << 0,
   SPN_CC_CAP_CLANG_FRONTEND = 1 << 1,
-  SPN_CC_CAP_EXCLUDE_LIBS   = 1 << 2,
-  SPN_CC_CAP_NOLIBC         = 1 << 3,
-  SPN_CC_CAP_FREESTANDING   = 1 << 4,
-  SPN_CC_CAP_LLVM_TRIPLE    = 1 << 5,
+  SPN_CC_CAP_LLVM_TRIPLE    = 1 << 2,
+  SPN_CC_CAP_FUSE_LD        = 1 << 3,
+  SPN_CC_CAP_CODEVIEW       = 1 << 4,
+  SPN_CC_CAP_LIBC_FILE      = 1 << 5,
+  SPN_CC_CAP_DEFAULT_UBSAN  = 1 << 6,
+  SPN_CC_CAP_BARE           = 1 << 7,
 } spn_cc_cap_t;
 
 typedef u32 spn_cc_cap_set_t;
+
+typedef enum {
+  SPN_LD_DIALECT_GNU,
+  SPN_LD_DIALECT_LINK,
+  SPN_LD_DIALECT_DARWIN,
+  SPN_LD_DIALECT_WASM,
+  SPN_LD_DIALECT_COUNT,
+} spn_ld_dialect_t;
+
+typedef enum {
+  SPN_SDK_NONE,
+  SPN_SDK_SYSROOT,
+  SPN_SDK_MACOS,
+  SPN_SDK_MSVC,
+} spn_sdk_kind_t;
+
+typedef enum {
+  SPN_WASI_SPELLING_WASI,
+  SPN_WASI_SPELLING_WASIP1,
+} spn_wasi_spelling_t;
+
+typedef struct {
+  spn_arch_t arch;
+  spn_path_t bin;
+  struct {
+    spn_path_t vc;
+    spn_path_t ucrt;
+    spn_path_t um;
+    spn_path_t shared;
+  } include;
+  struct {
+    spn_path_t vc;
+    spn_path_t ucrt;
+    spn_path_t um;
+  } lib;
+} spn_sdk_msvc_t;
+
+typedef struct {
+  spn_path_t root;
+  spn_path_t include;
+  spn_path_t frameworks;
+} spn_sdk_macos_t;
+
+typedef struct {
+  spn_sdk_kind_t kind;
+  union {
+    spn_path_t root;
+    spn_sdk_macos_t macos;
+    spn_sdk_msvc_t msvc;
+  };
+} spn_sdk_t;
+
+typedef struct {
+  spn_sdk_macos_t macos;
+  sp_da(spn_sdk_msvc_t) msvc;
+} spn_sdk_host_t;
+
+typedef enum {
+  SPN_PATH_OK,
+  SPN_PATH_UNROOTED,
+  SPN_PATH_ABSOLUTE,
+  SPN_PATH_MALFORMED,
+} spn_path_check_t;
 
 typedef struct {
   spn_arg_t program;
@@ -34,6 +99,18 @@ typedef struct {
   spn_triple_t triple;
   spn_artifact_t artifact;
 } spn_toolchain_host_t;
+
+typedef struct {
+  spn_triple_t triple;
+  spn_path_t sdk;
+  spn_sanitizer_set_t sanitizers;
+} spn_toolchain_target_t;
+
+typedef struct {
+  spn_triple_t triple;
+  spn_sdk_t sdk;
+  spn_sanitizer_set_t sanitizers;
+} spn_toolchain_row_t;
 
 typedef enum {
   SPN_TOOLCHAIN_SOURCE_LOCAL,
@@ -58,11 +135,13 @@ typedef struct {
   spn_cc_driver_t driver;
   spn_toolchain_launcher_t compiler;
   spn_toolchain_launcher_t cxx;
-  spn_toolchain_launcher_t linker;
   spn_toolchain_launcher_t archiver;
+  bool lld;
+  sp_da(sp_str_t) link_args;
   spn_toolchain_source_t source;
   sp_da(spn_toolchain_host_t) hosts;
-  sp_da(spn_triple_t) targets;
+  sp_da(spn_toolchain_target_t) targets;
+  bool host_row;
 } spn_toolchain_decl_t;
 
 typedef struct {
@@ -71,9 +150,11 @@ typedef struct {
   spn_cc_driver_t driver;
   spn_toolchain_launcher_t compiler;
   spn_toolchain_launcher_t cxx;
-  spn_toolchain_launcher_t linker;
   spn_toolchain_launcher_t archiver;
-  sp_da(spn_triple_t) targets;
+  bool lld;
+  sp_da(sp_str_t) link_args;
+  sp_da(spn_toolchain_row_t) rows;
+  sp_da(spn_triple_t) unserved;
   spn_toolchain_support_t support;
 } spn_toolchain_info_t;
 
@@ -81,6 +162,7 @@ typedef struct {
 struct spn_toolchain_catalog_t {
   sp_mem_t mem;
   spn_triple_t host;
+  spn_sdk_host_t sdks;
   sp_str_om(spn_toolchain_info_t) entries;
 };
 
@@ -104,14 +186,17 @@ typedef struct {
   spn_toolchain_ref_t toolchain;
   spn_triple_t target;
   spn_abi_list_t abis;
+  spn_sanitizer_set_t sanitizers;
+  spn_linkage_t linkage;
 } spn_toolchain_query_t;
 
 typedef struct {
   spn_toolchain_info_t* toolchain;
-  spn_triple_t triple;
+  spn_toolchain_row_t row;
 } spn_toolchain_selection_t;
 
-typedef spn_err_t (*spn_fetch_fn)(sp_str_t url, sp_str_t dest, void* user_data);
+typedef struct spn_toolchain_store spn_toolchain_store_t;
+typedef spn_err_t (*spn_fetch_fn)(spn_toolchain_store_t* store, sp_str_t url, sp_str_t dest, sp_str_t* output);
 
 typedef struct {
   sp_str_t path;
@@ -126,13 +211,13 @@ typedef struct {
   sp_str_om(spn_probe_entry_t) entries;
 } spn_probe_cache_t;
 
-typedef struct {
+struct spn_toolchain_store {
   sp_mem_t mem;
   sp_str_t dir;
   sp_str_t mirror;
   spn_fetch_fn fetch;
   void* fetch_user_data;
   spn_probe_cache_t probes;
-} spn_toolchain_store_t;
+};
 
 #endif

@@ -1,0 +1,14 @@
+
+[[toolchain]]
+name = "dupe"
+driver = "gcc"
+compiler = "gcc"
+archiver = "ar"
+target = [{ arch = "x86_64", os = "linux", abi = "gnu" }]
+
+[[toolchain]]
+name = "dupe"
+driver = "clang"
+compiler = "clang"
+archiver = "ar"
+target = [{ arch = "x86_64", os = "linux", abi = "gnu" }]

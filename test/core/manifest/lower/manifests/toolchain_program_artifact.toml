@@ -1,0 +1,14 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[[toolchain]]
+name = "T"
+compiler = "bin/cc"
+archiver = "bin/ar"
+driver = "gcc"
+target = [{ arch = "x86_64", os = "linux", abi = "gnu" }]
+
+[toolchain.host.x86_64-linux]
+url = "https://tc"
+sha256 = "deadbeef"

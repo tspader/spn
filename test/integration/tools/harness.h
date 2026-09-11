@@ -34,6 +34,8 @@ typedef enum {
   ACTION_VERIFY_EXISTS,
   ACTION_VERIFY_NOT_EXISTS,
   ACTION_VERIFY_NO_INTERP,
+  ACTION_VERIFY_ELF_ENTRY,
+  ACTION_VERIFY_ELF_NO_SYMBOL,
   ACTION_VERIFY_INCLUDE,
   ACTION_VERIFY_FILE_CONTAINS,
   ACTION_VERIFY_FILE_NOT_CONTAINS,
@@ -58,6 +60,8 @@ typedef struct {
     struct { const c8* name; s32 rc; } bin;
     sp_str_t exists;
     sp_str_t verify_no_interp;
+    struct { sp_str_t file; u64 entry; } verify_elf_entry;
+    struct { sp_str_t file; const c8* prefix; } verify_elf_no_symbol;
     struct { sp_str_t file; } verify_include;
     struct { sp_str_t file; sp_str_t needle; } verify_file_contains;
     struct { sp_str_t file; sp_str_t needle; } verify_file_not_contains;
@@ -67,13 +71,15 @@ typedef struct {
     struct { spn_err_t err; } verify_result;
     struct { const c8* dir; u32 count; } verify_dir_count;
     struct { spn_event_kind_t event; const c8* key; const c8* value; u32 count; } verify_event_count;
-    struct { const c8* cmd; const c8* args [8]; const c8* env [4]; s32 rc; } cli;
+    struct { const c8* cmd; const c8* args [8]; const c8* env [4]; const c8* path; s32 rc; } cli;
   };
 } action_t;
 
 typedef struct {
   const c8* project;
   const c8* copy [16];
+  const c8* config;
+  const c8* toolchain;
   test_when_t when;
   action_t actions [SPN_TEST_MAX_ACTIONS];
 } test_t;
@@ -179,6 +185,7 @@ typedef struct {
 typedef struct {
   const c8* project;
   const c8* copy [16];
+  const c8* toolchain;
   test_when_t when;
   command_test_t first;
   rebuild_step_t rebuilds [SPN_TEST_REBUILD_MAX_STEPS];

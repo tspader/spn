@@ -39,9 +39,10 @@ typedef struct {
   spn_cc_driver_t driver;
   spn_toolchain_launcher_t compiler;
   spn_toolchain_launcher_t cxx;
-  spn_toolchain_launcher_t linker;
   spn_toolchain_launcher_t archiver;
+  sp_da(sp_str_t) link_args;
   spn_ar_driver_t archiver_driver;
+  spn_wasi_spelling_t wasi;
 } spn_cc_toolchain_t;
 
 typedef struct {
@@ -66,6 +67,8 @@ typedef struct {
 } spn_cc_exports_t;
 
 typedef struct {
+  sp_str_t pkg;
+  sp_str_t name;
   spn_lang_t lang;
   spn_cc_output_kind_t kind;
   sp_da(sp_str_t) libs;
@@ -73,9 +76,10 @@ typedef struct {
   sp_da(sp_str_t) system_libs;
   sp_da(spn_path_t) lib_dirs;
   sp_da(sp_str_t) frameworks;
+  sp_da(sp_str_t) args;
+  sp_da(spn_path_t) scripts;
   spn_os_version_t min_os;
   spn_win_subsystem_t subsystem;
-  bool rpath;
 } spn_cc_link_t;
 
 typedef struct {
@@ -97,11 +101,23 @@ typedef enum {
   SPN_CC_EXPORTS_WASM,
 } spn_cc_exports_format_t;
 
+typedef enum {
+  SPN_ENV_INCLUDE,
+  SPN_ENV_LIB,
+  SPN_ENV_ZIG_LIBC,
+} spn_env_key_t;
+
+typedef struct {
+  spn_env_key_t key;
+  sp_da(spn_arg_t) values;
+} spn_invocation_env_t;
+
 typedef struct {
   spn_arg_t program;
   sp_da(spn_arg_t) args;
   u32 launcher;
   spn_path_t cwd;
+  sp_da(spn_invocation_env_t) env;
 } spn_invocation_t;
 
 typedef enum {

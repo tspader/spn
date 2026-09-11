@@ -11,6 +11,12 @@ typedef struct {
   bool done;
 } sp_str_line_it_t;
 
+typedef struct {
+  sp_str_t entry;
+  sp_str_t remaining;
+  c8 sep;
+} sp_str_word_it_t;
+
 sp_str_t  sp_str_repeat(sp_mem_t mem, c8 c, u32 len);
 bool      sp_str_iequal(sp_str_t a, sp_str_t b);
 sp_hash_t sp_hash_str(sp_str_t str);
@@ -19,7 +25,14 @@ bool             sp_str_line_it_valid(const sp_str_line_it_t* it);
 void             sp_str_line_it_next(sp_str_line_it_t* it);
 sp_str_line_it_t sp_str_line_it_begin(sp_str_t str);
 
+bool             sp_str_word_it_valid(const sp_str_word_it_t* it);
+void             sp_str_word_it_next(sp_str_word_it_t* it);
+sp_str_word_it_t sp_str_word_it_begin(sp_str_t str, c8 sep);
+
 #define sp_str_for_line(str, it) \
   for (sp_str_line_it_t it = sp_str_line_it_begin((str)); sp_str_line_it_valid(&(it)); sp_str_line_it_next(&(it)))
+
+#define sp_str_for_word(str, sep, it) \
+  for (sp_str_word_it_t it = sp_str_word_it_begin((str), (sep)); sp_str_word_it_valid(&(it)); sp_str_word_it_next(&(it)))
 
 #endif

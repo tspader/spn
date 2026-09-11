@@ -25,6 +25,7 @@
 #include "toolchain/catalog.h"
 #include "toolchain/probe.h"
 #include "toolchain/provision.h"
+#include "toolchain/sdk.h"
 #include "triple/triple.h"
 #include "version/version.h"
 
@@ -187,20 +188,24 @@ static spn_err_t open_ctx(spn_ctx_t* ctx, spn_open_request_t request) {
     spn_cg_config_t config = sp_zero;
     spn_toml_loader_t loader = sp_zero;
     spn_toml_loader_init(&loader, ctx->mem, ctx->intern);
-    spn_err_t loaded = spn_codegen_load_config(&loader, ctx->paths.config.toml, &config);
     sp_da(spn_index_info_t) indexes = sp_da_new(ctx->heap, spn_index_info_t);
-    if (!loaded) {
+    sp_da(spn_toolchain_decl_t) toolchains = SP_NULLPTR;
+    if (spn_codegen_load_config(&loader, ctx->paths.config.toml, &config) == SPN_OK) {
       sp_da_for(config.index, it) {
         sp_da_push(indexes, spn_index_lower(&loader, it, SPN_INDEX_KIND_USER, &config.index[it]));
       }
+      toolchains = spn_toolchains_lower_list(&loader, SPN_PATH_ROOT_NONE, config.toolchain);
     }
-    if (loaded || !sp_da_empty(loader.issues)) {
+    if (!sp_da_empty(loader.issues)) {
       return spn_err_emit(ctx, (spn_err_union_t) {
         .kind = SPN_ERR_MANIFEST_ISSUES,
         .manifest = { .path = ctx->paths.config.toml, .issues = spn_codegen_issues_to_err(ctx->mem, loader.issues) },
       });
     }
     ctx->config.indexes = indexes;
+    sp_da_for(toolchains, it) {
+      spn_toolchain_catalog_add(&ctx->catalog, toolchains[it]);
+    }
   }
 
   spn_try(spn_project_load(ctx, ctx->paths.project, &ctx->project));
@@ -227,6 +232,16 @@ static spn_err_t open_ctx(spn_ctx_t* ctx, spn_open_request_t request) {
   return SPN_OK;
 }
 
+static void load_builtins(spn_ctx_t* ctx) {
+  spn_toml_loader_t loader = sp_zero;
+  spn_toml_loader_init(&loader, ctx->mem, ctx->intern);
+  sp_da(spn_toolchain_decl_t) decls = spn_toolchains_lower(&loader, sp_str((const c8*)toolchains_toml, toolchains_toml_size), SPN_PATH_ROOT_NONE);
+  sp_assert(sp_da_empty(loader.issues));
+  sp_da_for(decls, it) {
+    spn_toolchain_catalog_add(&ctx->catalog, decls[it]);
+  }
+}
+
 spn_ctx_t* spn_ctx_new(spn_wake_fn_t wake, void* wake_data) {
   sp_assert(!spn.arena);
   spn_ctx_t* ctx = &spn;
@@ -243,10 +258,6 @@ spn_ctx_t* spn_ctx_new(spn_wake_fn_t wake, void* wake_data) {
   ctx->events->wake = &ctx->wake;
 
   ctx->host = spn_triple_host();
-
-  sp_str_t builtins = sp_str((const c8*)toolchains_json, toolchains_json_size);
-  spn_toolchain_catalog_init(&ctx->catalog, ctx->host, ctx->heap);
-  sp_assert(spn_toolchain_catalog_load(&ctx->catalog, builtins) == SPN_OK);
 
   ctx->paths.cwd = sp_fs_get_cwd(ctx->heap);
   ctx->paths.patches = sp_env_get(ctx->env, sp_str_lit("SPN_PATCH_DIR"));
@@ -269,6 +280,9 @@ spn_ctx_t* spn_ctx_new(spn_wake_fn_t wake, void* wake_data) {
   spn_path_roots_set(&ctx->roots, ctx->heap, SPN_PATH_ROOT_INDEX, ctx->paths.index);
   spn_path_roots_set(&ctx->roots, ctx->heap, SPN_PATH_ROOT_RUNTIME, ctx->paths.runtime);
   ctx->paths.toolchain = spn_path_roots_set(&ctx->roots, ctx->heap, SPN_PATH_ROOT_TOOLCHAIN, env_or(ctx, "SPN_TOOLCHAIN_DIR", join_path(ctx, ctx->paths.caches.dir, "toolchain")));
+
+  spn_toolchain_catalog_init(&ctx->catalog, ctx->host, spn_sdk_detect(ctx->heap, &ctx->roots, ctx->env, ctx->host), ctx->heap);
+  load_builtins(ctx);
   ctx->roots.pinned = spn_path_pinned_roots();
 
   spn_op_thread_start(ctx);

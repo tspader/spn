@@ -8,7 +8,7 @@
   X(arch,           "manifest.jtd.json") \
   X(os,             "manifest.jtd.json") \
   X(abi,            "manifest.jtd.json") \
-  X(cc_driver,      "toolchains.jtd.json") \
+  X(cc_driver,      "config.jtd.json") \
   X(linkage,        "manifest.jtd.json") \
   X(c_standard,     "manifest.jtd.json") \
   X(cxx_standard,   "manifest.jtd.json") \

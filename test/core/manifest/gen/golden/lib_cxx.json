@@ -23,7 +23,6 @@
     {
       "name": "custom",
       "compiler": "cc",
-      "linker": "cc",
       "archiver": "ar",
       "driver": "gcc",
       "cxx": "c++"

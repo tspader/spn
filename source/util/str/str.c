@@ -52,6 +52,31 @@ sp_str_line_it_t sp_str_line_it_begin(sp_str_t str) {
   return it;
 }
 
+bool sp_str_word_it_valid(const sp_str_word_it_t* it) {
+  return !sp_str_empty(it->entry);
+}
+
+void sp_str_word_it_next(sp_str_word_it_t* it) {
+  it->entry = sp_zero_s(sp_str_t);
+  while (!sp_str_empty(it->remaining) && sp_str_empty(it->entry)) {
+    s32 sep = sp_str_find_c8(it->remaining, it->sep);
+    if (sep == SP_STR_NO_MATCH) {
+      it->entry = it->remaining;
+      it->remaining = sp_zero_s(sp_str_t);
+    }
+    else {
+      it->entry = sp_str_prefix(it->remaining, sep);
+      it->remaining = sp_str_suffix(it->remaining, it->remaining.len - sep - 1);
+    }
+  }
+}
+
+sp_str_word_it_t sp_str_word_it_begin(sp_str_t str, c8 sep) {
+  sp_str_word_it_t it = { .remaining = str, .sep = sep };
+  sp_str_word_it_next(&it);
+  return it;
+}
+
 sp_hash_t sp_hash_str(sp_str_t str) {
   return sp_hash_bytes(str.data, str.len, 0);
 }

@@ -1,0 +1,6 @@
+[[toolchain]]
+name = "Z"
+driver = "zig"
+compiler = "Z cc"
+archiver = "Z ar"
+target = [{ arch = "aarch64", os = "freestanding", abi = "none" }]

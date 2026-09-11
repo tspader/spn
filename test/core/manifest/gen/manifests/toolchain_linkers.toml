@@ -1,0 +1,11 @@
+[package]
+name = "tclinkers"
+version = "1.0.0"
+
+[[toolchain]]
+name = "llvm"
+compiler = "clang"
+archiver = "llvm-ar"
+driver = "clang"
+link_args = ["-fuse-ld=lld"]
+linker = "lld"

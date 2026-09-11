@@ -45,6 +45,7 @@ yyjson = "0.14.0"
 files = [
   "tools/patches/sp-test-num-cpus.patch",
   "tools/patches/sp-prompt-external-wake.patch",
+  "tools/patches/sp-env-host-keys.patch",
 ]
 
 [patch.wamr]
@@ -100,7 +101,6 @@ source = [
   "source/core/codegen/gen/manifest.gen.c",
   "source/core/codegen/gen/release.gen.c",
   "source/core/codegen/gen/source_deps.gen.c",
-  "source/core/codegen/gen/toolchains.gen.c",
 ]
 include = ["include", "source/core", "source/util", "source/core/external", "source/core/codegen/gen"]
 
@@ -121,6 +121,39 @@ name = "docs"
 source = ["tools/gen/docs.c", "tools/jtd.c"]
 include = ["tools"]
 
+[[script]]
+name = "smoke"
+source = [
+  "tools/docker/source/main.c",
+  "tools/docker/source/docker/docker.c",
+  "tools/docker/source/tail/tail.c",
+  "tools/docker/source/variant/variant.c",
+  "test/tools/lanes.c",
+]
+include = ["include", "source/core", "source/util", "source/core/codegen/gen", "test/tools", "tools/docker/source"]
+deps = ["spn"]
+
+[[script]]
+name = "winvm"
+source = [
+  "tools/windows/source/main.c",
+  "tools/windows/source/winvm/winvm.c",
+  "tools/windows/source/variant/variant.c",
+  "tools/docker/source/tail/tail.c",
+]
+include = ["include", "source/core", "source/util", "source/core/codegen/gen", "tools/windows/source", "tools/docker/source"]
+deps = ["spn"]
+
+[[script]]
+name = "smoke-shell"
+source = ["tools/docker/source/container/shell.c"]
+include = ["tools/docker/source"]
+
+[[script]]
+name = "smoke-check"
+source = ["tools/docker/source/container/check.c"]
+include = ["tools/docker/source"]
+
 [[test]]
 name = "core"
 source = [
@@ -129,6 +162,7 @@ source = [
   "test/core/compiler/*.c",
   "test/core/compiler/exports/*.c",
   "test/core/compiler/rsp/*.c",
+  "test/core/config/*.c",
   "test/core/dag/*.c",
   "test/core/external/*.c",
   "test/core/gen/*.c",
@@ -154,6 +188,7 @@ source = [
   "source/core/codegen/loader.c",
   "source/core/codegen/json.c",
   "source/core/codegen/lower.c",
+  "source/core/codegen/toolchain.c",
   "source/core/codegen/options.c",
   "source/core/codegen/when.c",
   "source/core/codegen/gen/config.gen.c",
@@ -162,7 +197,6 @@ source = [
   "source/core/codegen/gen/manifest.gen.c",
   "source/core/codegen/gen/release.gen.c",
   "source/core/codegen/gen/source_deps.gen.c",
-  "source/core/codegen/gen/toolchains.gen.c",
   "source/core/compiler/driver.c",
   "source/core/compiler/exports.c",
   "source/core/compiler/gnu.c",
@@ -238,10 +272,16 @@ source = [
   "source/core/toml/edit.c",
   "source/core/toolchain/catalog.c",
   "source/core/toolchain/probe.c",
+  "source/core/toolchain/search.c",
   "source/core/toolchain/provision.c",
   "source/core/toolchain/select.c",
   "source/core/toolchain/toolchain.c",
+  "source/core/toolchain/sdk.c",
+  "source/core/toolchain/libc.c",
+  "source/util/sp/sp_msvc.c",
+  "source/core/toolchain/linker.c",
   "source/core/triple/triple.c",
+  "source/core/elf/elf.c",
   "source/core/unit/build.c",
   "source/core/unit/fingerprint.c",
   "source/core/unit/graph.c",
@@ -251,6 +291,7 @@ source = [
   "source/util/version/version.c",
   "source/core/when/when.c",
   "test/core/tools/ctx.c",
+  "test/core/tools/elf_emit.c",
   "test/core/tools/wasm_emit.c",
   "test/tools/fixture.c",
   "test/tools/path_roots.c",
@@ -265,6 +306,7 @@ flags = [
   '-DSCHEMA_DIR="source/core/codegen/schema"',
   '-DJTD_TEST_JSON_DIR="test/core/jtd/json"',
   '-DMANIFEST_DIR="test/core/manifest/lower/manifests"',
+  '-DCONFIG_DIR="test/core/config/configs"',
   '-DTOOLCHAINS_DIR="test/core/toolchain/toolchains"',
 ]
 
@@ -288,6 +330,7 @@ source = [
   "source/core/codegen/options.c",
   "source/core/codegen/when.c",
   "source/core/codegen/lower.c",
+  "source/core/codegen/toolchain.c",
   "source/core/git/key.c",
   "source/core/git/url.c",
   "source/core/git/patch.c",
@@ -295,7 +338,6 @@ source = [
   "source/core/hash/sha256/sha256.c",
   "source/core/when/when.c",
   "source/core/toolchain/catalog.c",
-  "source/core/codegen/gen/toolchains.gen.c",
   "source/core/codegen/gen/config.gen.c",
   "source/core/codegen/gen/errors.gen.c",
   "source/core/codegen/gen/events.gen.c",
@@ -316,6 +358,7 @@ source = [
   "source/core/pkg/pkg.c",
   "source/core/profile/profile.c",
   "source/core/triple/triple.c",
+  "source/core/elf/elf.c",
   "source/core/resolve/resolve.c",
   "source/core/resolve/dump.c",
   "source/core/codegen/gen/resolve.gen.c",
@@ -326,6 +369,9 @@ source = [
   "source/core/target/mutate.c",
   "source/core/target/select.c",
   "source/core/toolchain/toolchain.c",
+  "source/core/toolchain/sdk.c",
+  "source/util/sp/sp_msvc.c",
+  "source/core/toolchain/linker.c",
   "test/core/resolver/main.c",
   "test/tools/fixture.c",
   "test/tools/toml.c",
@@ -346,6 +392,8 @@ source = [
   "source/core/codegen/gen/source_deps.gen.c",
   "source/core/codegen/json.c",
   "source/core/codegen/loader.c",
+  "source/core/codegen/toolchain.c",
+  "source/core/codegen/gen/config.gen.c",
   "source/core/core/core.c",
   "source/core/ctx/ctx.c",
   "source/core/enum/enum.c",
@@ -358,20 +406,31 @@ source = [
   "source/core/paths/paths.c",
   "source/util/io/io.c",
   "source/util/str/str.c",
+  "source/core/toolchain/catalog.c",
+  "source/core/toolchain/select.c",
   "source/core/toolchain/toolchain.c",
+  "source/core/toolchain/sdk.c",
+  "source/core/profile/profile.c",
+  "source/util/sp/sp_msvc.c",
+  "source/core/toolchain/linker.c",
+  "source/core/toolchain/search.c",
   "source/core/triple/triple.c",
+  "source/core/elf/elf.c",
   "test/integration/main.c",
   "test/integration/cli.c",
   "test/integration/compile_commands.c",
+  "test/integration/config.c",
   "test/integration/consume.c",
   "test/integration/corrupt.c",
   "test/integration/cxx.c",
   "test/integration/defines.c",
   "test/integration/deps.c",
+  "test/integration/example.c",
   "test/integration/exports.c",
   "test/integration/freshness.c",
   "test/integration/harness_test.c",
   "test/integration/layout.c",
+  "test/integration/linker.c",
   "test/integration/log.c",
   "test/integration/offline.c",
   "test/integration/options.c",
@@ -388,6 +447,7 @@ source = [
   "test/tools/caps.c",
   "test/tools/env.c",
   "test/tools/fixture.c",
+  "test/tools/lanes.c",
   "test/tools/toml.c",
 ]
 include = ["include", "source/core", "source/util", "source/core/codegen/gen", "source/core/external", "test/integration/tools", "test/tools"]
@@ -406,6 +466,8 @@ source = [
   "source/core/codegen/gen/source_deps.gen.c",
   "source/core/codegen/json.c",
   "source/core/codegen/loader.c",
+  "source/core/codegen/toolchain.c",
+  "source/core/codegen/gen/config.gen.c",
   "source/core/core/core.c",
   "source/core/ctx/ctx.c",
   "source/core/enum/enum.c",
@@ -418,13 +480,22 @@ source = [
   "source/core/paths/paths.c",
   "source/util/io/io.c",
   "source/util/str/str.c",
+  "source/core/toolchain/catalog.c",
+  "source/core/toolchain/select.c",
   "source/core/toolchain/toolchain.c",
+  "source/core/toolchain/sdk.c",
+  "source/core/profile/profile.c",
+  "source/util/sp/sp_msvc.c",
+  "source/core/toolchain/linker.c",
+  "source/core/toolchain/search.c",
   "source/core/triple/triple.c",
+  "source/core/elf/elf.c",
   "test/render/main.c",
   "test/render/cases.c",
   "test/tools/caps.c",
   "test/tools/env.c",
   "test/tools/fixture.c",
+  "test/tools/lanes.c",
   "test/tools/toml.c",
 ]
 include = ["include", "source/core", "source/util", "source/core/codegen/gen", "source/core/external", "test/render", "test/tools"]
@@ -486,6 +557,7 @@ source = [
   "source/core/codegen/options.c",
   "source/core/codegen/when.c",
   "source/core/codegen/lower.c",
+  "source/core/codegen/toolchain.c",
   "source/core/git/key.c",
   "source/core/git/url.c",
   "source/core/git/patch.c",
@@ -493,7 +565,6 @@ source = [
   "source/core/hash/sha256/sha256.c",
   "source/core/when/when.c",
   "source/core/toolchain/catalog.c",
-  "source/core/codegen/gen/toolchains.gen.c",
   "source/core/codegen/gen/config.gen.c",
   "source/core/codegen/gen/errors.gen.c",
   "source/core/codegen/gen/events.gen.c",
@@ -513,6 +584,7 @@ source = [
   "source/core/pkg/pkg.c",
   "source/core/profile/profile.c",
   "source/core/triple/triple.c",
+  "source/core/elf/elf.c",
   "source/core/resolve/resolve.c",
   "source/util/str/str.c",
   "source/core/semver/compare.c",
@@ -521,6 +593,9 @@ source = [
   "source/core/target/mutate.c",
   "source/core/target/select.c",
   "source/core/toolchain/toolchain.c",
+  "source/core/toolchain/sdk.c",
+  "source/util/sp/sp_msvc.c",
+  "source/core/toolchain/linker.c",
   "test/fuzz/resolver/main.c",
   "test/fuzz/resolver/generator.c",
   "test/fuzz/resolver/oracles/exhaustive.c",
@@ -558,17 +633,27 @@ source = [
   "test/core/toolchain/*.c",
   "source/core/toolchain/catalog.c",
   "source/core/toolchain/probe.c",
+  "source/core/toolchain/search.c",
   "source/core/toolchain/provision.c",
   "source/core/toolchain/select.c",
   "source/core/toolchain/toolchain.c",
+  "source/core/toolchain/sdk.c",
+  "source/core/toolchain/libc.c",
+  "source/util/sp/sp_msvc.c",
+  "source/core/toolchain/linker.c",
   "source/core/paths/paths.c",
   "source/core/triple/triple.c",
+  "source/core/elf/elf.c",
   "source/core/hash/digest/digest.c",
   "source/core/hash/sha256/sha256.c",
-  "source/core/codegen/gen/toolchains.gen.c",
   "source/core/codegen/gen/events.gen.c",
   "source/core/codegen/gen/errors.gen.c",
+  "source/core/codegen/gen/config.gen.c",
   "source/core/codegen/json.c",
+  "source/core/codegen/loader.c",
+  "source/core/codegen/toolchain.c",
+  "source/core/external/tom.c",
+  "test/tools/toml.c",
   "source/core/error/json.c",
   "source/core/enum/enum.c",
   "source/core/error/error.c",
@@ -577,6 +662,7 @@ source = [
   "source/core/ctx/ctx.c",
   "source/core/core/core.c",
   "source/util/lazy/lazy.c",
+  "source/util/atomic_file/atomic_file.c",
   "source/util/fs/fs.c",
   "source/util/io/io.c",
   "source/util/str/str.c",
@@ -604,6 +690,11 @@ source = [
   "source/core/codegen/gen/errors.gen.c",
   "source/core/codegen/gen/events.gen.c",
   "source/core/codegen/json.c",
+  "source/core/codegen/loader.c",
+  "source/core/codegen/toolchain.c",
+  "source/core/codegen/gen/config.gen.c",
+  "source/core/external/tom.c",
+  "test/tools/toml.c",
   "source/core/codegen/gen/source_deps.gen.c",
   "source/core/reflect/json.c",
   "source/core/compiler/driver.c",
@@ -636,13 +727,19 @@ source = [
   "source/core/target/select.c",
   "source/core/target/target.c",
   "source/core/toolchain/catalog.c",
-  "source/core/codegen/gen/toolchains.gen.c",
   "source/core/toolchain/select.c",
+  "source/core/toolchain/search.c",
   "source/core/toolchain/toolchain.c",
+  "source/core/toolchain/sdk.c",
+  "source/core/toolchain/libc.c",
+  "source/util/sp/sp_msvc.c",
+  "source/core/toolchain/linker.c",
   "source/core/unit/package.c",
   "source/core/triple/triple.c",
+  "source/core/elf/elf.c",
   "source/core/when/when.c",
   "source/util/coff/coff.c",
+  "source/util/atomic_file/atomic_file.c",
   "source/util/fs/fs.c",
   "source/util/macho/macho.c",
   "source/util/sp_elf/sp_elf.c",

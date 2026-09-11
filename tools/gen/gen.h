@@ -32,6 +32,7 @@ typedef struct gen_type gen_type_t;
 
 typedef struct {
   sp_str_t name;
+  gen_type_t* owner;
   gen_type_t* object;
   sp_str_t shorthand;
 } gen_entry_t;

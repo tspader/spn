@@ -1,7 +1,10 @@
 int a();
 
 void _start() {
-  a();
+  volatile int x = a();
+  volatile int* p = &x;
+  x = -x;
+  p = p + x;
   for (;;) {
   }
 }

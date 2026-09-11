@@ -7,4 +7,4 @@ name = "main"
 source = ["main.c"]
 
 [bin.macos]
-frameworks = ["CoreFoundation", { value = "Foundation", when = { os = "macos" } }]
+frameworks = ["CoreFoundation", "Security", { value = "Foundation", when = { os = "macos" } }]

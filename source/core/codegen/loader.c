@@ -9,6 +9,7 @@ void spn_toml_loader_init(spn_toml_loader_t* ctx, sp_mem_t mem, sp_intern_t* int
   ctx->mem = mem;
   ctx->intern = intern;
   ctx->depth = 0;
+  ctx->scope = sp_zero_s(spn_codegen_scope_t);
   ctx->issues = sp_da_new(mem, spn_codegen_issue_t);
 }
 
@@ -34,13 +35,21 @@ void spn_toml_loader_pop(spn_toml_loader_t* ctx) {
   }
 }
 
+void spn_toml_loader_push_scope(spn_toml_loader_t* ctx, sp_str_t name) {
+  ctx->scope = (spn_codegen_scope_t) { .name = name, .depth = ctx->depth };
+}
+
+void spn_toml_loader_pop_scope(spn_toml_loader_t* ctx) {
+  ctx->scope = sp_zero_s(spn_codegen_scope_t);
+}
+
 static sp_str_t spn_codegen_path(spn_toml_loader_t* ctx) {
   sp_io_dyn_mem_writer_t writer;
   sp_io_dyn_mem_writer_init(ctx->mem, &writer);
-  sp_for(it, ctx->depth) {
+  for (u32 it = ctx->scope.depth; it < ctx->depth; it++) {
     spn_codegen_path_seg_t* seg = &ctx->path[it];
     if (seg->kind == SPN_CODEGEN_PATH_KEY) {
-      sp_fmt_io(&writer.base, it ? ".{}" : "{}", sp_fmt_cstr(seg->key));
+      sp_fmt_io(&writer.base, it > ctx->scope.depth ? ".{}" : "{}", sp_fmt_cstr(seg->key));
     } else {
       sp_fmt_io(&writer.base, "[{}]", sp_fmt_uint(seg->index));
     }
@@ -48,20 +57,35 @@ static sp_str_t spn_codegen_path(spn_toml_loader_t* ctx) {
   return sp_io_dyn_mem_writer_as_str(&writer);
 }
 
-static void spn_toml_loader_record(spn_toml_loader_t* ctx, spn_err_t code, sp_str_t detail) {
-  spn_codegen_issue_t issue = { .code = code, .path = spn_codegen_path(ctx), .detail = sp_str_copy(ctx->mem, detail) };
-  sp_da_push(ctx->issues, issue);
+static void record(spn_toml_loader_t* ctx, spn_codegen_issue_t issue) {
+  spn_codegen_issue_t recorded = {
+    .code = issue.code,
+    .path = spn_codegen_path(ctx),
+    .detail = sp_str_copy(ctx->mem, issue.detail),
+    .value = sp_str_copy(ctx->mem, issue.value),
+    .scope = sp_str_copy(ctx->mem, ctx->scope.name),
+    .choices = issue.choices,
+    .depth = ctx->depth,
+  };
+  sp_for(it, ctx->depth) {
+    recorded.segs[it] = ctx->path[it];
+  }
+  sp_da_push(ctx->issues, recorded);
 }
 
-bool spn_toml_loader_issue(spn_toml_loader_t* ctx, spn_err_t code, const c8* key) {
+bool spn_toml_loader_issue_with(spn_toml_loader_t* ctx, const c8* key, spn_codegen_issue_t issue) {
   spn_toml_loader_push_key(ctx, key);
-  spn_toml_loader_record(ctx, code, sp_cstr_as_str(key));
+  record(ctx, issue);
   spn_toml_loader_pop(ctx);
   return true;
 }
 
+bool spn_toml_loader_issue(spn_toml_loader_t* ctx, spn_err_t code, const c8* key) {
+  return spn_toml_loader_issue_with(ctx, key, (spn_codegen_issue_t) { .code = code, .detail = sp_cstr_as_str(key) });
+}
+
 bool spn_toml_loader_issue_at(spn_toml_loader_t* ctx, spn_err_t code, sp_str_t detail) {
-  spn_toml_loader_record(ctx, code, detail);
+  record(ctx, (spn_codegen_issue_t) { .code = code, .detail = detail });
   return true;
 }
 
@@ -187,7 +211,7 @@ sp_da(sp_str_t) spn_toml_loader_read_str_array(spn_toml_loader_t* ctx, toml_tabl
     if (element.ok) {
       sp_da_push(values, spn_toml_loader_intern_value(ctx, element));
     } else {
-      spn_toml_loader_record(ctx, SPN_ERR_CODEGEN_EXPECTED_STR, sp_str_lit(""));
+      record(ctx, (spn_codegen_issue_t) { .code = SPN_ERR_CODEGEN_EXPECTED_STR });
     }
     spn_toml_loader_pop(ctx);
   }
@@ -210,77 +234,10 @@ const c8* spn_codegen_err_name(spn_err_t code) {
     case SPN_ERR_CODEGEN_INVALID:        return "invalid";
     case SPN_ERR_CODEGEN_ROOT_ONLY:      return "root_only";
     case SPN_ERR_CODEGEN_PATH:           return "path";
+    case SPN_ERR_CODEGEN_UNROOTED:       return "unrooted";
+    case SPN_ERR_CODEGEN_ABSOLUTE:       return "absolute";
     default:                             return "unknown";
   }
-}
-
-void spn_codegen_issue_write(sp_io_writer_t* w, const spn_codegen_issue_t* issue) {
-  switch (issue->code) {
-    case SPN_ERR_CODEGEN_MISSING_KEY:
-      sp_fmt_io(w, "missing required field {.cyan}", SP_FMT_STR(issue->path));
-      break;
-    case SPN_ERR_CODEGEN_EXPECTED_STR:
-      sp_fmt_io(w, "{.cyan} must be a string", SP_FMT_STR(issue->path));
-      break;
-    case SPN_ERR_CODEGEN_EXPECTED_INT:
-      sp_fmt_io(w, "{.cyan} must be a non-negative integer", SP_FMT_STR(issue->path));
-      break;
-    case SPN_ERR_CODEGEN_EXPECTED_BOOL:
-      sp_fmt_io(w, "{.cyan} must be a boolean", SP_FMT_STR(issue->path));
-      break;
-    case SPN_ERR_CODEGEN_EXPECTED_OBJECT:
-      sp_fmt_io(w, "{.cyan} must be a table", SP_FMT_STR(issue->path));
-      break;
-    case SPN_ERR_CODEGEN_DUPLICATE_KEY:
-      sp_fmt_io(w, "duplicate {.yellow} at {.cyan}", SP_FMT_STR(issue->detail), SP_FMT_STR(issue->path));
-      break;
-    case SPN_ERR_CODEGEN_UNKNOWN_KEY:
-      if (sp_str_empty(issue->path)) {
-        sp_fmt_io(w, "unknown field {.red}", SP_FMT_STR(issue->detail));
-      } else {
-        sp_fmt_io(w, "unknown field {.red} in {.cyan}", SP_FMT_STR(issue->detail), SP_FMT_STR(issue->path));
-      }
-      break;
-    case SPN_ERR_CODEGEN_INVALID:
-      sp_fmt_io(w, "invalid value at {.cyan}", SP_FMT_STR(issue->path));
-      break;
-    case SPN_ERR_CODEGEN_PARSE:
-      if (sp_str_empty(issue->detail)) {
-        sp_io_write_str(w, sp_str_lit("not valid toml"), SP_NULLPTR);
-      } else {
-        sp_fmt_io(w, "not valid toml: {}", SP_FMT_STR(issue->detail));
-      }
-      break;
-    case SPN_ERR_CODEGEN_FILE_MISSING:
-      sp_io_write_str(w, sp_str_lit("file is missing"), SP_NULLPTR);
-      break;
-    case SPN_ERR_CODEGEN_ROOT_ONLY:
-      sp_fmt_io(w, "{.cyan} is only allowed in the root manifest", SP_FMT_STR(issue->path));
-      break;
-    case SPN_ERR_CODEGEN_PATH:
-      sp_fmt_io(w, "path {.yellow} must not contain '.', '..', or empty components", SP_FMT_STR(issue->detail));
-      break;
-    default:
-      sp_fmt_io(w, "invalid field at {.cyan}", SP_FMT_STR(issue->path));
-      break;
-  }
-}
-
-sp_str_t spn_err_issues_message(sp_mem_t mem, sp_da(spn_err_issue_t) issues) {
-  sp_io_dyn_mem_writer_t b = sp_zero;
-  sp_io_dyn_mem_writer_init(mem, &b);
-  sp_da_for(issues, it) {
-    if (it) {
-      sp_fmt_io(&b.base, "; ");
-    }
-    spn_codegen_issue_t issue = {
-      .code = issues[it].code,
-      .path = issues[it].path,
-      .detail = issues[it].detail,
-    };
-    spn_codegen_issue_write(&b.base, &issue);
-  }
-  return sp_io_dyn_mem_writer_as_str(&b);
 }
 
 sp_da(spn_err_issue_t) spn_codegen_issues_to_err(sp_mem_t mem, sp_da(spn_codegen_issue_t) issues) {
@@ -290,21 +247,12 @@ sp_da(spn_err_issue_t) spn_codegen_issues_to_err(sp_mem_t mem, sp_da(spn_codegen
       .code = issues[it].code,
       .path = issues[it].path,
       .detail = issues[it].detail,
+      .value = issues[it].value,
+      .scope = issues[it].scope,
+      .choices = issues[it].choices,
     }));
   }
   return projected;
-}
-
-sp_str_t spn_codegen_issues_message(sp_mem_t mem, sp_da(spn_codegen_issue_t) issues) {
-  sp_io_dyn_mem_writer_t b = sp_zero;
-  sp_io_dyn_mem_writer_init(mem, &b);
-  sp_da_for(issues, it) {
-    if (it) {
-      sp_fmt_io(&b.base, "; ");
-    }
-    spn_codegen_issue_write(&b.base, &issues[it]);
-  }
-  return sp_io_dyn_mem_writer_as_str(&b);
 }
 
 toml_table_t* spn_codegen_parse(spn_toml_loader_t* ctx, sp_str_t path) {
@@ -315,6 +263,15 @@ toml_table_t* spn_codegen_parse(spn_toml_loader_t* ctx, sp_str_t path) {
 
   sp_str_t diag = sp_zero;
   toml_table_t* table = spn_toml_parse_diag(ctx->mem, path, &diag);
+  if (!table) {
+    spn_toml_loader_issue_at(ctx, SPN_ERR_CODEGEN_PARSE, diag);
+  }
+  return table;
+}
+
+toml_table_t* spn_codegen_parse_str(spn_toml_loader_t* ctx, sp_str_t content) {
+  sp_str_t diag = sp_zero;
+  toml_table_t* table = spn_toml_parse_str_diag(ctx->mem, content, &diag);
   if (!table) {
     spn_toml_loader_issue_at(ctx, SPN_ERR_CODEGEN_PARSE, diag);
   }
@@ -351,5 +308,12 @@ sp_str_t spn_codegen_issues_to_str(sp_mem_t mem, sp_da(spn_codegen_issue_t) issu
   spn_codegen_json_writer_t pretty;
   spn_codegen_json_writer_init(&pretty, &sink.base);
   spn_codegen_json_issues(&pretty.base, issues);
+  return sp_io_dyn_mem_writer_as_str(&sink);
+}
+
+sp_str_t spn_codegen_issues_to_json(sp_mem_t mem, sp_da(spn_codegen_issue_t) issues) {
+  sp_io_dyn_mem_writer_t sink;
+  sp_io_dyn_mem_writer_init(mem, &sink);
+  spn_codegen_json_issues(&sink.base, issues);
   return sp_io_dyn_mem_writer_as_str(&sink);
 }

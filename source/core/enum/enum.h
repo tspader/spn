@@ -18,6 +18,10 @@ spn_os_t        spn_os_from_str(sp_str_t str);
 sp_str_t        spn_os_to_str(spn_os_t os);
 spn_cc_driver_t spn_cc_driver_from_str(sp_str_t str);
 sp_str_t        spn_cc_driver_to_str(spn_cc_driver_t driver);
+spn_ld_family_t spn_ld_family_from_str(sp_str_t str);
+sp_str_t        spn_ld_family_to_str(spn_ld_family_t family);
+sp_str_t        spn_ld_dialect_to_str(spn_ld_dialect_t dialect);
+sp_str_t        spn_format_to_str(spn_format_t format);
 spn_abi_t       spn_abi_from_str(sp_str_t str);
 sp_str_t        spn_abi_to_str(spn_abi_t abi);
 
@@ -34,6 +38,7 @@ sp_str_t spn_tree_to_str(spn_tree_t tree);
 spn_sanitizer_t spn_sanitizer_from_str(sp_str_t str);
 sp_str_t spn_sanitizer_to_str(spn_sanitizer_t sanitizer);
 sp_str_t spn_sanitizer_set_to_str(sp_mem_t mem, spn_sanitizer_set_t set);
+spn_sanitizer_set_t spn_sanitizer_set_from_list(sp_da(spn_sanitizer_t) list);
 bool spn_sanitizer_set_has_conflict(spn_sanitizer_set_t set);
 
 spn_linkage_t spn_lib_kind_from_str(sp_str_t str);
@@ -43,6 +48,7 @@ sp_str_t spn_linkage_to_str(spn_linkage_t kind);
 spn_option_type_t spn_option_type_from_str(sp_str_t str);
 sp_str_t spn_option_type_to_str(spn_option_type_t type);
 sp_str_t spn_option_setter_kind_to_str(spn_option_setter_kind_t kind);
+sp_str_t spn_linkage_requester_to_str(spn_linkage_requester_t requester);
 sp_str_t spn_cc_feature_to_str(spn_cc_feature_t feature);
 
 spn_dir_t spn_cache_dir_kind_from_str(sp_str_t str);

@@ -1,19 +1,17 @@
 #include "toolchain.h"
 #include "toolchain/probe.h"
+#include "toolchain/search.h"
 
 #define PROBE_MAX_FILES 6
 #define PROBE_MAX_ACTIONS 6
 #define PROBE_MAX_DIRS 2
 #define PROBE_MAX_SLOTS 4
 #define PROBE_MAX_PAIRS 2
-#define PROBE_MAX_SPLIT 3
-#define PROBE_MAX_PROGRAMS 4
+#define PROBE_MAX_PROGRAMS 3
 
 #if defined(SP_WIN32)
-  #define PROBE_SEP ";"
   #define PROBE_EXE ".exe"
 #else
-  #define PROBE_SEP ":"
   #define PROBE_EXE ""
 #endif
 
@@ -33,6 +31,17 @@ typedef struct {
   const c8* content;
 } file_t;
 
+typedef enum {
+  PROBE_PROGRAM_NONE,
+  PROBE_PROGRAM_COMPILER,
+  PROBE_PROGRAM_ARCHIVER,
+} program_slot_t;
+
+typedef struct {
+  const c8* path;
+  spn_path_root_t root;
+} resolved_t;
+
 typedef struct {
   action_kind_t kind;
   union {
@@ -41,8 +50,8 @@ typedef struct {
       u32 slot;
       const c8* dirs [PROBE_MAX_DIRS];
       spn_err_t err;
-      const c8* program;
-      const c8* resolved [PROBE_MAX_PROGRAMS];
+      program_slot_t missing;
+      resolved_t resolved [PROBE_MAX_PROGRAMS];
       bool cxx_dropped;
     } probe;
   };
@@ -62,10 +71,9 @@ typedef struct {
 typedef struct {
   const c8* name;
   struct {
-    const c8* compiler;
-    const c8* linker;
-    const c8* archiver;
-    const c8* cxx;
+    fixture_launcher_t compiler;
+    fixture_launcher_t archiver;
+    fixture_launcher_t cxx;
     bool no_cxx;
   } programs;
   file_t files [PROBE_MAX_FILES];
@@ -80,7 +88,7 @@ static const test_t tests [] = {
     .name = "resolves_all_programs",
     .files = STANDARD_FILES,
     .actions = {
-      { .kind = PROBE_ACTION_PROBE, .probe = { .slot = 1, .resolved = { "A/cc", "A/cc", "A/ar", "A/c++" } } },
+      { .kind = PROBE_ACTION_PROBE, .probe = { .slot = 1, .resolved = { { "A/cc" }, { "A/ar" }, { "A/c++" } } } },
     },
     .expect = { .entries = 3 },
   },
@@ -88,22 +96,14 @@ static const test_t tests [] = {
     .name = "missing_compiler",
     .files = { { "A/ar" }, { "A/c++" } },
     .actions = {
-      { .kind = PROBE_ACTION_PROBE, .probe = { .err = SPN_ERR_TOOLCHAIN_MISSING, .program = "cc" } },
-    },
-  },
-  {
-    .name = "missing_linker",
-    .programs = { .linker = "ld" },
-    .files = STANDARD_FILES,
-    .actions = {
-      { .kind = PROBE_ACTION_PROBE, .probe = { .err = SPN_ERR_TOOLCHAIN_MISSING, .program = "ld" } },
+      { .kind = PROBE_ACTION_PROBE, .probe = { .err = SPN_ERR_TOOLCHAIN_MISSING, .missing = PROBE_PROGRAM_COMPILER } },
     },
   },
   {
     .name = "missing_archiver",
     .files = { { "A/cc" }, { "A/c++" } },
     .actions = {
-      { .kind = PROBE_ACTION_PROBE, .probe = { .err = SPN_ERR_TOOLCHAIN_MISSING, .program = "ar" } },
+      { .kind = PROBE_ACTION_PROBE, .probe = { .err = SPN_ERR_TOOLCHAIN_MISSING, .missing = PROBE_PROGRAM_ARCHIVER } },
     },
   },
   {
@@ -134,28 +134,54 @@ static const test_t tests [] = {
     .expect = { .entries = 2 },
   },
   {
-    .name = "absolute_program_bypasses_search",
-    .programs = { .compiler = "B/cc", .linker = "B/cc", .archiver = "B/ar", .cxx = "B/c++" },
+    .name = "absolute_path_program",
+    .programs = { .compiler = { .path = "B/cc" }, .archiver = { .path = "B/ar" }, .cxx = { .path = "B/c++" } },
     .files = { { "B/cc" }, { "B/ar" }, { "B/c++" } },
     .actions = {
-      { .kind = PROBE_ACTION_PROBE, .probe = { .slot = 1, .resolved = { "B/cc", "B/cc", "B/ar", "B/c++" } } },
+      { .kind = PROBE_ACTION_PROBE, .probe = { .slot = 1, .resolved = { { "B/cc" }, { "B/ar" }, { "B/c++" } } } },
     },
     .expect = { .entries = 3 },
   },
   {
-    .name = "absolute_program_missing",
-    .programs = { .compiler = "B/cc" },
+    .name = "absolute_path_program_missing",
+    .programs = { .compiler = { .path = "B/cc" } },
     .files = STANDARD_FILES,
     .actions = {
-      { .kind = PROBE_ACTION_PROBE, .probe = { .err = SPN_ERR_TOOLCHAIN_MISSING, .program = "B/cc" } },
+      { .kind = PROBE_ACTION_PROBE, .probe = { .err = SPN_ERR_TOOLCHAIN_MISSING, .missing = PROBE_PROGRAM_COMPILER } },
     },
+  },
+  {
+    .name = "project_path_program",
+    .programs = { .compiler = { .path = "B/cc", .root = SPN_PATH_ROOT_PROJECT } },
+    .files = { { "P/B/cc" }, { "A/ar" }, { "A/c++" } },
+    .actions = {
+      { .kind = PROBE_ACTION_PROBE, .probe = { .slot = 1, .resolved = { { "B/cc", SPN_PATH_ROOT_PROJECT }, { "A/ar" }, { "A/c++" } } } },
+    },
+    .expect = { .entries = 3 },
+  },
+  {
+    .name = "project_path_program_missing",
+    .programs = { .compiler = { .path = "B/cc", .root = SPN_PATH_ROOT_PROJECT } },
+    .files = STANDARD_FILES,
+    .actions = {
+      { .kind = PROBE_ACTION_PROBE, .probe = { .err = SPN_ERR_TOOLCHAIN_MISSING, .missing = PROBE_PROGRAM_COMPILER } },
+    },
+  },
+  {
+    .name = "archiver_beside_compiler",
+    .programs = { .compiler = { .path = "B/cc" } },
+    .files = { { "B/cc" }, { "B/ar" }, { "A/ar" }, { "A/c++" } },
+    .actions = {
+      { .kind = PROBE_ACTION_PROBE, .probe = { .slot = 1, .resolved = { { "B/cc" }, { "B/ar" }, { "A/c++" } } } },
+    },
+    .expect = { .entries = 3 },
   },
   {
     .name = "first_dir_wins",
     .files = { { "A/cc", "1" }, { "B/cc", "2" }, { "A/ar" }, { "B/ar" }, { "A/c++" }, { "B/c++" } },
     .actions = {
-      { .kind = PROBE_ACTION_PROBE, .probe = { .slot = 1, .dirs = { "A", "B" }, .resolved = { "A/cc" } } },
-      { .kind = PROBE_ACTION_PROBE, .probe = { .slot = 2, .dirs = { "B", "A" }, .resolved = { "B/cc" } } },
+      { .kind = PROBE_ACTION_PROBE, .probe = { .slot = 1, .dirs = { "A", "B" }, .resolved = { { "A/cc" } } } },
+      { .kind = PROBE_ACTION_PROBE, .probe = { .slot = 2, .dirs = { "B", "A" }, .resolved = { { "B/cc" } } } },
       { .kind = PROBE_ACTION_PROBE, .probe = { .slot = 3, .dirs = { "A" } } },
     },
     .expect = {
@@ -167,7 +193,7 @@ static const test_t tests [] = {
     .name = "later_dir_is_searched",
     .files = { { "A/cc" }, { "B/ar" }, { "B/c++" } },
     .actions = {
-      { .kind = PROBE_ACTION_PROBE, .probe = { .slot = 1, .dirs = { "A", "B" }, .resolved = { "A/cc", "A/cc", "B/ar", "B/c++" } } },
+      { .kind = PROBE_ACTION_PROBE, .probe = { .slot = 1, .dirs = { "A", "B" }, .resolved = { { "A/cc" }, { "B/ar" }, { "B/c++" } } } },
     },
     .expect = { .entries = 3 },
   },
@@ -229,29 +255,41 @@ static const test_t tests [] = {
     .actions = {
       { .kind = PROBE_ACTION_PROBE, .probe = { .slot = 1 } },
       { .kind = PROBE_ACTION_REMOVE, .file = { "A/cc" } },
-      { .kind = PROBE_ACTION_PROBE, .probe = { .err = SPN_ERR_TOOLCHAIN_MISSING, .program = "cc" } },
+      { .kind = PROBE_ACTION_PROBE, .probe = { .err = SPN_ERR_TOOLCHAIN_MISSING, .missing = PROBE_PROGRAM_COMPILER } },
     },
   },
 };
 
-static bool is_absolute(const c8* program) {
-  return sp_str_find_c8(sp_cstr_as_str(program), '/') >= 0;
-}
-
-static sp_str_t file_path(sp_mem_t mem, sp_str_t root, const c8* spec) {
-  sp_str_t path = sp_fs_join_path(mem, root, sp_cstr_as_str(spec));
+static sp_str_t exe(sp_mem_t mem, sp_str_t path) {
   return sp_fmt(mem, "{}" PROBE_EXE, sp_fmt_str(path)).value;
 }
 
-static sp_str_t program_str(sp_mem_t mem, sp_str_t root, const c8* program) {
-  if (is_absolute(program)) {
-    return sp_fs_join_path(mem, root, sp_cstr_as_str(program));
-  }
-  return sp_cstr_as_str(program);
+static sp_str_t file_path(sp_mem_t mem, sp_str_t root, const c8* spec) {
+  return exe(mem, sp_fs_join_path(mem, root, sp_cstr_as_str(spec)));
 }
 
-static spn_toolchain_launcher_t launcher(sp_mem_t mem, sp_str_t root, const c8* program) {
-  return (spn_toolchain_launcher_t) { .program = spn_arg_lit(program_str(mem, root, program)) };
+static test_arg_t resolved_arg(sp_mem_t mem, sp_str_t root, resolved_t resolved) {
+  sp_str_t sub = resolved.root == SPN_PATH_ROOT_NONE ? file_path(mem, root, resolved.path) : exe(mem, sp_cstr_as_str(resolved.path));
+  return (test_arg_t) { .path = sp_str_to_cstr(mem, sub), .root = resolved.root };
+}
+
+static spn_arg_t missing_program(const spn_cc_toolchain_t* cc, program_slot_t slot) {
+  switch (slot) {
+    case PROBE_PROGRAM_COMPILER: return cc->compiler.program;
+    case PROBE_PROGRAM_ARCHIVER: return cc->archiver.program;
+    case PROBE_PROGRAM_NONE: sp_unreachable_case();
+  }
+  sp_unreachable_return(sp_zero_struct(spn_arg_t));
+}
+
+static spn_toolchain_launcher_t launcher(sp_mem_t mem, sp_str_t root, fixture_launcher_t spec, const c8* fallback) {
+  if (spec.path && spec.root == SPN_PATH_ROOT_NONE) {
+    spec.path = sp_str_to_cstr(mem, sp_fs_join_path(mem, root, sp_cstr_as_str(spec.path)));
+  }
+  if (!spec.path && !spec.name) {
+    spec.name = fallback;
+  }
+  return (spn_toolchain_launcher_t) { .program = fixture_arg(spec) };
 }
 
 static void write_file(sp_mem_t mem, sp_str_t root, file_t file) {
@@ -259,7 +297,7 @@ static void write_file(sp_mem_t mem, sp_str_t root, file_t file) {
   sp_fs_create_file_str(file_path(mem, root, file.path), content);
 }
 
-static sp_da(sp_str_t) search_dirs(sp_mem_t mem, sp_str_t root, const c8* const* dirs) {
+static sp_str_t search_path(sp_mem_t mem, sp_str_t root, const c8* const* dirs) {
   sp_da(sp_str_t) result = sp_da_new(mem, sp_str_t);
   bool any = false;
   sp_for(it, PROBE_MAX_DIRS) {
@@ -272,20 +310,19 @@ static sp_da(sp_str_t) search_dirs(sp_mem_t mem, sp_str_t root, const c8* const*
   if (!any) {
     sp_da_push(result, sp_fs_join_path(mem, root, sp_str_lit("A")));
   }
-  return result;
+  c8 sep = spn_search_rules(spn_triple_host().os).sep;
+  return sp_str_join_n(mem, result, sp_da_size(result), sp_str(&sep, 1));
 }
 
 static spn_cc_toolchain_t make_cc(sp_mem_t mem, sp_str_t root, const test_t* it) {
-  const c8* compiler = it->programs.compiler ? it->programs.compiler : "cc";
   spn_cc_toolchain_t cc = {
     .name = sp_str_lit("A"),
-    .driver = SPN_CC_DRIVER_GCC,
-    .compiler = launcher(mem, root, compiler),
-    .linker = launcher(mem, root, it->programs.linker ? it->programs.linker : compiler),
-    .archiver = launcher(mem, root, it->programs.archiver ? it->programs.archiver : "ar"),
+    .driver = SPN_CC_DRIVER_CLANG,
+    .compiler = launcher(mem, root, it->programs.compiler, "cc"),
+    .archiver = launcher(mem, root, it->programs.archiver, "ar"),
   };
   if (!it->programs.no_cxx) {
-    cc.cxx = launcher(mem, root, it->programs.cxx ? it->programs.cxx : "c++");
+    cc.cxx = launcher(mem, root, it->programs.cxx, "c++");
   }
   return cc;
 }
@@ -293,8 +330,11 @@ static spn_cc_toolchain_t make_cc(sp_mem_t mem, sp_str_t root, const test_t* it)
 sp_test_each(probe, resolve, test_t, tests, .setup = spn_test_ctx_setup) {
   sp_mem_t mem = sp_test_arena(t);
   sp_str_t root = sp_test_dir(t);
+  spn_path_roots_t roots = sp_zero;
+  spn_path_roots_set(&roots, mem, SPN_PATH_ROOT_PROJECT, sp_fs_join_path(mem, root, sp_str_lit("P")));
   sp_fs_create_dir(sp_fs_join_path(mem, root, sp_str_lit("A")));
   sp_fs_create_dir(sp_fs_join_path(mem, root, sp_str_lit("B")));
+  sp_fs_create_dir(sp_fs_join_path(mem, root, sp_str_lit("P/B")));
 
   sp_carr_for(it->files, at) {
     if (!it->files[at].path) {
@@ -343,26 +383,36 @@ sp_test_each(probe, resolve, test_t, tests, .setup = spn_test_ctx_setup) {
         break;
       }
       case PROBE_ACTION_PROBE: {
-        spn_cc_toolchain_t cc = make_cc(mem, root, it);
+        spn_cc_toolchain_t declared = make_cc(mem, root, it);
+        spn_cc_toolchain_t cc = declared;
         sp_hash_t identity = sp_zero;
-        spn_err_t err = spn_toolchain_probe(&cc, search_dirs(mem, root, action.probe.dirs), &cache, mem, &identity);
+        spn_err_t err = spn_toolchain_probe(&cc, &roots, spn_search_rules(spn_triple_host().os), search_path(mem, root, action.probe.dirs), &cache, mem, &identity);
         sp_must_eq(t, (u32)action.probe.err, (u32)err);
         if (err) {
           sp_da(spn_event_t) errs = spn_test_drain_errs(mem);
           sp_must_eq(t, 1, sp_da_size(errs));
           sp_expect_eq(t, errs[0].err.kind, action.probe.err);
           sp_expect_str_eq_c(t, errs[0].err.program.name, "A");
-          sp_expect_str_eq(t, errs[0].err.program.program, program_str(mem, root, action.probe.program));
+          sp_expect_str_eq(t, errs[0].err.program.program, spn_arg_str(&roots, mem, missing_program(&declared, action.probe.missing)));
           break;
         }
         sp_expect(t, identity != 0);
         sp_expect_eq(t, action.probe.cxx_dropped || it->programs.no_cxx, spn_arg_empty(cc.cxx.program));
-        const spn_toolchain_launcher_t* launchers [PROBE_MAX_PROGRAMS] = { &cc.compiler, &cc.linker, &cc.archiver, &cc.cxx };
-        sp_carr_for(action.probe.resolved, pt) {
-          if (!action.probe.resolved[pt]) {
+        const spn_arg_t* programs [PROBE_MAX_PROGRAMS] = { &cc.compiler.program, &cc.archiver.program, &cc.cxx.program };
+        sp_carr_for(programs, pt) {
+          if (spn_arg_empty(*programs[pt])) {
             continue;
           }
-          sp_expect_str_eq(t, launchers[pt]->program.prefix, file_path(mem, root, action.probe.resolved[pt]));
+          sp_expect(t, sp_str_empty(programs[pt]->prefix));
+          sp_expect(t, !spn_path_empty(programs[pt]->path));
+        }
+        sp_carr_for(action.probe.resolved, pt) {
+          if (!action.probe.resolved[pt].path) {
+            continue;
+          }
+          if (test_check_arg(t, *programs[pt], resolved_arg(mem, root, action.probe.resolved[pt]))) {
+            return SP_ERR;
+          }
         }
         if (action.probe.slot) {
           slots[action.probe.slot] = identity;
@@ -393,22 +443,3 @@ sp_test_each(probe, resolve, test_t, tests, .setup = spn_test_ctx_setup) {
   return SP_OK;
 }
 
-
-typedef struct {
-  const c8* name;
-  const c8* path;
-  const c8* expect [PROBE_MAX_SPLIT];
-} split_t;
-
-static const split_t split_tests [] = {
-  { "single", "A", { "A" } },
-  { "two", "A" PROBE_SEP "B", { "A", "B" } },
-  { "empty_entries_dropped", PROBE_SEP "A" PROBE_SEP PROBE_SEP "B" PROBE_SEP, { "A", "B" } },
-  { "empty", "" },
-};
-
-sp_test_each(probe, split_path, split_t, split_tests) {
-  sp_da(sp_str_t) dirs = spn_probe_split_path(sp_test_arena(t), sp_cstr_as_str(it->path));
-  sp_must_strs_eq(t, dirs, sp_da_size(dirs), it->expect);
-  return SP_OK;
-}

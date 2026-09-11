@@ -17,6 +17,7 @@ spn_path_t      spn_path_make(const spn_path_roots_t* roots, sp_str_t path);
 spn_path_t      spn_path_from_root(spn_path_root_t root);
 spn_path_t      spn_path_copy(sp_mem_t mem, spn_path_t path);
 spn_path_t      spn_path_join(sp_mem_t mem, spn_path_t base, sp_str_t sub);
+spn_path_t      spn_path_parent(spn_path_t path);
 spn_path_t      spn_path_suffix(sp_mem_t mem, spn_path_t path, sp_str_t suffix);
 sp_str_t        spn_path_str(const spn_path_roots_t* roots, sp_mem_t mem, spn_path_t path);
 bool            spn_path_empty(spn_path_t path);
@@ -31,6 +32,7 @@ spn_path_root_set_t spn_path_pinned_roots();
 spn_arg_t       spn_arg_lit(sp_str_t value);
 spn_arg_t       spn_arg_path(spn_path_t path);
 spn_arg_t       spn_arg_glue(sp_str_t prefix, spn_path_t path);
+spn_arg_t       spn_arg_prepend(sp_mem_t mem, sp_str_t prefix, spn_arg_t arg);
 bool            spn_arg_empty(spn_arg_t arg);
 sp_str_t        spn_arg_str(const spn_path_roots_t* roots, sp_mem_t mem, spn_arg_t arg);
 

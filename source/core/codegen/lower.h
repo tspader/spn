@@ -2,10 +2,12 @@
 #define SPN_CODEGEN_LOWER_H
 
 #include "codegen/codegen.h"
+#include "codegen/toolchain.h"
 #include "sp.h"
 #include "spn/core.h"
 #include "index/types.h"
 #include "spn/types.h"
+#include "common.gen.h"
 #include "manifest.gen.h"
 #include "pkg/types.h"
 

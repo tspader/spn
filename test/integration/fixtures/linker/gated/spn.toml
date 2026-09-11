@@ -1,0 +1,8 @@
+[package]
+name = "linker_gated"
+version = "0.1.0"
+
+[[bin]]
+name = "main"
+source = ["main.c"]
+link_flags = [{ value = "-lmissing", when = { linker = "lld" } }]

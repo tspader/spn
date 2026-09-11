@@ -1,0 +1,5 @@
+[[toolchain]]
+name = "T"
+driver = "zig"
+compiler = "/Q"
+archiver = "/Q"

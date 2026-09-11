@@ -16,6 +16,7 @@ add_executable(fuzz_resolver
   ${SRC}/codegen/options.c
   ${SRC}/codegen/when.c
   ${SRC}/codegen/lower.c
+  ${SRC}/codegen/toolchain.c
   ${SRC}/git/key.c
   ${SRC}/git/url.c
   ${SRC}/git/patch.c
@@ -23,7 +24,7 @@ add_executable(fuzz_resolver
   ${SRC}/hash/sha256/sha256.c
   ${SRC}/when/when.c
   ${SRC}/toolchain/catalog.c
-  ${SRC}/codegen/gen/toolchains.gen.c
+  ${SRC}/toolchain/linker.c
   ${SRC}/codegen/gen/config.gen.c
   ${SRC}/codegen/gen/errors.gen.c
   ${SRC}/codegen/gen/events.gen.c
@@ -43,6 +44,7 @@ add_executable(fuzz_resolver
   ${SRC}/profile/profile.c
   ${SRC}/pkg/load.c
   ${SRC}/triple/triple.c
+  ${SRC}/elf/elf.c
   ${SRC}/resolve/resolve.c
   ${UTIL}/str/str.c
   ${SRC}/semver/compare.c
@@ -51,6 +53,8 @@ add_executable(fuzz_resolver
   ${SRC}/target/mutate.c
   ${SRC}/target/select.c
   ${SRC}/toolchain/toolchain.c
+  ${SRC}/toolchain/sdk.c
+  ${UTIL}/sp/sp_msvc.c
   main.c
   generator.c
   oracles/exhaustive.c

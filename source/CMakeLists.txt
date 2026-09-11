@@ -22,6 +22,7 @@ set(SPN_SOURCES
   core/codegen/loader.c
   core/codegen/json.c
   core/codegen/lower.c
+  core/codegen/toolchain.c
   core/codegen/options.c
   core/codegen/when.c
   core/compiler/driver.c
@@ -118,6 +119,7 @@ set(SPN_SOURCES
   util/sp/sp_cli.c
   util/sp_elf/sp_elf.c
   util/sp/sp_glob.c
+  util/sp/sp_msvc.c
   util/sp/sp_math.c
   util/sp_template/sp_template.c
   util/str/str.c
@@ -128,11 +130,16 @@ set(SPN_SOURCES
   core/toml/edit.c
   core/pkg/load.c
   core/toolchain/catalog.c
+  core/toolchain/linker.c
   core/toolchain/probe.c
+  core/toolchain/search.c
   core/toolchain/provision.c
   core/toolchain/select.c
   core/toolchain/toolchain.c
+  core/toolchain/sdk.c
+  core/toolchain/libc.c
   core/triple/triple.c
+  core/elf/elf.c
   cli/tui/tui.c
   core/unit/build.c
   core/unit/fingerprint.c
@@ -151,7 +158,6 @@ add_executable(spn ${SPN_SOURCES}
   ${SRC}/codegen/gen/manifest.gen.c
   ${SRC}/codegen/gen/release.gen.c
   ${SRC}/codegen/gen/source_deps.gen.c
-  ${SRC}/codegen/gen/toolchains.gen.c
   ${SRC}/codegen/gen/abi.gen.c
   )
 target_include_directories(spn PRIVATE

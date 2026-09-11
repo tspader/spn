@@ -7,10 +7,6 @@
 #include "source_deps.gen.h"
 #include "macro/macro.h"
 
-spn_sanitizer_set_t spn_msvc_supported_sanitizers(spn_triple_t target) {
-  return target.os == SPN_OS_WINDOWS && target.abi == SPN_ABI_MSVC && target.arch == SPN_ARCH_X64 ? SPN_SANITIZER_ADDRESS : 0;
-}
-
 static sp_str_t opt_switch(spn_opt_level_t level) {
   switch (level) {
     case SPN_OPT_LEVEL_0: return sp_str_lit("/Od");
@@ -40,7 +36,6 @@ static sp_str_t c_standard_switch(spn_c_standard_t standard) {
 
 static sp_str_t cxx_standard_switch(spn_cxx_standard_t standard) {
   switch (standard) {
-    // cl bottoms out at c++14
     case SPN_CXX11:
     case SPN_CXX14: return sp_str_lit("/std:c++14");
     case SPN_CXX17: return sp_str_lit("/std:c++17");
@@ -71,27 +66,67 @@ void spn_msvc_render_flags(sp_mem_t mem, const spn_profile_info_t* profile, spn_
   }
 }
 
-static void add_launcher(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, spn_lang_t lang, spn_invocation_t* invocation) {
-  spn_toolchain_launcher_t launcher = lang == SPN_LANG_CXX ? toolchain->cxx : toolchain->compiler;
+static void add_sdk_compile(sp_mem_t mem, const spn_sdk_msvc_t* sdk, spn_invocation_t* invocation) {
+  spn_path_t includes [] = { sdk->include.vc, sdk->include.ucrt, sdk->include.um, sdk->include.shared };
+  sp_carr_for(includes, it) {
+    spn_cc_push_glued(mem, invocation, "/I", includes[it]);
+  }
+  spn_cc_push_env_paths(mem, invocation, SPN_ENV_INCLUDE, includes, sp_carr_len(includes));
+}
+
+static void add_sdk_link(sp_mem_t mem, const spn_sdk_msvc_t* sdk, spn_invocation_t* invocation) {
+  spn_path_t libs [] = { sdk->lib.vc, sdk->lib.ucrt, sdk->lib.um };
+  spn_cc_push_env_paths(mem, invocation, SPN_ENV_LIB, libs, sp_carr_len(libs));
+}
+
+static spn_path_t sdk_bin(const spn_profile_info_t* profile) {
+  return profile->sdk.kind == SPN_SDK_MSVC ? profile->sdk.msvc.bin : sp_zero_struct(spn_path_t);
+}
+
+static spn_arg_t program(sp_mem_t mem, const spn_profile_info_t* profile, spn_toolchain_launcher_t launcher, sp_str_t name) {
   sp_assert(!spn_arg_empty(launcher.program));
-  invocation->program = launcher.program;
+  spn_path_t bin = sdk_bin(profile);
+  return spn_path_empty(bin) ? launcher.program : spn_arg_path(spn_path_join(mem, bin, name));
+}
+
+static void add_launcher(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, spn_lang_t lang, spn_invocation_t* invocation) {
+  spn_toolchain_launcher_t launcher = lang == SPN_LANG_CXX ? toolchain->cxx : toolchain->compiler;
+  invocation->program = program(mem, profile, launcher, sp_str_lit("cl.exe"));
   spn_cc_push_strs(mem, invocation, launcher.args);
   invocation->launcher = sp_da_size(invocation->args);
   spn_cc_push_c(mem, invocation, "/nologo");
 }
 
+static sp_str_t assembler_name(spn_arch_t arch) {
+  switch (arch) {
+    case SPN_ARCH_X64: return sp_str_lit("ml64.exe");
+    case SPN_ARCH_ARM64: return sp_str_lit("armasm64.exe");
+    case SPN_ARCH_WASM32:
+    case SPN_ARCH_NONE: {
+      sp_unreachable_case();
+    }
+  }
+  sp_unreachable_return(sp_str_lit(""));
+}
+
+static spn_arg_t assembler(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile) {
+  spn_path_t bin = sdk_bin(profile);
+  if (spn_path_empty(bin)) {
+    spn_path_t compiler = toolchain->compiler.program.path;
+    sp_assert(!spn_path_empty(compiler));
+    bin = spn_path_parent(compiler);
+  }
+  return spn_arg_path(spn_path_join(mem, bin, assembler_name(profile->arch)));
+}
+
 void spn_msvc_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_compile_t* compile, spn_invocation_t* invocation) {
   if (compile->lang == SPN_LANG_ASM) {
-    // cl neither assembles nor errors on assembly sources; it warns and
-    // exits zero, so these must go to MASM directly
-    invocation->program = spn_arg_lit(sp_str_lit("ml64"));
+    invocation->program = assembler(mem, toolchain, profile);
     spn_cc_push_c(mem, invocation, "/nologo");
     spn_cc_push_c(mem, invocation, "/c");
     return;
   }
-  add_launcher(mem, toolchain, compile->lang, invocation);
-  // cl reads sources in the system ANSI codepage by default; non-ASCII
-  // string literals are mangled without this
+  add_launcher(mem, toolchain, profile, compile->lang, invocation);
   spn_cc_push_c(mem, invocation, "/utf-8");
   spn_cc_push_c(mem, invocation, "/Brepro");
   spn_cc_flags_t flags = sp_zero;
@@ -109,6 +144,9 @@ void spn_msvc_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, 
   sp_da_for(compile->include, it) {
     spn_cc_push_glued(mem, invocation, "/I", compile->include[it]);
   }
+  if (profile->sdk.kind == SPN_SDK_MSVC) {
+    add_sdk_compile(mem, &profile->sdk.msvc, invocation);
+  }
   sp_da_for(compile->define, it) {
     spn_cc_push_fmt(mem, invocation, "/D{}", sp_fmt_str(compile->define[it]));
   }
@@ -120,8 +158,6 @@ void spn_msvc_render_compile(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, 
       spn_cc_push_c(mem, invocation, "/GR-");
     }
   }
-  // PIC and symbol visibility have no cl equivalents; code is always
-  // relocatable and symbols are hidden unless exported
   spn_cc_push_strs(mem, invocation, compile->args);
   // Parity with -Werror=return-type: C4715 is "not all control paths
   // return a value"
@@ -152,7 +188,7 @@ spn_err_t spn_msvc_parse_depfile(sp_mem_t mem, sp_str_t content, sp_da(sp_str_t)
 }
 
 void spn_msvc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_link_t* link, const spn_cc_link_files_t* files, spn_invocation_t* invocation) {
-  add_launcher(mem, toolchain, link->lang, invocation);
+  add_launcher(mem, toolchain, profile, link->lang, invocation);
   spn_cc_flags_t flags = sp_zero;
   sp_da_init(mem, flags.compile);
   sp_da_init(mem, flags.link);
@@ -184,8 +220,10 @@ void spn_msvc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, con
     spn_cc_push_fmt(mem, invocation, "{}.lib", sp_fmt_str(link->system_libs[it]));
   }
   spn_cc_push_glued(mem, invocation, "/Fe", files->output);
+  if (profile->sdk.kind == SPN_SDK_MSVC) {
+    add_sdk_link(mem, &profile->sdk.msvc, invocation);
+  }
 
-  // Everything past /link goes to link.exe verbatim
   sp_da(spn_arg_t) linker = sp_da_new(mem, spn_arg_t);
   if (profile->mode == SPN_MODE_DEBUG) {
     sp_da_push(linker, spn_arg_lit(sp_str_lit("/DEBUG")));
@@ -201,6 +239,13 @@ void spn_msvc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, con
   }
   if (link->kind == SPN_CC_OUTPUT_EXE && link->subsystem == SPN_WIN_SUBSYSTEM_WINDOWS) {
     sp_da_push(linker, spn_arg_lit(sp_str_lit("/SUBSYSTEM:WINDOWS")));
+    sp_da_push(linker, spn_arg_lit(sp_str_lit("/ENTRY:mainCRTStartup")));
+  }
+  sp_da_for(toolchain->link_args, it) {
+    sp_da_push(linker, spn_arg_lit(toolchain->link_args[it]));
+  }
+  sp_da_for(link->args, it) {
+    sp_da_push(linker, spn_arg_lit(link->args[it]));
   }
 
   if (!sp_da_empty(linker)) {
@@ -209,8 +254,8 @@ void spn_msvc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, con
   }
 }
 
-void spn_msvc_render_archive(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_cc_archive_files_t* files, spn_invocation_t* invocation) {
-  invocation->program = toolchain->archiver.program;
+void spn_msvc_render_archive(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_archive_files_t* files, spn_invocation_t* invocation) {
+  invocation->program = program(mem, profile, toolchain->archiver, sp_str_lit("lib.exe"));
   spn_cc_push_strs(mem, invocation, toolchain->archiver.args);
   invocation->launcher = sp_da_size(invocation->args);
   spn_cc_push_c(mem, invocation, "/nologo");

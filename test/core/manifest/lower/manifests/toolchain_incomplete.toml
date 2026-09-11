@@ -4,7 +4,6 @@ version = "1.0.0"
 
 [[toolchain]]
 name = "zig"
-linker = "ld"
 archiver = "ar"
 driver = "clang"
 target = [{ arch = "x86_64", os = "linux", abi = "gnu" }]

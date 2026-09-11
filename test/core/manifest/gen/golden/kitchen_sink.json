@@ -82,7 +82,6 @@
     {
       "name": "host-gcc",
       "compiler": "gcc",
-      "linker": "ld",
       "archiver": "ar",
       "driver": "gcc",
       "target": [

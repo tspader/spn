@@ -1,7 +1,9 @@
 add_executable(core
   tools/ctx.c
+  tools/elf_emit.c
   tools/main/sim.c
   drain.c
+  elf.c
   fs.c
   filter.c
   wake.c
@@ -9,8 +11,8 @@ add_executable(core
   identity.c
   intern.c
   lazy.c
-  os.c
   stable_map.c
+  str.c
   triple.c
   version.c
   when.c
@@ -22,6 +24,7 @@ add_executable(core
   closure/runtime.c
   closure/siblings.c
   compiler/harness.c
+  compiler/invocation.c
   compiler/archive.c
   compiler/compile.c
   compiler/depfile.c
@@ -34,6 +37,7 @@ add_executable(core
   compiler/rsp/style.c
   compiler/rsp/windows.c
   compiler/toc.c
+  config/config.c
   dag/harness.c
   dag/action_cache.c
   dag/canonicalize.c
@@ -123,9 +127,22 @@ add_executable(core
   toml/set.c
   toolchain/builtins.c
   toolchain/catalog.c
+  toolchain/driver.c
+  toolchain/linker.c
   toolchain/parse.c
+  toolchain/path.c
   toolchain/probe.c
+  toolchain/program.c
   toolchain/provision.c
+  toolchain/sdk.c
+  toolchain/sdk_detect.c
+  toolchain/sdk_hash.c
+  toolchain/sdk_libc.c
+  toolchain/sdk_msvc.c
+  toolchain/sdk_root.c
+  toolchain/sdk_serve.c
+  toolchain/sdk_wasi.c
+  toolchain/search.c
   toolchain/select.c
   toolchain/sha256.c
   toolchain/toolchain.c
@@ -134,6 +151,7 @@ add_executable(core
   unit/link_plan.c
   unit/objects.c
   unit/paths.c
+  unit/fingerprint.c
   unit/clone.c
   ${CMAKE_SOURCE_DIR}/tools/jtd.c
   ${CMAKE_SOURCE_DIR}/tools/gen/lower.c
@@ -142,6 +160,7 @@ add_executable(core
   ${SRC}/codegen/loader.c
   ${SRC}/codegen/json.c
   ${SRC}/codegen/lower.c
+  ${SRC}/codegen/toolchain.c
   ${SRC}/codegen/options.c
   ${SRC}/codegen/when.c
   ${SRC}/codegen/gen/config.gen.c
@@ -150,7 +169,6 @@ add_executable(core
   ${SRC}/codegen/gen/manifest.gen.c
   ${SRC}/codegen/gen/release.gen.c
   ${SRC}/codegen/gen/source_deps.gen.c
-  ${SRC}/codegen/gen/toolchains.gen.c
   ${SRC}/compiler/driver.c
   ${SRC}/compiler/exports.c
   ${SRC}/compiler/gnu.c
@@ -226,10 +244,16 @@ add_executable(core
   ${SRC}/pkg/load.c
   ${SRC}/toolchain/catalog.c
   ${SRC}/toolchain/probe.c
+  ${SRC}/toolchain/search.c
   ${SRC}/toolchain/provision.c
   ${SRC}/toolchain/select.c
   ${SRC}/toolchain/toolchain.c
+  ${SRC}/toolchain/sdk.c
+  ${SRC}/toolchain/libc.c
+  ${UTIL}/sp/sp_msvc.c
+  ${SRC}/toolchain/linker.c
   ${SRC}/triple/triple.c
+  ${SRC}/elf/elf.c
   ${SRC}/unit/build.c
   ${SRC}/unit/fingerprint.c
   ${SRC}/unit/graph.c
@@ -266,11 +290,26 @@ set_source_files_properties(jtd/harness.c jtd/conformance.c PROPERTIES COMPILE_D
   "JTD_TEST_JSON_DIR=\"test/core/jtd/json\"")
 set_source_files_properties(manifest/lower/lower.c PROPERTIES COMPILE_DEFINITIONS
   "MANIFEST_DIR=\"test/core/manifest/lower/manifests\"")
+set_source_files_properties(config/config.c PROPERTIES COMPILE_DEFINITIONS
+  "CONFIG_DIR=\"test/core/config/configs\"")
 set_source_files_properties(
   toolchain/builtins.c
   toolchain/catalog.c
+  toolchain/driver.c
+  toolchain/linker.c
   toolchain/parse.c
+  toolchain/path.c
   toolchain/probe.c
+  toolchain/program.c
+  toolchain/sdk.c
+  toolchain/sdk_detect.c
+  toolchain/sdk_hash.c
+  toolchain/sdk_libc.c
+  toolchain/sdk_msvc.c
+  toolchain/sdk_root.c
+  toolchain/sdk_serve.c
+  toolchain/sdk_wasi.c
+  toolchain/search.c
   toolchain/provision.c
   toolchain/select.c
   toolchain/sha256.c

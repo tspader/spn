@@ -6,20 +6,23 @@
 #include "compiler/driver.h"
 #include "external/cc.h"
 #include "paths/paths.h"
+#include "profile/types.h"
 #include "session/invocation.h"
 #include "session/session.h"
 #include "unit/unit.h"
 #include "graph/build.h"
+#include "toolchain/search.h"
 #include "triple/triple.h"
 
 static spn_cc_compile_t compile_desc(sp_mem_t mem, spn_compile_unit_t* unit) {
   spn_pkg_unit_t* pkg = unit->target->pkg;
   spn_build_unit_t* build = pkg->build;
 
+  spn_triple_t target = spn_profile_triple(&build->profile);
   spn_cc_compile_t compile = {
     .lang = unit->lang,
     .cxx = unit->target->info->cxx,
-    .pic = unit->target->info->kind == SPN_TARGET_KIND_LIB && spn_os_dynamic(build->profile.os),
+    .pic = unit->target->info->kind == SPN_TARGET_KIND_LIB && spn_triple_pic(target),
   };
   if (build->profile.os == SPN_OS_MACOS) {
     compile.min_os = unit->target->link.cc.min_os;
@@ -80,7 +83,7 @@ spn_err_t spn_build_render_compile(sp_mem_t mem, spn_compile_unit_t* unit, spn_i
   spn_build_unit_t* build = pkg->build;
 
   spn_cc_compile_t compile = compile_desc(mem, unit);
-  spn_try(spn_cc_render_compile(mem, &build->toolchain->cc, &build->profile, &compile, invocation));
+  spn_cc_render_compile(mem, &build->toolchain->cc, &build->profile, &compile, invocation);
   invocation->cwd = pkg->paths.work;
   return SPN_OK;
 }
@@ -151,9 +154,39 @@ sp_da(sp_str_t) spn_invocation_args(const spn_path_roots_t* roots, sp_mem_t mem,
   return args;
 }
 
+typedef struct {
+  sp_str_t name;
+  sp_str_t separator;
+} env_key_t;
+
+static env_key_t env_key(spn_env_key_t key) {
+  switch (key) {
+    case SPN_ENV_INCLUDE: return (env_key_t) { sp_str_lit("INCLUDE"), sp_str_lit(";") };
+    case SPN_ENV_LIB: return (env_key_t) { sp_str_lit("LIB"), sp_str_lit(";") };
+    case SPN_ENV_ZIG_LIBC: return (env_key_t) { sp_str_lit("ZIG_LIBC"), sp_str_lit("") };
+  }
+  sp_unreachable_return(sp_zero_struct(env_key_t));
+}
+
+sp_env_var_t spn_invocation_env_var(const spn_path_roots_t* roots, sp_mem_t mem, spn_invocation_env_t env) {
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch_for(mem);
+  env_key_t key = env_key(env.key);
+  sp_da(sp_str_t) values = sp_da_new(scratch.mem, sp_str_t);
+  sp_da_for(env.values, it) {
+    sp_da_push(values, spn_arg_str(roots, scratch.mem, env.values[it]));
+  }
+  sp_str_t value = sp_str_join_n(mem, values, sp_da_size(values), key.separator);
+  sp_mem_end_scratch(scratch);
+  return (sp_env_var_t) { .key = key.name, .value = value };
+}
+
 sp_str_t spn_invocation_to_str(sp_mem_t mem, const spn_invocation_t* invocation) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch_for(mem);
   sp_da(sp_str_t) parts = sp_da_new(scratch.mem, sp_str_t);
+  sp_da_for(invocation->env, it) {
+    sp_env_var_t var = spn_invocation_env_var(&spn.roots, scratch.mem, invocation->env[it]);
+    sp_da_push(parts, sp_fmt(scratch.mem, "{}={}", sp_fmt_str(var.key), sp_fmt_str(var.value)).value);
+  }
   sp_da_push(parts, spn_arg_str(&spn.roots, scratch.mem, invocation->program));
   sp_da_for(invocation->args, it) {
     sp_da_push(parts, spn_arg_str(&spn.roots, scratch.mem, invocation->args[it]));
@@ -162,6 +195,16 @@ sp_str_t spn_invocation_to_str(sp_mem_t mem, const spn_invocation_t* invocation)
   sp_str_t command = sp_str_join_n(mem, parts, sp_da_size(parts), sp_str_lit(" "));
   sp_mem_end_scratch(scratch);
   return command;
+}
+
+static sp_env_var_t path_var(sp_mem_t mem, sp_str_t program) {
+  sp_assert(sp_fs_is_absolute(program));
+  spn_search_rules_t rules = spn_search_rules(spn.host.os);
+  sp_str_t path = sp_env_get(spn.env, sp_str_lit("PATH"));
+  return (sp_env_var_t) {
+    .key = sp_str_lit("PATH"),
+    .value = spn_search_prepend(rules, mem, sp_fs_parent_path(program), path),
+  };
 }
 
 spn_invocation_result_t spn_invocation_run(spn_invocation_t* invocation) {
@@ -180,6 +223,11 @@ spn_invocation_result_t spn_invocation_run(spn_invocation_t* invocation) {
       .err.mode = SP_PS_IO_MODE_REDIRECT,
     }
   };
+  sp_assert(sp_da_size(invocation->env) < SP_PS_MAX_ENV);
+  sp_da_for(invocation->env, it) {
+    ps.env.extra[it] = spn_invocation_env_var(roots, scratch.mem, invocation->env[it]);
+  }
+  ps.env.extra[sp_da_size(invocation->env)] = path_var(scratch.mem, ps.command);
 
   sp_tm_timer_t timer = sp_tm_start_timer();
   sp_ps_output_t result = sp_ps_run(spn.mem, ps);

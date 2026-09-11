@@ -34,6 +34,8 @@ typedef struct {
   const c8* deps [UNIT_TEST_MAX_STRS];
   const c8* system_deps [UNIT_TEST_MAX_STRS];
   const c8* frameworks [UNIT_TEST_MAX_STRS];
+  const c8* link_flags [UNIT_TEST_MAX_STRS];
+  const c8* linker_script [UNIT_TEST_MAX_STRS];
   spn_os_version_t min_os;
 } unit_lib_t;
 
@@ -49,7 +51,8 @@ typedef struct {
 
 typedef struct {
   spn_os_t os; // zero selects linux
-  const c8* sysroot;
+  spn_abi_t abi; // zero selects the os default
+  const c8* sdk;
   unit_pkg_t pkgs [UNIT_TEST_MAX_PKGS]; // pkgs[0] is the root package
 } unit_graph_test_t;
 

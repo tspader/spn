@@ -1,0 +1,6 @@
+[[toolchain]]
+name = "A"
+driver = "gcc"
+compiler = "A"
+archiver = "ar"
+linker = "gnu"

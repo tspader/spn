@@ -4,6 +4,7 @@ sp_test(cxx, static_lib) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cxx/static_lib",
     .copy = { "packages/*" },
+    .when.cxx = true,
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
       { .kind = ACTION_VERIFY_EXISTS, .exists = static_lib("spum") },
@@ -15,7 +16,7 @@ sp_test(cxx, static_lib) {
 sp_test(cxx, shared_lib) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cxx/shared_lib",
-    .when.msvc_todo = true,
+    .when = { .cxx = true, .msvc_todo = true },
     .copy = { "packages/*" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
@@ -29,6 +30,7 @@ sp_test(cxx, mixed_lib) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cxx/mixed_lib",
     .copy = { "packages/*" },
+    .when.cxx = true,
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
       { .kind = ACTION_RUN_BIN, .bin.name = "main" },
@@ -40,6 +42,7 @@ sp_test(cxx, standard) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cxx/standard",
     .copy = { "packages/*" },
+    .when.cxx = true,
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
       { .kind = ACTION_VERIFY_EXISTS, .exists = exe("main") },
@@ -51,6 +54,7 @@ sp_test(cxx, exceptions_off) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cxx/exceptions_off",
     .copy = { "packages/*" },
+    .when.cxx = true,
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
       { .kind = ACTION_VERIFY_EXISTS, .exists = exe("main") },
@@ -62,6 +66,7 @@ sp_test(cxx, rtti_off) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cxx/rtti_off",
     .copy = { "packages/*" },
+    .when.cxx = true,
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
       { .kind = ACTION_VERIFY_EXISTS, .exists = exe("main") },
@@ -72,7 +77,7 @@ sp_test(cxx, rtti_off) {
 sp_test(cxx, static_into_shared) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cxx/static_into_shared",
-    .when.msvc_todo = true,
+    .when = { .cxx = true, .msvc_todo = true },
     .copy = { "packages/*" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
@@ -86,6 +91,7 @@ sp_test(cxx, transitive) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cxx/transitive",
     .copy = { "packages/*" },
+    .when.cxx = true,
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
       { .kind = ACTION_RUN_BIN, .bin.name = "main" },
@@ -96,6 +102,8 @@ sp_test(cxx, transitive) {
 sp_test(cxx, toolchain) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cxx/toolchain",
+    .toolchain = "custom",
+    .when.programs = { "cc", "c++", "ar" },
     .copy = { "packages/*" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
@@ -108,6 +116,7 @@ sp_test(cxx, bin) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cxx/bin",
     .copy = { "main.cpp" },
+    .when.cxx = true,
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
       { .kind = ACTION_RUN_BIN, .bin.name = "main" },
@@ -130,7 +139,8 @@ sp_test(cxx, script_rejected) {
 sp_test(cxx, toolchain_missing) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cxx/toolchain_missing",
-    .when.msvc_todo = true,
+    .toolchain = "conly",
+    .when = { .programs = { "cc", "ar" }, .msvc_todo = true },
     .copy = { "packages/*" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },

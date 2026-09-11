@@ -1,0 +1,18 @@
+{
+  "package": {
+    "name": "tclinkers",
+    "version": "1.0.0"
+  },
+  "toolchain": [
+    {
+      "name": "llvm",
+      "compiler": "clang",
+      "linker": "lld",
+      "link_args": [
+        "-fuse-ld=lld"
+      ],
+      "archiver": "llvm-ar",
+      "driver": "clang"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[[toolchain]]
+name = "T"
+compiler = "cc"
+archiver = "ar"
+driver = "gcc"
+target = [{ arch = "x86_64", os = "linux", abi = "gnu", sdk = "./S" }]

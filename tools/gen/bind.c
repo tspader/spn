@@ -322,8 +322,12 @@ void gen_bind_types(gen_t* g, sp_template_scope_t* scope) {
     sp_template_set(tag, sp_str_lit("tag"), gen_undecorated(g, type->name));
   }
   sp_da_for(g->entries, it) {
+    gen_entry_t* entry = g->entries[it];
+    if (entry->owner->shared) {
+      continue;
+    }
     sp_template_scope_t* tag = sp_template_push(scope, sp_str_lit("tags"));
-    sp_template_set(tag, sp_str_lit("tag"), gen_undecorated(g, g->entries[it]->name));
+    sp_template_set(tag, sp_str_lit("tag"), gen_undecorated(g, entry->name));
   }
 
   sp_template_list(scope, sp_str_lit("oms"));
@@ -348,6 +352,9 @@ void gen_bind_types(gen_t* g, sp_template_scope_t* scope) {
   }
   sp_da_for(g->entries, it) {
     gen_entry_t* entry = g->entries[it];
+    if (entry->owner->shared) {
+      continue;
+    }
     sp_template_scope_t* child = sp_template_push(scope, sp_str_lit("structs"));
     sp_template_set(child, sp_str_lit("tag"), gen_undecorated(g, entry->name));
     sp_template_list(child, sp_str_lit("fields"));
