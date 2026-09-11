@@ -2,5 +2,6 @@
 name = "p"
 version = "1.0.0"
 
-[profile.dev]
-opt = "9"
+[profile.a]
+os = "plan9"
+arch = "risc"

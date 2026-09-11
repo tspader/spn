@@ -2,12 +2,14 @@
 #include "ctx/types.h"
 #include "error/error.h"
 #include "core/types.h"
+#include "enum/enum.h"
 #include "macro/macro.h"
 #include "intern/intern.h"
 #include "pkg/types.h"
 #include "spn/core.h"
 #include "toolchain/toolchain.h"
 #include "triple/triple.h"
+#include "when/when.h"
 
 sp_str_t spn_profile_build_dir(sp_mem_t mem, const spn_profile_info_t* profile) {
   if (!profile->targeted) {
@@ -16,10 +18,7 @@ sp_str_t spn_profile_build_dir(sp_mem_t mem, const spn_profile_info_t* profile) 
   return sp_fs_join_path(mem, spn_triple_to_str(mem, spn_profile_triple(profile)), profile->name);
 }
 
-static void overlay_profile(spn_profile_info_t* to, spn_profile_info_t* from) {
-  if (!sp_str_empty(from->name)) {
-    to->name = from->name;
-  }
+static void overlay_profile(spn_profile_info_t* to, const spn_profile_info_t* from) {
   if (from->toolchain.kind) {
     to->toolchain = from->toolchain;
   }
@@ -64,9 +63,56 @@ static sp_str_t select_name(const spn_profile_override_t* override) {
   return sp_str_lit("debug");
 }
 
+static spn_mode_t builtin_mode(sp_str_t name) {
+  if (sp_str_equal_cstr(name, "release")) {
+    return SPN_MODE_RELEASE;
+  }
+  if (sp_str_equal_cstr(name, "debug")) {
+    return SPN_MODE_DEBUG;
+  }
+  return SPN_MODE_NONE;
+}
+
+static bool is_builtin(sp_str_t name) {
+  return sp_str_equal_cstr(name, "default") || builtin_mode(name) != SPN_MODE_NONE;
+}
+
+static const spn_profile_decl_t* find_decl(spn_profile_map_t profiles, sp_str_t name) {
+  spn_profile_decl_t** slot = sp_str_om_getp(profiles, name);
+  return slot ? *slot : SP_NULLPTR;
+}
+
+static spn_triple_t decl_platform(const spn_profile_decl_t* decl) {
+  return (spn_triple_t) { .arch = decl->arch, .os = decl->os };
+}
+
+static sp_str_t pick(spn_gated_list_t candidates, spn_when_env_t* env) {
+  sp_da_for(candidates, it) {
+    if (spn_when_eval(&candidates[it].when, env)) {
+      return candidates[it].value;
+    }
+  }
+  return sp_str_lit("");
+}
+
+static spn_profile_info_t evaluate(const spn_profile_decl_t* decl, spn_when_env_t* env) {
+  return (spn_profile_info_t) {
+    .toolchain = spn_toolchain_ref_from_str(pick(decl->toolchain, env)),
+    .os = decl->os,
+    .arch = decl->arch,
+    .abi = spn_abi_from_str(pick(decl->abi, env)),
+    .linkage = spn_linkage_from_str(pick(decl->linkage, env)),
+    .standard = spn_c_standard_from_str(pick(decl->standard, env)),
+    .mode = spn_mode_from_str(pick(decl->mode, env)),
+    .opt = spn_opt_level_from_str(pick(decl->opt, env)),
+    .sanitizers = decl->sanitizers,
+    .sanitizers_set = decl->sanitizers_set,
+    .options = decl->options,
+  };
+}
+
 static spn_profile_info_t override_to_info(const spn_profile_override_t* override) {
   return (spn_profile_info_t) {
-    .name = override->name,
     .toolchain = spn_toolchain_ref_from_str(override->toolchain),
     .mode = override->mode,
     .opt = override->opt,
@@ -76,61 +122,6 @@ static spn_profile_info_t override_to_info(const spn_profile_override_t* overrid
     .arch = override->triple.arch,
     .abi = override->triple.abi,
   };
-}
-
-void spn_profile_populate(spn_profile_table_t* profiles, spn_pkg_info_t* pkg) {
-  struct {
-    sp_str_t name;
-    spn_profile_info_t automatic;
-    spn_profile_info_t* user;
-  } fallback = sp_zero;
-  fallback.name = spn_intern_cstr("default");
-  fallback.automatic = (spn_profile_info_t) {
-    .name      = fallback.name,
-    .toolchain = { .kind = SPN_TOOLCHAIN_REF_AUTO },
-    .standard  = SPN_C11,
-    .mode      = SPN_MODE_DEBUG,
-  };
-  sp_str_ht_insert(*profiles, fallback.name, fallback.automatic);
-
-  // Start with the default, if present
-  spn_profile_info_t** ptr = sp_om_getp(pkg->profiles, fallback.name);
-  fallback.user = ptr ? *ptr : SP_NULLPTR;
-  if (fallback.user) {
-    overlay_profile(sp_str_ht_get(*profiles, fallback.name), fallback.user);
-  }
-
-  // Build the base debug and release profiles
-  spn_profile_info_t base = *sp_str_ht_get(*profiles, fallback.name);
-  struct {
-    spn_profile_info_t debug;
-    spn_profile_info_t release;
-    spn_profile_info_t derived;
-  } p = { base, base, base };
-
-  p.debug.name = sp_str_lit("debug");
-  p.debug.mode = SPN_MODE_DEBUG;
-  sp_str_ht_insert(*profiles, p.debug.name, p.debug);
-
-  p.release.name = sp_str_lit("release");
-  p.release.mode = SPN_MODE_RELEASE;
-  sp_str_ht_insert(*profiles, p.release.name, p.release);
-
-  // Apply overlaid fields
-  sp_str_om_for(pkg->profiles, it) {
-    spn_profile_info_t* user = sp_str_om_at(pkg->profiles, it);
-    if (sp_str_equal(user->name, fallback.name)) continue;
-
-    spn_profile_info_t* entry = sp_str_ht_get(*profiles, user->name);
-    if (entry) {
-      overlay_profile(entry, user);
-    } else {
-      p.derived = base;
-      p.derived.name = user->name;
-      overlay_profile(&p.derived, user);
-      sp_str_ht_insert(*profiles, p.derived.name, p.derived);
-    }
-  }
 }
 
 static void push_abi(spn_abi_list_t* list, spn_abi_t abi) {
@@ -213,7 +204,7 @@ static spn_linkage_t resolve_linkage(spn_linkage_t linkage, spn_triple_t target,
   return SPN_LIB_KIND_NONE;
 }
 
-spn_err_t spn_profile_resolve(spn_profile_table_t profiles, const spn_profile_override_t* override, spn_triple_t host, const spn_pkg_info_t* pkg, spn_profile_info_t* result) {
+spn_err_t spn_profile_resolve(const spn_profile_override_t* override, spn_triple_t host, const spn_pkg_info_t* pkg, spn_profile_info_t* result) {
   sp_str_t name = select_name(override);
 
   if (sp_str_find_c8(name, '/') >= 0 || sp_str_find_c8(name, '\\') >= 0) {
@@ -231,30 +222,51 @@ spn_err_t spn_profile_resolve(spn_profile_table_t profiles, const spn_profile_ov
     });
   }
 
-  spn_profile_info_t* info = sp_str_ht_get(profiles, name);
-  if (!info) {
+  const spn_profile_decl_t* selected = find_decl(pkg->profiles, name);
+  if (!selected && !is_builtin(name)) {
     return spn_err_emit(&spn, (spn_err_union_t) {
       .kind = SPN_ERR_PROFILE_UNDEFINED,
       .profile = { .name = name },
     });
   }
 
-  spn_profile_info_t merged = *info;
+  spn_profile_decl_t none = sp_zero;
+  const spn_profile_decl_t* base = find_decl(pkg->profiles, sp_str_lit("default"));
+  base = base ? base : &none;
+  selected = selected ? selected : &none;
+
+  spn_triple_t platform = { .arch = host.arch, .os = host.os };
+  platform = spn_triple_merge(platform, decl_platform(base));
+  platform = spn_triple_merge(platform, decl_platform(selected));
+  platform = spn_triple_merge(platform, (spn_triple_t) { .arch = override->triple.arch, .os = override->triple.os });
+
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  spn_when_env_t env;
+  spn_when_env_init(scratch.mem, &env);
+  spn_when_env_set_platform(&env, platform.os, platform.arch);
+  spn_profile_info_t from_base = evaluate(base, &env);
+  spn_profile_info_t from_selected = evaluate(selected, &env);
+  sp_mem_end_scratch(scratch);
+
+  spn_profile_info_t builtin = { .mode = builtin_mode(name) };
   spn_profile_info_t lifted = override_to_info(override);
+  spn_profile_info_t merged = {
+    .toolchain = { .kind = SPN_TOOLCHAIN_REF_AUTO },
+    .standard = SPN_C11,
+    .mode = SPN_MODE_DEBUG,
+  };
+  overlay_profile(&merged, &from_base);
+  overlay_profile(&merged, &builtin);
+  overlay_profile(&merged, &from_selected);
   overlay_profile(&merged, &lifted);
 
-  spn_triple_t target = { merged.arch, merged.os, merged.abi };
-  bool targeted = target.arch || target.os || target.abi;
+  bool targeted = merged.arch || merged.os || merged.abi;
 
   if (!merged.opt) {
     merged.opt = merged.mode == SPN_MODE_RELEASE ? SPN_OPT_LEVEL_2 : SPN_OPT_LEVEL_0;
   }
 
-  spn_triple_t pinned = {
-    .arch = target.arch ? target.arch : host.arch,
-    .os = target.os ? target.os : host.os,
-    .abi = target.abi,
-  };
+  spn_triple_t pinned = { .arch = platform.arch, .os = platform.os, .abi = merged.abi };
   spn_triple_t full = sp_zero;
   switch (spn_triple_entry(pinned, &full)) {
     case SPN_TRIPLE_ENTRY_OK: {
@@ -289,7 +301,7 @@ spn_err_t spn_profile_resolve(spn_profile_table_t profiles, const spn_profile_ov
   }
 
   *result = (spn_profile_info_t) {
-    .name       = merged.name,
+    .name       = name,
     .toolchain  = merged.toolchain,
     .os         = pinned.os,
     .arch       = pinned.arch,

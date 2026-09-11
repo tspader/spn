@@ -44,6 +44,8 @@ static const test_t tests [] = {
   { "profile_opt_sanitize" },
   { "profile_opt_wrong_type" },
   { "profile_sanitize_invalid" },
+  { "profile_gated" },
+  { "profile_gated_invalid" },
   { "profile_single" },
   { "required_empty_string_kept" },
   { "semver_normalize" },

@@ -43,9 +43,13 @@ void spn_when_env_set(spn_when_env_t* env, sp_str_t key, spn_option_value_t valu
   sp_str_ht_insert(*env, key, value);
 }
 
+void spn_when_env_set_platform(spn_when_env_t* env, spn_os_t os, spn_arch_t arch) {
+  spn_when_env_set(env, sp_str_lit("os"), spn_option_value_str(spn_os_to_str(os)));
+  spn_when_env_set(env, sp_str_lit("arch"), spn_option_value_str(spn_arch_to_str(arch)));
+}
+
 void spn_when_env_set_facts(spn_when_env_t* env, spn_when_facts_t facts) {
-  spn_when_env_set(env, sp_str_lit("os"), spn_option_value_str(spn_os_to_str(facts.os)));
-  spn_when_env_set(env, sp_str_lit("arch"), spn_option_value_str(spn_arch_to_str(facts.arch)));
+  spn_when_env_set_platform(env, facts.os, facts.arch);
   spn_when_env_set(env, sp_str_lit("abi"), spn_option_value_str(spn_abi_to_str(facts.abi)));
   spn_when_env_set(env, sp_str_lit("driver"), spn_option_value_str(spn_cc_driver_to_str(facts.driver)));
   spn_when_env_set(env, sp_str_lit("linker"), spn_option_value_str(spn_ld_family_to_str(facts.linker)));

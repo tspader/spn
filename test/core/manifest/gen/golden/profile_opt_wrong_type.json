@@ -1,7 +1,7 @@
 {
   "issues": [
     {
-      "code": "expected_str",
+      "code": "invalid",
       "path": "profile.dev.opt",
       "detail": "opt"
     },

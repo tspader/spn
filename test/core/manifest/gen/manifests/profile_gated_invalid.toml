@@ -1,0 +1,15 @@
+[package]
+name = "profgatedinvalid"
+version = "1.0.0"
+
+[profile.a]
+abi = [{ when = { os = "linux" } }]
+
+[profile.b]
+abi = true
+
+[profile.c]
+abi = [{ value = 3 }]
+
+[profile.d]
+abi = { when = { os = "linux" } }

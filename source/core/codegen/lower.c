@@ -281,25 +281,28 @@ static void lower_toolchains(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg
   }
 }
 
-static void lower_profiles(const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
+static spn_profile_decl_t lower_profile(spn_toml_loader_t* ctx, sp_str_t name, const spn_cg_profile_t* p) {
+  return (spn_profile_decl_t) {
+    .name = name,
+    .os = sp_opt_is_null(p->os) ? SPN_OS_NONE : sp_opt_get(p->os),
+    .arch = sp_opt_is_null(p->arch) ? SPN_ARCH_NONE : sp_opt_get(p->arch),
+    .toolchain = lower_gated_values(ctx, p->toolchain),
+    .abi = lower_gated_values(ctx, p->abi),
+    .linkage = lower_gated_values(ctx, p->linkage),
+    .standard = lower_gated_values(ctx, p->standard),
+    .mode = lower_gated_values(ctx, p->mode),
+    .opt = lower_gated_values(ctx, p->opt),
+    .sanitizers = spn_sanitizer_set_from_list(p->sanitize),
+    .sanitizers_set = p->sanitize != SP_NULLPTR,
+    .options = p->options,
+  };
+}
+
+static void lower_profiles(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, spn_pkg_info_t* out) {
   sp_str_om_init(out->profiles);
   sp_da_for(cg->profile, i) {
-    const spn_cg_profile_t* p = &cg->profile[i].value;
-    spn_profile_info_t info = {
-      .name = cg->profile[i].key,
-      .toolchain = spn_toolchain_ref_from_str(p->toolchain),
-      .os = sp_opt_is_null(p->os) ? SPN_OS_NONE : sp_opt_get(p->os),
-      .arch = sp_opt_is_null(p->arch) ? SPN_ARCH_NONE : sp_opt_get(p->arch),
-      .abi = sp_opt_is_null(p->abi) ? SPN_ABI_NONE : sp_opt_get(p->abi),
-      .linkage = sp_opt_is_null(p->linkage) ? SPN_LIB_KIND_NONE : sp_opt_get(p->linkage),
-      .standard = sp_opt_is_null(p->standard) ? SPN_C_STANDARD_NONE : sp_opt_get(p->standard),
-      .mode = sp_opt_is_null(p->mode) ? SPN_MODE_NONE : sp_opt_get(p->mode),
-      .opt = sp_opt_is_null(p->opt) ? SPN_OPT_LEVEL_NONE : sp_opt_get(p->opt),
-      .sanitizers = spn_sanitizer_set_from_list(p->sanitize),
-      .sanitizers_set = p->sanitize != SP_NULLPTR,
-      .options = p->options,
-    };
-    sp_str_om_insert(out->profiles, info.name, info);
+    spn_profile_decl_t decl = lower_profile(ctx, cg->profile[i].key, &cg->profile[i].value);
+    sp_str_om_insert(out->profiles, decl.name, decl);
   }
 }
 
@@ -808,13 +811,83 @@ static void validate_whens(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, 
   validate_option_sets(ctx, cg, out);
 }
 
+static bool when_key_is_platform(sp_str_t key) {
+  return sp_str_equal_cstr(key, "os") || sp_str_equal_cstr(key, "arch");
+}
+
+static void validate_platform_when(spn_toml_loader_t* ctx, const spn_when_t* when) {
+  spn_toml_loader_push_key(ctx, "when");
+  sp_da_for(when->clauses, it) {
+    const spn_when_clause_t* clause = &when->clauses[it];
+    if (!when_key_is_platform(clause->key) || !when_fact_value_valid(clause->key, clause->value)) {
+      spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, clause->key.data);
+    }
+  }
+  spn_toml_loader_pop(ctx);
+}
+
+static void validate_candidates(spn_toml_loader_t* ctx, const c8* key, sp_da(spn_cg_value_entry_t) list) {
+  spn_toml_loader_push_key(ctx, key);
+  sp_da_for(list, it) {
+    spn_toml_loader_push_index(ctx, it);
+    validate_platform_when(ctx, &list[it].when);
+    if (it + 1 < sp_da_size(list) && !spn_codegen_when_present(&list[it].when)) {
+      spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, "when");
+    }
+    spn_toml_loader_pop(ctx);
+  }
+  spn_toml_loader_pop(ctx);
+}
+
+static void issue_candidate_value(spn_toml_loader_t* ctx, const c8* key, u32 index) {
+  spn_toml_loader_push_key(ctx, key);
+  spn_toml_loader_push_index(ctx, index);
+  spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "value");
+  spn_toml_loader_pop(ctx);
+  spn_toml_loader_pop(ctx);
+}
+
 static void validate_profiles(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg) {
   spn_toml_loader_push_key(ctx, "profile");
   sp_da_for(cg->profile, it) {
     const spn_cg_profile_t* p = &cg->profile[it].value;
     spn_toml_loader_push_index(ctx, it);
-    if (!sp_opt_is_null(p->opt) && sp_opt_get(p->opt) == SPN_OPT_LEVEL_NONE) {
-      spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "opt");
+    if (!sp_opt_is_null(p->os) && sp_opt_get(p->os) == SPN_OS_NONE) {
+      spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "os");
+    }
+    if (!sp_opt_is_null(p->arch) && sp_opt_get(p->arch) == SPN_ARCH_NONE) {
+      spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "arch");
+    }
+    validate_candidates(ctx, "linkage", p->linkage);
+    validate_candidates(ctx, "standard", p->standard);
+    validate_candidates(ctx, "toolchain", p->toolchain);
+    validate_candidates(ctx, "mode", p->mode);
+    validate_candidates(ctx, "opt", p->opt);
+    validate_candidates(ctx, "abi", p->abi);
+    sp_da_for(p->linkage, ct) {
+      if (spn_linkage_from_str(p->linkage[ct].value) == SPN_LIB_KIND_NONE) {
+        issue_candidate_value(ctx, "linkage", ct);
+      }
+    }
+    sp_da_for(p->standard, ct) {
+      if (spn_c_standard_from_str(p->standard[ct].value) == SPN_C_STANDARD_NONE) {
+        issue_candidate_value(ctx, "standard", ct);
+      }
+    }
+    sp_da_for(p->mode, ct) {
+      if (spn_mode_from_str(p->mode[ct].value) == SPN_MODE_NONE) {
+        issue_candidate_value(ctx, "mode", ct);
+      }
+    }
+    sp_da_for(p->opt, ct) {
+      if (spn_opt_level_from_str(p->opt[ct].value) == SPN_OPT_LEVEL_NONE) {
+        issue_candidate_value(ctx, "opt", ct);
+      }
+    }
+    sp_da_for(p->abi, ct) {
+      if (spn_abi_from_str(p->abi[ct].value) == SPN_ABI_NONE) {
+        issue_candidate_value(ctx, "abi", ct);
+      }
     }
     if (spn_sanitizer_set_has_conflict(spn_sanitizer_set_from_list(p->sanitize))) {
       spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "sanitize");
@@ -1016,7 +1089,7 @@ spn_err_t spn_pkg_lower(spn_toml_loader_t* ctx, const spn_cg_manifest_t* cg, spn
   lower_publish(ctx, cg, out);
   lower_targets(ctx, cg, out);
   lower_toolchains(ctx, cg, out);
-  lower_profiles(cg, out);
+  lower_profiles(ctx, cg, out);
   lower_indexes(ctx, cg, out);
   lower_deps(ctx, cg, out);
   lower_options(ctx, cg, out);

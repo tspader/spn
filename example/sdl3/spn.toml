@@ -12,8 +12,5 @@ sdl3 = "3.4.15"
 [config.sdl3]
 options = { x11 = true }
 
-[profile.linux]
-abi = "gnu"
-
-[profile.macos]
-toolchain = "clang"
+[profile.default]
+abi = { value = "gnu", when = { os = "linux" } }

@@ -261,6 +261,19 @@ sp_test(profile, coff_libs_not_pic) {
   });
 }
 
+sp_test(profile, gated_reads_host_platform) {
+  return run_command_test(t, (command_test_t) {
+    .project = "test/integration/fixtures/profile/gated",
+    .when = { .host = SPN_OS_LINUX, .target = SPN_TEST_ARCH "-linux-gnu" },
+    .args = { "build" },
+    .expect = {
+      .exists = { target_exe("main", SPN_TEST_ARCH "-linux-gnu") },
+      .events = { { .event = SPN_EVENT_INIT_BUILD_GRAPH, .key = "target", .value = SPN_TEST_ARCH "-linux-gnu" } },
+      .cc = { { .args = { "-O3" }, .absent = true } },
+    },
+  });
+}
+
 sp_test(profile, flags) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/profile/sanitize",

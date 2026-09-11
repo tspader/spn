@@ -1,0 +1,7 @@
+[package]
+name = "p"
+version = "1.0.0"
+
+[profile.a]
+abi = ["gnu", "msvc"]
+toolchain = [{ value = "zig" }, { value = "clang", when = { os = "macos" } }]

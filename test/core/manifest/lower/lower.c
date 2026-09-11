@@ -99,16 +99,16 @@ typedef struct {
 
 typedef struct {
   const c8* name;
-  const c8* toolchain;
-  spn_linkage_t linkage;
-  spn_c_standard_t standard;
-  spn_mode_t mode;
-  spn_opt_level_t opt;
+  gated_t toolchain [4];
+  gated_t linkage [4];
+  gated_t standard [4];
+  gated_t mode [4];
+  gated_t opt [4];
+  gated_t abi [4];
   spn_sanitizer_set_t sanitizers;
   bool sanitizers_set;
   spn_os_t os;
   spn_arch_t arch;
-  spn_abi_t abi;
   const c8* options;
 } profile_t;
 
@@ -904,21 +904,84 @@ static const test_t tests [] = {
     .profiles = {
       {
         .name = "release",
-        .toolchain = "zig",
-        .linkage = SPN_LIB_KIND_SHARED,
-        .standard = SPN_C99,
-        .mode = SPN_MODE_RELEASE,
-        .opt = SPN_OPT_LEVEL_3,
+        .toolchain = { { "zig" } },
+        .linkage = { { "shared" } },
+        .standard = { { "c99" } },
+        .mode = { { "release" } },
+        .opt = { { "3" } },
         .sanitizers = SPN_SANITIZER_ADDRESS | SPN_SANITIZER_UNDEFINED,
         .sanitizers_set = true,
         .os = SPN_OS_LINUX,
         .arch = SPN_ARCH_X64,
-        .abi = SPN_ABI_GNU,
+        .abi = { { "gnu" } },
       },
       {
         .name = "clean",
         .sanitizers_set = true,
       },
+    },
+  },
+  {
+    .name = "profile_gated",
+    .manifest = "profile_gated",
+    .profiles = {
+      {
+        .name = "default",
+        .toolchain = { { "clang", "os = \"macos\"" } },
+        .linkage = { { "static", "os = \"linux\"" } },
+        .mode = { { "debug" } },
+        .abi = {
+          { "gnu", "os = \"linux\"" },
+          { "msvc", "os = \"windows\", arch != \"aarch64\"" },
+          { "musl" },
+        },
+      },
+    },
+  },
+  {
+    .name = "validate_profile_candidate_value",
+    .manifest = "validate_profile_candidate_value",
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "profile[0].linkage[0].value" },
+      { SPN_ERR_CODEGEN_INVALID, "profile[0].standard[0].value" },
+      { SPN_ERR_CODEGEN_INVALID, "profile[0].mode[0].value" },
+      { SPN_ERR_CODEGEN_INVALID, "profile[0].opt[0].value" },
+      { SPN_ERR_CODEGEN_INVALID, "profile[0].abi[0].value" },
+    },
+  },
+  {
+    .name = "validate_profile_candidate_unreachable",
+    .manifest = "validate_profile_candidate_unreachable",
+    .issues = {
+      { SPN_ERR_CODEGEN_MISSING_KEY, "profile[0].toolchain[0].when" },
+      { SPN_ERR_CODEGEN_MISSING_KEY, "profile[0].abi[0].when" },
+    },
+  },
+  {
+    .name = "validate_profile_gated_when_key",
+    .manifest = "validate_profile_gated_when_key",
+    .options = {
+      { .name = "tls", .type = SPN_OPTION_TYPE_BOOL },
+    },
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "profile[0].toolchain[0].when.tls" },
+      { SPN_ERR_CODEGEN_INVALID, "profile[0].abi[0].when.abi" },
+    },
+  },
+  {
+    .name = "validate_profile_gated_when_value",
+    .manifest = "validate_profile_gated_when_value",
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "profile[0].opt[0].when.arch" },
+      { SPN_ERR_CODEGEN_INVALID, "profile[0].abi[0].when.os" },
+    },
+  },
+  {
+    .name = "validate_profile_platform",
+    .manifest = "validate_profile_platform",
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "profile[0].os" },
+      { SPN_ERR_CODEGEN_INVALID, "profile[0].arch" },
     },
   },
   {
@@ -997,13 +1060,6 @@ static const test_t tests [] = {
       { SPN_ERR_CODEGEN_INVALID, "deps.package[1].when.sanitize_address" },
       { SPN_ERR_CODEGEN_INVALID, "deps.package[2].when.driver" },
       { SPN_ERR_CODEGEN_INVALID, "deps.package[3].when.linker" },
-    },
-  },
-  {
-    .name = "validate_profile_bad_opt",
-    .manifest = "validate_profile_bad_opt",
-    .issues = {
-      { SPN_ERR_CODEGEN_INVALID, "profile[0].opt" },
     },
   },
   {
@@ -1589,19 +1645,19 @@ sp_test_each(lower, cases, test_t, tests) {
     profile_t expected = it->profiles[pr];
     if (!expected.name) break;
 
-    spn_profile_info_t* p = sp_str_om_get(pkg.profiles, sp_str_view(expected.name));
+    spn_profile_decl_t* p = sp_str_om_get(pkg.profiles, sp_str_view(expected.name));
     sp_must(t, p);
     sp_expect_str_eq_c(t, p->name, expected.name);
-    if (expected.toolchain) sp_expect_str_eq_c(t, p->toolchain.name, expected.toolchain);
-    sp_expect_eq(t, (u32)expected.linkage, (u32)p->linkage);
-    if (expected.standard) sp_expect_eq(t, (u32)expected.standard, (u32)p->standard);
-    if (expected.mode) sp_expect_eq(t, (u32)expected.mode, (u32)p->mode);
-    if (expected.opt) sp_expect_eq(t, (u32)expected.opt, (u32)p->opt);
+    check_gated(t, p->toolchain, expected.toolchain);
+    check_gated(t, p->linkage, expected.linkage);
+    check_gated(t, p->standard, expected.standard);
+    check_gated(t, p->mode, expected.mode);
+    check_gated(t, p->opt, expected.opt);
+    check_gated(t, p->abi, expected.abi);
     sp_expect_eq(t, expected.sanitizers, p->sanitizers);
     sp_expect_eq(t, expected.sanitizers_set, p->sanitizers_set);
     sp_expect_eq(t, (u32)expected.os, (u32)p->os);
     sp_expect_eq(t, (u32)expected.arch, (u32)p->arch);
-    if (expected.abi) sp_expect_eq(t, (u32)expected.abi, (u32)p->abi);
     if (expected.options) sp_expect_str_eq_c(t, spn_when_to_str(mem, &p->options), expected.options);
   }
 

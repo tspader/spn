@@ -1,0 +1,42 @@
+{
+  "package": {
+    "name": "profgated",
+    "version": "1.0.0"
+  },
+  "profile": {
+    "default": {
+      "linkage": [
+        {
+          "value": "static",
+          "when": {
+            "os": "linux"
+          }
+        }
+      ],
+      "toolchain": [
+        "zig"
+      ],
+      "mode": [
+        "debug"
+      ],
+      "abi": [
+        {
+          "value": "gnu",
+          "when": {
+            "os": "linux"
+          }
+        },
+        {
+          "value": "msvc",
+          "when": {
+            "os": "windows",
+            "arch": {
+              "not": "aarch64"
+            }
+          }
+        },
+        "musl"
+      ]
+    }
+  }
+}

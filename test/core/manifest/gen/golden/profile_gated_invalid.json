@@ -1,0 +1,24 @@
+{
+  "issues": [
+    {
+      "code": "missing_key",
+      "path": "profile.a.abi[0].value",
+      "detail": "value"
+    },
+    {
+      "code": "invalid",
+      "path": "profile.b.abi",
+      "detail": "abi"
+    },
+    {
+      "code": "expected_str",
+      "path": "profile.c.abi[0].value",
+      "detail": "value"
+    },
+    {
+      "code": "missing_key",
+      "path": "profile.d.abi.value",
+      "detail": "value"
+    }
+  ]
+}

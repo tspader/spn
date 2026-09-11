@@ -64,8 +64,6 @@ typedef struct {
   spn_option_defaults_t defaults;
 } spn_option_info_t;
 
-// A manifest list entry that may carry a predicate; after option application
-// every surviving entry has been folded into the plain list beside it
 typedef struct {
   sp_str_t value;
   spn_when_t when;

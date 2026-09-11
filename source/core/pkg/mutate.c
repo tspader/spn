@@ -100,20 +100,6 @@ void spn_pkg_add_linkage(spn_pkg_info_t* pkg, spn_linkage_t linkage) {
   (void)linkage;
 }
 
-spn_profile_info_t* spn_pkg_add_profile(spn_pkg_info_t* pkg, const c8* name) {
-  spn_profile_info_t profile = {
-    .name = spn_intern_cstr(name),
-  };
-
-  return spn_pkg_add_profile_ex(pkg, profile);
-}
-
-spn_profile_info_t* spn_pkg_add_profile_ex(spn_pkg_info_t* pkg, spn_profile_info_t profile) {
-  sp_str_om_insert(pkg->profiles, profile.name, profile);
-  return sp_str_om_get(pkg->profiles, profile.name);
-}
-
-
 spn_target_info_t* spn_pkg_add_exe(spn_pkg_info_t* pkg, const c8* name) {
   return spn_pkg_add_exe_ex(pkg, spn_intern_cstr(name));
 }
