@@ -410,6 +410,8 @@ static sp_cli_result_t test_variant(sp_cli_t* cli, app_t* app, const winvm_varia
     return SP_CLI_OK;
   }
 
+  sp_ps_run(mem, winvm_ssh_config(vm, variant, "cmd /c rmdir /s /q C:\\probes"));
+
   sp_str_t wintest = sp_fs_join_path(mem, vm->paths.recipes, sp_str_lit("wintest.ps1"));
   if (winvm_upload_file(vm, variant, src_tar, sp_str_lit("spn-src.tar.gz")) ||
       winvm_upload_file(vm, variant, bins_tar, sp_str_lit("spn-bins.tar.gz")) ||
@@ -443,11 +445,73 @@ static sp_cli_result_t test_variant(sp_cli_t* cli, app_t* app, const winvm_varia
     }
   }
 
+  sp_str_t variant_probes = sp_fs_join_path(mem, vm->paths.probes, sp_cstr_as_str(variant->name));
+  sp_fs_create_dir(variant_probes);
+  winvm_download_dir(vm, variant, sp_str_lit("C:/probes"), variant_probes);
+
   winvm_shutdown(vm, variant);
   if (tail_trace(mem, app->prompt, cfmt(mem, "shut down {}", sp_fmt_cstr(variant->name)),
                  winvm_log(vm, cfmt(mem, "test-down-{}", sp_fmt_cstr(variant->name))),
                  winvm_wait_off_config(vm, variant, 180))) {
     winvm_destroy(vm, variant);
+  }
+  return SP_CLI_OK;
+}
+
+static sp_cli_result_t bare_run(sp_cli_t* cli, app_t* app, u32* failures) {
+  winvm_t* vm = &app->vm;
+  sp_mem_t mem = vm->mem;
+
+  sp_da(winvm_probe_t) probes = sp_da_new(mem, winvm_probe_t);
+  if (winvm_probes_read(vm, &probes)) {
+    return oops(cli, app, sp_str_lit("failed to read bare-run probes from the probe store"));
+  }
+  if (sp_da_empty(probes)) {
+    return SP_CLI_OK;
+  }
+
+  const winvm_variant_t* bare = winvm_variant_find("base");
+  sp_assert(bare);
+  if (up(cli, app, bare)) {
+    (*failures)++;
+    return SP_CLI_OK;
+  }
+
+  sp_str_t barerun = sp_fs_join_path(mem, vm->paths.recipes, sp_str_lit("barerun.ps1"));
+  if (winvm_upload_file(vm, bare, barerun, sp_str_lit("barerun.ps1"))) {
+    (*failures)++;
+    sp_prompt_error(app->prompt, "failed to upload barerun.ps1 to base");
+    return SP_CLI_OK;
+  }
+
+  sp_str_t remote_probes = sp_fmt(mem, "C:/Users/{}/probes", sp_fmt_str(vm->cfg.user)).value;
+  if (winvm_upload_dir(vm, bare, vm->paths.probes, remote_probes)) {
+    (*failures)++;
+    sp_prompt_error(app->prompt, "failed to upload probes to base");
+    return SP_CLI_OK;
+  }
+
+  sp_da_for(probes, it) {
+    winvm_probe_t probe = probes[it];
+    const c8* title = cfmt(mem, "bare-run {}", sp_fmt_str(probe.rel));
+    sp_str_t log = winvm_log(vm, cfmt(mem, "bare-{}", sp_fmt_str(probe.rel)));
+    s32 status = tail_trace(mem, app->prompt, title, log, winvm_probe_config(vm, bare, probe));
+    if (sp_prompt_cancelled(app->prompt)) {
+      return fail(cli, app, sp_str_lit("cancelled"));
+    }
+    if (status == winvm_probe_expected_code(probe.expect)) {
+      sp_prompt_success(app->prompt, cfmt(mem, "PASS bare {}", sp_fmt_str(probe.rel)));
+    }
+    else {
+      (*failures)++;
+      sp_prompt_error(app->prompt, cfmt(mem, "FAIL bare {} ({})", sp_fmt_str(probe.rel), sp_fmt_str(log)));
+    }
+  }
+
+  winvm_shutdown(vm, bare);
+  if (tail_trace(mem, app->prompt, cfmt(mem, "shut down {}", sp_fmt_cstr(bare->name)),
+                 winvm_log(vm, "bare-down"), winvm_wait_off_config(vm, bare, 180))) {
+    winvm_destroy(vm, bare);
   }
   return SP_CLI_OK;
 }
@@ -479,6 +543,9 @@ static sp_cli_result_t run_test(sp_cli_t* cli) {
 
   try(begin(cli, &app, "winvm test"));
 
+  sp_fs_remove_dir(vm->paths.probes);
+  sp_fs_create_dir(vm->paths.probes);
+
   sp_da_for(selected, it) {
     if (!sp_fs_is_file(winvm_image(vm, selected[it]))) {
       sp_cli_result_t r = oops(cli, &app, sp_fmt(mem, "{} is not built; run winvm build {}",
@@ -502,6 +569,12 @@ static sp_cli_result_t run_test(sp_cli_t* cli) {
       sp_prompt_end(app.prompt);
       return r;
     }
+  }
+
+  sp_cli_result_t bare = bare_run(cli, &app, &failures);
+  if (bare || sp_prompt_cancelled(app.prompt)) {
+    sp_prompt_end(app.prompt);
+    return bare;
   }
 
   if (failures) {

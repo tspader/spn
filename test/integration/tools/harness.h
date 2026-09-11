@@ -26,6 +26,11 @@
 // And then verifying that we get 69 -- this pattern is wrong. It makes brittle tests that are incompatible
 // with cross compiling.
 typedef enum {
+  BARE_EXPECT_RUNS,
+  BARE_EXPECT_NOT_LOADABLE,
+} bare_expect_t;
+
+typedef enum {
   ACTION_NONE,
   ACTION_CREATE_FILE,
   ACTION_REMOVE_DIR,
@@ -49,6 +54,7 @@ typedef enum {
   ACTION_VERIFY_DIR_COUNT,
   ACTION_VERIFY_EVENT_COUNT,
   ACTION_RUN_CLI,
+  ACTION_STAGE_BARE_RUN,
 } action_kind_t;
 
 typedef struct {
@@ -58,6 +64,7 @@ typedef struct {
     struct { sp_str_t file; sp_str_t content; } create;
     struct { const c8* dir; } rm;
     struct { const c8* name; s32 rc; } bin;
+    struct { const c8* name; bare_expect_t expect; } bare;
     sp_str_t exists;
     sp_str_t verify_no_interp;
     struct { sp_str_t file; u64 entry; } verify_elf_entry;

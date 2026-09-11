@@ -47,6 +47,7 @@ if ($Lane -eq 'msvc') {
 }
 
 if ($Lane) { $env:SPN_TEST_TOOLCHAIN = $Lane }
+$env:SPN_BARE_PROBES = 'C:\probes'
 Set-Location $Work
 if ($Filter) {
   Write-Host "== integration --filter $Filter =="
