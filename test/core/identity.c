@@ -35,6 +35,7 @@ typedef struct {
   const c8* fn;
   identity_path_t inputs [IDENTITY_TEST_MAX_PATHS];
   identity_path_t outputs [IDENTITY_TEST_MAX_PATHS];
+  identity_path_t output_dirs [IDENTITY_TEST_MAX_PATHS];
 } identity_node_t;
 
 typedef struct {
@@ -106,6 +107,7 @@ static spn_user_node_t* identity_node(sp_mem_t mem, const identity_node_t* spec)
   node->fn = sp_str_view(spec->fn);
   sp_da_init(mem, node->inputs);
   sp_da_init(mem, node->outputs);
+  sp_da_init(mem, node->output_dirs);
   sp_carr_for(spec->inputs, it) {
     if (!spec->inputs[it].sub) {
       break;
@@ -117,6 +119,12 @@ static spn_user_node_t* identity_node(sp_mem_t mem, const identity_node_t* spec)
       break;
     }
     sp_da_push(node->outputs, identity_path(&spec->outputs[it]));
+  }
+  sp_carr_for(spec->output_dirs, it) {
+    if (!spec->output_dirs[it].sub) {
+      break;
+    }
+    sp_da_push(node->output_dirs, identity_path(&spec->output_dirs[it]));
   }
   return node;
 }
@@ -240,6 +248,12 @@ static const identity_node_test_t user_tests [] = {
     .name = "distinct_outputs",
     .a = { .pkg = { .qualified = "A", .rev = "1" }, .tag = "N", .fn = "F", .outputs = { { "A-1/H", SPN_PATH_ROOT_BUILD } } },
     .b = { .pkg = { .qualified = "A", .rev = "1" }, .tag = "N", .fn = "F", .outputs = { { "A-1/I", SPN_PATH_ROOT_BUILD } } },
+    .expect = { .distinct = true }
+  },
+  {
+    .name = "distinct_output_kind",
+    .a = { .pkg = { .qualified = "A", .rev = "1" }, .tag = "N", .fn = "F", .outputs = { { "A-1/H", SPN_PATH_ROOT_BUILD } } },
+    .b = { .pkg = { .qualified = "A", .rev = "1" }, .tag = "N", .fn = "F", .output_dirs = { { "A-1/H", SPN_PATH_ROOT_BUILD } } },
     .expect = { .distinct = true }
   },
   {

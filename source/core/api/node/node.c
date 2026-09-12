@@ -10,6 +10,7 @@
 #include "unit/types.h"
 
 #include "event/event.h"
+#include "external/wasm/wasm.h"
 #include "paths/paths.h"
 #include "unit/unit.h"
 #include "intern/intern.h"
@@ -26,6 +27,7 @@ spn_node_t* spn_add_node(spn_config_t* config, const c8* tag) {
   };
   sp_da_init(mem, node.inputs);
   sp_da_init(mem, node.outputs);
+  sp_da_init(mem, node.output_dirs);
   sp_da_init(mem, node.deps);
   sp_da_push(unit->user_nodes, node);
 
@@ -58,6 +60,28 @@ void spn_node_add_output(spn_node_t* node, const c8* output) {
     return;
   }
   sp_da_push(info->outputs, made);
+}
+
+static bool output_dir_rejected(spn_pkg_unit_t* unit, spn_path_t dir) {
+  if (!spn_path_within(dir, unit->paths.include).within) {
+    return false;
+  }
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_str_t message = sp_fmt(scratch.mem, "spn_node_add_output_dir: {} contains the include tree", SP_FMT_STR(spn_path_str(&spn.roots, scratch.mem, dir))).value;
+  bool trapped = spn_wasm_trap_active(unit, message);
+  sp_mem_end_scratch(scratch);
+  sp_assert(trapped);
+  return true;
+}
+
+void spn_node_add_output_dir(spn_node_t* node, const c8* dir) {
+  spn_user_node_t* info = spn_node_deref(node->ref);
+  SPN_API_LOG(node->ref.pkg, "spn_node_add_output_dir", "{}, {}", SP_FMT_STR(info->tag), SP_FMT_CSTR(dir));
+  spn_path_t made = spn_api_tree_path(node->ref.pkg, "spn_node_add_output_dir", dir);
+  if (spn_path_empty(made) || output_dir_rejected(node->ref.pkg, made)) {
+    return;
+  }
+  sp_da_push(info->output_dirs, made);
 }
 
 void spn_node_link(spn_node_t* from, spn_node_t* to) {

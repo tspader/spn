@@ -31,6 +31,50 @@ sp_test(script, package_discovery) {
   });
 }
 
+sp_test(script, tree_output) {
+  return run_command_test(t, (command_test_t) {
+    .project = "test/integration/fixtures/script/tree_output",
+    .copy = { "packages/*" },
+    .args = { "build" },
+    .expect = {
+      .exists = { store_file("K/include/G/a.h"), store_file("K/include/G/b/c.h"), exe("M") },
+    },
+  });
+}
+
+sp_test(script, tree_output_cached) {
+  return run_rebuild_test(t, (rebuild_test_t) {
+    .project = "test/integration/fixtures/script/tree_output",
+    .copy = { "packages/*" },
+    .first = {
+      .args = { "build" },
+      .expect.events = { { .event = SPN_EVENT_SCRIPT_USER_FN } },
+    },
+    .rebuilds = {
+      {
+        .command = {
+          .args = { "build" },
+          .expect.events = { { .event = SPN_EVENT_SCRIPT_USER_FN, .absent = true } },
+        },
+      },
+    },
+    .watches = {
+      { .file = store_file("K/include/G/a.h"), .mtime = REBUILD_MTIME_UNCHANGED },
+    },
+  });
+}
+
+sp_test(script, tree_output_include) {
+  return run_command_test(t, (command_test_t) {
+    .project = "test/integration/fixtures/script/tree_output_include",
+    .args = { "build" },
+    .expect = {
+      .rc = 1,
+      .events = { { .event = SPN_EVENT_ERR, .key = "kind", .value = "wasm_module_call_failed" } },
+    },
+  });
+}
+
 sp_test(script, copy_dir) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/script/copy_dir",

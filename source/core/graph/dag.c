@@ -192,6 +192,15 @@ static spn_err_t generate_embedding(spn_dag_t* g, spn_dag_action_t* action, void
   return SPN_OK;
 }
 
+static sp_err_t user_output_copy(spn_dag_artifact_kind_t kind, sp_str_t declared, sp_str_t target) {
+  switch (kind) {
+    case SPN_DAG_ARTIFACT_KIND_FILE: return sp_fs_copy_file(declared, target, SP_FS_ATOMIC_REPLACE);
+    case SPN_DAG_ARTIFACT_KIND_TREE: return sp_fs_copy_tree(declared, target, SP_FS_ATOMIC_REPLACE);
+    case SPN_DAG_ARTIFACT_KIND_VALUE: break;
+  }
+  SP_UNREACHABLE_RETURN(SP_ERR_SYS_UNSUPPORTED);
+}
+
 static spn_err_t dag_user_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data, spn_dag_env_t* env, sp_mem_t mem, sp_da(spn_dag_obs_t)* obs) {
   spn_dag_user_ctx_t* ctx = (spn_dag_user_ctx_t*)user_data;
   spn_user_node_t* node = ctx->node;
@@ -230,7 +239,7 @@ static spn_err_t dag_user_exec(spn_dag_t* g, spn_dag_action_t* action, void* use
       });
       return SPN_ERR_DAG_ACTION;
     }
-    if (sp_fs_copy_file(declared, target, SP_FS_ATOMIC_REPLACE)) {
+    if (user_output_copy(artifact->kind, declared, target)) {
       spn_event_buffer_push(spn.events, (spn_event_t) {
         .kind = SPN_EVENT_NODE_FAILED,
         .pkg = pkg->info->name,
@@ -298,33 +307,49 @@ spn_err_t spn_build_publish_copies(spn_pkg_unit_t* unit, sp_str_t root, sp_mem_t
   return SPN_OK;
 }
 
-static s32 dag_tree_copy_user_outputs(spn_pkg_unit_t* unit, sp_str_t root) {
+static spn_err_t tree_copy_user_file(sp_str_t root, sp_str_t sub, spn_path_t path) {
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  spn_err_t err = spn_fs_update_file(spn_path_str(&spn.roots, scratch.mem, path), sp_fs_join_path(scratch.mem, root, sub));
+  sp_mem_end_scratch(scratch);
+  return err;
+}
+
+static spn_err_t tree_copy_user_dir(sp_str_t root, sp_str_t sub, spn_path_t path) {
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_err_t err = sp_fs_copy_tree(spn_path_str(&spn.roots, scratch.mem, path), sp_fs_join_path(scratch.mem, root, sub), SP_FS_ATOMIC_REPLACE);
+  sp_mem_end_scratch(scratch);
+  return err ? SPN_ERROR : SPN_OK;
+}
+
+static spn_err_t user_output_unpublished(spn_pkg_unit_t* unit, spn_user_node_t* node, spn_path_t path) {
+  spn_event_buffer_push(spn.events, (spn_event_t) {
+    .kind = SPN_EVENT_NODE_FAILED,
+    .pkg = unit->info->name,
+    .node_failed = {
+      .path = spn_path_str(&spn.roots, spn.mem, path),
+      .message = sp_fmt(spn.mem, "output of node {} could not be published to the package store", sp_fmt_str(node->tag)).value,
+    },
+  });
+  return SPN_ERROR;
+}
+
+static spn_err_t dag_tree_copy_user_outputs(spn_pkg_unit_t* unit, sp_str_t root) {
   sp_da_for(unit->user_nodes, it) {
     spn_user_node_t* node = &unit->user_nodes[it];
     sp_da_for(node->outputs, ot) {
-      spn_path_t path = node->outputs[ot];
-      spn_path_rel_t rel = spn_path_within(unit->paths.include, path);
-      if (!rel.within) {
-        continue;
+      spn_path_rel_t rel = spn_path_within(unit->paths.include, node->outputs[ot]);
+      if (rel.within && tree_copy_user_file(root, rel.sub, node->outputs[ot])) {
+        return user_output_unpublished(unit, node, node->outputs[ot]);
       }
-      sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-      sp_str_t to = sp_fs_join_path(scratch.mem, root, rel.sub);
-      s32 err = spn_fs_update_file(spn_path_str(&spn.roots, scratch.mem, path), to);
-      sp_mem_end_scratch(scratch);
-      if (err) {
-        spn_event_buffer_push(spn.events, (spn_event_t) {
-          .kind = SPN_EVENT_NODE_FAILED,
-          .pkg = unit->info->name,
-          .node_failed = {
-            .path = spn_path_str(&spn.roots, spn.mem, path),
-            .message = sp_fmt(spn.mem, "output of node {} could not be published to the package store", sp_fmt_str(node->tag)).value,
-          },
-        });
-        return 1;
+    }
+    sp_da_for(node->output_dirs, ot) {
+      spn_path_rel_t rel = spn_path_within(unit->paths.include, node->output_dirs[ot]);
+      if (rel.within && tree_copy_user_dir(root, rel.sub, node->output_dirs[ot])) {
+        return user_output_unpublished(unit, node, node->output_dirs[ot]);
       }
     }
   }
-  return 0;
+  return SPN_OK;
 }
 
 static spn_err_t dag_tree_exec(spn_dag_t* g, spn_dag_action_t* action, void* user_data, spn_dag_env_t* env, sp_mem_t mem, sp_da(spn_dag_obs_t)* obs) {
@@ -393,6 +418,19 @@ static spn_dag_id_t dag_configure_reactor(spn_dag_build_t* b, spn_pkg_unit_t* un
   return spn_dag_add_file(b->graph, spn_target_output_path(b->mem, configure));
 }
 
+static spn_err_t dag_add_user_output(spn_dag_build_t* b, spn_dag_pkg_ids_t* pkg, spn_dag_id_t action, spn_dag_id_t artifact, spn_path_t path) {
+  spn_err_t err = spn_dag_action_add_output(b->graph, action, artifact);
+  if (err) {
+    b->env.diag = (spn_dag_diag_t) {
+      .err = err,
+      .path = spn_path_str(b->graph->roots, b->mem, path)
+    };
+    return err;
+  }
+  sp_da_push(pkg->user_outputs, artifact);
+  return SPN_OK;
+}
+
 static spn_err_t dag_add_user_nodes(spn_dag_build_t* b, spn_pkg_unit_t* unit, spn_dag_pkg_ids_t* pkg) {
   spn_dag_t* g = b->graph;
   spn_dag_id_t configure = dag_configure_reactor(b, unit);
@@ -411,7 +449,7 @@ static spn_err_t dag_add_user_nodes(spn_dag_build_t* b, spn_pkg_unit_t* unit, sp
 
     spn_dag_user_ctx_t* ctx = sp_alloc_type(b->mem, spn_dag_user_ctx_t);
     ctx->node = node;
-    ctx->stamp = sp_da_empty(node->outputs);
+    ctx->stamp = sp_da_empty(node->outputs) && sp_da_empty(node->output_dirs);
     if (ctx->stamp) {
       sp_da_push(node->outputs, spn_pkg_unit_get_node_stamp_file(unit, node));
     }
@@ -431,16 +469,10 @@ static spn_err_t dag_add_user_nodes(spn_dag_build_t* b, spn_pkg_unit_t* unit, sp
     }
 
     sp_da_for(node->outputs, ot) {
-      spn_dag_id_t file = spn_dag_add_file(g, node->outputs[ot]);
-      spn_err_t err = spn_dag_action_add_output(g, action, file);
-      if (err) {
-        b->env.diag = (spn_dag_diag_t) {
-          .err = err,
-          .path = spn_path_str(g->roots, b->mem, node->outputs[ot])
-        };
-        return err;
-      }
-      sp_da_push(pkg->user_outputs, file);
+      spn_try(dag_add_user_output(b, pkg, action, spn_dag_add_file(g, node->outputs[ot]), node->outputs[ot]));
+    }
+    sp_da_for(node->output_dirs, ot) {
+      spn_try(dag_add_user_output(b, pkg, action, spn_dag_add_tree(g, node->output_dirs[ot]), node->output_dirs[ot]));
     }
 
     sp_da_push(pkg->user_actions, action);
@@ -457,6 +489,9 @@ static spn_err_t dag_add_user_nodes(spn_dag_build_t* b, spn_pkg_unit_t* unit, sp
       spn_user_node_t* dep = spn_node_deref(node->deps[jt]);
       sp_da_for(dep->outputs, ot) {
         spn_dag_action_add_input(g, action, spn_dag_add_file(g, dep->outputs[ot]));
+      }
+      sp_da_for(dep->output_dirs, ot) {
+        spn_dag_action_add_input(g, action, spn_dag_add_tree(g, dep->output_dirs[ot]));
       }
     }
   }
@@ -653,6 +688,11 @@ static bool dag_pkg_publishes(spn_pkg_unit_t* unit) {
     spn_user_node_t* node = &unit->user_nodes[it];
     sp_da_for(node->outputs, ot) {
       if (spn_path_within(unit->paths.include, node->outputs[ot]).within) {
+        return true;
+      }
+    }
+    sp_da_for(node->output_dirs, ot) {
+      if (spn_path_within(unit->paths.include, node->output_dirs[ot]).within) {
         return true;
       }
     }

@@ -82,6 +82,7 @@ struct spn_user_node_t {
   sp_str_t fn;
   sp_da(spn_path_t) inputs;
   sp_da(spn_path_t) outputs;
+  sp_da(spn_path_t) output_dirs;
   sp_da(spn_node_ref_t) deps;
 };
 

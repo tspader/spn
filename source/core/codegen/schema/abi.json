@@ -45,6 +45,7 @@
     { "name": "spn_node_set_fn", "args": ["node", "str"] },
     { "name": "spn_node_add_input", "args": ["node", "str"] },
     { "name": "spn_node_add_output", "args": ["node", "str"] },
+    { "name": "spn_node_add_output_dir", "args": ["node", "str"] },
     { "name": "spn_node_link", "args": ["node", "node"] },
     { "name": "spn_write_file", "args": ["ctx", "str", "str"] },
     { "name": "spn_copy", "ret": "s32", "args": ["ctx", "s32", "str", "s32", "str"] },
