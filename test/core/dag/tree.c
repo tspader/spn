@@ -10,7 +10,7 @@ typedef enum {
   TREE_OP_PUT,
   TREE_OP_HAS,
   TREE_OP_MATERIALIZE,
-  TREE_OP_STALE,
+  TREE_OP_WRITE,
 } tree_op_kind_t;
 
 typedef struct {
@@ -18,12 +18,12 @@ typedef struct {
   spn_err_t err;
   tree_file_t files [DAG_TEST_MAX_OUTPUTS];
   const c8* absent [DAG_TEST_MAX_OUTPUTS];
+  const c8* kept [DAG_TEST_MAX_OUTPUTS];
 } tree_expect_t;
 
 typedef struct {
   tree_op_kind_t kind;
   tree_file_t files [DAG_TEST_MAX_OUTPUTS];
-  const c8* stale;
   tree_expect_t expect;
 } tree_op_t;
 
@@ -57,7 +57,7 @@ static const tree_store_test_t tree_store_tests [] = {
     .name = "stale_files_removed",
     .ops = {
       { .kind = TREE_OP_PUT, .files = { { "X.h", "A" } } },
-      { .kind = TREE_OP_STALE, .stale = "Z.h" },
+      { .kind = TREE_OP_WRITE, .files = { { "Z.h", "S" } } },
       { .kind = TREE_OP_MATERIALIZE, .expect = { .files = { { "X.h", "A" } }, .absent = { "Z.h" } } },
     }
   },
@@ -65,8 +65,42 @@ static const tree_store_test_t tree_store_tests [] = {
     .name = "stale_subdir_removed",
     .ops = {
       { .kind = TREE_OP_PUT, .files = { { "X.h", "A" } } },
-      { .kind = TREE_OP_STALE, .stale = "Z/W.h" },
+      { .kind = TREE_OP_WRITE, .files = { { "Z/W.h", "S" } } },
       { .kind = TREE_OP_MATERIALIZE, .expect = { .files = { { "X.h", "A" } }, .absent = { "Z" } } },
+    }
+  },
+  {
+    .name = "settled_entry_kept",
+    .ops = {
+      { .kind = TREE_OP_PUT, .files = { { "X.h", "A" } } },
+      { .kind = TREE_OP_MATERIALIZE },
+      { .kind = TREE_OP_WRITE, .files = { { "X.h", "A" } } },
+      { .kind = TREE_OP_MATERIALIZE, .expect = { .files = { { "X.h", "A" } }, .kept = { "X.h" } } },
+    }
+  },
+  {
+    .name = "changed_entry_relinked",
+    .ops = {
+      { .kind = TREE_OP_PUT, .files = { { "X.h", "A" } } },
+      { .kind = TREE_OP_MATERIALIZE },
+      { .kind = TREE_OP_WRITE, .files = { { "X.h", "T" } } },
+      { .kind = TREE_OP_MATERIALIZE, .expect = { .files = { { "X.h", "A" } } } },
+    }
+  },
+  {
+    .name = "dir_replaces_file",
+    .ops = {
+      { .kind = TREE_OP_PUT, .files = { { "B/Y.h", "B" } } },
+      { .kind = TREE_OP_WRITE, .files = { { "B", "S" } } },
+      { .kind = TREE_OP_MATERIALIZE, .expect = { .files = { { "B/Y.h", "B" } } } },
+    }
+  },
+  {
+    .name = "file_replaces_dir",
+    .ops = {
+      { .kind = TREE_OP_PUT, .files = { { "X.h", "A" } } },
+      { .kind = TREE_OP_WRITE, .files = { { "X.h/W", "S" } } },
+      { .kind = TREE_OP_MATERIALIZE, .expect = { .files = { { "X.h", "A" } }, .absent = { "X.h/W" } } },
     }
   },
   {
@@ -117,9 +151,24 @@ static sp_err_t tree_run_store_ops(sp_test_t* t, spn_dag_store_kind_t kind, cons
         break;
       }
       case TREE_OP_MATERIALIZE: {
+        sp_sys_file_meta_t before [DAG_TEST_MAX_OUTPUTS] = sp_zero;
+        sp_carr_for(op.expect.kept, ki) {
+          if (!op.expect.kept[ki]) {
+            break;
+          }
+          sp_must_ok(t, sp_sys_get_path_metadata_s(sp_sys_get_root(0), sp_fs_join_path(env.mem, dst, sp_cstr_as_str(op.expect.kept[ki])), &before[ki]));
+        }
         sp_expect_eq(t, op.expect.err, spn_dag_store_materialize_tree(&env.store, digest, dst));
         if (op.expect.err) {
           break;
+        }
+        sp_carr_for(op.expect.kept, ki) {
+          if (!op.expect.kept[ki]) {
+            break;
+          }
+          sp_sys_file_meta_t after = sp_zero;
+          sp_must_ok(t, sp_sys_get_path_metadata_s(sp_sys_get_root(0), sp_fs_join_path(env.mem, dst, sp_cstr_as_str(op.expect.kept[ki])), &after));
+          sp_expect_eq(t, before[ki].id, after.id);
         }
         sp_carr_for(op.expect.files, fi) {
           if (!op.expect.files[fi].path) {
@@ -138,8 +187,13 @@ static sp_err_t tree_run_store_ops(sp_test_t* t, spn_dag_store_kind_t kind, cons
         }
         break;
       }
-      case TREE_OP_STALE: {
-        dag_test_create(sp_fs_join_path(env.mem, dst, sp_cstr_as_str(op.stale)), sp_str_lit("stale"));
+      case TREE_OP_WRITE: {
+        sp_carr_for(op.files, fi) {
+          if (!op.files[fi].path) {
+            break;
+          }
+          dag_test_create(sp_fs_join_path(env.mem, dst, sp_cstr_as_str(op.files[fi].path)), sp_str_view(op.files[fi].content));
+        }
         break;
       }
     }

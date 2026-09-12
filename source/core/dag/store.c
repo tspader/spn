@@ -850,6 +850,67 @@ done:
   return ok;
 }
 
+typedef sp_str_ht(bool) tree_name_set_t;
+
+typedef struct {
+  tree_name_set_t files;
+  tree_name_set_t dirs;
+} tree_keep_t;
+
+static tree_keep_t tree_keep(sp_mem_t mem, sp_da(spn_dag_action_output_t) entries) {
+  tree_keep_t keep;
+  sp_str_ht_init(mem, keep.files);
+  sp_str_ht_init(mem, keep.dirs);
+  sp_da_for(entries, it) {
+    sp_str_ht_insert(keep.files, entries[it].name, true);
+    for (sp_str_t dir = sp_fs_parent_path(entries[it].name); !sp_str_empty(dir); dir = sp_fs_parent_path(dir)) {
+      sp_str_ht_insert(keep.dirs, dir, true);
+    }
+  }
+  return keep;
+}
+
+static spn_err_t tree_prune(sp_mem_t mem, sp_str_t dir, tree_keep_t keep) {
+  sp_da(sp_fs_entry_t) existing = sp_zero;
+  if (sp_fs_collect_recursive(mem, dir, &existing)) {
+    return SPN_ERR_DAG_STORE_READ;
+  }
+  sp_da_rfor(existing, it) {
+    sp_fs_entry_t* entry = &existing[it];
+    sp_str_t name = sp_str_strip_left(sp_str_strip_left(entry->path, dir), sp_str_lit("/"));
+    sp_err_t err = SP_OK;
+    switch (entry->kind) {
+      case SP_FS_KIND_DIR: {
+        if (!sp_str_ht_get(keep.dirs, name)) {
+          err = sp_fs_remove_dir(entry->path);
+        }
+        break;
+      }
+      case SP_FS_KIND_FILE:
+      case SP_FS_KIND_SYMLINK:
+      case SP_FS_KIND_NONE: {
+        if (!sp_str_ht_get(keep.files, name)) {
+          err = sp_fs_remove_file(entry->path);
+        }
+        break;
+      }
+    }
+    if (err) {
+      return SPN_ERR_DAG_STORE_WRITE;
+    }
+  }
+  return SPN_OK;
+}
+
+static bool tree_entry_settled(sp_str_t path, spn_dag_digest_t digest) {
+  spn_dag_digest_t existing = sp_zero;
+  u64 size = 0;
+  if (spn_digest_file(SPN_DIGEST_BLAKE3, path, existing.bytes, &size)) {
+    return false;
+  }
+  return spn_dag_digest_equal(existing, digest);
+}
+
 spn_err_t spn_dag_store_materialize_tree(spn_dag_store_t* store, spn_dag_digest_t digest, sp_str_t dir) {
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
   spn_err_t err = SPN_OK;
@@ -860,10 +921,20 @@ spn_err_t spn_dag_store_materialize_tree(spn_dag_store_t* store, spn_dag_digest_
     goto done;
   }
 
-  sp_fs_remove_dir(dir);
-  sp_fs_create_dir(dir);
+  if (sp_fs_create_dir(dir)) {
+    err = SPN_ERR_DAG_STORE_WRITE;
+    goto done;
+  }
+  err = tree_prune(s.mem, dir, tree_keep(s.mem, entries));
+  if (err) {
+    goto done;
+  }
+
   sp_da_for(entries, it) {
     sp_str_t path = sp_fs_join_path(s.mem, dir, entries[it].name);
+    if (tree_entry_settled(path, entries[it].digest)) {
+      continue;
+    }
     err = spn_dag_store_materialize(store, entries[it].digest, entries[it].name, path);
     if (err) {
       goto done;
