@@ -5,5 +5,6 @@
 #include "sp/sp_prompt.h"
 
 s32 tail_trace(sp_mem_t mem, sp_prompt_ctx_t* prompt, const c8* title, sp_str_t log, sp_ps_config_t config);
+s32 tail_trace_expect(sp_mem_t mem, sp_prompt_ctx_t* prompt, const c8* title, sp_str_t log, sp_ps_config_t config, s32 expected);
 
 #endif

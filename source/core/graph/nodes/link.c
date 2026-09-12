@@ -190,7 +190,7 @@ static spn_err_t read_export_symbols(sp_mem_t mem, sp_str_t path, sp_da(sp_str_t
   return SPN_OK;
 }
 
-static spn_err_t link_target_exec(sp_mem_t scratch, spn_target_unit_t* target, spn_path_t output, sp_da(spn_path_t) objects, spn_path_t exports) {
+static spn_err_t link_target_exec(sp_mem_t scratch, spn_target_unit_t* target, spn_path_t output, sp_da(spn_path_t) objects, spn_path_t exports, spn_path_t implib) {
   spn_cc_link_files_t files = {
     .output = output,
     .objects = objects,
@@ -203,6 +203,7 @@ static spn_err_t link_target_exec(sp_mem_t scratch, spn_target_unit_t* target, s
     }
     case SPN_CC_OUTPUT_SHARED_LIB: {
       files.exports.path = exports;
+      files.implib = implib;
       break;
     }
     case SPN_CC_OUTPUT_EXE:
@@ -229,7 +230,7 @@ static spn_err_t link_target_exec(sp_mem_t scratch, spn_target_unit_t* target, s
   return emit_link_passed(target, invocation, destination, run.result.out, run.elapsed);
 }
 
-spn_err_t spn_link_target_run(spn_target_unit_t* target, spn_path_t output, sp_da(spn_path_t) objects, spn_path_t exports) {
+spn_err_t spn_link_target_run(spn_target_unit_t* target, spn_path_t output, sp_da(spn_path_t) objects, spn_path_t exports, spn_path_t implib) {
   spn_pkg_unit_announce_compile(target->pkg);
 
   spn_event_buffer_push(spn.events, (spn_event_t) {
@@ -241,7 +242,7 @@ spn_err_t spn_link_target_run(spn_target_unit_t* target, spn_path_t output, sp_d
   });
 
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  spn_err_t result = link_target_exec(scratch.mem, target, output, objects, exports);
+  spn_err_t result = link_target_exec(scratch.mem, target, output, objects, exports, implib);
   sp_mem_end_scratch(scratch);
   return result;
 }

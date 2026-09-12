@@ -241,6 +241,9 @@ void spn_msvc_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, con
   if (!spn_path_empty(files->exports.path)) {
     sp_da_push(linker, spn_arg_glue(sp_str_lit("/DEF:"), files->exports.path));
   }
+  if (!spn_path_empty(files->implib)) {
+    sp_da_push(linker, spn_arg_glue(sp_str_lit("/IMPLIB:"), files->implib));
+  }
   sp_da_for(files->whole_archives, it) {
     sp_da_push(linker, spn_arg_glue(sp_str_lit("/WHOLEARCHIVE:"), files->whole_archives[it]));
   }

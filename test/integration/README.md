@@ -58,16 +58,15 @@ and skips with a reason otherwise.
   targets.
 - `.sanitize` also skips where a system gcc or clang targets a libc other than
   the host's, since its sanitizer runtimes are built for the host libc.
-- `.driver`, `.os`, `.host`, `.shell`, and the rest are unchanged. `.programs`
+- `.driver`, `.os`, `.host`, and the rest are unchanged. `.programs`
   is for cases that need a program by name that the lane doesn't provide, like
   a fixture-local toolchain's `compiler = "gcc"`, never as a stand-in for a
   lane.
 
 A case whose fixture declares its own `[[toolchain]]` names it with
 `.toolchain = "F"` on the case; that is what `--toolchain` receives instead of
-the lane's. It is for cases *about* declaring toolchains, like raw `link_args`
-reaching a fake linker or a custom `cxx`. A case that needs a real toolchain
-family belongs to a lane.
+the lane's. It is for cases *about* declaring toolchains, like a custom
+`cxx`. A case that needs a real toolchain family belongs to a lane.
 
 A case that needs user config of its own puts it in a file in its fixture dir
 and names it with `.config = "config.toml"`. It is appended to the generated
@@ -101,9 +100,8 @@ The `linker.*` cases check that per family: a script sets the entry point for
 gnu and lld on elf (`script_sets_entry` in the lanes that claim bare metal,
 `cross_script_sets_entry` in `aarch64-gnu`) and for gnu on mingw
 (`mingw_gcc_honors_script`); it is refused up front for lld on mingw, macho,
-wasm, and msvc. `toolchain_link_args_reach_the_driver` witnesses
-a raw arg selecting a fake linker, and the `link_flags_gated_on_linker_*` pair
-proves the `linker` fact matches the family the lane declares.
+wasm, and msvc. The `link_flags_gated_on_linker_*` pair proves the `linker`
+fact matches the family the lane declares.
 
 | lane          | driver  | linker family              | link_args                          | hosted by                                     |
 |---------------|---------|----------------------------|------------------------------------|-----------------------------------------------|

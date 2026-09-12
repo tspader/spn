@@ -15,7 +15,6 @@ sp_test(consume, static_lib) {
 sp_test(consume, shared_lib) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/consume/shared",
-    .when.msvc_todo = true,
     .copy = { "packages/*" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "-p", "debug" } } },
@@ -50,7 +49,6 @@ sp_test(consume, source_lib) {
 sp_test(consume, system_dep) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/consume/system_dep",
-    .when.msvc_todo = true,
     .copy = { "packages/*" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "-p", "static" } } },
@@ -76,7 +74,6 @@ sp_test(consume, transitive) {
 sp_test(consume, explicit_root_with_package_dep) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/consume/root_only",
-    .when.msvc_todo = true,
     .copy = { "packages/*" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "main" } } },
@@ -127,7 +124,6 @@ sp_test(consume, multi_kind_static) {
 sp_test(consume, multi_kind_shared) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/consume/multi_kind/shared",
-    .when.msvc_todo = true,
     .copy = { "packages/*" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },

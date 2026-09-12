@@ -34,8 +34,6 @@ typedef struct {
   bool exports;
   bool cxx;
   bool deterministic;
-  bool msvc_todo;
-  bool shell;
 } test_when_t;
 
 typedef struct {
@@ -45,6 +43,7 @@ typedef struct {
 
 const test_toolchain_t* test_toolchain(void);
 const c8* test_lane_toolchain_arg(void);
+sp_str_t  test_probes(void);
 sp_str_t  test_lanes_toml(void);
 spn_triple_t test_host(void);
 const c8* test_target_alternate(void);

@@ -1,22 +1,24 @@
 param(
-  [Parameter(Mandatory=$true)][string]$Dir,
   [Parameter(Mandatory=$true)][string]$Exe
 )
 $ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $false
 Set-StrictMode -Version Latest
 
-$exe = Join-Path $Dir $Exe
-Write-Host "== barerun: $exe =="
+$STATUS_DLL_NOT_FOUND       = -1073741515
+$STATUS_INVALID_IMAGE_FORMAT = -1073741701
+$SEM_NO_ERROR_DIALOGS        = 0x8003
 
-& $exe
+if (-not (Test-Path $Exe)) { throw "no probe at $Exe" }
+
+Add-Type -Namespace Win32 -Name ErrorMode -MemberDefinition '[DllImport("kernel32.dll")] public static extern uint SetErrorMode(uint mode);'
+[void][Win32.ErrorMode]::SetErrorMode($SEM_NO_ERROR_DIALOGS)
+
+Write-Host "== barerun: $Exe =="
+& $Exe
 $code = $LASTEXITCODE
+Write-Host "== barerun: exit $code =="
 
-# STATUS_DLL_NOT_FOUND (0xC0000135) and STATUS_INVALID_IMAGE_FORMAT (0xC000007B)
-# arrive as their signed 32-bit values; both mean the loader refused the image.
-$DLL_NOT_FOUND     = -1073741515
-$INVALID_IMAGE_FMT = -1073741701
-
-Write-Host "== barerun exit $code =="
 if ($code -eq 0) { exit 0 }
-elseif ($code -eq $DLL_NOT_FOUND -or $code -eq $INVALID_IMAGE_FMT) { exit 10 }
-else { exit 20 }
+if ($code -eq $STATUS_DLL_NOT_FOUND -or $code -eq $STATUS_INVALID_IMAGE_FORMAT) { exit 10 }
+exit 20

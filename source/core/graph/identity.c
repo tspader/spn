@@ -130,6 +130,7 @@ spn_dag_digest_t spn_build_compile_identity(const spn_compile_unit_t* unit) {
 spn_err_t spn_build_link_identity(sp_mem_t mem, spn_target_unit_t* target, spn_path_t output, sp_da(spn_path_t) objects, spn_path_t exports, spn_dag_digest_t* identity) {
   spn_cc_link_files_t files = {
     .output = output,
+    .implib = spn_target_import_lib_path(mem, target),
     .objects = objects,
     .exports.path = exports,
   };

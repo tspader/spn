@@ -24,6 +24,7 @@
     { "name": "spn_get_subdir", "ret": "str", "args": ["ctx", "s32", "str"] },
     { "name": "spn_get_profile", "ret": "profile", "args": ["ctx"] },
     { "name": "spn_profile_get_libc", "ret": "s32", "args": ["profile"] },
+    { "name": "spn_profile_get_os", "ret": "s32", "args": ["profile"] },
     { "name": "spn_profile_get_mode", "ret": "s32", "args": ["profile"] },
     { "name": "spn_profile_get_opt", "ret": "s32", "args": ["profile"] },
     { "name": "spn_profile_get_sanitizers", "ret": "s32", "args": ["profile"] },

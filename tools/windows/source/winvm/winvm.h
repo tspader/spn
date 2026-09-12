@@ -24,9 +24,13 @@ typedef struct {
     sp_str_t templates;
     sp_str_t domains;
     sp_str_t logs;
-    sp_str_t known_hosts;
     sp_str_t probes;
   } paths;
+
+  struct {
+    sp_str_t home;
+    sp_str_t probes;
+  } guest;
 
   struct {
     sp_str_t connect;
@@ -42,13 +46,28 @@ typedef struct {
 typedef enum {
   WINVM_PROBE_RUNS,
   WINVM_PROBE_NOT_LOADABLE,
-} winvm_probe_expect_t;
+  WINVM_PROBE_RAN_NONZERO,
+  WINVM_PROBE_ERROR,
+} winvm_probe_outcome_t;
 
 typedef struct {
-  sp_str_t rel;
+  const winvm_variant_t* variant;
+  sp_str_t lane;
+  sp_str_t name;
   sp_str_t exe;
-  winvm_probe_expect_t expect;
+  winvm_probe_outcome_t expect;
 } winvm_probe_t;
+
+typedef enum {
+  WINVM_PROBES_OK,
+  WINVM_PROBES_ERR_TREE,
+  WINVM_PROBES_ERR_MANIFEST,
+} winvm_probes_err_t;
+
+typedef struct {
+  winvm_probes_err_t err;
+  sp_str_t path;
+} winvm_probes_result_t;
 
 winvm_init_err_t winvm_init(winvm_t* vm, sp_mem_t mem);
 
@@ -68,19 +87,22 @@ s32 winvm_undefine(winvm_t* vm, const winvm_variant_t* variant);
 s32 winvm_seal(winvm_t* vm, sp_str_t path);
 s32 winvm_shutdown(winvm_t* vm, const winvm_variant_t* variant);
 s32 winvm_upload_recipe(winvm_t* vm, const winvm_variant_t* variant, winvm_step_t step);
-s32 winvm_upload_file(winvm_t* vm, const winvm_variant_t* variant, sp_str_t local, sp_str_t remote);
-s32 winvm_download_dir(winvm_t* vm, const winvm_variant_t* variant, sp_str_t remote, sp_str_t local);
-s32 winvm_upload_dir(winvm_t* vm, const winvm_variant_t* variant, sp_str_t local, sp_str_t remote);
 
-s32 winvm_probes_read(winvm_t* vm, sp_da(winvm_probe_t)* probes);
-s32 winvm_probe_expected_code(winvm_probe_expect_t expect);
+winvm_probes_result_t winvm_probes_read(winvm_t* vm, const winvm_variant_t* variant, sp_da(winvm_probe_t)* probes);
+winvm_probe_outcome_t winvm_probe_outcome(s32 status);
+s32                   winvm_probe_status(winvm_probe_outcome_t outcome);
+const c8*             winvm_probe_outcome_name(winvm_probe_outcome_t outcome);
 
 sp_ps_config_t winvm_recipe_config(winvm_t* vm, const winvm_variant_t* variant, winvm_step_t step);
+sp_ps_config_t winvm_test_config(winvm_t* vm, const winvm_variant_t* variant, const c8* lane, const c8* filter);
 sp_ps_config_t winvm_probe_config(winvm_t* vm, const winvm_variant_t* variant, winvm_probe_t probe);
+sp_ps_config_t winvm_upload_config(winvm_t* vm, const winvm_variant_t* variant, sp_str_t* locals, u32 count, sp_str_t remote);
+sp_ps_config_t winvm_download_config(winvm_t* vm, const winvm_variant_t* variant, sp_str_t remote, sp_str_t local);
 sp_ps_config_t winvm_wait_ssh_config(winvm_t* vm, const winvm_variant_t* variant, u32 timeout_s);
 sp_ps_config_t winvm_wait_off_config(winvm_t* vm, const winvm_variant_t* variant, u32 timeout_s);
 sp_ps_config_t winvm_voldownload_config(winvm_t* vm, sp_str_t dest);
 sp_ps_config_t winvm_convert_config(winvm_t* vm, sp_str_t src, sp_str_t dest);
 sp_ps_config_t winvm_ssh_config(winvm_t* vm, const winvm_variant_t* variant, const c8* command);
+sp_ps_config_t winvm_shell_config(winvm_t* vm, const winvm_variant_t* variant);
 
 #endif

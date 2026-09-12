@@ -34,6 +34,7 @@ typedef struct {
   spn_target_unit_t* target;
   sp_da(spn_dag_id_t) objects;
   spn_dag_id_t exports;
+  spn_dag_id_t implib;
 } spn_dag_link_ctx_t;
 
 typedef struct {
@@ -165,7 +166,8 @@ static spn_err_t dag_link_exec(spn_dag_t* g, spn_dag_action_t* action, void* use
     sp_da_push(objects, dag_artifact_path(g, link->objects[it]));
   }
   spn_path_t exports = link->exports.occupied ? dag_artifact_path(g, link->exports) : (spn_path_t) sp_zero;
-  if (spn_link_target_run(target, dag_artifact_path(g, action->produces[0]), objects, exports)) {
+  spn_path_t implib = link->implib.occupied ? dag_artifact_path(g, link->implib) : (spn_path_t) sp_zero;
+  if (spn_link_target_run(target, dag_artifact_path(g, action->produces[0]), objects, exports, implib)) {
     return SPN_ERR_DAG_ACTION;
   }
   return SPN_OK;
@@ -661,6 +663,7 @@ spn_err_t spn_dag_build_add_target(spn_dag_build_t* b, spn_target_unit_t* target
   }
 
   spn_path_t output = spn_target_output_path(b->mem, target);
+  spn_path_t implib = spn_target_import_lib_path(b->mem, target);
   spn_path_t exports = link->exports.occupied ? dag_artifact_declared(g, link->exports) : (spn_path_t) sp_zero;
 
   spn_dag_digest_t identity = sp_zero;
@@ -685,6 +688,10 @@ spn_err_t spn_dag_build_add_target(spn_dag_build_t* b, spn_target_unit_t* target
   }
   ids.output = spn_dag_add_file(g, output);
   spn_try(spn_dag_action_add_output(g, ids.action, ids.output));
+  if (!spn_path_empty(implib)) {
+    link->implib = spn_dag_add_file(g, implib);
+    spn_try(spn_dag_action_add_output(g, ids.action, link->implib));
+  }
 
   sp_ht_insert(b->ids.targets, target, ids);
   return SPN_OK;

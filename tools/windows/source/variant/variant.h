@@ -23,6 +23,7 @@ typedef struct {
 
 extern const winvm_variant_t winvm_variants[];
 extern const u32 winvm_num_variants;
+extern const winvm_variant_t* const winvm_bare;
 
 const winvm_variant_t* winvm_variant_find(const c8* name);
 sp_str_t winvm_variant_summary(sp_mem_t mem, const winvm_variant_t* variant);

@@ -84,6 +84,7 @@ typedef struct {
 
 typedef struct {
   spn_path_t output;
+  spn_path_t implib;
   sp_da(spn_path_t) objects;
   sp_da(spn_path_t) whole_archives;
   spn_cc_exports_t exports;
