@@ -1,6 +1,5 @@
 #define SP_IMPLEMENTATION
 #include "sp.h"
-#include "atomic_file/atomic_file.h"
 #include "spn.h"
 #include "codegen.h"
 

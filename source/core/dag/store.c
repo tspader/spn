@@ -4,7 +4,6 @@
 #include "sp.h"
 #include "spn/core.h"
 #include "io/io.h"
-#include "atomic_file/atomic_file.h"
 
 
 static c8 format_obs_kind(spn_dag_obs_kind_t kind) {
@@ -556,52 +555,17 @@ static sp_str_t get_blob_path(spn_dag_store_t* store, sp_mem_t mem, spn_dag_dige
   return spn_path_str(store->roots, mem, get_blob(store, mem, digest, name));
 }
 
-static sp_str_t get_staging_dir(spn_dag_store_t* store, sp_mem_t mem) {
-  return spn_path_str(store->roots, mem, spn_path_join(mem, store->dir, sp_str_lit(".staging")));
-}
-
-static spn_err_t copy_blob(sp_str_t source, sp_str_t target, sp_str_t staging) {
-  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-  spn_err_t err = SPN_OK;
-
-  sp_sys_file_meta_t meta = sp_zero;
-  sp_mem_slice_t bytes = sp_zero;
-  sp_fs_atomic_t af = sp_zero;
-  if (sp_sys_get_path_metadata_s(sp_sys_get_root(0), source, &meta)) {
-    err = SPN_ERR_DAG_STORE_READ;
-  } else if (sp_io_read_file_slice(s.mem, source, &bytes)) {
-    err = SPN_ERR_DAG_STORE_READ;
-  } else if (sp_fs_atomic_open_staged(&af, target, staging)) {
-    err = SPN_ERR_DAG_STORE_WRITE;
-  } else if (sp_io_write_all(sp_fs_atomic_writer(&af), bytes.data, bytes.len, SP_NULLPTR)) {
-    sp_fs_atomic_abort(&af);
-    err = SPN_ERR_DAG_STORE_WRITE;
-  } else {
-    sp_sys_chmod_s(af.dir, af.temp, &meta);
-    if (sp_fs_atomic_commit(&af, SP_FS_ATOMIC_REPLACE)) {
-      err = SPN_ERR_DAG_STORE_WRITE;
-    }
-  }
-
-  sp_mem_end_scratch(s);
-  return err;
-}
-
-static spn_err_t link_into_store(sp_str_t source, sp_str_t blob, sp_str_t staging) {
-  if (!sp_fs_link(source, blob, SP_FS_LINK_HARD)) {
-    return SPN_OK;
-  }
-  return copy_blob(source, blob, staging);
-}
-
-static spn_err_t link_from_store(sp_str_t source, sp_str_t target, sp_str_t staging) {
-  sp_fs_create_dir(sp_fs_parent_path(target));
-  sp_fs_remove_file(target);
-
+static spn_err_t link_or_copy(sp_str_t source, sp_str_t target) {
   if (!sp_fs_link(source, target, SP_FS_LINK_HARD)) {
     return SPN_OK;
   }
-  return copy_blob(source, target, staging);
+  return sp_fs_copy_file(source, target, SP_FS_ATOMIC_REPLACE) ? SPN_ERR_DAG_STORE_WRITE : SPN_OK;
+}
+
+static spn_err_t link_from_store(sp_str_t source, sp_str_t target) {
+  sp_fs_create_dir(sp_fs_parent_path(target));
+  sp_fs_remove_file(target);
+  return link_or_copy(source, target);
 }
 
 static bool find_blob(spn_dag_store_t* store, spn_dag_digest_t digest, sp_mem_slice_t* blob) {
@@ -658,7 +622,7 @@ spn_err_t spn_dag_store_put(spn_dag_store_t* store, const void* data, u64 len, s
       sp_str_t blob = get_blob_path(store, s.mem, *digest, name);
       if (!sp_fs_is_file(blob)) {
         sp_fs_create_dir(spn_path_str(store->roots, s.mem, get_blob_dir(store, s.mem, *digest)));
-        if (sp_fs_write_atomic_slice_staged(blob, get_staging_dir(store, s.mem), sp_mem_slice((u8*)data, len))) {
+        if (sp_fs_write_atomic_slice(blob, sp_mem_slice((u8*)data, len))) {
           err = SPN_ERR_DAG_STORE_WRITE;
         }
       }
@@ -698,7 +662,7 @@ spn_err_t spn_dag_store_put_file(spn_dag_store_t* store, sp_str_t path, sp_str_t
       sp_str_t blob = get_blob_path(store, s.mem, *digest, name);
       if (!sp_fs_is_file(blob)) {
         sp_fs_create_dir(spn_path_str(store->roots, s.mem, get_blob_dir(store, s.mem, *digest)));
-        err = link_into_store(path, blob, get_staging_dir(store, s.mem));
+        err = link_or_copy(path, blob);
       }
       sp_mem_end_scratch(s);
       return err;
@@ -781,7 +745,7 @@ spn_err_t spn_dag_store_materialize(spn_dag_store_t* store, spn_dag_digest_t dig
       sp_str_t stored = get_blob_path(store, s.mem, digest, name);
       spn_err_t err = SPN_ERR_DAG_STORE_MISSING;
       if (sp_fs_is_file(stored)) {
-        err = link_from_store(stored, path, sp_str_lit(""));
+        err = link_from_store(stored, path);
       }
       sp_mem_end_scratch(s);
       return err;

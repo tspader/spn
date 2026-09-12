@@ -5,6 +5,7 @@ add_executable(core
   drain.c
   elf.c
   fs.c
+  copy.c
   filter.c
   wake.c
   sim.c
@@ -228,7 +229,6 @@ add_executable(core
   ${SRC}/session/session.c
   ${SRC}/hash/digest/digest.c
   ${SRC}/hash/sha256/sha256.c
-  ${UTIL}/atomic_file/atomic_file.c
   ${UTIL}/coff/coff.c
   ${UTIL}/macho/macho.c
   ${UTIL}/sp_elf/sp_elf.c

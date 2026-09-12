@@ -45,7 +45,6 @@ yyjson = "0.14.0"
 files = [
   "tools/patches/sp-test-num-cpus.patch",
   "tools/patches/sp-prompt-external-wake.patch",
-  "tools/patches/sp-env-host-keys.patch",
 ]
 
 [patch.wamr]
@@ -258,7 +257,6 @@ source = [
   "source/core/session/session.c",
   "source/core/hash/digest/digest.c",
   "source/core/hash/sha256/sha256.c",
-  "source/util/atomic_file/atomic_file.c",
   "source/util/coff/coff.c",
   "source/util/macho/macho.c",
   "source/util/sp_elf/sp_elf.c",
@@ -664,7 +662,6 @@ source = [
   "source/core/ctx/ctx.c",
   "source/core/core/core.c",
   "source/util/lazy/lazy.c",
-  "source/util/atomic_file/atomic_file.c",
   "source/util/fs/fs.c",
   "source/util/io/io.c",
   "source/util/str/str.c",
@@ -741,7 +738,6 @@ source = [
   "source/core/elf/elf.c",
   "source/core/when/when.c",
   "source/util/coff/coff.c",
-  "source/util/atomic_file/atomic_file.c",
   "source/util/fs/fs.c",
   "source/util/macho/macho.c",
   "source/util/sp_elf/sp_elf.c",

@@ -43,8 +43,7 @@ static void git_repo_copy_dir(sp_str_t source, sp_str_t repo) {
     sp_str_t relative = sp_str_strip_left(entry->path, source);
     relative = sp_str_strip_left(relative, sp_str_lit("/"));
     sp_str_t target = sp_fs_join_path(mem, repo, relative);
-    sp_fs_create_dir(sp_fs_parent_path(target));
-    sp_fs_copy_file(entry->path, target);
+    sp_fs_copy_file(entry->path, target, SP_FS_ATOMIC_REPLACE);
   }
 }
 

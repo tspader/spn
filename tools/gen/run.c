@@ -1,5 +1,4 @@
 #include "gen.h"
-#include "atomic_file/atomic_file.h"
 
 #define try(expr) do { if (!(expr)) return false; } while (0)
 

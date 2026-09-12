@@ -31,6 +31,17 @@ sp_test(script, package_discovery) {
   });
 }
 
+sp_test(script, copy_dir) {
+  return run_test(t, (test_t) {
+    .project = "test/integration/fixtures/script/copy_dir",
+    .copy = { "data" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = store_file("misc/D/X.txt") },
+    },
+  });
+}
+
 sp_test(script, abi_discovery) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/script/abi_discovery",

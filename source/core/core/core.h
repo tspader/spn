@@ -4,6 +4,7 @@
 #include "core/types.h"
 
 spn_err_t spn_fs_update_file(sp_str_t from, sp_str_t to);
+spn_err_t spn_fs_update_glob(sp_str_t from, sp_str_t to);
 spn_err_t spn_fs_update_file_str(sp_str_t path, sp_str_t content);
 
 void spn_wake_ring(spn_wake_t* wake);

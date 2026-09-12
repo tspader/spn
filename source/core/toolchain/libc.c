@@ -1,6 +1,5 @@
 #include "toolchain/libc.h"
 
-#include "atomic_file/atomic_file.h"
 #include "ctx/types.h"
 #include "error/error.h"
 #include "hash/digest/digest.h"

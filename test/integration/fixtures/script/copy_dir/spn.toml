@@ -1,0 +1,7 @@
+[package]
+name = "copy_dir"
+version = "0.0.1"
+
+[[bin]]
+name = "copy_dir"
+source = ["main.c"]

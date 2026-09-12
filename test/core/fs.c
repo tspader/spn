@@ -1,6 +1,5 @@
 #include "spn_test.h"
 
-#include "atomic_file/atomic_file.h"
 #include "fs/fs.h"
 
 
@@ -229,55 +228,7 @@ sp_test(fs_append, appends) {
   return SP_OK;
 }
 
-sp_test(fs_copy_atomic, replaces) {
-  sp_mem_t mem = sp_test_arena(t);
-  sp_str_t src = sp_fs_join_path(mem, sp_test_dir(t), sp_str_lit("src"));
-  sp_str_t dst = sp_fs_join_path(mem, sp_test_dir(t), sp_str_lit("dst"));
-  sp_must_ok(t, sp_fs_create_file_cstr(src, "NEW"));
-  sp_must_ok(t, sp_fs_create_file_cstr(dst, "OLD"));
-
-  sp_must_ok(t, sp_fs_copy_atomic(dst, src));
-
-  sp_str_t content = sp_zero;
-  sp_must_ok(t, sp_io_read_file(mem, dst, &content));
-  sp_expect_str_eq_c(t, content, "NEW");
-  sp_must_ok(t, sp_io_read_file(mem, src, &content));
-  sp_expect_str_eq_c(t, content, "NEW");
-  return SP_OK;
-}
-
-sp_test(fs_copy_atomic, missing_source) {
-  sp_mem_t mem = sp_test_arena(t);
-  sp_str_t src = sp_fs_join_path(mem, sp_test_dir(t), sp_str_lit("absent"));
-  sp_str_t dst = sp_fs_join_path(mem, sp_test_dir(t), sp_str_lit("dst"));
-
-  sp_expect_ne(t, sp_fs_copy_atomic(dst, src), SP_OK);
-  sp_expect(t, !sp_fs_exists(dst));
-  return SP_OK;
-}
-
-sp_test(fs_copy_atomic, preserves_mode) {
-  sp_test_skip_on_win32();
-
-  sp_mem_t mem = sp_test_arena(t);
-  sp_str_t src = sp_fs_join_path(mem, sp_test_dir(t), sp_str_lit("src"));
-  sp_str_t dst = sp_fs_join_path(mem, sp_test_dir(t), sp_str_lit("dst"));
-  sp_must_ok(t, sp_fs_create_file_cstr(src, "X"));
-  sp_ps_output_t chmod = sp_ps_run(mem, (sp_ps_config_t) {
-    .command = sp_str_lit("chmod"),
-    .args = { sp_str_lit("+x"), src },
-  });
-  sp_must_eq(t, 0, chmod.status.exit_code);
-
-  sp_must_ok(t, sp_fs_copy_atomic(dst, src));
-
-  sp_sys_file_meta_t meta = sp_zero;
-  sp_must_ok(t, sp_sys_get_path_metadata_s(sp_sys_get_root(0), dst, &meta));
-  sp_expect(t, (meta.raw_attrs & 0111) != 0);
-  return SP_OK;
-}
-
-sp_test(fs_copy_atomic, busy) {
+sp_test(fs_copy_file, busy) {
   sp_test_skip_on_win32();
 
   sp_mem_t mem = sp_test_arena(t);
@@ -291,8 +242,7 @@ sp_test(fs_copy_atomic, busy) {
   sp_str_t sleep_bin = sp_str_trim_right(which.out);
 
   sp_str_t target = sp_fs_join_path(mem, dir, sp_str_lit("bin/spn"));
-  sp_must_ok(t, sp_fs_create_dir(sp_fs_parent_path(target)));
-  sp_must_ok(t, sp_fs_copy_file(sleep_bin, target));
+  sp_must_ok(t, sp_fs_copy_file(sleep_bin, target, SP_FS_ATOMIC_REPLACE));
 
   sp_ps_t running = sp_ps_create(mem, (sp_ps_config_t) {
     .command = target,
@@ -304,7 +254,7 @@ sp_test(fs_copy_atomic, busy) {
   sp_str_t source = sp_fs_join_path(mem, dir, sp_str_lit("src"));
   sp_must_ok(t, sp_fs_create_file_cstr(source, "N"));
 
-  sp_err_t err = sp_fs_copy_atomic(target, source);
+  sp_err_t err = sp_fs_copy_file(source, target, SP_FS_ATOMIC_REPLACE);
 
   sp_ps_kill(&running);
   sp_ps_wait(&running);

@@ -1,5 +1,4 @@
 #include "sp.h"
-#include "atomic_file/atomic_file.h"
 #include "io/io.h"
 #include "macro/macro.h"
 #include "project/project.h"
@@ -232,7 +231,7 @@ static spn_err_t dag_user_exec(spn_dag_t* g, spn_dag_action_t* action, void* use
       });
       return SPN_ERR_DAG_ACTION;
     }
-    if (sp_fs_copy(declared, target)) {
+    if (sp_fs_copy_file(declared, target, SP_FS_ATOMIC_REPLACE)) {
       spn_event_buffer_push(spn.events, (spn_event_t) {
         .kind = SPN_EVENT_NODE_FAILED,
         .pkg = pkg->info->name,
@@ -280,7 +279,6 @@ static publish_copy_result_t publish_copy(spn_pkg_unit_t* unit, sp_str_t root, s
     result = PUBLISH_COPY_ABSENT;
   }
   else {
-    sp_fs_create_dir(sp_fs_parent_path(dest));
     result = spn_fs_update_file(spn_path_str(&spn.roots, scratch.mem, matches[0]), dest) ? PUBLISH_COPY_FAILED : PUBLISH_COPY_OK;
   }
 
@@ -339,7 +337,6 @@ static s32 dag_tree_copy_user_outputs(spn_pkg_unit_t* unit, sp_str_t root) {
       }
       sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
       sp_str_t to = sp_fs_join_path(scratch.mem, root, rel.sub);
-      sp_fs_create_dir(sp_fs_parent_path(to));
       s32 err = spn_fs_update_file(spn_path_str(&spn.roots, scratch.mem, path), to);
       sp_mem_end_scratch(scratch);
       if (err) {
@@ -984,11 +981,9 @@ static void dag_stage_link(spn_dag_build_t* b, dag_staged_t* staged, spn_path_t 
   sp_str_t target = spn_path_str(b->graph->roots, scratch.mem, to);
 
   sp_fs_create_dir(sp_fs_parent_path(target));
-  if (sp_fs_exists(target)) {
-    sp_fs_remove_file(target);
-  }
-  if (sp_fs_link(source, target, SP_FS_LINK_HARD) != SP_OK) {
-    sp_fs_link(source, target, SP_FS_LINK_COPY);
+  sp_fs_remove_file(target);
+  if (sp_fs_link(source, target, SP_FS_LINK_HARD)) {
+    sp_fs_copy_file(source, target, SP_FS_ATOMIC_REPLACE);
   }
   sp_mem_end_scratch(scratch);
 
@@ -1038,21 +1033,7 @@ static void dag_stage_copy(spn_dag_build_t* b, dag_staged_t* staged, spn_dag_id_
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
   sp_str_t source = spn_path_str(b->graph->roots, scratch.mem, artifact->materialized);
   sp_str_t target = spn_path_str(b->graph->roots, scratch.mem, to);
-
-  sp_sys_file_meta_t meta = sp_zero;
-  sp_mem_slice_t bytes = sp_zero;
-  sp_fs_atomic_t af = sp_zero;
-  if (!sp_sys_get_path_metadata_s(sp_sys_get_root(0), source, &meta) &&
-      !sp_io_read_file_slice(scratch.mem, source, &bytes) &&
-      !sp_fs_atomic_open(&af, target)) {
-    if (sp_io_write_all(sp_fs_atomic_writer(&af), bytes.data, bytes.len, SP_NULLPTR)) {
-      sp_fs_atomic_abort(&af);
-    }
-    else {
-      sp_sys_chmod_s(af.dir, af.temp, &meta);
-      sp_fs_atomic_commit(&af, SP_FS_ATOMIC_REPLACE);
-    }
-  }
+  sp_fs_copy_file(source, target, SP_FS_ATOMIC_REPLACE);
   sp_mem_end_scratch(scratch);
 
   spn_dag_file_cache_invalidate(&b->files, to);

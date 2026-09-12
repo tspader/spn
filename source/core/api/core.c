@@ -1,6 +1,5 @@
 #include "sp.h"
 #include "macro/macro.h"
-#include "sp/sp_glob.h"
 #include "spn.h"
 
 #include "api/api.h"
@@ -193,57 +192,13 @@ void spn_write_file(spn_t* s, const c8* path, const c8* content) {
 }
 
 s32 spn_api_copy(sp_str_t from, sp_str_t to) {
-  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-
-  s32 err = SPN_OK;
-
-  // sp_fs_copy only understands a bare "*" or an exact name; expand real glob
-  // patterns (e.g. "lib/*.o") ourselves against the source directory.
-  sp_str_t pattern = sp_fs_get_name(from);
   if (sp_fs_is_glob(from)) {
-    sp_str_t dir = sp_fs_parent_path(from);
-    if (!sp_fs_is_dir(dir)) {
-      err = SPN_ERROR;
-    }
-    else if (sp_str_equal(pattern, sp_str_lit("*"))) {
-      err = sp_fs_copy(from, to);
-    }
-    else {
-      sp_fs_create_dir(to);
-
-      sp_glob_set_t* glob = sp_glob_set_new(scratch.mem);
-      sp_glob_set_add(glob, sp_str_to_cstr(scratch.mem, pattern));
-      sp_glob_set_build(glob);
-
-      sp_da(sp_fs_entry_t) entries = sp_zero;
-      sp_fs_collect(scratch.mem, dir, &entries);
-      sp_da_for(entries, it) {
-        if (sp_glob_set_match(glob, entries[it].name)) {
-          spn_fs_update_file(sp_fs_join_path(scratch.mem, dir, entries[it].name), to);
-        }
-      }
-    }
+    return spn_fs_update_glob(from, to);
   }
-  else if (!sp_fs_exists(from)) {
-    err = SPN_ERROR;
+  if (sp_fs_is_dir(from)) {
+    return sp_fs_copy_into(from, to) ? SPN_ERROR : SPN_OK;
   }
-  else if (sp_fs_is_dir(from)) {
-    sp_fs_create_dir(to);
-    err = sp_fs_copy(from, to);
-  }
-  else {
-    // @spader This bit me so I just patched it over like this, but
-    // I need to think about how this should work
-    sp_str_t parent = sp_fs_parent_path(to);
-    if (!sp_str_empty(parent)) {
-      sp_fs_create_dir(parent);
-    }
-
-    err = spn_fs_update_file(from, to);
-  }
-
-  sp_mem_end_scratch(scratch);
-  return err;
+  return spn_fs_update_file(from, to);
 }
 
 s32 spn_api_copy_rooted(spn_pkg_unit_t* unit, spn_dir_t from_dir, sp_str_t from_path, spn_dir_t to_dir, sp_str_t to_path) {

@@ -107,7 +107,6 @@ set(SPN_SOURCES
   core/session/session.c
   core/hash/digest/digest.c
   core/hash/sha256/sha256.c
-  util/atomic_file/atomic_file.c
   util/coff/coff.c
   util/fs/fs.c
   util/io/io.c

@@ -189,7 +189,7 @@ static spn_err_t fetch_stub(spn_toolchain_store_t* store, sp_str_t url, sp_str_t
   if (stub->fail) return SPN_ERROR;
   if (!sp_str_empty(stub->fail_url_containing) && sp_str_contains(url, stub->fail_url_containing)) return SPN_ERROR;
   if (stub->vanish) return SPN_OK;
-  if (sp_fs_copy(stub->tarball, dest)) return SPN_ERROR;
+  if (sp_fs_copy_file(stub->tarball, dest, SP_FS_ATOMIC_REPLACE)) return SPN_ERROR;
   return SPN_OK;
 }
 

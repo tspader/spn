@@ -213,10 +213,10 @@ static sp_err_t build_fixture(sp_test_t* t, const test_t* it, fixture_t* fx) {
   sp_must_eq(t, 0, tar.status.exit_code);
 
   sp_str_t asset = sp_fs_join_path(mem, fx->fix, sp_str_lit(SHIM_LINUX_ASSET));
-  sp_must_eq(t, (u32)SP_OK, (u32)sp_fs_copy_file(asset, sp_fs_join_path(mem, fx->fix, sp_str_lit(SHIM_MACOS_ASSET))));
+  sp_must_eq(t, (u32)SP_OK, (u32)sp_fs_copy_file(asset, sp_fs_join_path(mem, fx->fix, sp_str_lit(SHIM_MACOS_ASSET)), SP_FS_ATOMIC_REPLACE));
 
   sp_str_t corrupt = sp_fs_join_path(mem, bad, sp_str_lit(SHIM_LINUX_ASSET));
-  sp_must_eq(t, (u32)SP_OK, (u32)sp_fs_copy_file(asset, corrupt));
+  sp_must_eq(t, (u32)SP_OK, (u32)sp_fs_copy_file(asset, corrupt, SP_FS_ATOMIC_REPLACE));
   sp_str_t bytes = sp_zero;
   sp_must_eq(t, (u32)SP_OK, (u32)sp_io_read_file(mem, corrupt, &bytes));
   sp_must_eq(t, (u32)SP_OK, (u32)sp_fs_create_file_str(corrupt, sp_str_concat(mem, bytes, sp_str_lit("x"))));

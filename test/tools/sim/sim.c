@@ -322,6 +322,11 @@ static sp_err_t sp_sim_sys_transfer(sp_sys_fd_t in, u64* in_pos, sp_sys_fd_t out
   return SP_ERR_SYS;
 }
 
+static sp_err_t sp_sim_sys_transfer_positional(sp_sys_fd_t in, u64* in_pos, sp_sys_fd_t out, u64 count, u64 offset, u64* bytes_moved) {
+  *bytes_moved = 0;
+  return SP_ERR_SYS_UNSUPPORTED;
+}
+
 static sp_sys_fd_t sp_sim_sys_get_root(s32 it) {
   if (it != 0) {
     sp_sim_unexpected("get_root");
@@ -649,6 +654,11 @@ static sp_err_t sp_sim_sys_symlink(const c8* existing, u32 existing_len, sp_sys_
   return SP_ERR_SYS;
 }
 
+static sp_err_t sp_sim_sys_readlink(sp_sys_fd_t fd, const c8* path, u32 len, c8* buf, u64 size, u64* target_len) {
+  sp_sim_unexpected("readlink");
+  return SP_ERR_SYS;
+}
+
 static sp_err_t sp_sim_sys_get_path_metadata(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_file_meta_t* st) {
   sp_sim_syscall_at(fd);
   if (sp_sim_fail()) {
@@ -678,6 +688,11 @@ static sp_err_t sp_sim_sys_chmod(sp_sys_fd_t fd, const c8* path, u32 len, const 
 
   c8 buf [SP_PATH_MAX];
   return sp_sim_find(sp_sim_norm(path, len, buf)) ? SP_OK : SP_ERR_SYS_NOT_FOUND;
+}
+
+static sp_err_t sp_sim_sys_set_times(sp_sys_fd_t fd, const c8* path, u32 len, sp_sys_timespec_t atime, sp_sys_timespec_t mtime) {
+  sp_sim_unexpected("set_times");
+  return SP_ERR_SYS;
 }
 
 static sp_err_t sp_sim_sys_clock_gettime(s32 clockid, sp_sys_timespec_t* ts) {
@@ -902,6 +917,7 @@ static const sp_sys_vtable_t sp_sim_vtable = {
   .pread                  = sp_sim_sys_pread,
   .pwrite                 = sp_sim_sys_pwrite,
   .transfer               = sp_sim_sys_transfer,
+  .transfer_positional    = sp_sim_sys_transfer_positional,
   .get_root               = sp_sim_sys_get_root,
   .get_exe_path           = sp_sim_sys_get_exe_path,
   .get_cwd_path           = sp_sim_sys_get_cwd_path,
@@ -917,10 +933,12 @@ static const sp_sys_vtable_t sp_sim_vtable = {
   .rename                 = sp_sim_sys_rename,
   .link                   = sp_sim_sys_link,
   .symlink                = sp_sim_sys_symlink,
+  .readlink               = sp_sim_sys_readlink,
   .get_path_metadata      = sp_sim_sys_get_path_metadata,
   .get_link_metadata      = sp_sim_sys_get_path_metadata,
   .get_file_metadata      = sp_sim_sys_get_file_metadata,
   .chmod                  = sp_sim_sys_chmod,
+  .set_times              = sp_sim_sys_set_times,
   .clock_gettime          = sp_sim_sys_clock_gettime,
   .nanosleep              = sp_sim_sys_nanosleep,
   .canonicalize_path      = sp_sim_sys_canonicalize_path,

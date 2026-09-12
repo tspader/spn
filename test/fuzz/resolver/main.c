@@ -1,6 +1,7 @@
 #define SP_IMPLEMENTATION
 #include "sp.h"
 #include "sp/sp_cli.h"
+#include "sp/sp_glob.h"
 
 #include "fuzz.h"
 

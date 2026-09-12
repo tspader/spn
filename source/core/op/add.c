@@ -13,7 +13,6 @@
 #include "semver/compare.h"
 #include "semver/convert.h"
 #include "semver/parser.h"
-#include "atomic_file/atomic_file.h"
 #include "toml/edit.h"
 #include "toml/issue.h"
 
