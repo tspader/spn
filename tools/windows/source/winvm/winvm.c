@@ -33,7 +33,6 @@ winvm_init_err_t winvm_init(winvm_t* vm, sp_mem_t mem) {
   vm->paths.templates = sp_fs_join_path(mem, vm->paths.repo, sp_str_lit("tools/windows/templates"));
   vm->paths.domains = sp_fs_join_path(mem, vm->paths.repo, sp_str_lit("build/winvm/domains"));
   vm->paths.logs = sp_fs_join_path(mem, vm->paths.repo, sp_str_lit("build/winvm/logs"));
-  vm->paths.known_hosts = sp_fs_join_path(mem, vm->paths.repo, sp_str_lit("build/winvm/known_hosts"));
   vm->paths.probes = sp_fs_join_path(mem, vm->paths.repo, sp_str_lit("build/winvm/probes"));
 
   vm->cfg.connect = env_or(mem, "SPN_WIN_CONNECT", sp_str_lit("qemu:///system"));
@@ -43,6 +42,9 @@ winvm_init_err_t winvm_init(winvm_t* vm, sp_mem_t mem) {
   vm->cfg.network = env_or(mem, "SPN_WIN_NETWORK", sp_str_lit("default"));
   vm->cfg.prefix = env_or(mem, "SPN_WIN_PREFIX", sp_str_lit("win-11"));
   vm->cfg.user = env_or(mem, "SPN_WIN_USER", sp_str_lit("spader"));
+
+  vm->guest.home = sp_fmt(mem, "C:/Users/{}", sp_fmt_str(vm->cfg.user)).value;
+  vm->guest.probes = sp_fs_join_path(mem, vm->guest.home, sp_str_lit("probes"));
 
   vm->templates = sp_template_registry_create(mem);
   if (!sp_fs_is_dir(vm->paths.templates) || sp_template_load_dir(vm->templates, vm->paths.templates)) {
@@ -80,14 +82,6 @@ static sp_str_t mac(winvm_t* vm, const winvm_variant_t* variant) {
   c8 lo = hex[variant->octet & 0xf];
   c8 hi = hex[(variant->octet >> 4) & 0xf];
   return sp_fmt(vm->mem, "52:54:00:77:77:{}{}", sp_fmt_str(sp_str(&hi, 1)), sp_fmt_str(sp_str(&lo, 1))).value;
-}
-
-static u32 memory(const winvm_variant_t* variant) {
-  return variant->memory_mb ? variant->memory_mb : 8192;
-}
-
-static u32 vcpus(const winvm_variant_t* variant) {
-  return variant->vcpus ? variant->vcpus : 4;
 }
 
 static sp_ps_output_t run(winvm_t* vm, const c8** argv) {
@@ -158,8 +152,8 @@ static sp_str_t render_domain(winvm_t* vm, const winvm_variant_t* variant, sp_st
 
   sp_template_scope_t* scope = sp_template_scope_create(vm->mem);
   sp_template_set(scope, sp_str_lit("name"), winvm_domain(vm, variant));
-  sp_template_set(scope, sp_str_lit("memory"), sp_fmt(vm->mem, "{}", sp_fmt_uint(memory(variant))).value);
-  sp_template_set(scope, sp_str_lit("vcpus"), sp_fmt(vm->mem, "{}", sp_fmt_uint(vcpus(variant))).value);
+  sp_template_set(scope, sp_str_lit("memory"), sp_fmt(vm->mem, "{}", sp_fmt_uint(variant->memory_mb)).value);
+  sp_template_set(scope, sp_str_lit("vcpus"), sp_fmt(vm->mem, "{}", sp_fmt_uint(variant->vcpus)).value);
   sp_template_set(scope, sp_str_lit("disk"), disk);
   sp_template_set(scope, sp_str_lit("mac"), mac(vm, variant));
   sp_template_set(scope, sp_str_lit("network"), vm->cfg.network);
@@ -202,30 +196,68 @@ s32 winvm_seal(winvm_t* vm, sp_str_t path) {
 }
 
 static void ssh_opts(winvm_t* vm, sp_ps_config_t* config) {
-  sp_ps_config_add_arg(vm->mem, config, sp_str_lit("-o"));
-  sp_ps_config_add_arg(vm->mem, config, sp_str_lit("BatchMode=yes"));
-  sp_ps_config_add_arg(vm->mem, config, sp_str_lit("-o"));
-  sp_ps_config_add_arg(vm->mem, config, sp_str_lit("StrictHostKeyChecking=accept-new"));
-  sp_ps_config_add_arg(vm->mem, config, sp_str_lit("-o"));
-  sp_ps_config_add_arg(vm->mem, config, sp_str_lit("ConnectTimeout=10"));
-  sp_ps_config_add_arg(vm->mem, config, sp_str_lit("-o"));
-  sp_ps_config_add_arg(vm->mem, config, sp_fmt(vm->mem, "UserKnownHostsFile={}", sp_fmt_str(vm->paths.known_hosts)).value);
+  const c8* opts[] = {
+    "BatchMode=yes",
+    "StrictHostKeyChecking=no",
+    "UserKnownHostsFile=/dev/null",
+    "LogLevel=ERROR",
+    "WarnWeakCrypto=no",
+    "ConnectTimeout=10",
+  };
+  sp_carr_for(opts, it) {
+    sp_ps_config_add_arg(vm->mem, config, sp_str_lit("-o"));
+    sp_ps_config_add_arg(vm->mem, config, sp_cstr_as_str(opts[it]));
+  }
 }
 
 static sp_str_t ssh_target(winvm_t* vm, const winvm_variant_t* variant) {
   return sp_fmt(vm->mem, "{}@{}", sp_fmt_str(vm->cfg.user), sp_fmt_str(winvm_ip(vm, variant))).value;
 }
 
-sp_ps_config_t winvm_ssh_config(winvm_t* vm, const winvm_variant_t* variant, const c8* command) {
+static sp_str_t ssh_path(winvm_t* vm, const winvm_variant_t* variant, sp_str_t path) {
+  return sp_fmt(vm->mem, "{}:{}", sp_fmt_str(ssh_target(vm, variant)), sp_fmt_str(path)).value;
+}
+
+static sp_ps_config_t ssh(winvm_t* vm) {
   sp_ps_config_t config = { .command = sp_str_lit("ssh") };
   ssh_opts(vm, &config);
-  if (!command) {
-    sp_ps_config_add_arg(vm->mem, &config, sp_str_lit("-t"));
-  }
+  return config;
+}
+
+static sp_ps_config_t scp(winvm_t* vm) {
+  sp_ps_config_t config = { .command = sp_str_lit("scp"), .io.err = { .mode = SP_PS_IO_MODE_REDIRECT } };
+  ssh_opts(vm, &config);
+  sp_ps_config_add_arg(vm->mem, &config, sp_str_lit("-r"));
+  return config;
+}
+
+sp_ps_config_t winvm_ssh_config(winvm_t* vm, const winvm_variant_t* variant, const c8* command) {
+  sp_ps_config_t config = ssh(vm);
   sp_ps_config_add_arg(vm->mem, &config, ssh_target(vm, variant));
-  if (command) {
-    sp_ps_config_add_arg(vm->mem, &config, sp_cstr_as_str(command));
+  sp_ps_config_add_arg(vm->mem, &config, sp_cstr_as_str(command));
+  return config;
+}
+
+sp_ps_config_t winvm_shell_config(winvm_t* vm, const winvm_variant_t* variant) {
+  sp_ps_config_t config = ssh(vm);
+  sp_ps_config_add_arg(vm->mem, &config, sp_str_lit("-t"));
+  sp_ps_config_add_arg(vm->mem, &config, ssh_target(vm, variant));
+  return config;
+}
+
+sp_ps_config_t winvm_upload_config(winvm_t* vm, const winvm_variant_t* variant, sp_str_t* locals, u32 count, sp_str_t remote) {
+  sp_ps_config_t config = scp(vm);
+  sp_for(it, count) {
+    sp_ps_config_add_arg(vm->mem, &config, locals[it]);
   }
+  sp_ps_config_add_arg(vm->mem, &config, ssh_path(vm, variant, remote));
+  return config;
+}
+
+sp_ps_config_t winvm_download_config(winvm_t* vm, const winvm_variant_t* variant, sp_str_t remote, sp_str_t local) {
+  sp_ps_config_t config = scp(vm);
+  sp_ps_config_add_arg(vm->mem, &config, ssh_path(vm, variant, remote));
+  sp_ps_config_add_arg(vm->mem, &config, local);
   return config;
 }
 
@@ -268,98 +300,112 @@ static sp_str_t recipe_name(winvm_t* vm, winvm_step_t step) {
 
 s32 winvm_upload_recipe(winvm_t* vm, const winvm_variant_t* variant, winvm_step_t step) {
   sp_str_t local = sp_fs_join_path(vm->mem, vm->paths.recipes, sp_fmt(vm->mem, "{}.ps1", sp_fmt_cstr(step.recipe)).value);
-  return winvm_upload_file(vm, variant, local, recipe_name(vm, step));
+  sp_str_t remote = sp_fs_join_path(vm->mem, vm->guest.home, recipe_name(vm, step));
+  return sp_ps_run(vm->mem, winvm_upload_config(vm, variant, &local, 1, remote)).status.exit_code;
 }
 
-s32 winvm_upload_file(winvm_t* vm, const winvm_variant_t* variant, sp_str_t local, sp_str_t remote) {
-  sp_ps_config_t scp = { .command = sp_str_lit("scp"), .io.err = { .mode = SP_PS_IO_MODE_REDIRECT } };
-  ssh_opts(vm, &scp);
-  sp_ps_config_add_arg(vm->mem, &scp, local);
-  sp_ps_config_add_arg(vm->mem, &scp, sp_fmt(vm->mem, "{}:{}", sp_fmt_str(ssh_target(vm, variant)), sp_fmt_str(remote)).value);
-  return sp_ps_run(vm->mem, scp).status.exit_code;
-}
-
-s32 winvm_download_dir(winvm_t* vm, const winvm_variant_t* variant, sp_str_t remote, sp_str_t local) {
-  sp_ps_config_t scp = { .command = sp_str_lit("scp"), .io.err = { .mode = SP_PS_IO_MODE_REDIRECT } };
-  ssh_opts(vm, &scp);
-  sp_ps_config_add_arg(vm->mem, &scp, sp_str_lit("-r"));
-  sp_ps_config_add_arg(vm->mem, &scp, sp_fmt(vm->mem, "{}:{}", sp_fmt_str(ssh_target(vm, variant)), sp_fmt_str(remote)).value);
-  sp_ps_config_add_arg(vm->mem, &scp, local);
-  return sp_ps_run(vm->mem, scp).status.exit_code;
-}
-
-s32 winvm_upload_dir(winvm_t* vm, const winvm_variant_t* variant, sp_str_t local, sp_str_t remote) {
-  sp_ps_config_t scp = { .command = sp_str_lit("scp"), .io.err = { .mode = SP_PS_IO_MODE_REDIRECT } };
-  ssh_opts(vm, &scp);
-  sp_ps_config_add_arg(vm->mem, &scp, sp_str_lit("-r"));
-  sp_ps_config_add_arg(vm->mem, &scp, local);
-  sp_ps_config_add_arg(vm->mem, &scp, sp_fmt(vm->mem, "{}:{}", sp_fmt_str(ssh_target(vm, variant)), sp_fmt_str(remote)).value);
-  return sp_ps_run(vm->mem, scp).status.exit_code;
+static sp_ps_config_t pwsh(winvm_t* vm, const winvm_variant_t* variant, sp_str_t script, sp_str_t args) {
+  sp_str_t invoke = sp_fmt(vm->mem, "pwsh -NoProfile -ExecutionPolicy Bypass -File {} {}; exit $LASTEXITCODE",
+    sp_fmt_str(sp_fs_join_path(vm->mem, vm->guest.home, script)), sp_fmt_str(args)).value;
+  return winvm_ssh_config(vm, variant, sp_str_to_cstr(vm->mem, invoke));
 }
 
 sp_ps_config_t winvm_recipe_config(winvm_t* vm, const winvm_variant_t* variant, winvm_step_t step) {
-  sp_str_t remote = sp_fmt(vm->mem, "C:/Users/{}/{}", sp_fmt_str(vm->cfg.user), sp_fmt_str(recipe_name(vm, step))).value;
-  sp_str_t invoke = step.arg
-    ? sp_fmt(vm->mem, "pwsh -NoProfile -ExecutionPolicy Bypass -File {} {}", sp_fmt_str(remote), sp_fmt_cstr(step.arg)).value
-    : sp_fmt(vm->mem, "pwsh -NoProfile -ExecutionPolicy Bypass -File {}", sp_fmt_str(remote)).value;
-  return winvm_ssh_config(vm, variant, sp_str_to_cstr(vm->mem, invoke));
+  return pwsh(vm, variant, recipe_name(vm, step), step.arg ? sp_cstr_as_str(step.arg) : sp_str_lit(""));
 }
 
-s32 winvm_probe_expected_code(winvm_probe_expect_t expect) {
-  switch (expect) {
-    case WINVM_PROBE_RUNS: return 0;
-    case WINVM_PROBE_NOT_LOADABLE: return 10;
-  }
-  SP_UNREACHABLE_RETURN(0);
-}
-
-static winvm_probe_expect_t probe_expect_from_token(sp_str_t token) {
-  if (sp_str_equal_cstr(sp_str_trim(token), "not_loadable")) {
-    return WINVM_PROBE_NOT_LOADABLE;
-  }
-  return WINVM_PROBE_RUNS;
-}
-
-s32 winvm_probes_read(winvm_t* vm, sp_da(winvm_probe_t)* probes) {
-  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  sp_da(sp_fs_entry_t) entries = sp_zero;
-  sp_fs_collect_recursive(scratch.mem, vm->paths.probes, &entries);
-
-  s32 result = 0;
-  sp_da_for(entries, it) {
-    if (entries[it].kind == SP_FS_KIND_DIR || !sp_str_equal(sp_fs_get_name(entries[it].path), sp_str_lit("probe"))) {
-      continue;
-    }
-    sp_str_t content = sp_zero;
-    if (sp_io_read_file(vm->mem, entries[it].path, &content)) {
-      result = -1;
-      break;
-    }
-    s32 nl = sp_str_find_c8(content, '\n');
-    if (nl < 0) {
-      result = -1;
-      break;
-    }
-    sp_str_t dir = sp_fs_parent_path(entries[it].path);
-    winvm_probe_t probe = {
-      .rel = sp_str_copy(vm->mem, sp_str_suffix(dir, dir.len - vm->paths.probes.len - 1)),
-      .exe = sp_str_trim(sp_str_prefix(content, nl)),
-      .expect = probe_expect_from_token(sp_str_suffix(content, content.len - nl - 1)),
-    };
-    sp_da_push(*probes, probe);
-  }
-
-  sp_mem_end_scratch(scratch);
-  return result;
+sp_ps_config_t winvm_test_config(winvm_t* vm, const winvm_variant_t* variant, const c8* lane, const c8* filter) {
+  sp_str_t args = sp_fmt(vm->mem, "-Lane {} -Filter {} -Probes {}",
+    sp_fmt_cstr(lane), sp_fmt_cstr(filter), sp_fmt_str(vm->guest.probes)).value;
+  return pwsh(vm, variant, sp_str_lit("wintest.ps1"), args);
 }
 
 sp_ps_config_t winvm_probe_config(winvm_t* vm, const winvm_variant_t* variant, winvm_probe_t probe) {
-  sp_str_t script = sp_fmt(vm->mem, "C:/Users/{}/barerun.ps1", sp_fmt_str(vm->cfg.user)).value;
-  sp_str_t dir = sp_fmt(vm->mem, "C:/Users/{}/probes/{}", sp_fmt_str(vm->cfg.user), sp_fmt_str(probe.rel)).value;
-  sp_str_t invoke = sp_fmt(vm->mem,
-    "pwsh -NoProfile -ExecutionPolicy Bypass -File {} -Dir {} -Exe {}",
-    sp_fmt_str(script), sp_fmt_str(dir), sp_fmt_str(probe.exe)).value;
-  return winvm_ssh_config(vm, variant, sp_str_to_cstr(vm->mem, invoke));
+  sp_str_t exe = sp_fmt(vm->mem, "{}/{}/{}/{}/{}",
+    sp_fmt_str(vm->guest.probes), sp_fmt_cstr(probe.variant->name), sp_fmt_str(probe.lane),
+    sp_fmt_str(probe.name), sp_fmt_str(probe.exe)).value;
+  return pwsh(vm, variant, sp_str_lit("barerun.ps1"), sp_fmt(vm->mem, "-Exe {}", sp_fmt_str(exe)).value);
+}
+
+winvm_probe_outcome_t winvm_probe_outcome(s32 status) {
+  switch (status) {
+    case 0:  return WINVM_PROBE_RUNS;
+    case 10: return WINVM_PROBE_NOT_LOADABLE;
+    case 20: return WINVM_PROBE_RAN_NONZERO;
+    default: return WINVM_PROBE_ERROR;
+  }
+}
+
+s32 winvm_probe_status(winvm_probe_outcome_t outcome) {
+  switch (outcome) {
+    case WINVM_PROBE_RUNS:         return 0;
+    case WINVM_PROBE_NOT_LOADABLE: return 10;
+    case WINVM_PROBE_RAN_NONZERO:  return 20;
+    case WINVM_PROBE_ERROR:        return -1;
+  }
+  SP_UNREACHABLE_RETURN(-1);
+}
+
+const c8* winvm_probe_outcome_name(winvm_probe_outcome_t outcome) {
+  switch (outcome) {
+    case WINVM_PROBE_RUNS:         return "runs";
+    case WINVM_PROBE_NOT_LOADABLE: return "not_loadable";
+    case WINVM_PROBE_RAN_NONZERO:  return "ran_nonzero";
+    case WINVM_PROBE_ERROR:        return "error";
+  }
+  SP_UNREACHABLE_RETURN("");
+}
+
+static bool parse_manifest(sp_str_t content, sp_str_t* exe, winvm_probe_outcome_t* expect) {
+  sp_da(sp_str_t) lines = sp_str_split_c8(sp_mem_get_scratch(), sp_str_trim(content), '\n');
+  if (sp_da_size(lines) != 2) {
+    return false;
+  }
+  *exe = sp_str_trim(lines[0]);
+  sp_str_t token = sp_str_trim(lines[1]);
+  if (sp_str_equal_cstr(token, winvm_probe_outcome_name(WINVM_PROBE_RUNS))) {
+    *expect = WINVM_PROBE_RUNS;
+    return true;
+  }
+  if (sp_str_equal_cstr(token, winvm_probe_outcome_name(WINVM_PROBE_NOT_LOADABLE))) {
+    *expect = WINVM_PROBE_NOT_LOADABLE;
+    return true;
+  }
+  return false;
+}
+
+static winvm_probes_result_t read_lane(winvm_t* vm, const winvm_variant_t* variant, sp_fs_entry_t lane, sp_da(winvm_probe_t)* probes) {
+  sp_da(sp_fs_entry_t) cases = sp_zero;
+  if (sp_fs_collect(vm->mem, lane.path, &cases)) {
+    return (winvm_probes_result_t) { .err = WINVM_PROBES_ERR_TREE, .path = lane.path };
+  }
+
+  sp_da_for(cases, it) {
+    sp_str_t manifest = sp_fs_join_path(vm->mem, cases[it].path, sp_str_lit("probe"));
+    sp_str_t content = sp_zero;
+    winvm_probe_t probe = { .variant = variant, .lane = lane.name, .name = cases[it].name };
+    if (sp_io_read_file(vm->mem, manifest, &content) || !parse_manifest(content, &probe.exe, &probe.expect)) {
+      return (winvm_probes_result_t) { .err = WINVM_PROBES_ERR_MANIFEST, .path = manifest };
+    }
+    sp_da_push(*probes, probe);
+  }
+  return (winvm_probes_result_t) { .err = WINVM_PROBES_OK };
+}
+
+winvm_probes_result_t winvm_probes_read(winvm_t* vm, const winvm_variant_t* variant, sp_da(winvm_probe_t)* probes) {
+  sp_str_t root = sp_fs_join_path(vm->mem, vm->paths.probes, sp_cstr_as_str(variant->name));
+  sp_da(sp_fs_entry_t) lanes = sp_zero;
+  if (sp_fs_collect(vm->mem, root, &lanes)) {
+    return (winvm_probes_result_t) { .err = WINVM_PROBES_ERR_TREE, .path = root };
+  }
+
+  sp_da_for(lanes, it) {
+    winvm_probes_result_t result = read_lane(vm, variant, lanes[it], probes);
+    if (result.err) {
+      return result;
+    }
+  }
+  return (winvm_probes_result_t) { .err = WINVM_PROBES_OK };
 }
 
 sp_ps_config_t winvm_voldownload_config(winvm_t* vm, sp_str_t dest) {

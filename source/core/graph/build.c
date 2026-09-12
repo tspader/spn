@@ -112,3 +112,15 @@ spn_path_t spn_target_output_path(sp_mem_t mem, spn_target_unit_t* target) {
   sp_mem_end_scratch(s);
   return path;
 }
+
+spn_path_t spn_target_import_lib_path(sp_mem_t mem, spn_target_unit_t* target) {
+  spn_triple_t triple = target_triple(target);
+  if (target->kind != SPN_CC_OUTPUT_SHARED_LIB || spn_ld_dialect(triple) != SPN_LD_DIALECT_LINK) {
+    return sp_zero_struct(spn_path_t);
+  }
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch_for(mem);
+  sp_str_t file_name = spn_triple_lib_file_name(s.mem, triple, target->info->name, SP_OS_LIB_STATIC);
+  spn_path_t path = spn_path_join(mem, target->pkg->paths.lib, file_name);
+  sp_mem_end_scratch(s);
+  return path;
+}

@@ -10,6 +10,7 @@ typedef struct {
   sp_io_reader_t* reader;
   sp_io_file_writer_t log;
   s32 status;
+  s32 expected;
   u32 frame;
   struct {
     c8 data [TAIL_ROWS][TAIL_COLS];
@@ -98,7 +99,7 @@ static void on_update(sp_prompt_ctx_t* ctx) {
     commit(tail);
   }
   tail->status = status.exit_code;
-  sp_prompt_set_state(ctx, status.exit_code ? SP_PROMPT_STATE_ERROR : SP_PROMPT_STATE_SUBMIT);
+  sp_prompt_set_state(ctx, status.exit_code == tail->expected ? SP_PROMPT_STATE_SUBMIT : SP_PROMPT_STATE_ERROR);
 }
 
 static void rail(sp_prompt_ctx_t* ctx, sp_prompt_style_t style) {
@@ -193,12 +194,17 @@ static void render(sp_prompt_ctx_t* ctx) {
 }
 
 s32 tail_trace(sp_mem_t mem, sp_prompt_ctx_t* prompt, const c8* title, sp_str_t log, sp_ps_config_t config) {
+  return tail_trace_expect(mem, prompt, title, log, config, 0);
+}
+
+s32 tail_trace_expect(sp_mem_t mem, sp_prompt_ctx_t* prompt, const c8* title, sp_str_t log, sp_ps_config_t config, s32 expected) {
   config.io.out = (sp_ps_io_out_config_t) { .mode = SP_PS_IO_MODE_CREATE };
   config.io.err = (sp_ps_io_out_config_t) { .mode = SP_PS_IO_MODE_REDIRECT };
 
   tail_t tail = sp_zero;
   tail.title = title;
   tail.status = -1;
+  tail.expected = expected;
   sp_fs_create_dir(sp_fs_parent_path(log));
   if (sp_io_file_writer_from_path(&tail.log, log)) {
     return -1;

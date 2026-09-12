@@ -6,7 +6,10 @@ version = "0.1.0"
 name = "mathy"
 kinds = ["static"]
 source = ["mathy.c"]
-system_deps = ["m"]
+system_deps = [
+  { value = "m", when = { os = { not = "windows" } } },
+  { value = "user32", when = { os = "windows" } },
+]
 
 [[bin]]
 name = "main"
@@ -16,4 +19,7 @@ deps = ["mathy"]
 [[bin]]
 name = "direct"
 source = ["direct.c"]
-system_deps = ["m"]
+system_deps = [
+  { value = "m", when = { os = { not = "windows" } } },
+  { value = "user32", when = { os = "windows" } },
+]

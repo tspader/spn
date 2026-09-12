@@ -46,7 +46,6 @@ sp_test(target, shared_source) {
 sp_test(target, multiple_roots) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/target/shared_source",
-    .when.msvc_todo = true,
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "main", "test" } } },
       { .kind = ACTION_VERIFY_EXISTS, .exists = static_lib("spum") },
@@ -100,7 +99,6 @@ sp_test(target, selection_example) {
 sp_test(target, selection_named_library) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/target/selection_libs",
-    .when.msvc_todo = true,
     .copy = { "one.c", "two.c" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "one" } } },
@@ -140,7 +138,6 @@ sp_test(target, selection_name_respects_kind) {
 sp_test(target, selection_test_command) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/target/selection",
-    .when.msvc_todo = true,
     .copy = { "spum.c", "script.c" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "test", .args = { "test" } } },
@@ -155,7 +152,6 @@ sp_test(target, selection_test_command) {
 sp_test(target, selection_named_script) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/target/selection",
-    .when.msvc_todo = true,
     .copy = { "spum.c", "script.c" },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build", .args = { "script" } } },
@@ -233,7 +229,6 @@ sp_test(target, publish) {
 sp_test(target, system_deps) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/target/system_deps",
-    .when.msvc_todo = true,
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
       { .kind = ACTION_VERIFY_EXISTS, .exists = sp_str_lit("spn.lock") },
@@ -248,7 +243,6 @@ sp_test(target, lib_system_deps) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/target/lib_system_deps",
     .copy = { "mathy.c", "direct.c" },
-    .when.msvc_todo = true,
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
       { .kind = ACTION_VERIFY_EXISTS, .exists = exe("main") },
@@ -275,7 +269,7 @@ sp_test(target, cross_exe) {
   }
   return run_command_test(t, (command_test_t) {
     .project = "test/integration/fixtures/profile/override",
-    .when = { .host = SPN_OS_LINUX, .target = triple },
+    .when.target = triple,
     .args = { "build", "--target", triple },
     .expect = { .exists = { target_exe("main", triple) } },
   });

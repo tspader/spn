@@ -1,7 +1,10 @@
 [package]
 name = "top_level_system_deps"
 version = "0.1.0"
-system_deps = ["m"]
+system_deps = [
+  { lib = "m", when = { os = { not = "windows" } } },
+  { lib = "user32", when = { os = "windows" } },
+]
 
 [[bin]]
 name = "main"

@@ -3,18 +3,25 @@
 const winvm_variant_t winvm_variants[] = {
   {
     .name = "base",
-    .summary = "golden as-is: no toolchains, exercises the not-installed paths",
+    .summary = "no toolchains and no language runtimes: exercises the not-installed paths and bare-runs probes",
+    .memory_mb = 4096,
+    .vcpus = 2,
     .octet = 201,
+    .steps = { { "bare" } },
   },
   {
     .name = "llvm",
     .summary = "LLVM/clang + lld-link",
+    .memory_mb = 8192,
+    .vcpus = 4,
     .octet = 202,
     .steps = { { "llvm" } },
   },
   {
     .name = "zig",
     .summary = "zig as a toolchain",
+    .memory_mb = 8192,
+    .vcpus = 4,
     .octet = 203,
     .steps = { { "zig" } },
     .lanes = { "zig" },
@@ -22,6 +29,8 @@ const winvm_variant_t winvm_variants[] = {
   {
     .name = "w64devkit",
     .summary = "w64devkit mingw gcc",
+    .memory_mb = 8192,
+    .vcpus = 4,
     .octet = 204,
     .steps = { { "w64devkit" } },
     .lanes = { "w64devkit" },
@@ -29,6 +38,8 @@ const winvm_variant_t winvm_variants[] = {
   {
     .name = "msys2",
     .summary = "MSYS2 clang64/ucrt64/mingw64 toolchains",
+    .memory_mb = 8192,
+    .vcpus = 4,
     .octet = 205,
     .steps = { { "msys2", "clang64,ucrt64,mingw64" } },
     .lanes = { "mingw64", "ucrt64", "clang64" },
@@ -54,6 +65,7 @@ const winvm_variant_t winvm_variants[] = {
 };
 
 const u32 winvm_num_variants = sp_carr_len(winvm_variants);
+const winvm_variant_t* const winvm_bare = &winvm_variants[0];
 
 const winvm_variant_t* winvm_variant_find(const c8* name) {
   sp_carr_for(winvm_variants, it) {

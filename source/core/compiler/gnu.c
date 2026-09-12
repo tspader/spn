@@ -468,6 +468,9 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
       if (!spn_path_empty(files->exports.path)) {
         add_exports(mem, format, dialect, files->exports.path, invocation);
       }
+      if (!spn_path_empty(files->implib)) {
+        spn_cc_push_glued(mem, invocation, "-Wl,/IMPLIB:", files->implib);
+      }
       break;
     }
     case SPN_CC_OUTPUT_EXE: {

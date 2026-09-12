@@ -21,6 +21,7 @@ static spn_toolchain_catalog_t catalog;
 static lanes_t builtin;
 static lanes_t lanes;
 static sp_str_t toml;
+static sp_str_t probes;
 
 static void read_lanes(sp_mem_t mem, const c8* rel, lanes_t* lanes) {
   switch (lanes_read(mem, test_repo_path(mem, sp_cstr_as_str(rel)), lanes)) {
@@ -259,6 +260,7 @@ static sp_err_t load_lanes(void* user) {
     sp_sys_exit(1);
   }
   toml = lanes_text(&lanes, name);
+  probes = sp_str_copy(mem, sp_os_env_get(sp_str_lit("SPN_BARE_PROBES")));
   cached = (test_toolchain_t) { .name = sp_str_to_cstr(mem, info->name), .info = info };
   return SP_OK;
 }
@@ -266,6 +268,11 @@ static sp_err_t load_lanes(void* user) {
 const test_toolchain_t* test_toolchain(void) {
   sp_test_once(&once, load_lanes, SP_NULLPTR);
   return &cached;
+}
+
+sp_str_t test_probes(void) {
+  sp_test_once(&once, load_lanes, SP_NULLPTR);
+  return probes;
 }
 
 const c8* test_lane_toolchain_arg(void) {
@@ -346,10 +353,6 @@ sp_str_t test_when_blocked(test_when_t when) {
       sp_fmt_str(spn_os_to_str(when.host))).value;
   }
 
-  if (when.shell && host.os == SPN_OS_WINDOWS) {
-    return sp_str_lit("fixture needs a posix shell");
-  }
-
   sp_carr_for(when.programs, it) {
     if (!when.programs[it]) {
       break;
@@ -401,10 +404,6 @@ sp_str_t test_when_blocked(test_when_t when) {
   if (when.deterministic && !toolchain_deterministic_objects(toolchain)) {
     return sp_fmt(mem, "{} does not recompile objects byte-identically",
       sp_fmt_cstr(toolchain->name)).value;
-  }
-
-  if (when.msvc_todo && toolchain->info->driver == SPN_CC_DRIVER_MSVC) {
-    return sp_str_lit("not yet implemented for the msvc toolchain");
   }
 
   return sp_str_lit("");

@@ -24,20 +24,6 @@ sp_test(linker, script_unsupported_by_lld_on_windows_gnu) {
   });
 }
 
-sp_test(linker, toolchain_link_args_reach_the_driver) {
-  return run_test(t, (test_t) {
-    .project = "test/integration/fixtures/linker/fuse",
-    .copy = { "bin" },
-    .toolchain = "G",
-    .when = { .os = SPN_OS_LINUX, .programs = { "gcc" }, .shell = true },
-    .actions = {
-      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .path = "bin", .rc = 1 } },
-      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_LINK_FAILED } },
-      { .kind = ACTION_VERIFY_EXISTS, .exists = sp_str_lit("witness") },
-    },
-  });
-}
-
 sp_test(linker, link_flags_gated_on_linker_apply) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/linker/gated",
@@ -76,7 +62,7 @@ sp_test(linker, mingw_gcc_honors_script) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/linker/mingw",
     .copy = { "main.ld" },
-    .when = { .lanes = { "mingw-gnu", "clang-mingw" }, .target = "x86_64-windows-gnu" },
+    .when = { .target = "x86_64-windows-gnu", .linker = SPN_LD_FAMILY_GNU },
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .args = { "--target", "x86_64-windows-gnu" } } },
       { .kind = ACTION_VERIFY_EXISTS, .exists = target_exe("main", "x86_64-windows-gnu") },

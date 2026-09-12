@@ -31,7 +31,6 @@ sp_test(units, shared_conflict) {
 sp_test(units, shared_private) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/units/shared_private",
-    .when.msvc_todo = true,
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { "build" } },
     },

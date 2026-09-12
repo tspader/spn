@@ -106,7 +106,6 @@ sp_test(options, default_identity) {
 sp_test(options, private_versions) {
   return run_opt_test(t, (opt_test_t) {
     .project = "test/integration/fixtures/options/private_versions",
-    .when.msvc_todo = true,
     .builds = { { .present = true } },
   });
 }
