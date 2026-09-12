@@ -41,7 +41,7 @@ bool                spn_dag_digest_valid(spn_dag_digest_t digest);
 sp_str_t            spn_dag_digest_hex(sp_mem_t mem, spn_dag_digest_t digest);
 bool                spn_dag_digest_parse(sp_str_t hex, spn_dag_digest_t* out);
 
-spn_err_t           spn_dag_glob(sp_mem_t mem, const spn_path_roots_t* roots, spn_path_t pattern, sp_da(spn_dag_obs_t)* obs, sp_da(spn_path_t)* matches);
+spn_err_t           spn_dag_glob(sp_mem_t mem, const spn_path_roots_t* roots, spn_path_t pattern, spn_dag_glob_result_t* result);
 
 void                spn_dag_store_init(spn_dag_store_t* store, spn_dag_store_config_t config);
 spn_err_t           spn_dag_store_put(spn_dag_store_t* store, const void* data, u64 len, sp_str_t name, spn_dag_digest_t* digest);

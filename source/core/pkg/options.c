@@ -252,7 +252,11 @@ static void apply_copies(apply_ctx_t* ctx, sp_da(spn_publish_copy_t)* plain, sp_
     if (!spn_when_eval(&gated[it].when, ctx->env)) {
       continue;
     }
-    sp_da_push(*plain, ((spn_publish_copy_t) { .from = gated[it].from, .to = gated[it].to }));
+    sp_da_push(*plain, ((spn_publish_copy_t) {
+      .tree = gated[it].tree,
+      .pattern = gated[it].pattern,
+      .dest = gated[it].dest,
+    }));
   }
 }
 

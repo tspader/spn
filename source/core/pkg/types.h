@@ -133,8 +133,9 @@ typedef struct {
 } spn_pkg_config_entry_t;
 
 typedef struct {
-  sp_str_t from;
-  sp_str_t to;
+  spn_tree_t tree;
+  sp_str_t pattern;
+  sp_str_t dest;
   spn_when_t when;
 } spn_publish_copy_t;
 

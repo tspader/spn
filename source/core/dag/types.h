@@ -37,6 +37,16 @@ typedef struct {
   sp_str_t filter;
 } spn_dag_obs_t;
 
+typedef struct {
+  spn_path_t path;
+  sp_str_t rel;
+} spn_dag_glob_match_t;
+
+typedef struct {
+  sp_da(spn_dag_obs_t) obs;
+  sp_da(spn_dag_glob_match_t) matches;
+} spn_dag_glob_result_t;
+
 typedef struct spn_dag_env_t spn_dag_env_t;
 
 SP_TYPEDEF_FN(spn_err_t, spn_dag_exec_fn_t, spn_dag_t*, spn_dag_action_t*, void*, spn_dag_env_t*, sp_mem_t, sp_da(spn_dag_obs_t)*);

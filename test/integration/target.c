@@ -223,9 +223,22 @@ sp_test(target, publish) {
       { .kind = ACTION_VERIFY_INCLUDE, .verify_include.file = sp_str_lit("kit.h") },
       { .kind = ACTION_VERIFY_INCLUDE, .verify_include.file = sp_str_lit("kit/a.h") },
       { .kind = ACTION_VERIFY_INCLUDE, .verify_include.file = sp_str_lit("kit/b.h") },
+      { .kind = ACTION_VERIFY_INCLUDE, .verify_include.file = sp_str_lit("kit/deep/x/y.h") },
+      { .kind = ACTION_VERIFY_INCLUDE, .verify_include.file = sp_str_lit("lit/kit.h") },
       { .kind = ACTION_VERIFY_INCLUDE, .verify_include.file = sp_str_lit("kit/on.h") },
       { .kind = ACTION_VERIFY_NOT_EXISTS, .exists = store_file("include/kit/off.h") },
       { .kind = ACTION_VERIFY_EXISTS, .exists = exe("publish") },
+    },
+  });
+}
+
+sp_test(target, publish_absent) {
+  return run_test(t, (test_t) {
+    .project = "test/integration/fixtures/target/publish_absent",
+    .copy = { "packages/*" },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build", .rc = 1 } },
+      { .kind = ACTION_VERIFY_EVENT, .verify_event = { .event = SPN_EVENT_NODE_FAILED } },
     },
   });
 }

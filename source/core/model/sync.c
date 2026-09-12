@@ -237,8 +237,8 @@ static spn_err_t resolve_configure_source(spn_ctx_t* ctx, sp_str_t name, spn_gat
       continue;
     }
 
-    sp_da(spn_path_t) matches = sp_da_new(spn.mem, spn_path_t);
-    if (spn_dag_glob(spn.mem, &ctx->roots, path, SP_NULLPTR, &matches) || sp_da_empty(matches)) {
+    spn_dag_glob_result_t glob = sp_zero;
+    if (spn_dag_glob(spn.mem, &ctx->roots, path, &glob) || sp_da_empty(glob.matches)) {
       return spn_err_emit(ctx, (spn_err_union_t) {
         .kind = SPN_ERR_CONFIGURE_SOURCE_GLOB,
         .configure_source = {
@@ -246,8 +246,8 @@ static spn_err_t resolve_configure_source(spn_ctx_t* ctx, sp_str_t name, spn_gat
           .source = declared[it].path,
         }});
     }
-    sp_da_for(matches, jt) {
-      sp_da_push(resolved, spn_path_canonicalize(spn.mem, &ctx->roots, matches[jt]));
+    sp_da_for(glob.matches, jt) {
+      sp_da_push(resolved, spn_path_canonicalize(spn.mem, &ctx->roots, glob.matches[jt].path));
     }
   }
   *source = resolved;

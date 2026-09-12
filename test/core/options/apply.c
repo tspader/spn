@@ -596,8 +596,7 @@ sp_test_each(options_apply, option_defines, apply_option_test_t, option_tests) {
 }
 
 typedef struct {
-  const c8* from;
-  const c8* to;
+  const c8* pattern;
   apply_clause_t when [2];
 } apply_copy_t;
 
@@ -613,11 +612,11 @@ static const apply_copy_test_t copy_tests [] = {
     .name = "publish_copies",
     .facts = { .os = SPN_OS_LINUX },
     .copies = {
-      { .from = "source/a.h", .to = "include", .when = { { "os", "linux" } } },
-      { .from = "source/b.h", .to = "include", .when = { { "os", "windows" } } },
-      { .from = "source/c.h", .to = "include" },
+      { .pattern = "a.h", .when = { { "os", "linux" } } },
+      { .pattern = "b.h", .when = { { "os", "windows" } } },
+      { .pattern = "c.h" },
     },
-    .expect = { "source/a.h", "source/c.h" },
+    .expect = { "a.h", "c.h" },
   },
 };
 
@@ -627,12 +626,12 @@ sp_test_each(options_apply, publish_copies, apply_copy_test_t, copy_tests) {
   sp_da_init(mem, info.publish.copy);
   sp_da_init(mem, info.gated.publish.copy);
   sp_carr_for(it->copies, ct) {
-    if (!it->copies[ct].from) {
+    if (!it->copies[ct].pattern) {
       break;
     }
     sp_da_push(info.gated.publish.copy, ((spn_publish_copy_t) {
-      .from = sp_cstr_as_str(it->copies[ct].from),
-      .to = sp_cstr_as_str(it->copies[ct].to),
+      .tree = SPN_TREE_SOURCE,
+      .pattern = sp_cstr_as_str(it->copies[ct].pattern),
       .when = make_apply_when(mem, it->copies[ct].when, sp_carr_len(it->copies[ct].when)),
     }));
   }
@@ -649,7 +648,7 @@ sp_test_each(options_apply, publish_copies, apply_copy_test_t, copy_tests) {
   sp_carr_detect_len(it->expect, expected, it->expect[expected]);
   sp_must_eq(t, expected, (u32)sp_da_size(info.publish.copy));
   sp_for(ct, expected) {
-    sp_expect_str_eq_c(t, info.publish.copy[ct].from, it->expect[ct]);
+    sp_expect_str_eq_c(t, info.publish.copy[ct].pattern, it->expect[ct]);
   }
   return SP_OK;
 }

@@ -32,11 +32,6 @@ spn_err_t spn_fs_update_file(sp_str_t from, sp_str_t to) {
 
   sp_sys_file_meta_t dest = sp_zero;
   sp_sys_get_path_metadata_s(sp_sys_get_root(0), to, &dest);
-  if (dest.kind == SP_FS_KIND_DIR) {
-    to = sp_fs_join_path(s.mem, to, sp_fs_get_name(from));
-    dest = sp_zero_s(sp_sys_file_meta_t);
-    sp_sys_get_path_metadata_s(sp_sys_get_root(0), to, &dest);
-  }
 
   bool matches = false;
   if (dest.kind == SP_FS_KIND_FILE && dest.size == source.size) {

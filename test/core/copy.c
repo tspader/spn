@@ -51,19 +51,19 @@ static const test_t tests [] = {
     .expect.files = { { "B", "X" } },
   },
   {
-    .name = "file_into_dir",
-    .setup.files = { { "A", "X" } },
-    .setup.dirs = { "D" },
-    .from = "A",
-    .to = "D",
-    .expect.files = { { "D/A", "X" } },
-  },
-  {
     .name = "file_creates_parents",
     .setup.files = { { "A", "X" } },
     .from = "A",
     .to = "D/E/B",
     .expect.files = { { "D/E/B", "X" } },
+  },
+  {
+    .name = "file_onto_dir",
+    .setup.files = { { "A", "X" } },
+    .setup.dirs = { "D" },
+    .from = "A",
+    .to = "D",
+    .expect = { .err = true, .dirs = { "D" }, .absent = { "D/A" } },
   },
   {
     .name = "file_identical_untouched",

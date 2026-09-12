@@ -9,7 +9,6 @@
 #include "core/types.h"
 #include "unit/types.h"
 
-#include "api/api.h"
 #include "compiler/driver.h"
 #include "core/core.h"
 #include "cpu/cpu.h"
@@ -247,43 +246,34 @@ static spn_err_t dag_user_exec(spn_dag_t* g, spn_dag_action_t* action, void* use
   return SPN_OK;
 }
 
-typedef enum {
-  PUBLISH_COPY_OK,
-  PUBLISH_COPY_ABSENT,
-  PUBLISH_COPY_FAILED,
-} publish_copy_result_t;
-
-static publish_copy_result_t publish_copy(spn_pkg_unit_t* unit, sp_str_t root, spn_publish_copy_t* copy, sp_str_t rest, sp_da(spn_dag_obs_t)* obs) {
+static spn_err_t copy_matches(sp_da(spn_dag_glob_match_t) matches, sp_str_t root, sp_str_t dest) {
   sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  publish_copy_result_t result = PUBLISH_COPY_OK;
-
-  sp_str_pair_t from = sp_str_cleave_c8(copy->from, '/');
-  spn_path_t from_root = spn_api_dir_path(unit, spn_cache_dir_kind_from_str(from.first));
-  sp_str_t dest = sp_fs_join_path(scratch.mem, root, rest);
-
-  sp_da(spn_path_t) matches = sp_da_new(scratch.mem, spn_path_t);
-  if (spn_dag_glob(spn.mem, &spn.roots, spn_path_join(spn.mem, from_root, from.second), obs, &matches)) {
-    result = PUBLISH_COPY_FAILED;
-  }
-  else if (sp_fs_is_glob(copy->from)) {
-    sp_fs_create_dir(dest);
-    sp_da_for(matches, mt) {
-      sp_str_t to = sp_fs_join_path(scratch.mem, dest, sp_fs_get_name(matches[mt].sub));
-      if (spn_fs_update_file(spn_path_str(&spn.roots, scratch.mem, matches[mt]), to)) {
-        result = PUBLISH_COPY_FAILED;
-        break;
-      }
+  sp_str_t dir = sp_fs_join_path(scratch.mem, root, dest);
+  spn_err_t err = SPN_OK;
+  sp_da_for(matches, it) {
+    if (err) {
+      break;
     }
+    err = spn_fs_update_file(
+      spn_path_str(&spn.roots, scratch.mem, matches[it].path),
+      sp_fs_join_path(scratch.mem, dir, matches[it].rel)
+    );
   }
-  else if (sp_da_empty(matches)) {
-    result = PUBLISH_COPY_ABSENT;
-  }
-  else {
-    result = spn_fs_update_file(spn_path_str(&spn.roots, scratch.mem, matches[0]), dest) ? PUBLISH_COPY_FAILED : PUBLISH_COPY_OK;
-  }
-
   sp_mem_end_scratch(scratch);
-  return result;
+  return err;
+}
+
+static spn_err_t publish_copy(spn_tree_roots_t trees, sp_str_t root, spn_publish_copy_t* copy, sp_mem_t mem, sp_da(spn_dag_obs_t)* obs) {
+  spn_path_t pattern = spn_path_join(mem, spn_tree_root(trees, copy->tree), copy->pattern);
+  spn_dag_glob_result_t glob = sp_zero;
+  spn_try(spn_dag_glob(mem, &spn.roots, pattern, &glob));
+  sp_da_for(glob.obs, it) {
+    sp_da_push(*obs, glob.obs[it]);
+  }
+  if (sp_da_empty(glob.matches)) {
+    return SPN_ERROR;
+  }
+  return copy_matches(glob.matches, root, copy->dest);
 }
 
 static spn_err_t publish_copy_failed(spn_pkg_unit_t* unit, spn_publish_copy_t* copy) {
@@ -291,35 +281,17 @@ static spn_err_t publish_copy_failed(spn_pkg_unit_t* unit, spn_publish_copy_t* c
     .kind = SPN_EVENT_NODE_FAILED,
     .pkg = unit->info->name,
     .node_failed = {
-      .path = copy->from,
-      .message = sp_fmt(spn.mem, "could not be published to {}", sp_fmt_str(copy->to)).value,
+      .path = sp_fs_join_path(spn.mem, spn_tree_to_str(copy->tree), copy->pattern),
+      .message = sp_fmt(spn.mem, "could not be published to {}", sp_fmt_str(sp_fs_join_path(spn.mem, sp_str_lit("include"), copy->dest))).value,
     },
   });
   return SPN_ERROR;
 }
 
-spn_err_t spn_build_publish_copies(spn_pkg_unit_t* unit, sp_str_t root, sp_da(spn_dag_obs_t)* obs) {
+spn_err_t spn_build_publish_copies(spn_pkg_unit_t* unit, sp_str_t root, sp_mem_t mem, sp_da(spn_dag_obs_t)* obs) {
   sp_da_for(unit->info->publish.copy, it) {
     spn_publish_copy_t* copy = &unit->info->publish.copy[it];
-    sp_str_t rest = sp_zero;
-    if (!spn_build_copy_to_include(copy, &rest)) {
-      continue;
-    }
-    if (publish_copy(unit, root, copy, rest, obs) != PUBLISH_COPY_OK) {
-      return publish_copy_failed(unit, copy);
-    }
-  }
-  return SPN_OK;
-}
-
-spn_err_t spn_build_publish_existing_copies(spn_pkg_unit_t* unit, sp_str_t root) {
-  sp_da_for(unit->info->publish.copy, it) {
-    spn_publish_copy_t* copy = &unit->info->publish.copy[it];
-    sp_str_t rest = sp_zero;
-    if (!spn_build_copy_to_include(copy, &rest)) {
-      continue;
-    }
-    if (publish_copy(unit, root, copy, rest, SP_NULLPTR) == PUBLISH_COPY_FAILED) {
+    if (publish_copy(unit->paths.roots, root, copy, mem, obs)) {
       return publish_copy_failed(unit, copy);
     }
   }
@@ -364,7 +336,7 @@ static spn_err_t dag_tree_exec(spn_dag_t* g, spn_dag_action_t* action, void* use
     return SPN_ERR_DAG_ACTION;
   }
 
-  if (spn_build_publish_copies(unit, root, obs)) {
+  if (spn_build_publish_copies(unit, root, mem, obs)) {
     return SPN_ERR_DAG_ACTION;
   }
   if (dag_tree_copy_user_outputs(unit, root)) {
@@ -378,31 +350,6 @@ static spn_err_t dag_package_exec(spn_dag_t* g, spn_dag_action_t* action, void* 
   spn_pkg_unit_t* unit = (spn_pkg_unit_t*)user_data;
 
   spn_pkg_unit_create_layout(unit);
-
-  sp_da_for(unit->info->publish.copy, it) {
-    spn_publish_copy_t* copy = &unit->info->publish.copy[it];
-    if (spn_build_copy_to_include(copy, SP_NULLPTR)) {
-      continue;
-    }
-    sp_str_pair_t from = sp_str_cleave_c8(copy->from, '/');
-    sp_str_pair_t to = sp_str_cleave_c8(copy->to, '/');
-    s32 err = spn_api_copy_rooted(
-      unit,
-      spn_cache_dir_kind_from_str(from.first), from.second,
-      spn_cache_dir_kind_from_str(to.first), to.second
-    );
-    if (err) {
-      spn_event_buffer_push(spn.events, (spn_event_t) {
-        .kind = SPN_EVENT_NODE_FAILED,
-        .pkg = unit->info->name,
-        .node_failed = {
-          .path = copy->from,
-          .message = sp_fmt(spn.mem, "could not be published to {}", sp_fmt_str(copy->to)).value,
-        },
-      });
-      return SPN_ERR_DAG_ACTION;
-    }
-  }
 
   spn_wasm_script_t* script = SP_NULLPTR;
   if (spn_wasm_find_export(unit, sp_str_lit("package"), &script)) {
@@ -698,10 +645,8 @@ static bool dag_pkg_publishes(spn_pkg_unit_t* unit) {
     }
   }
 
-  sp_da_for(unit->info->publish.copy, it) {
-    if (spn_build_copy_to_include(&unit->info->publish.copy[it], SP_NULLPTR)) {
-      return true;
-    }
+  if (!sp_da_empty(unit->info->publish.copy)) {
+    return true;
   }
 
   sp_da_for(unit->user_nodes, it) {

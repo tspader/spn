@@ -314,18 +314,19 @@ void spn_dag_wasi_observe_glob(wasm_module_inst_t instance, sp_str_t dir, sp_str
   }
 
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-  sp_da(spn_dag_obs_t) obs = sp_da_new(s.mem, spn_dag_obs_t);
+  spn_dag_glob_result_t glob = sp_zero;
   spn_path_t resolved = spn_path_join(s.mem, spn_path_make(w->roots, dir), pattern);
-  if (!spn_dag_glob(s.mem, w->roots, resolved, &obs, SP_NULLPTR)) {
-    sp_da_for(obs, it) {
-      sp_str_t host = spn_path_str(w->roots, s.mem, obs[it].path);
-      if (obs[it].kind == SPN_DAG_OBS_FILE && wasi_written(w, host)) {
+  if (!spn_dag_glob(s.mem, w->roots, resolved, &glob)) {
+    sp_da_for(glob.obs, it) {
+      spn_dag_obs_t* obs = &glob.obs[it];
+      sp_str_t host = spn_path_str(w->roots, s.mem, obs->path);
+      if (obs->kind == SPN_DAG_OBS_FILE && wasi_written(w, host)) {
         continue;
       }
       sp_da_push(*w->obs, ((spn_dag_obs_t) {
-        .kind = obs[it].kind,
-        .path = { .root = obs[it].path.root, .sub = sp_str_copy(w->obs_mem, obs[it].path.sub) },
-        .filter = sp_str_copy(w->obs_mem, obs[it].filter)
+        .kind = obs->kind,
+        .path = { .root = obs->path.root, .sub = sp_str_copy(w->obs_mem, obs->path.sub) },
+        .filter = sp_str_copy(w->obs_mem, obs->filter)
       }));
     }
   }

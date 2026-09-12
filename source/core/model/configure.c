@@ -31,7 +31,12 @@ static spn_err_t configure_package(spn_dag_t* g, spn_dag_action_t* action, spn_p
   }
   sp_str_t include = spn_path_str(g->roots, spn.mem, unit->paths.include);
   spn_try(spn_pkg_unit_publish_existing_headers(unit, include));
-  spn_try(spn_build_publish_existing_copies(unit, include));
+
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  sp_da(spn_dag_obs_t) obs = sp_da_new(scratch.mem, spn_dag_obs_t);
+  spn_err_t published = spn_build_publish_copies(unit, include, scratch.mem, &obs);
+  sp_mem_end_scratch(scratch);
+  spn_try(published);
   spn_pkg_unit_write_stamp(unit, spn_dag_find_artifact(g, action->produces[0])->materialized);
   return SPN_OK;
 }

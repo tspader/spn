@@ -65,7 +65,7 @@ static sp_str_t get_glob_filter(sp_mem_t mem, sp_str_t pattern) {
 }
 
 static s32 compare_matches(const void* a, const void* b) {
-  return sp_str_compare_alphabetical(((const spn_path_t*)a)->sub, ((const spn_path_t*)b)->sub);
+  return sp_str_compare_alphabetical(((const spn_dag_glob_match_t*)a)->path.sub, ((const spn_dag_glob_match_t*)b)->path.sub);
 }
 
 typedef struct {
@@ -77,18 +77,22 @@ typedef struct {
   sp_mem_t mem;
   const spn_path_roots_t* roots;
   sp_glob_t* glob;
+  sp_str_t prefix;
   sp_str_t filter;
   bool recursive;
-  sp_da(spn_dag_obs_t)* obs;
-  sp_da(spn_path_t)* matches;
+  spn_dag_glob_result_t* result;
 } spn_dag_glob_walk_t;
 
-static sp_str_t walk_str(spn_dag_glob_walk_t* w, spn_path_t path) {
-  return spn_path_str(w->roots, w->mem, path);
+static void walk_match(spn_dag_glob_walk_t* w, spn_path_t path) {
+  sp_str_t rel = sp_str_suffix(path.sub, path.sub.len - w->prefix.len);
+  sp_da_push(w->result->matches, ((spn_dag_glob_match_t) {
+    .path = path,
+    .rel = sp_str_strip_left(rel, sp_str_lit("/"))
+  }));
 }
 
 static void walk_observe(spn_dag_glob_walk_t* w, spn_dag_obs_kind_t kind, spn_path_t path, sp_str_t filter) {
-  sp_da_push(*w->obs, ((spn_dag_obs_t) {
+  sp_da_push(w->result->obs, ((spn_dag_obs_t) {
     .kind = kind,
     .path = path,
     .filter = filter
@@ -96,18 +100,22 @@ static void walk_observe(spn_dag_glob_walk_t* w, spn_dag_obs_kind_t kind, spn_pa
 }
 
 static spn_err_t glob_walk(spn_dag_glob_walk_t* w, spn_dag_glob_dir_t start) {
-  sp_da(spn_dag_glob_dir_t) pending = sp_da_new(w->mem, spn_dag_glob_dir_t);
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch_for(w->mem);
+  spn_err_t err = SPN_OK;
+
+  sp_da(spn_dag_glob_dir_t) pending = sp_da_new(scratch.mem, spn_dag_glob_dir_t);
   sp_da_push(pending, start);
 
   for (u64 dt = 0; dt < sp_da_size(pending); dt++) {
     spn_dag_glob_dir_t visit = pending[dt];
     if (visit.depth > SPN_DAG_GLOB_DEPTH_MAX) {
-      return SPN_ERR_DAG_GLOB;
+      err = SPN_ERR_DAG_GLOB;
+      break;
     }
     walk_observe(w, SPN_DAG_OBS_ENUMERATION, visit.path, w->filter);
 
     sp_da(sp_fs_entry_t) entries = sp_zero;
-    sp_fs_collect(w->mem, walk_str(w, visit.path), &entries);
+    sp_fs_collect(scratch.mem, spn_path_str(w->roots, scratch.mem, visit.path), &entries);
     sp_da_for(entries, it) {
       sp_fs_entry_t* entry = &entries[it];
       if (entry->kind == SP_FS_KIND_DIR) {
@@ -125,10 +133,19 @@ static spn_err_t glob_walk(spn_dag_glob_walk_t* w, spn_dag_glob_dir_t start) {
         continue;
       }
       walk_observe(w, SPN_DAG_OBS_FILE, path, sp_str_lit(""));
-      sp_da_push(*w->matches, path);
+      walk_match(w, path);
     }
   }
-  return SPN_OK;
+
+  sp_mem_end_scratch(scratch);
+  return err;
+}
+
+static bool literal_exists(spn_dag_glob_walk_t* w, spn_path_t pattern) {
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch_for(w->mem);
+  bool exists = sp_fs_is_file(spn_path_str(w->roots, scratch.mem, pattern));
+  sp_mem_end_scratch(scratch);
+  return exists;
 }
 
 static spn_err_t glob_run(spn_dag_glob_walk_t* w, spn_path_t pattern) {
@@ -136,48 +153,41 @@ static spn_err_t glob_run(spn_dag_glob_walk_t* w, spn_path_t pattern) {
   if (!w->glob) {
     return SPN_ERR_DAG_GLOB;
   }
+  w->prefix = get_literal_dir(w->glob);
 
   if (w->glob->strategy == SP_GLOB_STRATEGY_LITERAL) {
-    if (sp_fs_is_file(walk_str(w, pattern))) {
+    if (literal_exists(w, pattern)) {
       walk_observe(w, SPN_DAG_OBS_FILE, pattern, sp_str_lit(""));
-      sp_da_push(*w->matches, pattern);
+      walk_match(w, pattern);
     } else {
       walk_observe(w, SPN_DAG_OBS_ABSENT, pattern, sp_str_lit(""));
     }
     return SPN_OK;
   }
 
-  sp_str_t prefix = get_literal_dir(w->glob);
-  sp_str_t remainder = sp_str_sub(pattern.sub, prefix.len, pattern.sub.len - prefix.len);
+  sp_str_t remainder = sp_str_sub(pattern.sub, w->prefix.len, pattern.sub.len - w->prefix.len);
   remainder = sp_str_strip_left(remainder, sp_str_lit("/"));
 
-  w->filter = get_glob_filter(w->mem, pattern.sub);
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch_for(w->mem);
+  w->filter = get_glob_filter(scratch.mem, pattern.sub);
+  sp_mem_end_scratch(scratch);
   w->recursive = sp_str_contains(remainder, sp_str_lit("/")) || has_recursive_token(w->glob);
 
   spn_try(glob_walk(w, (spn_dag_glob_dir_t) {
-    .path = { .root = pattern.root, .sub = prefix }
+    .path = { .root = pattern.root, .sub = w->prefix }
   }));
 
-  sp_da_sort(*w->matches, compare_matches);
+  sp_da_sort(w->result->matches, compare_matches);
   return SPN_OK;
 }
 
-spn_err_t spn_dag_glob(sp_mem_t mem, const spn_path_roots_t* roots, spn_path_t pattern, sp_da(spn_dag_obs_t)* obs, sp_da(spn_path_t)* matches) {
-  sp_da(spn_dag_obs_t) discarded_obs;
-  if (!obs) {
-    discarded_obs = sp_da_new(mem, spn_dag_obs_t);
-    obs = &discarded_obs;
-  }
-  sp_da(spn_path_t) discarded_matches;
-  if (!matches) {
-    discarded_matches = sp_da_new(mem, spn_path_t);
-    matches = &discarded_matches;
-  }
+spn_err_t spn_dag_glob(sp_mem_t mem, const spn_path_roots_t* roots, spn_path_t pattern, spn_dag_glob_result_t* result) {
+  result->obs = sp_da_new(mem, spn_dag_obs_t);
+  result->matches = sp_da_new(mem, spn_dag_glob_match_t);
   spn_dag_glob_walk_t walk = {
     .mem = mem,
     .roots = roots,
-    .obs = obs,
-    .matches = matches
+    .result = result
   };
   return glob_run(&walk, pattern);
 }

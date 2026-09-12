@@ -39,7 +39,7 @@ sp_test_each(unit, clone, clone_test_t, tests, .setup = spn_test_ctx_setup) {
   sp_da_push(loaded->gated.system_deps, ((spn_gated_str_t) { .value = sp_str_lit("A") }));
   sp_da_push(loaded->gated.frameworks, ((spn_gated_str_t) { .value = sp_str_lit("A") }));
   sp_da_push(loaded->gated.include, ((spn_gated_path_t) { .path = sp_str_lit("A"), .tree = SPN_TREE_SOURCE }));
-  sp_da_push(loaded->gated.publish.copy, ((spn_publish_copy_t) { .from = sp_str_lit("source/A"), .to = sp_str_lit("include") }));
+  sp_da_push(loaded->gated.publish.copy, ((spn_publish_copy_t) { .tree = SPN_TREE_SOURCE, .pattern = sp_str_lit("A") }));
   sp_da_push(loaded_lib->gated.define, ((spn_gated_str_t) { .value = sp_str_lit("A") }));
   sp_da_push(loaded_lib->gated.frameworks, ((spn_gated_str_t) { .value = sp_str_lit("A") }));
 

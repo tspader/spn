@@ -25,9 +25,10 @@ typedef struct {
 } gated_t;
 
 typedef struct {
-  const c8* from;
-  const c8* to;
+  const c8* pattern;
+  const c8* dest;
   const c8* when;
+  spn_tree_t tree;
 } copy_t;
 
 typedef struct {
@@ -1180,14 +1181,74 @@ static const test_t tests [] = {
     .name = "publish_gated",
     .manifest = "publish_gated",
     .publish = {
-      { "source/a.h", "include" },
-      { "source/b.h", "include/b", "os = \"windows\"" },
+      { "a.h", "" },
+      { "b.h", "b", "os = \"windows\"" },
+    },
+  },
+  {
+    .name = "publish_glob_dest",
+    .manifest = "publish_glob_dest",
+    .publish = { { "sub/*.h", "s" } },
+  },
+  {
+    .name = "publish_manifest_tree",
+    .manifest = "publish_manifest_tree",
+    .publish = { { "gen/a.h", "", .tree = SPN_TREE_MANIFEST } },
+  },
+  {
+    .name = "validate_publish_from_tree",
+    .manifest = "validate_publish_from_tree",
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "publish.copy[0].from" },
+    },
+  },
+  {
+    .name = "validate_publish_from_prefix",
+    .manifest = "validate_publish_from_prefix",
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "publish.copy[0].from" },
+    },
+  },
+  {
+    .name = "validate_publish_from_empty",
+    .manifest = "validate_publish_from_empty",
+    .issues = {
+      { SPN_ERR_CODEGEN_PATH, "publish.copy[0].from" },
+    },
+  },
+  {
+    .name = "validate_publish_from_glob",
+    .manifest = "validate_publish_from_glob",
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "publish.copy[0].from" },
+    },
+  },
+  {
+    .name = "validate_publish_to_mount",
+    .manifest = "validate_publish_to_mount",
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "publish.copy[0].to" },
+    },
+  },
+  {
+    .name = "validate_publish_to_prefix",
+    .manifest = "validate_publish_to_prefix",
+    .issues = {
+      { SPN_ERR_CODEGEN_INVALID, "publish.copy[0].to" },
+    },
+  },
+  {
+    .name = "validate_publish_paths",
+    .manifest = "validate_publish_paths",
+    .issues = {
+      { SPN_ERR_CODEGEN_PATH, "publish.copy[0].from" },
+      { SPN_ERR_CODEGEN_PATH, "publish.copy[0].to" },
     },
   },
   {
     .name = "validate_publish_when_unknown_key",
     .manifest = "validate_publish_when_unknown_key",
-    .publish = { { "source/a.h", "include", "simd = \"avx2\"" } },
+    .publish = { { "a.h", "", "simd = \"avx2\"" } },
     .issues = {
       { SPN_ERR_CODEGEN_INVALID, "publish.copy[0].when.simd" },
     },
@@ -1405,8 +1466,10 @@ static sp_err_t check_gated_list(sp_test_t* t, spn_gated_list_t actual, const ga
 static sp_err_t check_copy_list(sp_test_t* t, sp_da(spn_publish_copy_t) actual, const copy_t* expected, u32 n) {
   sp_must_eq(t, n, (u32)sp_da_size(actual));
   sp_for(it, n) {
-    sp_expect_str_eq_c(t, actual[it].from, expected[it].from);
-    sp_expect_str_eq_c(t, actual[it].to, expected[it].to);
+    spn_tree_t tree = expected[it].tree ? expected[it].tree : SPN_TREE_SOURCE;
+    sp_expect_eq(t, (u32)tree, (u32)actual[it].tree);
+    sp_expect_str_eq_c(t, actual[it].pattern, expected[it].pattern);
+    sp_expect_str_eq_c(t, actual[it].dest, expected[it].dest);
     sp_expect_str_eq_c(t, spn_when_to_str(sp_test_arena(t), &actual[it].when), expected[it].when ? expected[it].when : "always");
   }
   return SP_OK;
@@ -1534,7 +1597,7 @@ sp_test_each(lower, cases, test_t, tests) {
   check_gated(t, pkg.gated.frameworks, it->frameworks);
   sp_expect_eq(t, (u32)0, (u32)sp_da_size(pkg.publish.copy));
   u32 num_copies = 0;
-  sp_carr_detect_len(it->publish, num_copies, it->publish[num_copies].from);
+  sp_carr_detect_len(it->publish, num_copies, it->publish[num_copies].pattern);
   sp_try(check_copy_list(t, pkg.gated.publish.copy, it->publish, num_copies));
   sp_expect_eq(t, (u32)0, (u32)sp_da_size(pkg.include));
   check_gated_paths(t, pkg.gated.include, it->include);

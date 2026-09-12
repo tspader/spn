@@ -198,7 +198,13 @@ s32 spn_api_copy(sp_str_t from, sp_str_t to) {
   if (sp_fs_is_dir(from)) {
     return sp_fs_copy_into(from, to) ? SPN_ERROR : SPN_OK;
   }
-  return spn_fs_update_file(from, to);
+  if (!sp_fs_is_dir(to)) {
+    return spn_fs_update_file(from, to);
+  }
+  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+  s32 err = spn_fs_update_file(from, sp_fs_join_path(scratch.mem, to, sp_fs_get_name(from)));
+  sp_mem_end_scratch(scratch);
+  return err;
 }
 
 s32 spn_api_copy_rooted(spn_pkg_unit_t* unit, spn_dir_t from_dir, sp_str_t from_path, spn_dir_t to_dir, sp_str_t to_path) {

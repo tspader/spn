@@ -51,8 +51,6 @@ sp_str_t spn_option_setter_kind_to_str(spn_option_setter_kind_t kind);
 sp_str_t spn_linkage_requester_to_str(spn_linkage_requester_t requester);
 sp_str_t spn_cc_feature_to_str(spn_cc_feature_t feature);
 
-spn_dir_t spn_cache_dir_kind_from_str(sp_str_t str);
-
 spn_cc_kind_t spn_cc_kind_from_str(sp_str_t str);
 spn_c_standard_t spn_c_standard_from_str(sp_str_t str);
 sp_str_t spn_c_standard_to_str(spn_c_standard_t standard);
