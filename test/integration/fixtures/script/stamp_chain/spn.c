@@ -54,7 +54,7 @@ spn_err_t configure(spn_t* spn, spn_config_t* config) {
 
   spn_node_t* final = spn_add_node(config, "final");
   spn_node_set_fn(final, "final_fn");
-  spn_node_add_output(final, spn_get_subdir(spn, SPN_DIR_WORK, "result.h"));
+  spn_node_add_output(final, SPN_DIR_WORK, "result.h");
   spn_node_link(step3, final);
   return SPN_OK;
 }

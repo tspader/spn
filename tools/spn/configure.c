@@ -31,9 +31,9 @@ static bool is_union_schema(sp_str_t name) {
   return sp_str_equal_cstr(name, "errors") || sp_str_equal_cstr(name, "events");
 }
 
-static void add_output(spn_t* spn, sp_mem_t mem, spn_node_t* node, const c8* dir, sp_str_t name, const c8* suffix) {
+static void add_output(sp_mem_t mem, spn_node_t* node, const c8* dir, sp_str_t name, const c8* suffix) {
   sp_str_t file = sp_fmt(mem, "{}/{}{}", sp_fmt_cstr(dir), sp_fmt_str(name), sp_fmt_cstr(suffix)).value;
-  spn_node_add_output(node, spn_get_subdir(spn, SPN_DIR_SOURCE, sp_str_to_cstr(mem, file)));
+  spn_node_add_output(node, SPN_DIR_SOURCE, sp_str_to_cstr(mem, file));
 }
 
 static void add_codegen(spn_t* spn, spn_config_t* config) {
@@ -45,10 +45,10 @@ static void add_codegen(spn_t* spn, spn_config_t* config) {
   add_inputs(spn, mem, node, sp_str_lit("/source/source/core/codegen/schema"));
   add_inputs(spn, mem, node, sp_str_lit("/source/tools/gen/templates"));
 
-  add_output(spn, mem, node, "source/core/codegen/gen", sp_str_lit("common"), ".gen.h");
-  add_output(spn, mem, node, "source/core/codegen/gen", sp_str_lit("abi"), ".gen.h");
-  add_output(spn, mem, node, "source/core/codegen/gen", sp_str_lit("abi"), ".gen.c");
-  add_output(spn, mem, node, "include/spn", sp_str_lit("err"), ".h");
+  add_output(mem, node, "source/core/codegen/gen", sp_str_lit("common"), ".gen.h");
+  add_output(mem, node, "source/core/codegen/gen", sp_str_lit("abi"), ".gen.h");
+  add_output(mem, node, "source/core/codegen/gen", sp_str_lit("abi"), ".gen.c");
+  add_output(mem, node, "include/spn", sp_str_lit("err"), ".h");
 
   sp_da(sp_fs_entry_t) schemas = sp_zero;
   sp_fs_collect(mem, sp_str_lit("/source/source/core/codegen/schema"), &schemas);
@@ -62,12 +62,12 @@ static void add_codegen(spn_t* spn, spn_config_t* config) {
       continue;
     }
     sp_str_t name = sp_str_strip_right(entry->name, sp_str_lit(".jtd.json"));
-    add_output(spn, mem, node, "source/core/codegen/gen", name, ".gen.c");
+    add_output(mem, node, "source/core/codegen/gen", name, ".gen.c");
     if (is_union_schema(name)) {
-      add_output(spn, mem, node, "include/spn", name, ".h");
+      add_output(mem, node, "include/spn", name, ".h");
     } else {
-      add_output(spn, mem, node, "source/core/codegen/gen", name, ".gen.h");
-      add_output(spn, mem, node, "source/core/codegen/gen", name, ".jtd.json");
+      add_output(mem, node, "source/core/codegen/gen", name, ".gen.h");
+      add_output(mem, node, "source/core/codegen/gen", name, ".jtd.json");
     }
   }
 }

@@ -44,7 +44,7 @@ spn_err_t configure(spn_t* spn, spn_config_t* config) {
 
   spn_node_t* info = spn_add_node(config, "gen_info");
   spn_node_set_fn(info, "gen_info");
-  spn_node_add_output(info, spn_get_subdir(spn, SPN_DIR_WORK, "dep_info.h"));
+  spn_node_add_output(info, SPN_DIR_WORK, "dep_info.h");
   spn_node_link(setup, info);
   return SPN_OK;
 }

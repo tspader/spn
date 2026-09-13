@@ -52,19 +52,18 @@ spn_err_t configure(spn_t* spn, spn_config_t* config) {
   const c8* types_h = spn_get_subdir(spn, SPN_DIR_WORK, "types.h");
   const c8* constants_h = spn_get_subdir(spn, SPN_DIR_WORK, "constants.h");
   const c8* macros_h = spn_get_subdir(spn, SPN_DIR_WORK, "macros.h");
-  const c8* all_h = spn_get_subdir(spn, SPN_DIR_WORK, "all.h");
 
   spn_node_t* gen = spn_add_node(config, "gen_all_headers");
   spn_node_set_fn(gen, "gen_all_headers");
-  spn_node_add_output(gen, types_h);
-  spn_node_add_output(gen, constants_h);
-  spn_node_add_output(gen, macros_h);
+  spn_node_add_output(gen, SPN_DIR_WORK, "types.h");
+  spn_node_add_output(gen, SPN_DIR_WORK, "constants.h");
+  spn_node_add_output(gen, SPN_DIR_WORK, "macros.h");
 
   spn_node_t* combined = spn_add_node(config, "gen_combined");
   spn_node_set_fn(combined, "gen_combined");
   spn_node_add_input(combined, types_h);
   spn_node_add_input(combined, constants_h);
   spn_node_add_input(combined, macros_h);
-  spn_node_add_output(combined, all_h);
+  spn_node_add_output(combined, SPN_DIR_WORK, "all.h");
   return SPN_OK;
 }

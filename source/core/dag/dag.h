@@ -11,6 +11,7 @@ spn_dag_t*          spn_dag_new(sp_mem_t mem, const spn_path_roots_t* roots);
 spn_dag_artifact_t* spn_dag_find_artifact(spn_dag_t* g, spn_dag_id_t id);
 spn_dag_action_t*   spn_dag_find_action(spn_dag_t* g, spn_dag_id_t id);
 spn_dag_id_t        spn_dag_add_value(spn_dag_t* g, const void* data, u64 len);
+spn_dag_id_t        spn_dag_add_path(spn_dag_t* g, spn_path_t path, spn_dag_artifact_kind_t kind);
 spn_dag_id_t        spn_dag_add_file(spn_dag_t* g, spn_path_t path);
 spn_dag_id_t        spn_dag_add_tree(spn_dag_t* g, spn_path_t path);
 spn_dag_id_t        spn_dag_add_output(spn_dag_t* g, sp_str_t name);

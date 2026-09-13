@@ -64,9 +64,20 @@ sp_test(script, tree_output_cached) {
   });
 }
 
-sp_test(script, tree_output_include) {
+sp_test(script, node_output_root) {
   return run_command_test(t, (command_test_t) {
-    .project = "test/integration/fixtures/script/tree_output_include",
+    .project = "test/integration/fixtures/script/node_output_root",
+    .args = { "build" },
+    .expect = {
+      .rc = 1,
+      .events = { { .event = SPN_EVENT_ERR, .key = "kind", .value = "wasm_module_call_failed" } },
+    },
+  });
+}
+
+sp_test(script, node_output_unnamed) {
+  return run_command_test(t, (command_test_t) {
+    .project = "test/integration/fixtures/script/node_output_unnamed",
     .args = { "build" },
     .expect = {
       .rc = 1,

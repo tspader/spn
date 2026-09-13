@@ -30,11 +30,10 @@ spn_err_t configure(spn_t* spn, spn_config_t* config) {
   spn_add_include(config, spn_get_dir(spn, SPN_DIR_WORK));
 
   const c8* data_txt = spn_get_subdir(spn, SPN_DIR_WORK, "data.txt");
-  const c8* validated_h = spn_get_subdir(spn, SPN_DIR_WORK, "validated.h");
 
   spn_node_t* gen = spn_add_node(config, "gen_data");
   spn_node_set_fn(gen, "gen_data");
-  spn_node_add_output(gen, data_txt);
+  spn_node_add_output(gen, SPN_DIR_WORK, "data.txt");
 
   spn_node_t* validate_node = spn_add_node(config, "validate");
   spn_node_set_fn(validate_node, "validate");
@@ -42,7 +41,7 @@ spn_err_t configure(spn_t* spn, spn_config_t* config) {
 
   spn_node_t* final = spn_add_node(config, "finalize");
   spn_node_set_fn(final, "finalize");
-  spn_node_add_output(final, validated_h);
+  spn_node_add_output(final, SPN_DIR_WORK, "validated.h");
   spn_node_link(validate_node, final);
   return SPN_OK;
 }

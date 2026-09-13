@@ -56,23 +56,22 @@ spn_err_t configure(spn_t* spn, spn_config_t* config) {
   const c8* beta_h = spn_get_subdir(spn, SPN_DIR_WORK, "beta.h");
   const c8* gamma_h = spn_get_subdir(spn, SPN_DIR_WORK, "gamma.h");
   const c8* delta_h = spn_get_subdir(spn, SPN_DIR_WORK, "delta.h");
-  const c8* combined_h = spn_get_subdir(spn, SPN_DIR_WORK, "combined.h");
 
   spn_node_t* alpha = spn_add_node(config, "gen_alpha");
   spn_node_set_fn(alpha, "gen_alpha");
-  spn_node_add_output(alpha, alpha_h);
+  spn_node_add_output(alpha, SPN_DIR_WORK, "alpha.h");
 
   spn_node_t* beta = spn_add_node(config, "gen_beta");
   spn_node_set_fn(beta, "gen_beta");
-  spn_node_add_output(beta, beta_h);
+  spn_node_add_output(beta, SPN_DIR_WORK, "beta.h");
 
   spn_node_t* gamma = spn_add_node(config, "gen_gamma");
   spn_node_set_fn(gamma, "gen_gamma");
-  spn_node_add_output(gamma, gamma_h);
+  spn_node_add_output(gamma, SPN_DIR_WORK, "gamma.h");
 
   spn_node_t* delta = spn_add_node(config, "gen_delta");
   spn_node_set_fn(delta, "gen_delta");
-  spn_node_add_output(delta, delta_h);
+  spn_node_add_output(delta, SPN_DIR_WORK, "delta.h");
 
   spn_node_t* combined = spn_add_node(config, "gen_combined");
   spn_node_set_fn(combined, "gen_combined");
@@ -80,6 +79,6 @@ spn_err_t configure(spn_t* spn, spn_config_t* config) {
   spn_node_add_input(combined, beta_h);
   spn_node_add_input(combined, gamma_h);
   spn_node_add_input(combined, delta_h);
-  spn_node_add_output(combined, combined_h);
+  spn_node_add_output(combined, SPN_DIR_WORK, "combined.h");
   return SPN_OK;
 }

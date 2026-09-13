@@ -16,8 +16,13 @@
 #include "unit/types.h"
 #include "unit/unit.h"
 
-spn_path_t spn_pkg_unit_get_node_stamp_file(spn_pkg_unit_t* ctx, spn_user_node_t* node) {
-  return spn_path_join(spn.mem, ctx->paths.stamp.dir, node->tag);
+spn_user_output_t spn_pkg_unit_node_stamp(spn_pkg_unit_t* ctx, spn_user_node_t* node) {
+  return (spn_user_output_t) {
+    .dir = SPN_DIR_WORK,
+    .sub = sp_fs_join_path(spn.mem, sp_str_lit("stamp"), node->tag),
+    .kind = SPN_DAG_ARTIFACT_KIND_FILE,
+    .path = spn_path_join(spn.mem, ctx->paths.stamp.dir, node->tag),
+  };
 }
 
 void spn_pkg_unit_create_layout(spn_pkg_unit_t* unit) {

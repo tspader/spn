@@ -128,6 +128,7 @@ static spn_pkg_unit_t* add_unit(spn_session_t* s, spn_build_unit_t* build, spn_p
   sp_da_init(s->mem, unit->libs);
   sp_da_init(s->mem, unit->targets);
   sp_da_init(s->mem, unit->user_nodes);
+  unit->fingerprint = spn_unit_fingerprint(s, build, pid);
   spn_unit_paths_init(unit, loaded);
 
   sp_da_push(build->packages, unit);

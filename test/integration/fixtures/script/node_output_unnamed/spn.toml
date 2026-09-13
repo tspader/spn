@@ -1,0 +1,7 @@
+[package]
+name = "U"
+version = "0.0.1"
+
+[[bin]]
+name = "U"
+source = ["main.c"]

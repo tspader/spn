@@ -34,11 +34,11 @@ spn_err_t configure(spn_t* spn, spn_config_t* config) {
 
   spn_node_t* phase1 = spn_add_node(config, "phase1");
   spn_node_set_fn(phase1, "phase1_fn");
-  spn_node_add_output(phase1, intermediate);
+  spn_node_add_output(phase1, SPN_DIR_WORK, "intermediate.h");
 
   spn_node_t* phase2 = spn_add_node(config, "phase2");
   spn_node_set_fn(phase2, "phase2_fn");
   spn_node_add_input(phase2, intermediate);
-  spn_node_add_output(phase2, final);
+  spn_node_add_output(phase2, SPN_DIR_WORK, "final.h");
   return SPN_OK;
 }

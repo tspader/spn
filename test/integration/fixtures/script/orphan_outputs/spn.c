@@ -32,16 +32,15 @@ s32 consumer_fn(spn_t* spn) {
 
 SPN_EXPORT
 spn_err_t configure(spn_t* spn, spn_config_t* config) {
-  const c8* orphan_h = spn_get_subdir(spn, SPN_DIR_WORK, "orphan_header.h");
   const c8* consumed_h = spn_get_subdir(spn, SPN_DIR_WORK, "consumed_header.h");
 
   spn_node_t* orphan = spn_add_node(config, "gen_orphan");
   spn_node_set_fn(orphan, "gen_orphan");
-  spn_node_add_output(orphan, orphan_h);
+  spn_node_add_output(orphan, SPN_DIR_WORK, "orphan_header.h");
 
   spn_node_t* producer = spn_add_node(config, "gen_consumed");
   spn_node_set_fn(producer, "gen_consumed");
-  spn_node_add_output(producer, consumed_h);
+  spn_node_add_output(producer, SPN_DIR_WORK, "consumed_header.h");
 
   spn_node_t* consumer = spn_add_node(config, "consumer");
   spn_node_set_fn(consumer, "consumer_fn");

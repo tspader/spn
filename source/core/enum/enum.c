@@ -374,6 +374,22 @@ sp_str_t spn_tree_to_str(spn_tree_t tree) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
+sp_str_t spn_dir_to_str(spn_dir_t dir) {
+  switch (dir) {
+    case SPN_DIR_NONE:     return sp_str_lit("");
+    case SPN_DIR_CACHE:    return sp_str_lit("cache");
+    case SPN_DIR_STORE:    return sp_str_lit("store");
+    case SPN_DIR_INCLUDE:  return sp_str_lit("include");
+    case SPN_DIR_VENDOR:   return sp_str_lit("vendor");
+    case SPN_DIR_LIB:      return sp_str_lit("lib");
+    case SPN_DIR_SOURCE:   return sp_str_lit("source");
+    case SPN_DIR_WORK:     return sp_str_lit("work");
+    case SPN_DIR_PROJECT:  return sp_str_lit("project");
+    case SPN_DIR_MANIFEST: return sp_str_lit("manifest");
+  }
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
 spn_sanitizer_t spn_sanitizer_from_str(sp_str_t str) {
   if (sp_str_equal_cstr(str, "address")) {
     return SPN_SANITIZER_ADDRESS;

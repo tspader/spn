@@ -31,7 +31,7 @@ spn_err_t configure(spn_t* spn, spn_config_t* config) {
 
   spn_node_t* codegen = spn_add_node(config, "codegen");
   spn_node_set_fn(codegen, "codegen_fn");
-  spn_node_add_output(codegen, spn_get_subdir(spn, SPN_DIR_WORK, "generated.h"));
+  spn_node_add_output(codegen, SPN_DIR_WORK, "generated.h");
   spn_node_link(setup, codegen);
   return SPN_OK;
 }

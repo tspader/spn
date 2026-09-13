@@ -48,7 +48,7 @@ static spn_dag_id_t add_artifact(spn_dag_t* g, spn_dag_artifact_t artifact) {
   return artifact.id;
 }
 
-static spn_dag_id_t add_path(spn_dag_t* g, spn_path_t path, spn_dag_artifact_kind_t kind) {
+spn_dag_id_t spn_dag_add_path(spn_dag_t* g, spn_path_t path, spn_dag_artifact_kind_t kind) {
   sp_assert(!spn_path_empty(path));
   spn_dag_id_t* existing = sp_ht_getp(g->paths, path);
   if (existing) {
@@ -80,11 +80,11 @@ spn_dag_id_t spn_dag_add_value(spn_dag_t* g, const void* data, u64 len) {
 }
 
 spn_dag_id_t spn_dag_add_file(spn_dag_t* g, spn_path_t path) {
-  return add_path(g, path, SPN_DAG_ARTIFACT_KIND_FILE);
+  return spn_dag_add_path(g, path, SPN_DAG_ARTIFACT_KIND_FILE);
 }
 
 spn_dag_id_t spn_dag_add_tree(spn_dag_t* g, spn_path_t path) {
-  return add_path(g, path, SPN_DAG_ARTIFACT_KIND_TREE);
+  return spn_dag_add_path(g, path, SPN_DAG_ARTIFACT_KIND_TREE);
 }
 
 spn_dag_id_t spn_dag_add_output(spn_dag_t* g, sp_str_t name) {

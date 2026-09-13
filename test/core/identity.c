@@ -25,17 +25,23 @@ typedef struct {
 typedef struct {
   const c8* qualified;
   const c8* rev;
+  sp_hash_t fingerprint;
   identity_copy_t copies [IDENTITY_TEST_MAX_COPIES];
   identity_path_t headers [IDENTITY_TEST_MAX_HEADERS];
 } identity_pkg_t;
+
+typedef struct {
+  spn_dir_t dir;
+  const c8* sub;
+  spn_dag_artifact_kind_t kind;
+} identity_output_t;
 
 typedef struct {
   identity_pkg_t pkg;
   const c8* tag;
   const c8* fn;
   identity_path_t inputs [IDENTITY_TEST_MAX_PATHS];
-  identity_path_t outputs [IDENTITY_TEST_MAX_PATHS];
-  identity_path_t output_dirs [IDENTITY_TEST_MAX_PATHS];
+  identity_output_t outputs [IDENTITY_TEST_MAX_PATHS];
 } identity_node_t;
 
 typedef struct {
@@ -89,6 +95,7 @@ static spn_pkg_unit_t* identity_unit(sp_mem_t mem, const identity_pkg_t* spec) {
   spn_pkg_unit_t* unit = sp_alloc_type(mem, spn_pkg_unit_t);
   unit->info = info;
   unit->source = SPN_PKG_SOURCE_INDEX;
+  unit->fingerprint = spec->fingerprint;
   sp_da_init(mem, unit->user_nodes);
   return unit;
 }
@@ -107,7 +114,6 @@ static spn_user_node_t* identity_node(sp_mem_t mem, const identity_node_t* spec)
   node->fn = sp_str_view(spec->fn);
   sp_da_init(mem, node->inputs);
   sp_da_init(mem, node->outputs);
-  sp_da_init(mem, node->output_dirs);
   sp_carr_for(spec->inputs, it) {
     if (!spec->inputs[it].sub) {
       break;
@@ -118,13 +124,11 @@ static spn_user_node_t* identity_node(sp_mem_t mem, const identity_node_t* spec)
     if (!spec->outputs[it].sub) {
       break;
     }
-    sp_da_push(node->outputs, identity_path(&spec->outputs[it]));
-  }
-  sp_carr_for(spec->output_dirs, it) {
-    if (!spec->output_dirs[it].sub) {
-      break;
-    }
-    sp_da_push(node->output_dirs, identity_path(&spec->output_dirs[it]));
+    sp_da_push(node->outputs, ((spn_user_output_t) {
+      .dir = spec->outputs[it].dir,
+      .sub = sp_cstr_as_str(spec->outputs[it].sub),
+      .kind = spec->outputs[it].kind ? spec->outputs[it].kind : SPN_DAG_ARTIFACT_KIND_FILE,
+    }));
   }
   return node;
 }
@@ -246,20 +250,32 @@ static const identity_node_test_t user_tests [] = {
   },
   {
     .name = "distinct_outputs",
-    .a = { .pkg = { .qualified = "A", .rev = "1" }, .tag = "N", .fn = "F", .outputs = { { "A-1/H", SPN_PATH_ROOT_BUILD } } },
-    .b = { .pkg = { .qualified = "A", .rev = "1" }, .tag = "N", .fn = "F", .outputs = { { "A-1/I", SPN_PATH_ROOT_BUILD } } },
+    .a = { .pkg = { .qualified = "A", .rev = "1" }, .tag = "N", .fn = "F", .outputs = { { SPN_DIR_WORK, "H" } } },
+    .b = { .pkg = { .qualified = "A", .rev = "1" }, .tag = "N", .fn = "F", .outputs = { { SPN_DIR_WORK, "I" } } },
+    .expect = { .distinct = true }
+  },
+  {
+    .name = "distinct_output_dir",
+    .a = { .pkg = { .qualified = "A", .rev = "1" }, .tag = "N", .fn = "F", .outputs = { { SPN_DIR_WORK, "H" } } },
+    .b = { .pkg = { .qualified = "A", .rev = "1" }, .tag = "N", .fn = "F", .outputs = { { SPN_DIR_INCLUDE, "H" } } },
     .expect = { .distinct = true }
   },
   {
     .name = "distinct_output_kind",
-    .a = { .pkg = { .qualified = "A", .rev = "1" }, .tag = "N", .fn = "F", .outputs = { { "A-1/H", SPN_PATH_ROOT_BUILD } } },
-    .b = { .pkg = { .qualified = "A", .rev = "1" }, .tag = "N", .fn = "F", .output_dirs = { { "A-1/H", SPN_PATH_ROOT_BUILD } } },
+    .a = { .pkg = { .qualified = "A", .rev = "1" }, .tag = "N", .fn = "F", .outputs = { { SPN_DIR_WORK, "H" } } },
+    .b = { .pkg = { .qualified = "A", .rev = "1" }, .tag = "N", .fn = "F", .outputs = { { SPN_DIR_WORK, "H", SPN_DAG_ARTIFACT_KIND_TREE } } },
     .expect = { .distinct = true }
   },
   {
     .name = "distinct_pinned_source",
     .a = { .pkg = { .qualified = "A", .rev = "1" }, .tag = "N", .fn = "F" },
     .b = { .pkg = { .qualified = "A", .rev = "2" }, .tag = "N", .fn = "F" },
+    .expect = { .distinct = true }
+  },
+  {
+    .name = "distinct_fingerprint",
+    .a = { .pkg = { .qualified = "A", .rev = "1" }, .tag = "N", .fn = "F" },
+    .b = { .pkg = { .qualified = "A", .rev = "1", .fingerprint = 1 }, .tag = "N", .fn = "F" },
     .expect = { .distinct = true }
   },
 };
