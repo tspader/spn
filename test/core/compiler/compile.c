@@ -463,7 +463,7 @@ static const compile_test_t tests [] = {
     },
     .expect = {
       .command = "cc",
-      .args = { "--target=x86_64-windows-msvc", "-std=c99", "-c", "-gno-codeview-command-line", "-Werror=return-type", "main.c", "-Xclang", "-object-file-name=main.o", "-o", "main.o" },
+      .args = { "--target=x86_64-windows-msvc", "-std=c99", "-fms-runtime-lib=static", "-c", "-gno-codeview-command-line", "-Werror=return-type", "main.c", "-Xclang", "-object-file-name=main.o", "-o", "main.o" },
       .env = { "ZIG_LIBC=/L" },
     },
   },

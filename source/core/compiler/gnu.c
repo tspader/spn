@@ -117,8 +117,10 @@ static sp_str_t ms_runtime_flag(spn_runtime_t runtime) {
 }
 
 void spn_gnu_render_flags(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, spn_cc_flags_t* flags) {
-  if (profile->abi == SPN_ABI_MSVC && toolchain->driver == SPN_CC_DRIVER_CLANG) {
-    sp_da_push(flags->compile, ms_runtime_flag(profile->runtime));
+  if (profile->abi == SPN_ABI_MSVC && spn_cc_has(toolchain, SPN_CC_CAP_CLANG_FRONTEND)) {
+    sp_str_t crt = ms_runtime_flag(profile->runtime);
+    sp_da_push(flags->compile, crt);
+    sp_da_push(flags->link, crt);
   }
   if (profile->mode == SPN_MODE_DEBUG) {
     sp_da_push(flags->compile, sp_str_lit("-g"));
