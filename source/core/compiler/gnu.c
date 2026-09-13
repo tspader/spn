@@ -472,7 +472,7 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
       break;
     }
     case SPN_CC_OUTPUT_EXE: {
-      bool fully_static = profile->linkage == SPN_LIB_KIND_STATIC && profile->runtime == SPN_RUNTIME_STATIC;
+      bool fully_static = spn_runtime_fully_static(profile->linkage, profile->runtime);
       if (fully_static && spn_ld_static(dialect)) {
         spn_cc_push_c(mem, invocation, "-static");
       }

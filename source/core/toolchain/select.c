@@ -74,7 +74,7 @@ static reach_t supports(spn_toolchain_row_t row, spn_toolchain_query_t query) {
   spn_sanitizer_set_t heavy = query.sanitizers & ~SPN_SANITIZER_UNDEFINED;
   spn_linkage_t linkage = query.linkage ? query.linkage : spn_abi_linkage(row.triple.abi);
   spn_runtime_t runtime = query.runtime ? query.runtime : spn_triple_runtime(row.triple);
-  bool fully_static = linkage == SPN_LIB_KIND_STATIC && runtime == SPN_RUNTIME_STATIC;
+  bool fully_static = spn_runtime_fully_static(linkage, runtime);
   if (heavy && fully_static && spn_ld_static(spn_ld_dialect(row.triple))) {
     return (reach_t) { .kind = REACH_SANITIZERS, .err = SPN_ERR_SANITIZER_STATIC, .row = row, .unsupported = heavy };
   }
