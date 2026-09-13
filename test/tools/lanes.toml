@@ -261,7 +261,7 @@ cxx = "C:/tools/msys64/clang64/bin/clang++.exe"
 linker = "lld"
 link_args = ["-fuse-ld=lld"]
 host = { x86_64-windows = {} }
-target = [{ arch = "x86_64", os = "windows", abi = "gnu" }]
+target = [{ arch = "x86_64", os = "windows", abi = "gnu", sanitizers = ["address"] }]
 
 [[toolchain]]
 name = "mingw64"
