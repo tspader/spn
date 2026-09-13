@@ -578,6 +578,13 @@ static const test_t tests [] = {
     .expect = { .err = SPN_ERR_PROFILE_RUNTIME },
   },
   {
+    .name = "explicit_shared_runtime_on_wasi_is_rejected",
+    .profile = { .name = "default", .runtime = { { "shared" } } },
+    .overrides = { .arch = SPN_ARCH_WASM32, .os = SPN_OS_WASI },
+    .host = PROFILE_HOST_LINUX_GNU,
+    .expect = { .err = SPN_ERR_PROFILE_RUNTIME_SHARED },
+  },
+  {
     .name = "explicit_shared_runtime_survives",
     .profile = { .name = "default", .runtime = { { "shared" } } },
     .host = PROFILE_HOST_LINUX_GNU,

@@ -334,6 +334,11 @@ static cell_t cells [] = {
     .args = { "build", "--target", "aarch64-macos-apple" },
   },
   {
+    .name = "err_profile_runtime_shared",
+    .project = "test/render/fixtures/errors/shared_runtime",
+    .args = { "build", "--target", "wasm32-wasi-musl" },
+  },
+  {
     .name = "err_issue_unrooted_relative",
     .project = "test/render/fixtures/errors/base",
     .config = "unrooted_relative.toml",
