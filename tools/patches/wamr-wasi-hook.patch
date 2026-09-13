@@ -1,5 +1,5 @@
 diff --git a/core/iwasm/libraries/libc-wasi/libc_wasi_wrapper.c b/core/iwasm/libraries/libc-wasi/libc_wasi_wrapper.c
-index 7eebf12..1fb6249 100644
+index 7eebf12..46e6c4c 100644
 --- a/core/iwasm/libraries/libc-wasi/libc_wasi_wrapper.c
 +++ b/core/iwasm/libraries/libc-wasi/libc_wasi_wrapper.c
 @@ -16,6 +16,10 @@
@@ -42,7 +42,23 @@ index 7eebf12..1fb6249 100644
  }
  
  static wasi_errno_t
-@@ -782,6 +797,10 @@ wasi_path_open(wasm_exec_env_t exec_env, wasi_fd_t dirfd,
+@@ -736,8 +751,13 @@ wasi_path_create_directory(wasm_exec_env_t exec_env, wasi_fd_t fd,
+     if (!wasi_ctx)
+         return (wasi_errno_t)-1;
+ 
+-    return wasmtime_ssp_path_create_directory(exec_env, curfds, fd, path,
+-                                              path_len);
++    wasi_errno_t err = wasmtime_ssp_path_create_directory(exec_env, curfds, fd,
++                                                          path, path_len);
++
++    if (spn_wasi_hook)
++        spn_wasi_hook(exec_env, 5, fd, path, path_len, err, 0, 0, 0);
++
++    return err;
+ }
+ 
+ static wasi_errno_t
+@@ -782,6 +802,10 @@ wasi_path_open(wasm_exec_env_t exec_env, wasi_fd_t dirfd,
                                   path_len, oflags, fs_rights_base,
                                   fs_rights_inheriting, fs_flags, &fd);
  
@@ -53,7 +69,7 @@ index 7eebf12..1fb6249 100644
      *fd_app = fd;
      return err;
  }
-@@ -804,6 +823,10 @@ wasi_fd_readdir(wasm_exec_env_t exec_env, wasi_fd_t fd, void *buf,
+@@ -804,6 +828,10 @@ wasi_fd_readdir(wasm_exec_env_t exec_env, wasi_fd_t fd, void *buf,
  
      err = wasmtime_ssp_fd_readdir(exec_env, curfds, fd, buf, buf_len, cookie,
                                    &bufused);
@@ -64,7 +80,26 @@ index 7eebf12..1fb6249 100644
      if (err)
          return err;
  
-@@ -916,8 +939,14 @@ wasi_path_filestat_get(wasm_exec_env_t exec_env, wasi_fd_t fd,
+@@ -849,9 +877,15 @@ wasi_path_rename(wasm_exec_env_t exec_env, wasi_fd_t old_fd,
+     if (!wasi_ctx)
+         return (wasi_errno_t)-1;
+ 
+-    return wasmtime_ssp_path_rename(exec_env, curfds, old_fd, old_path,
+-                                    old_path_len, new_fd, new_path,
+-                                    new_path_len);
++    wasi_errno_t err = wasmtime_ssp_path_rename(exec_env, curfds, old_fd,
++                                                old_path, old_path_len, new_fd,
++                                                new_path, new_path_len);
++
++    if (spn_wasi_hook)
++        spn_wasi_hook(exec_env, 6, new_fd, new_path, new_path_len, err, 0, 0,
++                      0);
++
++    return err;
+ }
+ 
+ static wasi_errno_t
+@@ -916,8 +950,14 @@ wasi_path_filestat_get(wasm_exec_env_t exec_env, wasi_fd_t fd,
      if (!validate_native_addr(filestat, (uint64)sizeof(wasi_filestat_t)))
          return (wasi_errno_t)-1;
  
@@ -81,3 +116,34 @@ index 7eebf12..1fb6249 100644
  }
  
  static wasi_errno_t
+@@ -966,7 +1006,13 @@ wasi_path_unlink_file(wasm_exec_env_t exec_env, wasi_fd_t fd, const char *path,
+     if (!wasi_ctx)
+         return (wasi_errno_t)-1;
+ 
+-    return wasmtime_ssp_path_unlink_file(exec_env, curfds, fd, path, path_len);
++    wasi_errno_t err =
++        wasmtime_ssp_path_unlink_file(exec_env, curfds, fd, path, path_len);
++
++    if (spn_wasi_hook)
++        spn_wasi_hook(exec_env, 7, fd, path, path_len, err, 0, 0, 0);
++
++    return err;
+ }
+ 
+ static wasi_errno_t
+@@ -980,8 +1026,13 @@ wasi_path_remove_directory(wasm_exec_env_t exec_env, wasi_fd_t fd,
+     if (!wasi_ctx)
+         return (wasi_errno_t)-1;
+ 
+-    return wasmtime_ssp_path_remove_directory(exec_env, curfds, fd, path,
+-                                              path_len);
++    wasi_errno_t err = wasmtime_ssp_path_remove_directory(exec_env, curfds, fd,
++                                                          path, path_len);
++
++    if (spn_wasi_hook)
++        spn_wasi_hook(exec_env, 8, fd, path, path_len, err, 0, 0, 0);
++
++    return err;
+ }
+ 
+ #if WASM_ENABLE_THREAD_MGR != 0

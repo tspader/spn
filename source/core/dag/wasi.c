@@ -8,6 +8,10 @@
 #define SPN_WASI_OP_FD_READDIR 2
 #define SPN_WASI_OP_FD_CLOSE 3
 #define SPN_WASI_OP_FD_RENUMBER 4
+#define SPN_WASI_OP_PATH_CREATE_DIRECTORY 5
+#define SPN_WASI_OP_PATH_RENAME 6
+#define SPN_WASI_OP_PATH_UNLINK_FILE 7
+#define SPN_WASI_OP_PATH_REMOVE_DIRECTORY 8
 
 #define SPN_WASI_ERRNO_NOENT 44
 #define SPN_WASI_ERRNO_NOTDIR 54
@@ -33,6 +37,7 @@ struct spn_dag_wasi_t {
   const spn_path_roots_t* roots;
   sp_da(spn_dag_wasi_dir_t) mounts;
   sp_ht(u32, sp_str_t) dirs;
+  sp_mem_arena_t* call;
   sp_str_ht(u8) writes;
   sp_mem_t obs_mem;
   sp_da(spn_dag_obs_t)* obs;
@@ -90,7 +95,7 @@ static bool wasi_written(spn_dag_wasi_t* w, sp_str_t host) {
 
 static void wasi_record_write(spn_dag_wasi_t* w, sp_str_t host) {
   if (!wasi_written(w, host)) {
-    sp_str_ht_insert(w->writes, sp_str_copy(w->mem, host), (u8)true);
+    sp_str_ht_insert(w->writes, sp_str_copy(sp_mem_arena_as_allocator(w->call), host), (u8)true);
   }
 }
 
@@ -161,7 +166,23 @@ static void wasi_on_readdir(spn_dag_wasi_t* w, u32 fd, u16 error) {
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
   sp_str_t host = wasi_host_path(w, s.mem, *guest);
   if (!sp_str_empty(host)) {
-    wasi_push_obs(w, SPN_DAG_OBS_ENUMERATION, spn_dag_wasi_canonicalize(s.mem, host));
+    host = spn_dag_wasi_canonicalize(s.mem, host);
+    if (!wasi_written(w, host)) {
+      wasi_push_obs(w, SPN_DAG_OBS_ENUMERATION, host);
+    }
+  }
+  sp_mem_end_scratch(s);
+}
+
+static void wasi_on_mutate(spn_dag_wasi_t* w, u32 fd, const c8* path, u32 path_len, u16 error) {
+  if (error) {
+    return;
+  }
+
+  sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+  sp_str_t host = wasi_host_path(w, s.mem, wasi_guest_path(w, s.mem, fd, path, path_len));
+  if (!sp_str_empty(host)) {
+    wasi_record_write(w, spn_dag_wasi_canonicalize(s.mem, host));
   }
   sp_mem_end_scratch(s);
 }
@@ -211,6 +232,13 @@ static void wasi_hook(wasm_exec_env_t exec_env, s32 op, u32 fd, const c8* path, 
       wasi_on_renumber(w, fd, new_fd, error);
       break;
     }
+    case SPN_WASI_OP_PATH_CREATE_DIRECTORY:
+    case SPN_WASI_OP_PATH_RENAME:
+    case SPN_WASI_OP_PATH_UNLINK_FILE:
+    case SPN_WASI_OP_PATH_REMOVE_DIRECTORY: {
+      wasi_on_mutate(w, fd, path, path_len, error);
+      break;
+    }
   }
 }
 
@@ -227,7 +255,8 @@ spn_dag_wasi_t* spn_dag_wasi_new(sp_mem_t mem, const spn_path_roots_t* roots, co
   w->obs = SP_NULLPTR;
   sp_da_init(mem, w->mounts);
   sp_ht_init(mem, w->dirs);
-  sp_str_ht_init(mem, w->writes);
+  w->call = sp_mem_arena_new(mem);
+  sp_str_ht_init(sp_mem_arena_as_allocator(w->call), w->writes);
 
   sp_for(it, count) {
     sp_da_push(w->mounts, ((spn_dag_wasi_dir_t) {
@@ -245,6 +274,8 @@ void spn_dag_wasi_bind(spn_dag_wasi_t* w, wasm_module_inst_t instance) {
 }
 
 void spn_dag_wasi_begin(spn_dag_wasi_t* w, sp_mem_t mem, sp_da(spn_dag_obs_t)* obs) {
+  sp_mem_arena_clear(w->call);
+  sp_str_ht_init(sp_mem_arena_as_allocator(w->call), w->writes);
   w->obs_mem = mem;
   w->obs = obs;
 }
@@ -264,12 +295,10 @@ static void wasi_observe_dir(spn_dag_wasi_t* w, sp_str_t dir) {
   sp_da(sp_fs_entry_t) entries = sp_zero;
   sp_fs_collect_recursive(s.mem, dir, &entries);
   sp_da_for(entries, it) {
-    if (entries[it].kind == SP_FS_KIND_DIR) {
-      wasi_push_obs(w, SPN_DAG_OBS_ENUMERATION, entries[it].path);
+    if (wasi_written(w, entries[it].path)) {
+      continue;
     }
-    else if (!wasi_written(w, entries[it].path)) {
-      wasi_push_obs(w, SPN_DAG_OBS_FILE, entries[it].path);
-    }
+    wasi_push_obs(w, entries[it].kind == SP_FS_KIND_DIR ? SPN_DAG_OBS_ENUMERATION : SPN_DAG_OBS_FILE, entries[it].path);
   }
   sp_mem_end_scratch(s);
 }
@@ -320,7 +349,7 @@ void spn_dag_wasi_observe_glob(wasm_module_inst_t instance, sp_str_t dir, sp_str
     sp_da_for(glob.obs, it) {
       spn_dag_obs_t* obs = &glob.obs[it];
       sp_str_t host = spn_path_str(w->roots, s.mem, obs->path);
-      if (obs->kind == SPN_DAG_OBS_FILE && wasi_written(w, host)) {
+      if (wasi_written(w, host)) {
         continue;
       }
       sp_da_push(*w->obs, ((spn_dag_obs_t) {

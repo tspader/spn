@@ -11,12 +11,17 @@ typedef enum {
   WASM_EMIT_STAT,
   WASM_EMIT_READDIR,
   WASM_EMIT_CLOSE,
+  WASM_EMIT_MKDIR,
+  WASM_EMIT_RENAME,
+  WASM_EMIT_UNLINK,
+  WASM_EMIT_RMDIR,
 } wasm_emit_op_kind_t;
 
 typedef struct {
   wasm_emit_op_kind_t kind;
   const c8* path;
   u32 mount;
+  const c8* to;
 } wasm_emit_op_t;
 
 typedef struct {

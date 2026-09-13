@@ -27,9 +27,16 @@
 #define WASM_FN_PATH_FILESTAT_GET 1
 #define WASM_FN_FD_READDIR 2
 #define WASM_FN_FD_CLOSE 3
-#define WASM_TYPE_GUEST 4
-#define WASM_TYPE_INIT 5
-#define WASM_NUM_IMPORTS 4
+#define WASM_FN_PATH_CREATE_DIRECTORY 4
+#define WASM_FN_PATH_RENAME 5
+#define WASM_FN_PATH_UNLINK_FILE 6
+#define WASM_FN_PATH_REMOVE_DIRECTORY 7
+#define WASM_TYPE_PATH 4
+#define WASM_TYPE_RENAME 5
+#define WASM_TYPE_GUEST 6
+#define WASM_TYPE_INIT 7
+#define WASM_NUM_TYPES 8
+#define WASM_NUM_IMPORTS 8
 
 #define WASM_SLOT_FD 0
 #define WASM_SLOT_USED 8
@@ -149,7 +156,14 @@ static void put_path_open(sp_io_writer_t* w, wasm_path_t path, s64 oflags, s64 r
   put_call(w, WASM_FN_PATH_OPEN);
 }
 
-static void put_op(sp_io_writer_t* w, const wasm_emit_op_t* op, wasm_path_t path) {
+static void put_path_op(sp_io_writer_t* w, const wasm_emit_op_t* op, wasm_path_t path, u32 fn) {
+  put_i32_const(w, WASM_PREOPEN_BASE_FD + op->mount);
+  put_i32_const(w, path.offset);
+  put_i32_const(w, path.len);
+  put_call(w, fn);
+}
+
+static void put_op(sp_io_writer_t* w, const wasm_emit_op_t* op, wasm_path_t path, wasm_path_t to) {
   switch (op->kind) {
     case WASM_EMIT_OPEN_READ: {
       put_i32_const(w, WASM_PREOPEN_BASE_FD + op->mount);
@@ -194,6 +208,28 @@ static void put_op(sp_io_writer_t* w, const wasm_emit_op_t* op, wasm_path_t path
       put_call(w, WASM_FN_FD_CLOSE);
       break;
     }
+    case WASM_EMIT_MKDIR: {
+      put_path_op(w, op, path, WASM_FN_PATH_CREATE_DIRECTORY);
+      break;
+    }
+    case WASM_EMIT_RENAME: {
+      put_i32_const(w, WASM_PREOPEN_BASE_FD + op->mount);
+      put_i32_const(w, path.offset);
+      put_i32_const(w, path.len);
+      put_i32_const(w, WASM_PREOPEN_BASE_FD + op->mount);
+      put_i32_const(w, to.offset);
+      put_i32_const(w, to.len);
+      put_call(w, WASM_FN_PATH_RENAME);
+      break;
+    }
+    case WASM_EMIT_UNLINK: {
+      put_path_op(w, op, path, WASM_FN_PATH_UNLINK_FILE);
+      break;
+    }
+    case WASM_EMIT_RMDIR: {
+      put_path_op(w, op, path, WASM_FN_PATH_REMOVE_DIRECTORY);
+      break;
+    }
     case WASM_EMIT_NONE: {
       sp_unreachable_case();
     }
@@ -206,19 +242,23 @@ static sp_io_dyn_mem_writer_t section_new(sp_mem_t mem) {
   return w;
 }
 
+static wasm_path_t put_data(sp_io_dyn_mem_writer_t* data, const c8* str) {
+  wasm_path_t path = sp_zero;
+  if (str) {
+    path.offset = WASM_DATA_BASE + (u32)sp_io_dyn_mem_writer_as_str(data).len;
+    path.len = (u32)sp_cstr_len(str);
+    put_bytes(&data->base, str, path.len);
+  }
+  return path;
+}
+
 sp_str_t wasm_emit_module(sp_mem_t mem, const wasm_emit_fn_t* fns, u32 count) {
   sp_io_dyn_mem_writer_t data = section_new(mem);
   sp_da(wasm_path_t) paths = sp_da_new(mem, wasm_path_t);
   sp_for(fi, count) {
     sp_for(oi, fns[fi].count) {
-      wasm_path_t path = sp_zero;
-      const c8* str = fns[fi].ops[oi].path;
-      if (str) {
-        path.offset = WASM_DATA_BASE + (u32)sp_io_dyn_mem_writer_as_str(&data).len;
-        path.len = (u32)sp_cstr_len(str);
-        put_bytes(&data.base, str, path.len);
-      }
-      sp_da_push(paths, path);
+      sp_da_push(paths, put_data(&data, fns[fi].ops[oi].path));
+      sp_da_push(paths, put_data(&data, fns[fi].ops[oi].to));
     }
   }
 
@@ -234,13 +274,17 @@ sp_str_t wasm_emit_module(sp_mem_t mem, const wasm_emit_fn_t* fns, u32 count) {
     const u8 params_stat [] = { WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I32 };
     const u8 params_readdir [] = { WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I64, WASM_TYPE_I32 };
     const u8 params_close [] = { WASM_TYPE_I32 };
+    const u8 params_path [] = { WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I32 };
+    const u8 params_rename [] = { WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I32, WASM_TYPE_I32 };
 
     sp_io_dyn_mem_writer_t s = section_new(mem);
-    put_uleb(&s.base, 6);
+    put_uleb(&s.base, WASM_NUM_TYPES);
     put_functype(&s.base, params_path_open, sp_carr_len(params_path_open), true);
     put_functype(&s.base, params_stat, sp_carr_len(params_stat), true);
     put_functype(&s.base, params_readdir, sp_carr_len(params_readdir), true);
     put_functype(&s.base, params_close, sp_carr_len(params_close), true);
+    put_functype(&s.base, params_path, sp_carr_len(params_path), true);
+    put_functype(&s.base, params_rename, sp_carr_len(params_rename), true);
     put_functype(&s.base, SP_NULLPTR, 0, true);
     put_functype(&s.base, SP_NULLPTR, 0, false);
     put_section(&out.base, WASM_SEC_TYPE, &s);
@@ -253,6 +297,10 @@ sp_str_t wasm_emit_module(sp_mem_t mem, const wasm_emit_fn_t* fns, u32 count) {
     put_import(&s.base, "path_filestat_get", WASM_FN_PATH_FILESTAT_GET);
     put_import(&s.base, "fd_readdir", WASM_FN_FD_READDIR);
     put_import(&s.base, "fd_close", WASM_FN_FD_CLOSE);
+    put_import(&s.base, "path_create_directory", WASM_TYPE_PATH);
+    put_import(&s.base, "path_rename", WASM_TYPE_RENAME);
+    put_import(&s.base, "path_unlink_file", WASM_TYPE_PATH);
+    put_import(&s.base, "path_remove_directory", WASM_TYPE_PATH);
     put_section(&out.base, WASM_SEC_IMPORT, &s);
   }
 
@@ -300,7 +348,8 @@ sp_str_t wasm_emit_module(sp_mem_t mem, const wasm_emit_fn_t* fns, u32 count) {
       sp_io_dyn_mem_writer_t code = section_new(mem);
       put_uleb(&code.base, 0);
       sp_for(oi, fns[fi].count) {
-        put_op(&code.base, &fns[fi].ops[oi], paths[next++]);
+        put_op(&code.base, &fns[fi].ops[oi], paths[next], paths[next + 1]);
+        next += 2;
         if (oi + 1 < fns[fi].count) {
           put_u8(&code.base, WASM_OP_DROP);
         }

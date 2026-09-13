@@ -258,16 +258,12 @@ spn_err_t spn_wasm_script_call_ex(spn_wasm_script_t* script, spn_pkg_unit_t* uni
     });
   }
   else {
-    if (obs.out) {
-      spn_dag_wasi_begin(script->wasi, obs.mem, obs.out);
-    }
+    spn_dag_wasi_begin(script->wasi, obs.mem, obs.out);
     spn_wasm_script_t* previous = unit->wasm.active;
     unit->wasm.active = script;
     err = script_call_invoke(script, unit, fn, kind, arg);
     unit->wasm.active = previous;
-    if (obs.out) {
-      spn_dag_wasi_end(script->wasi);
-    }
+    spn_dag_wasi_end(script->wasi);
   }
 
   sp_mutex_unlock(&script->mutex);

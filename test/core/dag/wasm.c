@@ -163,6 +163,63 @@ static const wasm_test_t wasm_tests [] = {
     }
   },
   {
+    .name = "write_then_read_cross_call",
+    .calls = {
+      { .fn = "A",
+        .ops = { { WASM_EMIT_OPEN_WRITE, "O" } } },
+      { .fn = "B",
+        .ops = { { WASM_EMIT_OPEN_READ, "O" } },
+        .expect = { .obs = { { .path = "work/O" } } } },
+    }
+  },
+  {
+    .name = "rename_then_read",
+    .calls = {
+      { .fn = "run",
+        .ops = {
+          { WASM_EMIT_OPEN_WRITE, "T" },
+          { WASM_EMIT_CLOSE },
+          { WASM_EMIT_RENAME, "T", .to = "O" },
+          { WASM_EMIT_OPEN_READ, "O" },
+        } },
+    }
+  },
+  {
+    .name = "mkdir_then_stat",
+    .calls = {
+      { .fn = "run",
+        .ops = {
+          { WASM_EMIT_MKDIR, "D" },
+          { WASM_EMIT_STAT, "D" },
+        } },
+    }
+  },
+  {
+    .name = "unlink_then_stat",
+    .files = { { "work/H" } },
+    .calls = {
+      { .fn = "run",
+        .ops = {
+          { WASM_EMIT_UNLINK, "H" },
+          { WASM_EMIT_STAT, "H" },
+        },
+        .expect = { .rc = WASI_ENOENT } },
+    }
+  },
+  {
+    .name = "rmdir_then_stat",
+    .files = { { "work/D/H" } },
+    .calls = {
+      { .fn = "run",
+        .ops = {
+          { WASM_EMIT_UNLINK, "D/H" },
+          { WASM_EMIT_RMDIR, "D" },
+          { WASM_EMIT_STAT, "D" },
+        },
+        .expect = { .rc = WASI_ENOENT } },
+    }
+  },
+  {
     .name = "escape",
     .calls = {
       { .fn = "run",
