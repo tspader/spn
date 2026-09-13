@@ -386,6 +386,12 @@ sp_str_t test_when_blocked(test_when_t when) {
       sp_fmt_str(spn_ld_family_to_str(profile.linker)),
       sp_fmt_str(spn_ld_family_to_str(when.linker))).value;
   }
+  if (when.linker_not && when.linker_not == profile.linker) {
+    return sp_fmt(mem, "{} links {} with {}, test needs another family",
+      sp_fmt_cstr(toolchain->name),
+      sp_fmt_str(spn_triple_to_str(mem, target)),
+      sp_fmt_str(spn_ld_family_to_str(profile.linker))).value;
+  }
   sp_str_t broken = lane_broken(mem, selection.toolchain);
   if (!sp_str_empty(broken)) {
     return sp_fmt(mem, "{} {}", sp_fmt_str(selection.toolchain->name), sp_fmt_str(broken)).value;

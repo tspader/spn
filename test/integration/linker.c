@@ -38,7 +38,7 @@ sp_test(linker, link_flags_gated_on_linker_apply) {
 sp_test(linker, link_flags_gated_on_linker_skip) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/linker/gated",
-    .when.linker = SPN_LD_FAMILY_GNU,
+    .when.linker_not = SPN_LD_FAMILY_LLD,
     .actions = {
       { .kind = ACTION_RUN_CLI, .cli = { .cmd = "build" } },
       { .kind = ACTION_VERIFY_EXISTS, .exists = exe("main") },
