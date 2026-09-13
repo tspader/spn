@@ -416,7 +416,8 @@ static void add_static_runtime(sp_mem_t mem, spn_cc_driver_t driver, spn_triple_
     return;
   }
   switch (driver) {
-    case SPN_CC_DRIVER_GCC: {
+    case SPN_CC_DRIVER_GCC:
+    case SPN_CC_DRIVER_CLANG: {
       spn_cc_push_c(mem, invocation, "-static-libstdc++");
       spn_cc_push_c(mem, invocation, "-static-libgcc");
       if (triple.os == SPN_OS_WINDOWS) {
@@ -424,10 +425,6 @@ static void add_static_runtime(sp_mem_t mem, spn_cc_driver_t driver, spn_triple_
         spn_cc_push_c(mem, invocation, "-lwinpthread");
         spn_cc_push_c(mem, invocation, "-Wl,--no-whole-archive,-Bdynamic");
       }
-      break;
-    }
-    case SPN_CC_DRIVER_CLANG: {
-      spn_cc_push_c(mem, invocation, "-static-libstdc++");
       break;
     }
     case SPN_CC_DRIVER_ZIG:
