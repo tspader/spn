@@ -811,6 +811,16 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
           );
           break;
         }
+        case SPN_ERR_PROFILE_RUNTIME_SHARED: {
+          sp_tty_fmt(
+            &w,
+            "Target {.yellow} can't use {.red}; {} has no dynamic loader",
+            sp_fmt_str(spn_triple_to_str(mem, event->err.profile.target)),
+            sp_fmt_str(sp_str_lit("runtime = \"shared\"")),
+            sp_fmt_str(spn_os_to_str(event->err.profile.target.os))
+          );
+          break;
+        }
         case SPN_ERR_SANITIZER_UNSUPPORTED: {
           sp_tty_fmt(
             &w,

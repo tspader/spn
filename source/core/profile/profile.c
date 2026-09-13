@@ -314,6 +314,12 @@ spn_err_t spn_profile_resolve(const spn_profile_override_t* override, spn_triple
       .profile = { .name = name, .target = pinned },
     });
   }
+  if (merged.runtime == SPN_RUNTIME_SHARED && !spn_triple_dynamic(pinned)) {
+    return spn_err_emit(&spn, (spn_err_union_t) {
+      .kind = SPN_ERR_PROFILE_RUNTIME_SHARED,
+      .profile = { .name = name, .target = pinned },
+    });
+  }
 
   *result = (spn_profile_info_t) {
     .name       = name,
