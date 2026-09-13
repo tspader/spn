@@ -103,7 +103,7 @@ static const flags_test_t tests [] = {
       .runtime = SPN_RUNTIME_STATIC,
     },
     .driver = SPN_CC_DRIVER_CLANG,
-    .expect = { .compile = { "-fms-runtime-lib=static" } },
+    .expect = { .compile = { "-fms-runtime-lib=static" }, .link = { "-fms-runtime-lib=static" } },
   },
   {
     .name = "render_clang_msvc_shared_runtime",
@@ -114,7 +114,7 @@ static const flags_test_t tests [] = {
       .runtime = SPN_RUNTIME_SHARED,
     },
     .driver = SPN_CC_DRIVER_CLANG,
-    .expect = { .compile = { "-fms-runtime-lib=dll" } },
+    .expect = { .compile = { "-fms-runtime-lib=dll" }, .link = { "-fms-runtime-lib=dll" } },
   },
   {
     .name = "freestanding_zig_strips_runtime",
