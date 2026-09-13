@@ -22,6 +22,7 @@ spn_abi_t                spn_default_abi(spn_cc_driver_t driver, spn_os_t os);
 spn_linkage_t            spn_abi_linkage(spn_abi_t abi);
 spn_runtime_t            spn_triple_runtime(spn_triple_t triple);
 bool                     spn_triple_runtime_static(spn_triple_t triple);
+bool                     spn_runtime_fully_static(spn_linkage_t linkage, spn_runtime_t runtime);
 spn_path_t               spn_toolchain_artifact_root(spn_artifact_t artifact);
 spn_toolchain_launcher_t spn_toolchain_launcher_with_root(sp_mem_t mem, spn_toolchain_launcher_t launcher, spn_path_t root);
 sp_str_t                 spn_toolchain_launcher_to_str(const spn_path_roots_t* roots, sp_mem_t mem, spn_toolchain_launcher_t launcher);

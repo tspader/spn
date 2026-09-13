@@ -201,6 +201,10 @@ spn_runtime_t spn_triple_runtime(spn_triple_t triple) {
   SP_UNREACHABLE_RETURN(SPN_RUNTIME_STATIC);
 }
 
+bool spn_runtime_fully_static(spn_linkage_t linkage, spn_runtime_t runtime) {
+  return linkage == SPN_LIB_KIND_STATIC && runtime == SPN_RUNTIME_STATIC;
+}
+
 spn_abi_t spn_default_abi(spn_cc_driver_t driver, spn_os_t os) {
   switch (os) {
     case SPN_OS_LINUX:
