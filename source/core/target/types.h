@@ -75,6 +75,9 @@ struct spn_target_info {
   sp_da(spn_embed_t) embed;
   spn_cxx_options_t cxx;
   struct {
+    sp_da(spn_path_t) include;
+  } configured;
+  struct {
     sp_da(sp_str_t) frameworks;
     spn_os_version_t min_os;
   } macos;

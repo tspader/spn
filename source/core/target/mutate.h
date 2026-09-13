@@ -15,6 +15,7 @@ static inline void spn_target_info_init(sp_mem_t mem, spn_target_info_t* target)
   if (!target->system_deps)     sp_da_init(mem, target->system_deps);
   if (!target->deps)            sp_da_init(mem, target->deps);
   if (!target->embed)           sp_da_init(mem, target->embed);
+  if (!target->configured.include) sp_da_init(mem, target->configured.include);
   if (!target->macos.frameworks) sp_da_init(mem, target->macos.frameworks);
   if (!target->gated.source)        sp_da_init(mem, target->gated.source);
   if (!target->gated.headers)       sp_da_init(mem, target->gated.headers);

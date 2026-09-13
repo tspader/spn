@@ -31,6 +31,13 @@ static spn_cc_compile_t compile_desc(sp_mem_t mem, spn_compile_unit_t* unit) {
   sp_da_init(mem, compile.define);
   sp_da_init(mem, compile.args);
 
+  sp_da_for(unit->target->info->configured.include, it) {
+    sp_da_push(compile.include, unit->target->info->configured.include[it]);
+  }
+  sp_da_for(pkg->info->configured.include, it) {
+    sp_da_push(compile.include, pkg->info->configured.include[it]);
+  }
+
   sp_da_for(build->include, it) {
     sp_da_push(compile.include, build->include[it]);
   }

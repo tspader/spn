@@ -386,6 +386,7 @@ sp_str_t spn_dir_to_str(spn_dir_t dir) {
     case SPN_DIR_WORK:     return sp_str_lit("work");
     case SPN_DIR_PROJECT:  return sp_str_lit("project");
     case SPN_DIR_MANIFEST: return sp_str_lit("manifest");
+    case SPN_DIR_BIN:      return sp_str_lit("bin");
   }
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }

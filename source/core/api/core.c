@@ -43,6 +43,7 @@ spn_path_t spn_api_dir_path(spn_pkg_unit_t* unit, spn_dir_t dir) {
     case SPN_DIR_WORK:     return unit->paths.work;
     case SPN_DIR_PROJECT:  return unit->session->paths.root;
     case SPN_DIR_MANIFEST: return unit->paths.roots.recipe;
+    case SPN_DIR_BIN:      return unit->paths.bin;
   }
 
   SP_UNREACHABLE_RETURN(sp_zero_struct(spn_path_t));
@@ -266,7 +267,7 @@ void spn_target_add_include(spn_target_t* target, const c8* include) {
   if (spn_path_empty(made)) {
     return;
   }
-  sp_da_push(target->info->include, made);
+  sp_da_push(target->info->configured.include, made);
 }
 
 void spn_target_add_define(spn_target_t* target, const c8* define) {

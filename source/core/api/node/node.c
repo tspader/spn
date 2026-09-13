@@ -70,11 +70,12 @@ static output_problem_t output_problem(spn_dir_t dir, sp_str_t sub) {
     case SPN_DIR_INCLUDE:
     case SPN_DIR_VENDOR:
     case SPN_DIR_LIB:
-    case SPN_DIR_SOURCE:
+    case SPN_DIR_BIN:
     case SPN_DIR_WORK:     return OUTPUT_OK;
     case SPN_DIR_NONE:
     case SPN_DIR_CACHE:
     case SPN_DIR_STORE:
+    case SPN_DIR_SOURCE:
     case SPN_DIR_PROJECT:
     case SPN_DIR_MANIFEST: return OUTPUT_ROOT;
   }
@@ -86,7 +87,7 @@ static sp_str_t output_problem_str(output_problem_t problem) {
     case OUTPUT_OK:       return sp_str_lit("");
     case OUTPUT_UNNAMED:  return sp_str_lit("must name a path under its root");
     case OUTPUT_ABSOLUTE: return sp_str_lit("must be relative to its root");
-    case OUTPUT_ROOT:     return sp_str_lit("must be rooted at include, vendor, lib, source, or work");
+    case OUTPUT_ROOT:     return sp_str_lit("must be rooted at include, vendor, lib, bin, or work");
   }
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }

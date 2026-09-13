@@ -17,7 +17,7 @@
   typedef char     c8;
 #endif
 
-#include "err.h"
+#include "spn/err.h"
 
 typedef enum {
   SPN_ABI_NONE,
@@ -188,6 +188,7 @@ typedef enum {
   SPN_DIR_WORK = 7,
   SPN_DIR_PROJECT = 8,
   SPN_DIR_MANIFEST = 9,
+  SPN_DIR_BIN = 10,
 } spn_dir_t;
 
 typedef enum {

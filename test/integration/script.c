@@ -98,6 +98,27 @@ sp_test(script, node_output_root) {
   });
 }
 
+sp_test(script, node_output_source) {
+  return run_command_test(t, (command_test_t) {
+    .project = "test/integration/fixtures/script/node_output_source",
+    .args = { "build" },
+    .expect = {
+      .rc = 1,
+      .events = { { .event = SPN_EVENT_ERR, .key = "kind", .value = "wasm_module_call_failed" } },
+    },
+  });
+}
+
+sp_test(script, node_output_bin) {
+  return run_command_test(t, (command_test_t) {
+    .project = "test/integration/fixtures/script/node_output_bin",
+    .args = { "build" },
+    .expect = {
+      .exists = { store_file("bin/R") },
+    },
+  });
+}
+
 sp_test(script, node_output_unnamed) {
   return run_command_test(t, (command_test_t) {
     .project = "test/integration/fixtures/script/node_output_unnamed",
@@ -563,8 +584,6 @@ sp_test(script, input_order) {
 }
 
 sp_test(script, generated_source) {
-  return sp_test_skip(t, "pending: union declared node outputs into source-glob expansion");
-
   return run_command_test(t, (command_test_t) {
     .project = "test/integration/fixtures/script/generated_source",
     .args = { "build" },

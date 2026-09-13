@@ -1,6 +1,6 @@
 #include "spn/host.h"
 
-#include "codegen/gen/config.gen.h"
+#include "config.gen.h"
 #include "codegen/lower.h"
 #include "ctx/ctx.h"
 #include "error/error.h"

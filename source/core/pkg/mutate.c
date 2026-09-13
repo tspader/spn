@@ -30,6 +30,7 @@ void spn_pkg_init(sp_mem_t mem, spn_pkg_info_t* pkg, sp_str_t name) {
   sp_da_init(a, pkg->deps);
   sp_da_init(a, pkg->config);
   sp_da_init(a, pkg->include);
+  sp_da_init(a, pkg->configured.include);
   sp_da_init(a, pkg->define);
   sp_da_init(a, pkg->public_define);
   sp_da_init(a, pkg->system_deps);
@@ -76,7 +77,7 @@ void spn_pkg_set_maintainer_ex(spn_pkg_info_t* pkg, sp_str_t maintainer) {
 }
 
 void spn_pkg_add_include(spn_pkg_info_t* pkg, spn_path_t path) {
-  sp_da_push(pkg->include, path);
+  sp_da_push(pkg->configured.include, path);
 }
 
 void spn_pkg_add_define(spn_pkg_info_t* pkg, const c8* define) {

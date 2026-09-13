@@ -12,6 +12,9 @@ sp_str_t test_repo_root(sp_mem_t mem) {
 }
 
 sp_str_t test_repo_path(sp_mem_t mem, sp_str_t rel) {
+  if (sp_fs_is_absolute(rel)) {
+    return sp_str_copy(mem, rel);
+  }
   return sp_fs_join_path(mem, test_repo_root(mem), rel);
 }
 

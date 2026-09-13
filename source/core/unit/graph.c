@@ -51,6 +51,7 @@ static spn_target_info_t clone_target_info(sp_mem_t mem, spn_target_info_t* sour
   target.system_deps = clone_str_list(mem, source->system_deps);
   target.deps = clone_str_list(mem, source->deps);
   target.embed = clone_embed_list(mem, source->embed);
+  target.configured.include = clone_path_list(mem, source->configured.include);
   target.macos.frameworks = clone_str_list(mem, source->macos.frameworks);
   return target;
 }
@@ -79,6 +80,7 @@ static spn_pkg_info_t* clone_pkg_info(spn_session_t* s, spn_pkg_id_t id, spn_bui
   clone_target_map(&info->tests, source->tests, mem);
   clone_target_map(&info->examples, source->examples, mem);
   info->include = clone_path_list(mem, source->include);
+  info->configured.include = clone_path_list(mem, source->configured.include);
   info->define = clone_str_list(mem, source->define);
   info->public_define = clone_str_list(mem, source->public_define);
   info->system_deps = clone_str_list(mem, source->system_deps);
