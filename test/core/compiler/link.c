@@ -385,7 +385,7 @@ static const link_test_t tests [] = {
     .kind = SPN_CC_OUTPUT_EXE,
     .expect = {
       .command = "cc",
-      .args = { "--target=x86_64-windows-gnu", "-static-libstdc++", "main.o", "-o", "main" },
+      .args = { "--target=x86_64-windows-gnu", "-static-libstdc++", "-static-libgcc", "-Wl,-Bstatic,--whole-archive", "-lwinpthread", "-Wl,--no-whole-archive,-Bdynamic", "main.o", "-o", "main" },
     },
   },
   {
