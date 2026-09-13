@@ -214,6 +214,30 @@ static spn_err_t dag_user_exec(spn_dag_t* g, spn_dag_action_t* action, void* use
     .script_user_fn = { .tag = node->tag }
   });
 
+  sp_da_for(action->produces, it) {
+    spn_dag_artifact_t* artifact = spn_dag_find_artifact(g, action->produces[it]);
+    sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
+    sp_str_t declared = spn_path_str(g->roots, scratch.mem, artifact->path);
+    sp_err_t err = SP_OK;
+    switch (artifact->kind) {
+      case SPN_DAG_ARTIFACT_KIND_FILE:  err = sp_fs_remove_file(declared); break;
+      case SPN_DAG_ARTIFACT_KIND_TREE:  err = sp_fs_remove_dir(declared); break;
+      case SPN_DAG_ARTIFACT_KIND_VALUE: sp_unreachable_case();
+    }
+    sp_mem_end_scratch(scratch);
+    if (err && err != SP_ERR_SYS_NOT_FOUND) {
+      spn_event_buffer_push(spn.events, (spn_event_t) {
+        .kind = SPN_EVENT_NODE_FAILED,
+        .pkg = pkg->info->name,
+        .node_failed = {
+          .path = spn_path_str(g->roots, spn.mem, artifact->path),
+          .message = sp_fmt(spn.mem, "could not be removed before node {} ran", sp_fmt_str(node->tag)).value,
+        },
+      });
+      return SPN_ERR_DAG_ACTION;
+    }
+  }
+
   if (!sp_str_empty(node->fn)) {
     if (spn_wasm_call_export_ex(pkg, node->fn, SPN_ABI_KIND_NONE, SP_NULLPTR, (spn_wasm_obs_t) { .mem = mem, .out = obs })) {
       return SPN_ERR_DAG_ACTION;

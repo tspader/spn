@@ -8,6 +8,7 @@ typedef enum {
   STORE_OP_GET,
   STORE_OP_HAS,
   STORE_OP_MATERIALIZE,
+  STORE_OP_WRITE,
 } store_op_kind_t;
 
 typedef struct {
@@ -99,6 +100,24 @@ static const store_test_t store_tests [] = {
       { .kind = STORE_OP_MATERIALIZE, .blob = "A", .path = "a.bin" },
     }
   },
+  {
+    .name = "materialized_write_leaves_blob",
+    .ops = {
+      { .kind = STORE_OP_PUT, .blob = "A" },
+      { .kind = STORE_OP_MATERIALIZE, .blob = "A", .path = "a.bin" },
+      { .kind = STORE_OP_WRITE, .blob = "T", .path = "a.bin" },
+      { .kind = STORE_OP_GET, .blob = "A" },
+    }
+  },
+  {
+    .name = "put_file_source_write_leaves_blob",
+    .ops = {
+      { .kind = STORE_OP_FILE, .blob = "A", .path = "a.c" },
+      { .kind = STORE_OP_PUT_FILE, .blob = "A", .path = "a.c" },
+      { .kind = STORE_OP_WRITE, .blob = "T", .path = "a.c" },
+      { .kind = STORE_OP_GET, .blob = "A", .name = "a.c" },
+    }
+  },
 };
 
 static sp_err_t store_run_ops(sp_test_t* t, spn_dag_store_kind_t kind, const store_test_t* test) {
@@ -166,6 +185,14 @@ static sp_err_t store_run_ops(sp_test_t* t, spn_dag_store_kind_t kind, const sto
           if (err) {
             return err;
           }
+        }
+        break;
+      }
+      case STORE_OP_WRITE: {
+        sp_io_file_writer_t writer = sp_zero;
+        if (!sp_io_file_writer_from_path(&writer, dag_test_env_path(&env, sp_str_view(op.path)))) {
+          sp_io_write(&writer.base, blob.data, blob.len, SP_NULLPTR);
+          sp_io_file_writer_close(&writer);
         }
         break;
       }

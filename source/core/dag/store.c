@@ -3,6 +3,7 @@
 #include "paths/paths.h"
 #include "sp.h"
 #include "spn/core.h"
+#include "fs/fs.h"
 #include "io/io.h"
 
 
@@ -622,7 +623,7 @@ spn_err_t spn_dag_store_put(spn_dag_store_t* store, const void* data, u64 len, s
       sp_str_t blob = get_blob_path(store, s.mem, *digest, name);
       if (!sp_fs_is_file(blob)) {
         sp_fs_create_dir(spn_path_str(store->roots, s.mem, get_blob_dir(store, s.mem, *digest)));
-        if (sp_fs_write_atomic_slice(blob, sp_mem_slice((u8*)data, len))) {
+        if (sp_fs_write_atomic_slice(blob, sp_mem_slice((u8*)data, len)) || sp_fs_set_readonly(blob)) {
           err = SPN_ERR_DAG_STORE_WRITE;
         }
       }
@@ -663,6 +664,9 @@ spn_err_t spn_dag_store_put_file(spn_dag_store_t* store, sp_str_t path, sp_str_t
       if (!sp_fs_is_file(blob)) {
         sp_fs_create_dir(spn_path_str(store->roots, s.mem, get_blob_dir(store, s.mem, *digest)));
         err = link_or_copy(path, blob);
+        if (!err && sp_fs_set_readonly(blob)) {
+          err = SPN_ERR_DAG_STORE_WRITE;
+        }
       }
       sp_mem_end_scratch(s);
       return err;

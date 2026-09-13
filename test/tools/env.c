@@ -10,8 +10,9 @@ void write_file(sp_str_t path, sp_str_t content) {
     sp_fs_create_dir(parent);
   }
 
+  sp_fs_remove_file(path);
   sp_io_file_writer_t f = sp_zero;
-  sp_io_file_writer_from_path(&f, path);
+  sp_assert(!sp_io_file_writer_from_path(&f, path));
   sp_io_write_str(&f.base, content, SP_NULLPTR);
   sp_io_file_writer_close(&f);
 }

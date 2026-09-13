@@ -64,6 +64,29 @@ sp_test(script, tree_output_cached) {
   });
 }
 
+sp_test(script, tree_output_rerun_drops_file) {
+  return run_rebuild_test(t, (rebuild_test_t) {
+    .project = "test/integration/fixtures/script/tree_output_drop",
+    .copy = { "packages/*" },
+    .first = {
+      .args = { "build" },
+      .expect.exists = { store_file("K/include/G/a.h"), store_file("K/include/G/d.h") },
+    },
+    .rebuilds = {
+      {
+        .change.remove_files = { sp_str_lit("packages/K/H/d.h") },
+        .command = {
+          .args = { "build" },
+          .expect = {
+            .exists = { store_file("K/include/G/a.h") },
+            .missing = { store_file("K/include/G/d.h") },
+          },
+        },
+      },
+    },
+  });
+}
+
 sp_test(script, node_output_root) {
   return run_command_test(t, (command_test_t) {
     .project = "test/integration/fixtures/script/node_output_root",
