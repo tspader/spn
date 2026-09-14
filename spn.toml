@@ -99,6 +99,7 @@ source = [
   "source/core/codegen/gen/events.gen.c",
   "source/core/codegen/gen/fuzz.gen.c",
   "source/core/codegen/gen/manifest.gen.c",
+  "source/core/codegen/gen/probe.gen.c",
   "source/core/codegen/gen/release.gen.c",
   "source/core/codegen/gen/source_deps.gen.c",
 ]
@@ -394,6 +395,7 @@ source = [
   "source/core/codegen/loader.c",
   "source/core/codegen/toolchain.c",
   "source/core/codegen/gen/config.gen.c",
+  "source/core/codegen/gen/probe.gen.c",
   "source/core/core/core.c",
   "source/core/ctx/ctx.c",
   "source/core/enum/enum.c",
