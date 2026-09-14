@@ -597,9 +597,11 @@ static const resolve_test_t resolve_tests [] = {
 
 static spn_abi_list_t abi_list(const spn_abi_t abis [SELECT_MAX_ABIS]) {
   spn_abi_list_t list = sp_zero;
-  sp_carr_detect_len(abis, list.count, abis[list.count]);
-  sp_for(it, list.count) {
-    list.items[it] = abis[it];
+  sp_for(it, SELECT_MAX_ABIS) {
+    if (!abis[it]) {
+      break;
+    }
+    list.items[list.count++] = abis[it];
   }
   return list;
 }

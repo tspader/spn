@@ -313,7 +313,7 @@ static spn_err_t lane_selects(sp_mem_t mem, const test_when_t* when, spn_triple_
   return err;
 }
 
-static sp_str_t not_in_lanes(sp_mem_t mem, const test_toolchain_t* toolchain, const c8* const* names, u32 count) {
+static sp_str_t not_in_lanes(sp_mem_t mem, const test_toolchain_t* toolchain, const c8** names, u32 count) {
   sp_for(it, count) {
     if (!declared(sp_cstr_as_str(names[it]))) {
       sp_log("unknown lane {.red}", sp_fmt_cstr(names[it]));

@@ -89,7 +89,6 @@ typedef struct {
 } spn_semver_t;
 
 typedef enum {
-  SPN_CC_FEATURE_COMPILE,
   SPN_CC_FEATURE_LINK_EXE,
   SPN_CC_FEATURE_LINK_SHARED,
   SPN_CC_FEATURE_LINK_REACTOR,
