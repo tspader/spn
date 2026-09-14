@@ -8,6 +8,9 @@
       "linkage": [
         "static"
       ],
+      "runtime": [
+        "static"
+      ],
       "standard": [
         "c11"
       ],
