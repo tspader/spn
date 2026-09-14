@@ -177,6 +177,9 @@ void spn_profile_finalize(spn_profile_info_t* profile, const spn_toolchain_selec
   if (!profile->linkage) {
     profile->linkage = spn_abi_linkage(profile->abi);
   }
+  if (!profile->runtime) {
+    profile->runtime = spn_triple_runtime(selection->row.triple);
+  }
 }
 
 static bool shared_demand(const spn_pkg_info_t* pkg) {

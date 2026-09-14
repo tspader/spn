@@ -174,6 +174,18 @@ spn_linkage_t spn_abi_linkage(spn_abi_t abi) {
   SP_UNREACHABLE_RETURN(SPN_LIB_KIND_NONE);
 }
 
+spn_runtime_t spn_triple_runtime(spn_triple_t triple) {
+  switch (triple.os) {
+    case SPN_OS_LINUX: return triple.abi == SPN_ABI_GNU ? SPN_RUNTIME_SHARED : SPN_RUNTIME_STATIC;
+    case SPN_OS_MACOS: return SPN_RUNTIME_SHARED;
+    case SPN_OS_WINDOWS:
+    case SPN_OS_WASI:
+    case SPN_OS_FREESTANDING: return SPN_RUNTIME_STATIC;
+    case SPN_OS_NONE: sp_unreachable_case();
+  }
+  SP_UNREACHABLE_RETURN(SPN_RUNTIME_STATIC);
+}
+
 spn_abi_t spn_default_abi(spn_cc_driver_t driver, spn_os_t os) {
   switch (os) {
     case SPN_OS_LINUX:
