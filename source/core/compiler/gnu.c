@@ -110,10 +110,10 @@ static sp_str_t render_target(sp_mem_t mem, const spn_cc_toolchain_t* toolchain,
 static sp_str_t ms_runtime_flag(spn_runtime_t runtime) {
   switch (runtime) {
     case SPN_RUNTIME_SHARED: return sp_str_lit("-fms-runtime-lib=dll");
-    case SPN_RUNTIME_STATIC:
-    case SPN_RUNTIME_NONE: return sp_str_lit("-fms-runtime-lib=static");
+    case SPN_RUNTIME_STATIC: return sp_str_lit("-fms-runtime-lib=static");
+    case SPN_RUNTIME_NONE: sp_unreachable_case();
   }
-  SP_UNREACHABLE_RETURN(sp_str_lit("-fms-runtime-lib=static"));
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
 void spn_gnu_render_flags(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, spn_cc_flags_t* flags) {
