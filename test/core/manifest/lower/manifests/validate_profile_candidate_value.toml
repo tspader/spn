@@ -4,6 +4,7 @@ version = "1.0.0"
 
 [profile.dev]
 linkage = [{ value = "loose" }]
+runtime = [{ value = "loose" }]
 standard = "c2x"
 mode = [{ value = "fast", when = { os = "linux" } }]
 opt = "9"

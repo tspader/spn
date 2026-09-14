@@ -943,6 +943,7 @@ static const test_t tests [] = {
     .manifest = "validate_profile_candidate_value",
     .issues = {
       { SPN_ERR_CODEGEN_INVALID, "profile[0].linkage[0].value" },
+      { SPN_ERR_CODEGEN_INVALID, "profile[0].runtime[0].value" },
       { SPN_ERR_CODEGEN_INVALID, "profile[0].standard[0].value" },
       { SPN_ERR_CODEGEN_INVALID, "profile[0].mode[0].value" },
       { SPN_ERR_CODEGEN_INVALID, "profile[0].opt[0].value" },
