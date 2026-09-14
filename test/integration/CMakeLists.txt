@@ -11,6 +11,7 @@ add_executable(integration
   ${SRC}/codegen/loader.c
   ${SRC}/codegen/toolchain.c
   ${SRC}/codegen/gen/config.gen.c
+  ${TEST_TOOLS}/gen/probe.gen.c
   ${SRC}/core/core.c
   ${UTIL}/io/io.c
   ${SRC}/ctx/ctx.c
@@ -71,6 +72,7 @@ add_executable(integration
 spn_test_binary(integration)
 target_include_directories(integration PRIVATE
   ${SRC}/codegen/gen
+  ${TEST_TOOLS}/gen
   ${SRC}/external
   ${CMAKE_CURRENT_SOURCE_DIR}/tools
 )
@@ -78,5 +80,5 @@ target_compile_definitions(integration PRIVATE
   SPN_TEST_BIN=".build/store/${TRIPLE}${SPN_FLAVOR}/bin/spn${CMAKE_EXECUTABLE_SUFFIX}"
 )
 target_link_libraries(integration PRIVATE yyjson)
-add_dependencies(integration spn spn_codegen_gen)
+add_dependencies(integration spn spn_codegen_gen spn_codegen_test_gen)
 add_test(NAME integration COMMAND "$<TARGET_FILE:integration>" WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")

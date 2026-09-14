@@ -47,8 +47,8 @@ add_executable(resolver
   ${SRC}/triple/triple.c
   ${SRC}/elf/elf.c
   ${SRC}/resolve/resolve.c
-  ${SRC}/resolve/dump.c
-  ${SRC}/codegen/gen/resolve.gen.c
+  dump.c
+  ${TEST_TOOLS}/gen/resolve.gen.c
   ${UTIL}/str/str.c
   ${SRC}/semver/compare.c
   ${SRC}/semver/convert.c
@@ -63,7 +63,7 @@ add_executable(resolver
   ${TEST_TOOLS}/toml.c
 )
 spn_test_binary(resolver)
-target_include_directories(resolver PRIVATE ${SRC}/codegen/gen)
+target_include_directories(resolver PRIVATE ${SRC}/codegen/gen ${TEST_TOOLS}/gen)
 target_link_libraries(resolver PRIVATE yyjson blake3)
-add_dependencies(resolver spn_codegen_gen)
+add_dependencies(resolver spn_codegen_gen spn_codegen_test_gen)
 add_test(NAME resolver COMMAND "$<TARGET_FILE:resolver>" WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")

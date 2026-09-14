@@ -36,6 +36,29 @@ static void add_output(spn_t* spn, sp_mem_t mem, spn_node_t* node, const c8* dir
   spn_node_add_output(node, spn_get_subdir(spn, SPN_DIR_SOURCE, sp_str_to_cstr(mem, file)));
 }
 
+static void add_schema_outputs(spn_t* spn, sp_mem_t mem, spn_node_t* node, sp_str_t dir, const c8* out) {
+  sp_da(sp_fs_entry_t) schemas = sp_zero;
+  sp_fs_collect(mem, dir, &schemas);
+  sp_da_sort(schemas, sort_paths);
+  sp_da_for(schemas, it) {
+    sp_fs_entry_t* entry = &schemas[it];
+    if (!sp_str_ends_with(entry->name, sp_str_lit(".jtd.json"))) {
+      continue;
+    }
+    if (sp_str_equal_cstr(entry->name, "common.jtd.json")) {
+      continue;
+    }
+    sp_str_t name = sp_str_strip_right(entry->name, sp_str_lit(".jtd.json"));
+    add_output(spn, mem, node, out, name, ".gen.c");
+    if (is_union_schema(name)) {
+      add_output(spn, mem, node, "include/spn", name, ".h");
+    } else {
+      add_output(spn, mem, node, out, name, ".gen.h");
+      add_output(spn, mem, node, out, name, ".jtd.json");
+    }
+  }
+}
+
 static void add_codegen(spn_t* spn, spn_config_t* config) {
   sp_mem_t mem = sp_mem_heap_as_allocator(sp_mem_heap_new());
 
@@ -50,26 +73,20 @@ static void add_codegen(spn_t* spn, spn_config_t* config) {
   add_output(spn, mem, node, "source/core/codegen/gen", sp_str_lit("abi"), ".gen.c");
   add_output(spn, mem, node, "include/spn", sp_str_lit("err"), ".h");
 
-  sp_da(sp_fs_entry_t) schemas = sp_zero;
-  sp_fs_collect(mem, sp_str_lit("/source/source/core/codegen/schema"), &schemas);
-  sp_da_sort(schemas, sort_paths);
-  sp_da_for(schemas, it) {
-    sp_fs_entry_t* entry = &schemas[it];
-    if (!sp_str_ends_with(entry->name, sp_str_lit(".jtd.json"))) {
-      continue;
-    }
-    if (sp_str_equal_cstr(entry->name, "common.jtd.json")) {
-      continue;
-    }
-    sp_str_t name = sp_str_strip_right(entry->name, sp_str_lit(".jtd.json"));
-    add_output(spn, mem, node, "source/core/codegen/gen", name, ".gen.c");
-    if (is_union_schema(name)) {
-      add_output(spn, mem, node, "include/spn", name, ".h");
-    } else {
-      add_output(spn, mem, node, "source/core/codegen/gen", name, ".gen.h");
-      add_output(spn, mem, node, "source/core/codegen/gen", name, ".jtd.json");
-    }
-  }
+  add_schema_outputs(spn, mem, node, sp_str_lit("/source/source/core/codegen/schema"), "source/core/codegen/gen");
+}
+
+static void add_codegen_test(spn_t* spn, spn_config_t* config) {
+  sp_mem_t mem = sp_mem_heap_as_allocator(sp_mem_heap_new());
+
+  spn_node_t* node = spn_add_node(config, "codegen_test");
+  spn_node_set_fn(node, "codegen_test");
+
+  add_inputs(spn, mem, node, sp_str_lit("/source/test/tools/schema"));
+  add_inputs(spn, mem, node, sp_str_lit("/source/tools/gen/templates"));
+  spn_node_add_input(node, host_path(spn, mem, sp_str_lit("/source/source/core/codegen/schema/common.jtd.json")));
+
+  add_schema_outputs(spn, mem, node, sp_str_lit("/source/test/tools/schema"), "test/tools/gen");
 }
 
 SPN_EXPORT
@@ -82,5 +99,6 @@ spn_err_t configure(spn_t* spn, spn_config_t* config) {
   spn_target_embed_dir_ex(target, "assets/init", "init", "u8", "u64");
 
   add_codegen(spn, config);
+  add_codegen_test(spn, config);
   return SPN_OK;
 }

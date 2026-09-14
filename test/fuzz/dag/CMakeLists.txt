@@ -8,7 +8,7 @@ add_executable(fuzz_dag
   ${UTIL}/thread_pool/thread_pool.c
   ${SRC}/codegen/json.c
   ${SRC}/codegen/loader.c
-  ${SRC}/codegen/gen/fuzz.gen.c
+  ${TEST_TOOLS}/gen/fuzz.gen.c
   ${SRC}/external/tom.c
   ${SRC}/hash/digest/digest.c
   ${SRC}/hash/sha256/sha256.c
@@ -30,7 +30,7 @@ add_executable(fuzz_dag
   ${TEST_TOOLS}/toml.c
 )
 spn_test_binary(fuzz_dag)
-target_include_directories(fuzz_dag PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${SRC}/codegen/gen)
+target_include_directories(fuzz_dag PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${SRC}/codegen/gen ${TEST_TOOLS}/gen)
 target_link_libraries(fuzz_dag PRIVATE yyjson blake3)
-add_dependencies(fuzz_dag spn_codegen_gen)
+add_dependencies(fuzz_dag spn_codegen_gen spn_codegen_test_gen)
 add_test(NAME fuzz_dag COMMAND "$<TARGET_FILE:fuzz_dag>" WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")

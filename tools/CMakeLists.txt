@@ -81,17 +81,11 @@ set(GEN_FILES
   ${GEN_DIR}/release.gen.h
   ${GEN_DIR}/release.gen.c
   ${GEN_DIR}/release.jtd.json
-  ${GEN_DIR}/resolve.gen.h
-  ${GEN_DIR}/resolve.gen.c
-  ${GEN_DIR}/resolve.jtd.json
   ${GEN_DIR}/source_deps.gen.h
   ${GEN_DIR}/source_deps.gen.c
   ${GEN_DIR}/source_deps.jtd.json
   ${GEN_DIR}/abi.gen.h
   ${GEN_DIR}/abi.gen.c
-  ${GEN_DIR}/fuzz.gen.h
-  ${GEN_DIR}/fuzz.gen.c
-  ${GEN_DIR}/fuzz.jtd.json
   ${INCLUDE_DIR}/err.h
   ${INCLUDE_DIR}/errors.h
   ${GEN_DIR}/errors.gen.c
@@ -112,3 +106,32 @@ add_custom_command(
   VERBATIM)
 add_custom_target(spn_codegen_gen ALL DEPENDS ${GEN_FILES})
 add_dependencies(spn_embed spn_codegen_gen)
+
+set(TEST_GEN_DIR ${CMAKE_SOURCE_DIR}/test/tools/gen)
+file(MAKE_DIRECTORY ${TEST_GEN_DIR})
+
+set(TEST_SCHEMA_DIR ${CMAKE_SOURCE_DIR}/test/tools/schema)
+set(TEST_GEN_FILES
+  ${TEST_GEN_DIR}/fuzz.gen.h
+  ${TEST_GEN_DIR}/fuzz.gen.c
+  ${TEST_GEN_DIR}/fuzz.jtd.json
+  ${TEST_GEN_DIR}/probe.gen.h
+  ${TEST_GEN_DIR}/probe.gen.c
+  ${TEST_GEN_DIR}/probe.jtd.json
+  ${TEST_GEN_DIR}/resolve.gen.h
+  ${TEST_GEN_DIR}/resolve.gen.c
+  ${TEST_GEN_DIR}/resolve.jtd.json)
+file(GLOB JTD_TEST_GEN_SCHEMAS CONFIGURE_DEPENDS ${TEST_SCHEMA_DIR}/*.json)
+add_custom_command(
+  OUTPUT ${TEST_GEN_FILES}
+  COMMAND ${CMAKE_COMMAND} -E make_directory ${TEST_GEN_DIR}
+  COMMAND $<TARGET_FILE:jtd_gen>
+    --common ${SCHEMA_DIR}
+    ${TEST_SCHEMA_DIR}
+    ${TEST_GEN_DIR}
+    ${INCLUDE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/gen/templates
+  DEPENDS jtd_gen ${SCHEMA_DIR}/common.jtd.json ${JTD_TEST_GEN_SCHEMAS} ${JTD_GEN_TEMPLATES}
+  COMMENT "codegen: test/tools/gen/*.gen.{h,c}"
+  VERBATIM)
+add_custom_target(spn_codegen_test_gen ALL DEPENDS ${TEST_GEN_FILES})

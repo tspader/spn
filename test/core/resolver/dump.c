@@ -1,4 +1,4 @@
-#include "resolve/dump.h"
+#include "dump.h"
 
 #include "error/error.h"
 #include "intern/intern.h"
