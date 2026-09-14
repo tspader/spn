@@ -49,10 +49,10 @@ static sp_str_t cxx_standard_switch(spn_cxx_standard_t standard) {
 static sp_str_t crt_switch(spn_runtime_t runtime) {
   switch (runtime) {
     case SPN_RUNTIME_SHARED: return sp_str_lit("/MD");
-    case SPN_RUNTIME_STATIC:
-    case SPN_RUNTIME_NONE: return sp_str_lit("/MT");
+    case SPN_RUNTIME_STATIC: return sp_str_lit("/MT");
+    case SPN_RUNTIME_NONE: sp_unreachable_case();
   }
-  SP_UNREACHABLE_RETURN(sp_str_lit("/MT"));
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
 void spn_msvc_render_flags(sp_mem_t mem, const spn_profile_info_t* profile, spn_cc_flags_t* flags) {
