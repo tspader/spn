@@ -397,6 +397,33 @@ static void add_rpath(sp_mem_t mem, spn_os_t os, spn_invocation_t* invocation) {
   }
 }
 
+static void add_static_runtime(sp_mem_t mem, spn_cc_driver_t driver, spn_triple_t triple, spn_invocation_t* invocation) {
+  if (triple.abi == SPN_ABI_MSVC) {
+    return;
+  }
+  switch (driver) {
+    case SPN_CC_DRIVER_GCC: {
+      spn_cc_push_c(mem, invocation, "-static-libstdc++");
+      spn_cc_push_c(mem, invocation, "-static-libgcc");
+      if (triple.os == SPN_OS_WINDOWS) {
+        spn_cc_push_c(mem, invocation, "-Wl,-Bstatic,--whole-archive");
+        spn_cc_push_c(mem, invocation, "-lwinpthread");
+        spn_cc_push_c(mem, invocation, "-Wl,--no-whole-archive,-Bdynamic");
+      }
+      break;
+    }
+    case SPN_CC_DRIVER_CLANG: {
+      spn_cc_push_c(mem, invocation, "-static-libstdc++");
+      break;
+    }
+    case SPN_CC_DRIVER_ZIG:
+    case SPN_CC_DRIVER_MSVC:
+    case SPN_CC_DRIVER_NONE: {
+      break;
+    }
+  }
+}
+
 void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, const spn_profile_info_t* profile, const spn_cc_link_t* link, const spn_cc_link_files_t* files, spn_invocation_t* invocation) {
   spn_triple_t triple = spn_profile_triple(profile);
   spn_format_t format = spn_os_format(profile->os);
@@ -424,14 +451,21 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
       if (format == SPN_FORMAT_MACHO) {
         spn_cc_push_fmt(mem, invocation, "-Wl,-install_name,@rpath/{}", sp_fmt_str(sp_fs_get_name(files->output.sub)));
       }
+      if (profile->runtime == SPN_RUNTIME_STATIC) {
+        add_static_runtime(mem, toolchain->driver, triple, invocation);
+      }
       if (!spn_path_empty(files->exports.path)) {
         add_exports(mem, format, dialect, files->exports.path, invocation);
       }
       break;
     }
     case SPN_CC_OUTPUT_EXE: {
-      if (profile->linkage == SPN_LIB_KIND_STATIC && spn_ld_static(dialect)) {
+      bool fully_static = profile->linkage == SPN_LIB_KIND_STATIC && profile->runtime == SPN_RUNTIME_STATIC;
+      if (fully_static && spn_ld_static(dialect)) {
         spn_cc_push_c(mem, invocation, "-static");
+      }
+      else if (profile->runtime == SPN_RUNTIME_STATIC) {
+        add_static_runtime(mem, toolchain->driver, triple, invocation);
       }
       if (link->subsystem == SPN_WIN_SUBSYSTEM_WINDOWS && format == SPN_FORMAT_COFF) {
         add_subsystem(mem, dialect, invocation);

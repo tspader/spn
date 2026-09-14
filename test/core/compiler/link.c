@@ -332,11 +332,107 @@ static const link_test_t tests [] = {
       .os = SPN_OS_LINUX,
       .abi = SPN_ABI_GNU,
       .linkage = SPN_LIB_KIND_STATIC,
+      .runtime = SPN_RUNTIME_STATIC,
     },
     .kind = SPN_CC_OUTPUT_EXE,
     .expect = {
       .command = "cc",
       .args = { "-static", "main.o", "-Wl,-rpath,$ORIGIN", "-o", "main" },
+    },
+  },
+  {
+    .name = "gcc_windows_gnu_static_runtime",
+    .driver = SPN_CC_DRIVER_GCC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_GNU,
+      .linkage = SPN_LIB_KIND_SHARED,
+      .runtime = SPN_RUNTIME_STATIC,
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .expect = {
+      .command = "cc",
+      .args = { "-static-libstdc++", "-static-libgcc", "-Wl,-Bstatic,--whole-archive", "-lwinpthread", "-Wl,--no-whole-archive,-Bdynamic", "main.o", "-o", "main" },
+    },
+  },
+  {
+    .name = "gcc_windows_gnu_fully_static",
+    .driver = SPN_CC_DRIVER_GCC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_GNU,
+      .linkage = SPN_LIB_KIND_STATIC,
+      .runtime = SPN_RUNTIME_STATIC,
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .expect = {
+      .command = "cc",
+      .args = { "-static", "main.o", "-o", "main" },
+    },
+  },
+  {
+    .name = "clang_windows_gnu_static_runtime",
+    .driver = SPN_CC_DRIVER_CLANG,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_GNU,
+      .linkage = SPN_LIB_KIND_SHARED,
+      .runtime = SPN_RUNTIME_STATIC,
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .expect = {
+      .command = "cc",
+      .args = { "--target=x86_64-windows-gnu", "-static-libstdc++", "main.o", "-o", "main" },
+    },
+  },
+  {
+    .name = "gcc_linux_static_runtime",
+    .driver = SPN_CC_DRIVER_GCC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_LINUX,
+      .abi = SPN_ABI_GNU,
+      .linkage = SPN_LIB_KIND_SHARED,
+      .runtime = SPN_RUNTIME_STATIC,
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .expect = {
+      .command = "cc",
+      .args = { "-static-libstdc++", "-static-libgcc", "main.o", "-Wl,-rpath,$ORIGIN", "-o", "main" },
+    },
+  },
+  {
+    .name = "gcc_windows_gnu_shared_lib_static_runtime",
+    .driver = SPN_CC_DRIVER_GCC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_GNU,
+      .linkage = SPN_LIB_KIND_SHARED,
+      .runtime = SPN_RUNTIME_STATIC,
+    },
+    .kind = SPN_CC_OUTPUT_SHARED_LIB,
+    .expect = {
+      .command = "cc",
+      .args = { "-shared", "-static-libstdc++", "-static-libgcc", "-Wl,-Bstatic,--whole-archive", "-lwinpthread", "-Wl,--no-whole-archive,-Bdynamic", "main.o", "-o", "main" },
+    },
+  },
+  {
+    .name = "zig_windows_gnu_static_runtime_is_bare",
+    .driver = SPN_CC_DRIVER_ZIG,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_GNU,
+      .runtime = SPN_RUNTIME_STATIC,
+    },
+    .kind = SPN_CC_OUTPUT_EXE,
+    .expect = {
+      .command = "cc",
+      .args = { "--target=x86_64-windows-gnu", "main.o", "-o", "main" },
     },
   },
   {
@@ -417,6 +513,7 @@ static const link_test_t tests [] = {
       .os = SPN_OS_LINUX,
       .abi = SPN_ABI_BARE,
       .linkage = SPN_LIB_KIND_STATIC,
+      .runtime = SPN_RUNTIME_STATIC,
     },
     .kind = SPN_CC_OUTPUT_EXE,
     .expect = {
@@ -432,6 +529,7 @@ static const link_test_t tests [] = {
       .os = SPN_OS_LINUX,
       .abi = SPN_ABI_BARE,
       .linkage = SPN_LIB_KIND_STATIC,
+      .runtime = SPN_RUNTIME_STATIC,
     },
     .kind = SPN_CC_OUTPUT_EXE,
     .expect = {
@@ -447,6 +545,7 @@ static const link_test_t tests [] = {
       .os = SPN_OS_LINUX,
       .abi = SPN_ABI_BARE,
       .linkage = SPN_LIB_KIND_STATIC,
+      .runtime = SPN_RUNTIME_STATIC,
     },
     .kind = SPN_CC_OUTPUT_EXE,
     .expect = {
@@ -462,6 +561,7 @@ static const link_test_t tests [] = {
       .os = SPN_OS_FREESTANDING,
       .abi = SPN_ABI_ELF,
       .linkage = SPN_LIB_KIND_STATIC,
+      .runtime = SPN_RUNTIME_STATIC,
       .sdk = "/S",
     },
     .kind = SPN_CC_OUTPUT_EXE,
