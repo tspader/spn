@@ -124,6 +124,18 @@ sp_test(cxx, bin) {
   });
 }
 
+sp_test(cxx, runtime_shared) {
+  return run_test(t, (test_t) {
+    .project = "test/integration/fixtures/cxx/runtime_shared",
+    .copy = { "main.cpp" },
+    .when = { .cxx = true, .msvc_todo = true },
+    .actions = {
+      { .kind = ACTION_RUN_CLI, .cli.cmd = "build" },
+      { .kind = ACTION_VERIFY_EXISTS, .exists = exe("main") },
+    },
+  });
+}
+
 sp_test(cxx, script_rejected) {
   return run_test(t, (test_t) {
     .project = "test/integration/fixtures/cxx/script_rejected",
