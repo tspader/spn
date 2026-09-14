@@ -10,6 +10,7 @@
   X(abi,            "manifest.jtd.json") \
   X(cc_driver,      "config.jtd.json") \
   X(linkage,        "manifest.jtd.json") \
+  X(runtime,        "manifest.jtd.json") \
   X(c_standard,     "manifest.jtd.json") \
   X(cxx_standard,   "manifest.jtd.json") \
   X(mode,           "manifest.jtd.json") \

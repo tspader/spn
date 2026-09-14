@@ -148,6 +148,12 @@ typedef enum {
 } spn_linkage_t;
 
 typedef enum {
+  SPN_RUNTIME_NONE,
+  SPN_RUNTIME_STATIC,
+  SPN_RUNTIME_SHARED,
+} spn_runtime_t;
+
+typedef enum {
   SPN_TARGET_KIND_LIB,
   SPN_TARGET_KIND_EXE,
   SPN_TARGET_KIND_SCRIPT,
