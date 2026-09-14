@@ -25,6 +25,7 @@ spn_profile_info_t test_profile(test_profile_t desc) {
     .os = desc.os,
     .abi = desc.abi,
     .linkage = desc.linkage,
+    .runtime = desc.runtime,
     .standard = desc.standard,
     .mode = desc.mode,
     .opt = desc.opt,

@@ -67,7 +67,7 @@ static const flags_test_t tests [] = {
     },
     .driver = SPN_CC_DRIVER_MSVC,
     .expect = {
-      .compile = { "/O2", "/DNDEBUG", "/fsanitize=address" },
+      .compile = { "/MT", "/O2", "/DNDEBUG", "/fsanitize=address" },
       .link = { "/fsanitize=address" },
     },
   },
@@ -81,7 +81,18 @@ static const flags_test_t tests [] = {
       .opt = SPN_OPT_LEVEL_0,
     },
     .driver = SPN_CC_DRIVER_MSVC,
-    .expect = { .compile = { "/Z7", "/Od" } },
+    .expect = { .compile = { "/MT", "/Z7", "/Od" } },
+  },
+  {
+    .name = "render_msvc_shared_runtime",
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_MSVC,
+      .runtime = SPN_RUNTIME_SHARED,
+    },
+    .driver = SPN_CC_DRIVER_MSVC,
+    .expect = { .compile = { "/MD" } },
   },
   {
     .name = "freestanding_zig_strips_runtime",

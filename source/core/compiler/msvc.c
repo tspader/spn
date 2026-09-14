@@ -46,7 +46,17 @@ static sp_str_t cxx_standard_switch(spn_cxx_standard_t standard) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
+static sp_str_t crt_switch(spn_runtime_t runtime) {
+  switch (runtime) {
+    case SPN_RUNTIME_SHARED: return sp_str_lit("/MD");
+    case SPN_RUNTIME_STATIC:
+    case SPN_RUNTIME_NONE: return sp_str_lit("/MT");
+  }
+  SP_UNREACHABLE_RETURN(sp_str_lit("/MT"));
+}
+
 void spn_msvc_render_flags(sp_mem_t mem, const spn_profile_info_t* profile, spn_cc_flags_t* flags) {
+  sp_da_push(flags->compile, crt_switch(profile->runtime));
   if (profile->mode == SPN_MODE_DEBUG) {
     // /Z7 embeds debug info in the object; /Zi would funnel every parallel
     // cl in a package's work directory into one vc140.pdb (C1041)

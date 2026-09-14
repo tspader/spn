@@ -43,6 +43,7 @@ typedef struct {
   spn_os_t os;
   spn_abi_t abi;
   spn_linkage_t linkage;
+  spn_runtime_t runtime;
   spn_c_standard_t standard;
   spn_mode_t mode;
   spn_opt_level_t opt;

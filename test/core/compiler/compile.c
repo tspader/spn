@@ -248,7 +248,7 @@ static const compile_test_t tests [] = {
     .define = "SPUM=1",
     .expect = {
       .command = "cc",
-      .args = { "/nologo", "/utf-8", "/Brepro", "/std:c11", "/c", "/Iinc", "/DSPUM=1", "/we4715", "/Fomain.o", "main.c" },
+      .args = { "/nologo", "/utf-8", "/Brepro", "/std:c11", "/MT", "/c", "/Iinc", "/DSPUM=1", "/we4715", "/Fomain.o", "main.c" },
     },
   },
   {
@@ -317,7 +317,7 @@ static const compile_test_t tests [] = {
     },
     .expect = {
       .command = "cc",
-      .args = { "/nologo", "/utf-8", "/Brepro", "/std:c11", "/c", "/we4715", "/Fomain.o", "main.c" },
+      .args = { "/nologo", "/utf-8", "/Brepro", "/std:c11", "/MT", "/c", "/we4715", "/Fomain.o", "main.c" },
     },
   },
   {
@@ -331,7 +331,22 @@ static const compile_test_t tests [] = {
     },
     .expect = {
       .command = "cc",
-      .args = { "/nologo", "/utf-8", "/Brepro", "/c", "/we4715", "/Fomain.o", "main.c" },
+      .args = { "/nologo", "/utf-8", "/Brepro", "/MT", "/c", "/we4715", "/Fomain.o", "main.c" },
+    },
+  },
+  {
+    .name = "msvc_shared_runtime_uses_md",
+    .driver = SPN_CC_DRIVER_MSVC,
+    .profile = {
+      .arch = SPN_ARCH_X64,
+      .os = SPN_OS_WINDOWS,
+      .abi = SPN_ABI_MSVC,
+      .runtime = SPN_RUNTIME_SHARED,
+      .standard = SPN_C11,
+    },
+    .expect = {
+      .command = "cc",
+      .args = { "/nologo", "/utf-8", "/Brepro", "/std:c11", "/MD", "/c", "/we4715", "/Fomain.o", "main.c" },
     },
   },
   {
@@ -347,7 +362,7 @@ static const compile_test_t tests [] = {
     },
     .expect = {
       .command = "cc",
-      .args = { "/nologo", "/utf-8", "/Brepro", "/std:c11", "/Z7", "/Od", "/c", "/we4715", "/Fomain.o", "main.c" },
+      .args = { "/nologo", "/utf-8", "/Brepro", "/std:c11", "/MT", "/Z7", "/Od", "/c", "/we4715", "/Fomain.o", "main.c" },
     },
   },
   {
@@ -361,7 +376,7 @@ static const compile_test_t tests [] = {
     .lang = SPN_LANG_CXX,
     .expect = {
       .command = "c++",
-      .args = { "/nologo", "/utf-8", "/Brepro", "/std:c++17", "/c", "/EHsc", "/we4715", "/Fomain.o", "main.c" },
+      .args = { "/nologo", "/utf-8", "/Brepro", "/std:c++17", "/MT", "/c", "/EHsc", "/we4715", "/Fomain.o", "main.c" },
     },
   },
   {
@@ -376,7 +391,7 @@ static const compile_test_t tests [] = {
     .cxx = { .standard = SPN_CXX20, .no_exceptions = true, .no_rtti = true },
     .expect = {
       .command = "c++",
-      .args = { "/nologo", "/utf-8", "/Brepro", "/std:c++20", "/c", "/GR-", "/we4715", "/Fomain.o", "main.c" },
+      .args = { "/nologo", "/utf-8", "/Brepro", "/std:c++20", "/MT", "/c", "/GR-", "/we4715", "/Fomain.o", "main.c" },
     },
   },
   {
@@ -463,7 +478,7 @@ static const compile_test_t tests [] = {
     },
     .expect = {
       .command = "cc",
-      .args = { "/nologo", "/utf-8", "/Brepro", "/c", "/I/X/crt/include", "/I/X/sdk/include/ucrt", "/I/X/sdk/include/um", "/I/X/sdk/include/shared", "/we4715", "/Fomain.o", "main.c" },
+      .args = { "/nologo", "/utf-8", "/Brepro", "/MT", "/c", "/I/X/crt/include", "/I/X/sdk/include/ucrt", "/I/X/sdk/include/um", "/I/X/sdk/include/shared", "/we4715", "/Fomain.o", "main.c" },
       .env = { "INCLUDE=/X/crt/include;/X/sdk/include/ucrt;/X/sdk/include/um;/X/sdk/include/shared" },
     },
   },
