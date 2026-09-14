@@ -801,7 +801,7 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
           );
           break;
         }
-        case SPN_ERR_PROFILE_RUNTIME: {
+        case SPN_ERR_PROFILE_RUNTIME_STATIC: {
           sp_tty_fmt(
             &w,
             "Target {.yellow} can't use {.red}; {} ships no static runtime",
