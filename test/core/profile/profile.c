@@ -571,6 +571,13 @@ static const test_t tests [] = {
     .expect = { .err = SPN_ERR_PROFILE_LINKAGE },
   },
   {
+    .name = "explicit_static_runtime_on_macos_is_rejected",
+    .profile = { .name = "default", .runtime = { { "static" } } },
+    .overrides = { .arch = SPN_ARCH_ARM64, .os = SPN_OS_MACOS },
+    .host = PROFILE_HOST_LINUX_GNU,
+    .expect = { .err = SPN_ERR_PROFILE_RUNTIME },
+  },
+  {
     .name = "explicit_shared_runtime_survives",
     .profile = { .name = "default", .runtime = { { "shared" } } },
     .host = PROFILE_HOST_LINUX_GNU,
