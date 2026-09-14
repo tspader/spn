@@ -190,30 +190,21 @@ static spn_err_t read_export_symbols(sp_mem_t mem, sp_str_t path, sp_da(sp_str_t
   return SPN_OK;
 }
 
-static spn_err_t link_target_exec(sp_mem_t scratch, spn_target_unit_t* target, spn_path_t output, sp_da(spn_path_t) objects, spn_path_t exports, spn_path_t implib) {
-  spn_cc_link_files_t files = {
-    .output = output,
-    .objects = objects,
-  };
-  switch (target->kind) {
-    case SPN_CC_OUTPUT_REACTOR: {
-      sp_da_init(scratch, files.exports.symbols);
-      spn_try(read_export_symbols(scratch, spn_path_str(&spn.roots, scratch, exports), &files.exports.symbols));
-      break;
+spn_err_t spn_link_target_run(sp_mem_t mem, spn_target_unit_t* target, spn_cc_link_files_t files) {
+  spn_pkg_unit_announce_compile(target->pkg);
+
+  spn_event_buffer_push(spn.events, (spn_event_t) {
+    .kind = SPN_EVENT_LINK_START,
+    .pkg = target->pkg->info->name,
+    .link_start = {
+      .target = target->info->name,
     }
-    case SPN_CC_OUTPUT_SHARED_LIB: {
-      files.exports.path = exports;
-      files.implib = implib;
-      break;
-    }
-    case SPN_CC_OUTPUT_EXE:
-    case SPN_CC_OUTPUT_STATIC_LIB: {
-      sp_assert(spn_path_empty(exports));
-      break;
-    }
-    case SPN_CC_OUTPUT_OBJECT: {
-      sp_unreachable_case();
-    }
+  });
+
+  if (target->kind == SPN_CC_OUTPUT_REACTOR) {
+    sp_da_init(mem, files.exports.symbols);
+    spn_try(read_export_symbols(mem, spn_path_str(&spn.roots, mem, files.exports.path), &files.exports.symbols));
+    files.exports.path = (spn_path_t) sp_zero;
   }
 
   spn_invocation_t* invocation = sp_alloc_type(spn.mem, spn_invocation_t);
@@ -228,21 +219,4 @@ static spn_err_t link_target_exec(sp_mem_t scratch, spn_target_unit_t* target, s
 
   sp_str_t destination = spn_path_str(&spn.roots, spn.mem, spn_target_output_path(spn.mem, target));
   return emit_link_passed(target, invocation, destination, run.result.out, run.elapsed);
-}
-
-spn_err_t spn_link_target_run(spn_target_unit_t* target, spn_path_t output, sp_da(spn_path_t) objects, spn_path_t exports, spn_path_t implib) {
-  spn_pkg_unit_announce_compile(target->pkg);
-
-  spn_event_buffer_push(spn.events, (spn_event_t) {
-    .kind = SPN_EVENT_LINK_START,
-    .pkg = target->pkg->info->name,
-    .link_start = {
-      .target = target->info->name,
-    }
-  });
-
-  sp_mem_arena_marker_t scratch = sp_mem_begin_scratch();
-  spn_err_t result = link_target_exec(scratch.mem, target, output, objects, exports, implib);
-  sp_mem_end_scratch(scratch);
-  return result;
 }

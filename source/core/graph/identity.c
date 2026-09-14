@@ -127,16 +127,9 @@ spn_dag_digest_t spn_build_compile_identity(const spn_compile_unit_t* unit) {
   return spn_dag_hash_final(&ctx);
 }
 
-spn_err_t spn_build_link_identity(sp_mem_t mem, spn_target_unit_t* target, spn_path_t output, sp_da(spn_path_t) objects, spn_path_t exports, spn_dag_digest_t* identity) {
-  spn_cc_link_files_t files = {
-    .output = output,
-    .implib = spn_target_import_lib_path(mem, target),
-    .objects = objects,
-    .exports.path = exports,
-  };
-
+spn_err_t spn_build_link_identity(sp_mem_t mem, spn_target_unit_t* target, const spn_cc_link_files_t* files, spn_dag_digest_t* identity) {
   spn_invocation_t invocation = sp_zero;
-  spn_try(spn_target_link_invocation(mem, target, &files, &invocation));
+  spn_try(spn_target_link_invocation(mem, target, files, &invocation));
 
   spn_digest_ctx_t ctx = sp_zero;
   spn_digest_init_blake3(&ctx);
