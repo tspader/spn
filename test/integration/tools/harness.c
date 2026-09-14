@@ -1,5 +1,6 @@
 #include "harness.h"
 #include "elf/elf.h"
+#include "probe.gen.h"
 #include "error/error.h"
 #include "triple/triple.h"
 #include "yyjson.h"
@@ -758,8 +759,8 @@ static sp_err_t stage_bare_run(sp_test_t* t, fixture_t* fixture, action_t action
   sp_str_t exe_name = sp_fs_get_name(exe(action.bare.name));
   sp_try(sp_fs_copy_file(fixture_path(fixture, exe(action.bare.name)), sp_fs_join_path(mem, dir, exe_name)));
 
-  sp_str_t manifest = sp_fmt(mem, "{}\n{}\n", sp_fmt_str(exe_name), sp_fmt_str(bare_expect_token(action.bare.expect))).value;
-  return sp_fs_create_file_str(sp_fs_join_path(mem, dir, sp_str_lit("probe")), manifest);
+  spn_cg_probe_t probe = { .exe = exe_name, .expect = bare_expect_token(action.bare.expect) };
+  return sp_fs_create_file_str(sp_fs_join_path(mem, dir, sp_str_lit("probe.json")), spn_probe_write(mem, &probe));
 }
 
 sp_err_t run_actions(sp_test_t* t, fixture_t* fixture, const action_t* actions) {

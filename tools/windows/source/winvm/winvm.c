@@ -1,4 +1,5 @@
 #include "winvm.h"
+#include "probe.gen.h"
 
 #define cfmt(mem, ...) sp_str_to_cstr(mem, sp_fmt(mem, __VA_ARGS__).value)
 
@@ -356,13 +357,7 @@ const c8* winvm_probe_outcome_name(winvm_probe_outcome_t outcome) {
   SP_UNREACHABLE_RETURN("");
 }
 
-static bool parse_manifest(sp_str_t content, sp_str_t* exe, winvm_probe_outcome_t* expect) {
-  sp_da(sp_str_t) lines = sp_str_split_c8(sp_mem_get_scratch(), sp_str_trim(content), '\n');
-  if (sp_da_size(lines) != 2) {
-    return false;
-  }
-  *exe = sp_str_trim(lines[0]);
-  sp_str_t token = sp_str_trim(lines[1]);
+static bool probe_expect(sp_str_t token, winvm_probe_outcome_t* expect) {
   if (sp_str_equal_cstr(token, winvm_probe_outcome_name(WINVM_PROBE_RUNS))) {
     *expect = WINVM_PROBE_RUNS;
     return true;
@@ -381,12 +376,14 @@ static winvm_probes_result_t read_lane(winvm_t* vm, const winvm_variant_t* varia
   }
 
   sp_da_for(cases, it) {
-    sp_str_t manifest = sp_fs_join_path(vm->mem, cases[it].path, sp_str_lit("probe"));
+    sp_str_t manifest = sp_fs_join_path(vm->mem, cases[it].path, sp_str_lit("probe.json"));
     sp_str_t content = sp_zero;
+    spn_cg_probe_t cg = sp_zero;
     winvm_probe_t probe = { .variant = variant, .lane = lane.name, .name = cases[it].name };
-    if (sp_io_read_file(vm->mem, manifest, &content) || !parse_manifest(content, &probe.exe, &probe.expect)) {
+    if (sp_io_read_file(vm->mem, manifest, &content) || !spn_probe_read(content, &cg, vm->mem) || !probe_expect(cg.expect, &probe.expect)) {
       return (winvm_probes_result_t) { .err = WINVM_PROBES_ERR_MANIFEST, .path = manifest };
     }
+    probe.exe = cg.exe;
     sp_da_push(*probes, probe);
   }
   return (winvm_probes_result_t) { .err = WINVM_PROBES_OK };

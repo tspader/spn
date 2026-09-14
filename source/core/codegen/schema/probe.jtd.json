@@ -1,0 +1,7 @@
+{
+  "metadata": { "format": "json" },
+  "properties": {
+    "exe": { "type": "string" },
+    "expect": { "type": "string" }
+  }
+}
