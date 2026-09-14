@@ -33,7 +33,7 @@ include = ["include", "source/core", "source/util", "tools", "tools/gen"]
 [deps.package]
 "spader/sp" = { path = "vendor/sp" }
 wamr = { path = "vendor/wamr" }
-toml = "1.6.0"
+toml = "1.6.1"
 yyjson = "0.14.0"
 blake3 = "1.8.7"
 
