@@ -5,6 +5,7 @@
 
 typedef struct {
   sp_str_t schema;
+  sp_str_t common;
   sp_str_t out;
   sp_str_t include;
   sp_str_t templates;

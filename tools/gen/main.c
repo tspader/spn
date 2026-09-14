@@ -6,6 +6,7 @@
 
 typedef struct {
   const c8* schema;
+  const c8* common;
   const c8* out;
   const c8* include;
   const c8* templates;
@@ -21,6 +22,7 @@ static sp_cli_result_t run_cli(sp_cli_t* cli) {
   sp_mem_t mem = sp_mem_heap_as_allocator(sp_mem_heap_new());
   sp_str_t err = codegen_run(mem, (codegen_paths_t) {
     .schema = sp_cstr_as_str(args->schema),
+    .common = sp_cstr_as_str(args->common),
     .out = sp_cstr_as_str(args->out),
     .include = sp_cstr_as_str(args->include),
     .templates = sp_cstr_as_str(args->templates),
@@ -38,6 +40,15 @@ s32 main(s32 num_args, const c8** args) {
   sp_cli_cmd_t root = {
     .name = "jtd_gen",
     .summary = "Generate C structs and load/write code from JTD schemas",
+    .opts = {
+      {
+        .name = "common",
+        .kind = SP_CLI_OPT_CSTR,
+        .summary = "Directory holding a common.jtd.json owned by another run (defaults to the schema directory)",
+        .placeholder = "dir",
+        .ptr = &parsed.common,
+      },
+    },
     .args = {
       {
         .name = "schema",

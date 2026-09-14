@@ -13,7 +13,7 @@
 #include "index/types.h"
 #include "intern/intern.h"
 #include "pkg/id.h"
-#include "resolve/dump.h"
+#include "dump.h"
 #include "resolve/resolve.h"
 #include "resolve/types.h"
 #include "spn/core.h"

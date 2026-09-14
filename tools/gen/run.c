@@ -88,12 +88,15 @@ static bool parse_jtd(codegen_t* c, sp_str_t what, sp_str_t json, jtd_result_t* 
   return true;
 }
 
-static bool emit_common(codegen_t* c) {
-  sp_str_t path = sp_fs_join_path(c->mem, c->paths.schema, sp_str_lit("common.jtd.json"));
+static bool load_common(codegen_t* c) {
+  sp_str_t dir = sp_str_empty(c->paths.common) ? c->paths.schema : c->paths.common;
+  sp_str_t path = sp_fs_join_path(c->mem, dir, sp_str_lit("common.jtd.json"));
   sp_str_t json = sp_zero;
   try(read_json(c, path, &json, &c->common.doc));
-  try(parse_jtd(c, path, json, &c->common.jtd));
+  return parse_jtd(c, path, json, &c->common.jtd);
+}
 
+static bool emit_common(codegen_t* c) {
   gen_t* gen = gen_new(c->mem);
   sp_da_for(c->common.jtd.definitions, it) {
     jtd_definition_t* def = &c->common.jtd.definitions[it];
@@ -282,6 +285,10 @@ static bool render_kind(codegen_t* c, sp_fs_entry_t* entry) {
 
 static bool render_abi(codegen_t* c) {
   sp_str_t path = sp_fs_join_path(c->mem, c->paths.schema, sp_str_lit("abi.json"));
+  if (!sp_fs_exists(path)) {
+    return true;
+  }
+
   abi_t* abi = abi_parse(c->mem, path);
   if (!sp_str_empty(abi->err)) {
     return fail(c, abi->err);
@@ -305,7 +312,10 @@ static bool run(codegen_t* c) {
     return fail(c, sp_fmt(c->mem, "failed to load templates from {}", sp_fmt_str(c->paths.templates)).value);
   }
 
-  try(emit_common(c));
+  try(load_common(c));
+  if (sp_str_empty(c->paths.common)) {
+    try(emit_common(c));
+  }
 
   sp_da(sp_fs_entry_t) entries = sp_zero;
   sp_fs_collect(c->mem, c->paths.schema, &entries);

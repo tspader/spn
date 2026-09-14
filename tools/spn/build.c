@@ -14,21 +14,35 @@ static void codegen_log(void* user, sp_str_t message) {
   spn_log(io->spn, sp_str_to_cstr(io->mem, message));
 }
 
-SPN_EXPORT
-spn_err_t codegen(spn_t* spn) {
+static spn_err_t generate(spn_t* spn, codegen_paths_t paths) {
   sp_mem_t mem = sp_mem_heap_as_allocator(sp_mem_heap_new());
   codegen_io_t io = { .spn = spn, .mem = mem };
 
-  sp_str_t err = codegen_run(mem, (codegen_paths_t) {
-    .schema = sp_str_lit("/source/source/core/codegen/schema"),
-    .out = sp_str_lit("/source/source/core/codegen/gen"),
-    .include = sp_str_lit("/source/include/spn"),
-    .templates = sp_str_lit("/source/tools/gen/templates"),
-  }, codegen_log, &io);
-
+  sp_str_t err = codegen_run(mem, paths, codegen_log, &io);
   if (!sp_str_empty(err)) {
     spn_log(spn, sp_str_to_cstr(mem, err));
     return SPN_ERROR;
   }
   return SPN_OK;
+}
+
+SPN_EXPORT
+spn_err_t codegen(spn_t* spn) {
+  return generate(spn, (codegen_paths_t) {
+    .schema = sp_str_lit("/source/source/core/codegen/schema"),
+    .out = sp_str_lit("/source/source/core/codegen/gen"),
+    .include = sp_str_lit("/source/include/spn"),
+    .templates = sp_str_lit("/source/tools/gen/templates"),
+  });
+}
+
+SPN_EXPORT
+spn_err_t codegen_test(spn_t* spn) {
+  return generate(spn, (codegen_paths_t) {
+    .schema = sp_str_lit("/source/test/tools/schema"),
+    .common = sp_str_lit("/source/source/core/codegen/schema"),
+    .out = sp_str_lit("/source/test/tools/gen"),
+    .include = sp_str_lit("/source/include/spn"),
+    .templates = sp_str_lit("/source/tools/gen/templates"),
+  });
 }
