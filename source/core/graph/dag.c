@@ -24,6 +24,7 @@
 #include "thread_pool/thread_pool.h"
 #include "unit/unit.h"
 #include "graph/build.h"
+#include "toolchain/linker.h"
 #include "graph/dag.h"
 #include "graph/identity.h"
 #include "graph/nodes/nodes.h"
@@ -165,9 +166,13 @@ static spn_err_t dag_link_exec(spn_dag_t* g, spn_dag_action_t* action, void* use
   sp_da_for(link->objects, it) {
     sp_da_push(objects, dag_artifact_path(g, link->objects[it]));
   }
-  spn_path_t exports = link->exports.occupied ? dag_artifact_path(g, link->exports) : (spn_path_t) sp_zero;
-  spn_path_t implib = link->implib.occupied ? dag_artifact_path(g, link->implib) : (spn_path_t) sp_zero;
-  if (spn_link_target_run(target, dag_artifact_path(g, action->produces[0]), objects, exports, implib)) {
+  spn_cc_link_files_t files = {
+    .output = dag_artifact_path(g, action->produces[0]),
+    .objects = objects,
+    .exports.path = link->exports.occupied ? dag_artifact_path(g, link->exports) : (spn_path_t) sp_zero,
+    .implib = link->implib.occupied ? dag_artifact_path(g, link->implib) : (spn_path_t) sp_zero,
+  };
+  if (spn_link_target_run(mem, target, files)) {
     return SPN_ERR_DAG_ACTION;
   }
   return SPN_OK;
@@ -662,13 +667,23 @@ spn_err_t spn_dag_build_add_target(spn_dag_build_t* b, spn_target_unit_t* target
     spn_try(dag_add_exports(b, link));
   }
 
-  spn_path_t output = spn_target_output_path(b->mem, target);
-  spn_path_t implib = spn_target_import_lib_path(b->mem, target);
-  spn_path_t exports = link->exports.occupied ? dag_artifact_declared(g, link->exports) : (spn_path_t) sp_zero;
+  spn_triple_t triple = spn_profile_triple(&target->pkg->build->profile);
+  bool implib = target->kind == SPN_CC_OUTPUT_SHARED_LIB && spn_ld_dialect(triple) == SPN_LD_DIALECT_LINK;
+  spn_cc_link_files_t files = {
+    .output = spn_target_output_path(b->mem, target),
+    .exports.path = link->exports.occupied ? dag_artifact_declared(g, link->exports) : (spn_path_t) sp_zero,
+  };
+  if (implib) {
+    sp_mem_arena_marker_t s = sp_mem_begin_scratch();
+    sp_str_t file_name = spn_triple_lib_file_name(s.mem, triple, target->info->name, SP_OS_LIB_STATIC);
+    files.implib = spn_path_join(b->mem, target->pkg->paths.lib, file_name);
+    sp_mem_end_scratch(s);
+  }
 
   spn_dag_digest_t identity = sp_zero;
   sp_mem_arena_marker_t s = sp_mem_begin_scratch();
-  spn_err_t err = spn_build_link_identity(s.mem, target, output, dag_declared_paths(s.mem, g, link->objects), exports, &identity);
+  files.objects = dag_declared_paths(s.mem, g, link->objects);
+  spn_err_t err = spn_build_link_identity(s.mem, target, &files, &identity);
   sp_mem_end_scratch(s);
   spn_try(err);
 
@@ -686,10 +701,10 @@ spn_err_t spn_dag_build_add_target(spn_dag_build_t* b, spn_target_unit_t* target
   if (link->exports.occupied) {
     spn_dag_action_add_input(g, ids.action, link->exports);
   }
-  ids.output = spn_dag_add_file(g, output);
+  ids.output = spn_dag_add_file(g, files.output);
   spn_try(spn_dag_action_add_output(g, ids.action, ids.output));
-  if (!spn_path_empty(implib)) {
-    link->implib = spn_dag_add_file(g, implib);
+  if (implib) {
+    link->implib = spn_dag_add_file(g, files.implib);
     spn_try(spn_dag_action_add_output(g, ids.action, link->implib));
   }
 

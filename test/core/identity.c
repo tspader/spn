@@ -318,8 +318,8 @@ static sp_err_t identity_link_digest(sp_test_t* t, sp_mem_t mem, const identity_
     sp_da_push(objects, identity_path(&spec->objects[it]));
   }
 
-  spn_path_t output = identity_path(&spec->output);
-  sp_must_eq(t, SPN_OK, spn_build_link_identity(mem, &target, output, objects, sp_zero_s(spn_path_t), digest));
+  spn_cc_link_files_t files = { .output = identity_path(&spec->output), .objects = objects };
+  sp_must_eq(t, SPN_OK, spn_build_link_identity(mem, &target, &files, digest));
   return SP_OK;
 }
 
