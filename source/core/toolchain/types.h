@@ -195,6 +195,8 @@ typedef struct {
 typedef struct {
   spn_toolchain_info_t* toolchain;
   spn_toolchain_row_t row;
+  spn_linkage_t linkage;
+  spn_runtime_t runtime;
 } spn_toolchain_selection_t;
 
 typedef struct spn_toolchain_store spn_toolchain_store_t;

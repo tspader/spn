@@ -19,6 +19,8 @@ typedef struct {
   spn_err_t err;
   spn_toolchain_row_t row;
   spn_sanitizer_set_t unsupported;
+  spn_linkage_t linkage;
+  spn_runtime_t runtime;
 } reach_t;
 
 static bool usable(const spn_toolchain_info_t* toolchain) {
@@ -78,7 +80,7 @@ static reach_t supports(spn_toolchain_row_t row, spn_toolchain_query_t query) {
   if (heavy && fully_static && spn_ld_static(spn_ld_dialect(row.triple))) {
     return (reach_t) { .kind = REACH_SANITIZERS, .err = SPN_ERR_SANITIZER_STATIC, .row = row, .unsupported = heavy };
   }
-  return (reach_t) { .kind = REACH_OK, .row = row };
+  return (reach_t) { .kind = REACH_OK, .row = row, .linkage = linkage, .runtime = runtime };
 }
 
 static reach_kind_t absence(const spn_toolchain_catalog_t* catalog, const spn_toolchain_info_t* toolchain, spn_triple_t triple) {
@@ -132,21 +134,20 @@ static spn_err_t sdk_refusal(spn_triple_t target) {
   sp_unreachable_return(SPN_ERR_TOOLCHAIN_TARGET);
 }
 
-static bool satisfies(const spn_toolchain_catalog_t* catalog, const spn_toolchain_info_t* toolchain, spn_toolchain_query_t query, spn_toolchain_row_t* row) {
+static bool satisfies(const spn_toolchain_catalog_t* catalog, const spn_toolchain_info_t* toolchain, spn_toolchain_query_t query, reach_t* reach) {
   if (!usable(toolchain)) {
     return false;
   }
-  reach_t reach = reach_best(catalog, toolchain, query, query.abis);
-  *row = reach.row;
-  return reached(reach);
+  *reach = reach_best(catalog, toolchain, query, query.abis);
+  return reached(*reach);
 }
 
 static sp_da(sp_str_t) satisfying(spn_toolchain_catalog_t* catalog, spn_toolchain_query_t query) {
   sp_da(sp_str_t) names = sp_da_new(catalog->mem, sp_str_t);
   sp_om_for(catalog->entries, it) {
     spn_toolchain_info_t* entry = sp_om_at(catalog->entries, it);
-    spn_toolchain_row_t row = sp_zero;
-    if (satisfies(catalog, entry, query, &row)) {
+    reach_t reach = sp_zero;
+    if (satisfies(catalog, entry, query, &reach)) {
       sp_da_push(names, entry->name);
     }
   }
@@ -226,9 +227,9 @@ static spn_err_t emit_abi(spn_toolchain_catalog_t* catalog, spn_toolchain_query_
 static spn_err_t select_auto(spn_toolchain_catalog_t* catalog, spn_toolchain_query_t query, spn_toolchain_selection_t* selection) {
   sp_om_for(catalog->entries, it) {
     spn_toolchain_info_t* entry = sp_om_at(catalog->entries, it);
-    spn_toolchain_row_t row = sp_zero;
-    if (satisfies(catalog, entry, query, &row)) {
-      *selection = (spn_toolchain_selection_t) { .toolchain = entry, .row = row };
+    reach_t reach = sp_zero;
+    if (satisfies(catalog, entry, query, &reach)) {
+      *selection = (spn_toolchain_selection_t) { .toolchain = entry, .row = reach.row, .linkage = reach.linkage, .runtime = reach.runtime };
       return SPN_OK;
     }
   }
@@ -250,7 +251,7 @@ static spn_err_t select_named(spn_toolchain_catalog_t* catalog, spn_toolchain_qu
     return emit_reach(catalog, query, toolchain, reach, satisfying(catalog, query));
   }
 
-  *selection = (spn_toolchain_selection_t) { .toolchain = toolchain, .row = reach.row };
+  *selection = (spn_toolchain_selection_t) { .toolchain = toolchain, .row = reach.row, .linkage = reach.linkage, .runtime = reach.runtime };
   return SPN_OK;
 }
 

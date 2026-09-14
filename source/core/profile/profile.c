@@ -176,12 +176,8 @@ void spn_profile_finalize(spn_profile_info_t* profile, const spn_toolchain_selec
   profile->driver = selection->toolchain->driver;
   profile->linker = selection->toolchain->lld ? SPN_LD_FAMILY_LLD : spn_ld_native(selection->toolchain->driver, selection->row.triple);
   profile->sdk = selection->row.sdk;
-  if (!profile->linkage) {
-    profile->linkage = spn_abi_linkage(profile->abi);
-  }
-  if (!profile->runtime) {
-    profile->runtime = spn_triple_runtime(selection->row.triple);
-  }
+  profile->linkage = selection->linkage;
+  profile->runtime = selection->runtime;
 }
 
 static bool shared_demand(const spn_pkg_info_t* pkg) {

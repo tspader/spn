@@ -25,6 +25,8 @@ typedef struct {
   spn_abi_t abis [SELECT_MAX_ABIS];
   spn_sanitizer_set_t unsupported;
   spn_sanitizer_set_t supported;
+  spn_linkage_t linkage;
+  spn_runtime_t runtime;
 } expect_t;
 
 typedef struct {
@@ -80,6 +82,18 @@ static const complete_test_t complete_tests [] = {
     },
   },
   {
+    .name = "selection_resolves_linkage_and_runtime",
+    .driver = SPN_CC_DRIVER_GCC,
+    .targets = { HOST_X64_LINUX, { .triple = TARGET_LINUX_MUSL }, { .triple = TARGET_WIN_GNU } },
+    .checks = {
+      { .target = X64_LINUX, .abis = { SPN_ABI_GNU }, .expect = { .triple = HOST_X64_LINUX, .linkage = SPN_LIB_KIND_SHARED, .runtime = SPN_RUNTIME_SHARED } },
+      { .target = X64_LINUX, .abis = { SPN_ABI_MUSL }, .expect = { .triple = TARGET_LINUX_MUSL, .linkage = SPN_LIB_KIND_STATIC, .runtime = SPN_RUNTIME_STATIC } },
+      { .target = X64_WINDOWS, .abis = { SPN_ABI_GNU }, .expect = { .triple = TARGET_WIN_GNU, .linkage = SPN_LIB_KIND_SHARED, .runtime = SPN_RUNTIME_STATIC } },
+      { .target = X64_LINUX, .abis = { SPN_ABI_GNU }, .linkage = SPN_LIB_KIND_STATIC, .runtime = SPN_RUNTIME_STATIC, .expect = { .triple = HOST_X64_LINUX, .linkage = SPN_LIB_KIND_STATIC, .runtime = SPN_RUNTIME_STATIC } },
+      { .target = X64_LINUX, .abis = { SPN_ABI_MUSL }, .runtime = SPN_RUNTIME_SHARED, .expect = { .triple = TARGET_LINUX_MUSL, .linkage = SPN_LIB_KIND_STATIC, .runtime = SPN_RUNTIME_SHARED } },
+    },
+  },
+  {
     .name = "later_abis_fall_back",
     .driver = SPN_CC_DRIVER_GCC,
     .targets = { HOST_X64_LINUX },
@@ -118,8 +132,8 @@ static const complete_test_t complete_tests [] = {
     .driver = SPN_CC_DRIVER_GCC,
     .targets = { TARGET_X64_BARE, TARGET_X64_LINUX_NONE },
     .checks = {
-      { .target = X64_FREESTANDING, .abis = { SPN_ABI_BARE }, .expect = { .triple = TARGET_X64_BARE } },
-      { .target = X64_LINUX, .abis = { SPN_ABI_BARE }, .expect = { .triple = TARGET_X64_LINUX_NONE } },
+      { .target = X64_FREESTANDING, .abis = { SPN_ABI_BARE }, .expect = { .triple = TARGET_X64_BARE, .linkage = SPN_LIB_KIND_STATIC, .runtime = SPN_RUNTIME_STATIC } },
+      { .target = X64_LINUX, .abis = { SPN_ABI_BARE }, .expect = { .triple = TARGET_X64_LINUX_NONE, .linkage = SPN_LIB_KIND_STATIC, .runtime = SPN_RUNTIME_STATIC } },
     },
   },
   {
@@ -644,6 +658,12 @@ static sp_err_t check_selection(sp_test_t* t, const spn_toolchain_selection_t* s
   sp_must(t, selection->toolchain);
   sp_expect_str_eq_c(t, selection->toolchain->name, name);
   sp_expect(t, spn_triple_equal(selection->row.triple, expect->triple));
+  if (expect->linkage) {
+    sp_expect_eq(t, (u32)expect->linkage, (u32)selection->linkage);
+  }
+  if (expect->runtime) {
+    sp_expect_eq(t, (u32)expect->runtime, (u32)selection->runtime);
+  }
   return fixture_check_sdk(t, selection->row.sdk, expect->sdk);
 }
 
