@@ -19,7 +19,12 @@ foreach ($p in $excl) {
 }
 
 Write-Host "== unpacking repo + binaries =="
-if (Test-Path $Work) { Remove-Item -Recurse -Force $Work }
+if (Test-Path $Work) {
+  # Remove-Item -Recurse trips over deep kept test dirs (>MAX_PATH) and
+  # read-only git objects; cmd rmdir clears them where Remove-Item throws.
+  & cmd /c "rmdir /s /q `"$Work`"" 2>$null
+  if (Test-Path $Work) { Remove-Item -Recurse -Force $Work }
+}
 New-Item -ItemType Directory -Force -Path $Work | Out-Null
 & tar.exe -xzf $Src -C $Work
 if ($LASTEXITCODE -ne 0) { throw "source extract failed ($LASTEXITCODE)" }
