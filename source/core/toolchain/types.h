@@ -188,6 +188,7 @@ typedef struct {
   spn_abi_list_t abis;
   spn_sanitizer_set_t sanitizers;
   spn_linkage_t linkage;
+  spn_runtime_t runtime;
 } spn_toolchain_query_t;
 
 typedef struct {

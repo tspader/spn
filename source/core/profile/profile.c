@@ -149,7 +149,8 @@ static spn_abi_list_t abi_order(const spn_profile_info_t* profile, spn_triple_t 
     return list;
   }
   if (profile->os == SPN_OS_LINUX) {
-    push_abi(&list, profile->linkage == SPN_LIB_KIND_SHARED ? host.abi : SPN_ABI_MUSL);
+    bool ship_anywhere = profile->linkage != SPN_LIB_KIND_SHARED && profile->runtime != SPN_RUNTIME_SHARED;
+    push_abi(&list, ship_anywhere ? SPN_ABI_MUSL : host.abi);
   }
   const spn_abi_t* abis = SP_NULLPTR;
   u32 count = spn_os_completions(profile->os, &abis);
@@ -166,6 +167,7 @@ spn_toolchain_query_t spn_profile_query(const spn_profile_info_t* profile, spn_t
     .abis = abi_order(profile, host),
     .sanitizers = profile->sanitizers,
     .linkage = profile->linkage,
+    .runtime = profile->runtime,
   };
 }
 
