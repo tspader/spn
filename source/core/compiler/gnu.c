@@ -425,8 +425,8 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
   spn_triple_t triple = spn_profile_triple(profile);
   spn_format_t format = spn_os_format(profile->os);
   spn_ld_dialect_t dialect = spn_ld_dialect(triple);
-  bool fully_static = spn_runtime_fully_static(profile->linkage, profile->runtime);
-  bool static_gnu_runtime = profile->runtime == SPN_RUNTIME_STATIC && triple.abi != SPN_ABI_MSVC && spn_cc_has(toolchain, SPN_CC_CAP_GNU_RUNTIME);
+  bool is_full_static = profile->linkage == SPN_LIB_KIND_STATIC && profile->runtime == SPN_RUNTIME_STATIC;
+  bool is_gnu_runtime_static = profile->runtime == SPN_RUNTIME_STATIC && triple.abi != SPN_ABI_MSVC && spn_cc_has(toolchain, SPN_CC_CAP_GNU_RUNTIME);
 
   add_launcher(mem, toolchain, profile, link->lang, invocation);
   spn_cc_push_strs(mem, invocation, toolchain->link_args);
@@ -450,7 +450,7 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
       if (format == SPN_FORMAT_MACHO) {
         spn_cc_push_fmt(mem, invocation, "-Wl,-install_name,@rpath/{}", sp_fmt_str(sp_fs_get_name(files->output.sub)));
       }
-      if (static_gnu_runtime) {
+      if (is_gnu_runtime_static) {
         add_static_runtime(mem, profile->os, invocation);
       }
       if (!spn_path_empty(files->exports.path)) {
@@ -462,10 +462,10 @@ void spn_gnu_render_link(sp_mem_t mem, const spn_cc_toolchain_t* toolchain, cons
       break;
     }
     case SPN_CC_OUTPUT_EXE: {
-      if (fully_static && spn_ld_static(dialect)) {
+      if (is_full_static && spn_ld_static(dialect)) {
         spn_cc_push_c(mem, invocation, "-static");
       }
-      else if (static_gnu_runtime) {
+      else if (is_gnu_runtime_static) {
         add_static_runtime(mem, profile->os, invocation);
       }
       if (link->subsystem == SPN_WIN_SUBSYSTEM_WINDOWS && format == SPN_FORMAT_COFF) {
