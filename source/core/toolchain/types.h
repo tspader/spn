@@ -17,6 +17,7 @@ typedef enum {
   SPN_CC_CAP_LIBC_FILE      = 1 << 5,
   SPN_CC_CAP_DEFAULT_UBSAN  = 1 << 6,
   SPN_CC_CAP_BARE           = 1 << 7,
+  SPN_CC_CAP_GNU_RUNTIME    = 1 << 8,
 } spn_cc_cap_t;
 
 typedef u32 spn_cc_cap_set_t;
