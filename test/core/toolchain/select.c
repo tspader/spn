@@ -1,6 +1,6 @@
 #include "toolchain.h"
 
-#define SELECT_MAX_CHECKS 4
+#define SELECT_MAX_CHECKS 5
 #define SELECT_MAX_ABIS 3
 #define SELECT_MAX_CANDIDATES 3
 
@@ -32,6 +32,7 @@ typedef struct {
   spn_abi_t abis [SELECT_MAX_ABIS];
   spn_sanitizer_set_t sanitizers;
   spn_linkage_t linkage;
+  spn_runtime_t runtime;
   expect_t expect;
 } check_t;
 
@@ -53,6 +54,7 @@ typedef struct {
   spn_abi_t abis [SELECT_MAX_ABIS];
   spn_sanitizer_set_t sanitizers;
   spn_linkage_t linkage;
+  spn_runtime_t runtime;
   spn_triple_t host;
   fixture_sdks_t sdks;
   expect_t expect;
@@ -377,7 +379,8 @@ static const complete_test_t complete_tests [] = {
       { .target = X64_LINUX, .abis = { SPN_ABI_MUSL, SPN_ABI_GNU }, .sanitizers = SPN_SANITIZER_ADDRESS, .expect = { .triple = HOST_X64_LINUX } },
       { .target = X64_LINUX, .abis = { SPN_ABI_MUSL, SPN_ABI_GNU }, .sanitizers = SPN_SANITIZER_UNDEFINED, .expect = { .triple = TARGET_LINUX_MUSL } },
       { .target = X64_LINUX, .abis = { SPN_ABI_MUSL }, .sanitizers = SPN_SANITIZER_ADDRESS, .linkage = SPN_LIB_KIND_SHARED, .expect = { .triple = TARGET_LINUX_MUSL } },
-      { .target = X64_LINUX, .abis = { SPN_ABI_GNU }, .sanitizers = SPN_SANITIZER_ADDRESS | SPN_SANITIZER_UNDEFINED, .linkage = SPN_LIB_KIND_STATIC, .expect = { .err = SPN_ERR_SANITIZER_STATIC, .triple = HOST_X64_LINUX, .unsupported = SPN_SANITIZER_ADDRESS, .supported = SAN_GCC_LINUX } },
+      { .target = X64_LINUX, .abis = { SPN_ABI_GNU }, .sanitizers = SPN_SANITIZER_ADDRESS | SPN_SANITIZER_UNDEFINED, .linkage = SPN_LIB_KIND_STATIC, .runtime = SPN_RUNTIME_STATIC, .expect = { .err = SPN_ERR_SANITIZER_STATIC, .triple = HOST_X64_LINUX, .unsupported = SPN_SANITIZER_ADDRESS, .supported = SAN_GCC_LINUX } },
+      { .target = X64_LINUX, .abis = { SPN_ABI_GNU }, .sanitizers = SPN_SANITIZER_ADDRESS | SPN_SANITIZER_UNDEFINED, .linkage = SPN_LIB_KIND_STATIC, .runtime = SPN_RUNTIME_SHARED, .expect = { .triple = HOST_X64_LINUX } },
     },
   },
   {
@@ -674,6 +677,7 @@ sp_test_each(select, complete, complete_test_t, complete_tests, .setup = spn_tes
       .abis = abi_list(check->abis),
       .sanitizers = check->sanitizers,
       .linkage = check->linkage,
+      .runtime = check->runtime,
     };
     spn_toolchain_selection_t selection = sp_zero;
     spn_err_t err = query_catalog(&catalog, query, &selection);
@@ -708,6 +712,7 @@ sp_test_each(select, resolve, resolve_test_t, resolve_tests, .setup = spn_test_c
     .abis = abi_list(it->abis),
     .sanitizers = it->sanitizers,
     .linkage = it->linkage,
+    .runtime = it->runtime,
   };
   if (it->toolchain) {
     query.toolchain = (spn_toolchain_ref_t) { SPN_TOOLCHAIN_REF_NAMED, sp_cstr_as_str(it->toolchain) };
