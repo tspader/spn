@@ -580,6 +580,31 @@ sp_str_t spn_linkage_to_str(spn_linkage_t kind) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
+spn_runtime_t spn_runtime_from_str(sp_str_t str) {
+  if (sp_str_equal_cstr(str, "static")) {
+    return SPN_RUNTIME_STATIC;
+  }
+  if (sp_str_equal_cstr(str, "shared")) {
+    return SPN_RUNTIME_SHARED;
+  }
+
+  return SPN_RUNTIME_NONE;
+}
+
+sp_str_t spn_runtime_to_str(spn_runtime_t runtime) {
+  switch (runtime) {
+    case SPN_RUNTIME_STATIC: {
+      return sp_str_lit("static");
+    }
+    case SPN_RUNTIME_SHARED: {
+      return sp_str_lit("shared");
+    }
+    case SPN_RUNTIME_NONE: sp_unreachable_case();
+  }
+
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
 spn_dir_t spn_cache_dir_kind_from_str(sp_str_t str) {
   if (sp_str_equal_cstr(str, "")) {
     return SPN_DIR_STORE;

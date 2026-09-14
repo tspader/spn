@@ -44,6 +44,8 @@ bool spn_sanitizer_set_has_conflict(spn_sanitizer_set_t set);
 spn_linkage_t spn_lib_kind_from_str(sp_str_t str);
 spn_linkage_t spn_linkage_from_str(sp_str_t str);
 sp_str_t spn_linkage_to_str(spn_linkage_t kind);
+spn_runtime_t spn_runtime_from_str(sp_str_t str);
+sp_str_t spn_runtime_to_str(spn_runtime_t runtime);
 
 spn_option_type_t spn_option_type_from_str(sp_str_t str);
 sp_str_t spn_option_type_to_str(spn_option_type_t type);
