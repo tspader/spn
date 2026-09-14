@@ -26,6 +26,7 @@ sp_da(spn_triple_t) spn_os_triples(sp_mem_t mem, spn_arch_t arch, spn_os_t os);
 sp_da(spn_triple_t) spn_arch_triples(sp_mem_t mem, spn_arch_t arch);
 spn_format_t spn_os_format(spn_os_t os);
 bool spn_triple_dynamic(spn_triple_t triple);
+bool spn_triple_runtime_static(spn_triple_t triple);
 bool spn_triple_pic(spn_triple_t triple);
 spn_triple_entry_t spn_triple_entry(spn_triple_t partial, spn_triple_t* full);
 spn_triple_t spn_triple_merge(spn_triple_t base, spn_triple_t partial);

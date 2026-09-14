@@ -174,31 +174,16 @@ spn_linkage_t spn_abi_linkage(spn_abi_t abi) {
   SP_UNREACHABLE_RETURN(SPN_LIB_KIND_NONE);
 }
 
-bool spn_triple_runtime_static(spn_triple_t triple) {
-  switch (triple.os) {
-    case SPN_OS_MACOS: return false;
-    case SPN_OS_LINUX:
-    case SPN_OS_WINDOWS:
-    case SPN_OS_WASI:
-    case SPN_OS_FREESTANDING: return true;
-    case SPN_OS_NONE: sp_unreachable_case();
-  }
-  SP_UNREACHABLE_RETURN(false);
-}
-
 spn_runtime_t spn_triple_runtime(spn_triple_t triple) {
-  if (!spn_triple_runtime_static(triple)) {
-    return SPN_RUNTIME_SHARED;
-  }
   switch (triple.os) {
     case SPN_OS_LINUX: return triple.abi == SPN_ABI_GNU ? SPN_RUNTIME_SHARED : SPN_RUNTIME_STATIC;
+    case SPN_OS_MACOS: return SPN_RUNTIME_SHARED;
     case SPN_OS_WINDOWS:
     case SPN_OS_WASI:
     case SPN_OS_FREESTANDING: return SPN_RUNTIME_STATIC;
-    case SPN_OS_MACOS:
     case SPN_OS_NONE: sp_unreachable_case();
   }
-  SP_UNREACHABLE_RETURN(SPN_RUNTIME_STATIC);
+  SP_UNREACHABLE_RETURN(SPN_RUNTIME_NONE);
 }
 
 bool spn_runtime_fully_static(spn_linkage_t linkage, spn_runtime_t runtime) {
