@@ -25,6 +25,9 @@ static void overlay_profile(spn_profile_info_t* to, const spn_profile_info_t* fr
   if (from->linkage) {
     to->linkage = from->linkage;
   }
+  if (from->runtime) {
+    to->runtime = from->runtime;
+  }
   if (from->standard) {
     to->standard = from->standard;
   }
@@ -102,6 +105,7 @@ static spn_profile_info_t evaluate(const spn_profile_decl_t* decl, spn_when_env_
     .arch = decl->arch,
     .abi = spn_abi_from_str(pick(decl->abi, env)),
     .linkage = spn_linkage_from_str(pick(decl->linkage, env)),
+    .runtime = spn_runtime_from_str(pick(decl->runtime, env)),
     .standard = spn_c_standard_from_str(pick(decl->standard, env)),
     .mode = spn_mode_from_str(pick(decl->mode, env)),
     .opt = spn_opt_level_from_str(pick(decl->opt, env)),
@@ -307,6 +311,7 @@ spn_err_t spn_profile_resolve(const spn_profile_override_t* override, spn_triple
     .arch       = pinned.arch,
     .abi        = pinned.abi,
     .linkage    = resolve_linkage(merged.linkage, pinned, pkg),
+    .runtime    = merged.runtime,
     .standard   = merged.standard,
     .mode       = merged.mode,
     .opt        = merged.opt,
@@ -328,6 +333,7 @@ spn_profile_info_t spn_profile_metaprogram(void) {
     .opt = SPN_OPT_LEVEL_2,
     .standard = SPN_C99,
     .linkage = SPN_LIB_KIND_STATIC,
+    .runtime = SPN_RUNTIME_STATIC,
   };
 }
 

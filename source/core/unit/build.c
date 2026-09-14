@@ -22,6 +22,7 @@ spn_build_id_t spn_build_id(const spn_profile_info_t* profile) {
     (sp_hash_t)profile->driver,
     (sp_hash_t)profile->linker,
     (sp_hash_t)profile->linkage,
+    (sp_hash_t)profile->runtime,
     (sp_hash_t)profile->standard,
     (sp_hash_t)profile->mode,
     (sp_hash_t)profile->opt,

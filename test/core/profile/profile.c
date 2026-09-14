@@ -36,6 +36,7 @@ typedef struct {
   candidate_t toolchain [2];
   candidate_t abi [2];
   candidate_t linkage [2];
+  candidate_t runtime [2];
   candidate_t standard [2];
   candidate_t mode [2];
   candidate_t opt [2];
@@ -55,6 +56,7 @@ typedef struct {
   const c8* name;
   spn_triple_t target;
   spn_linkage_t linkage;
+  spn_runtime_t runtime;
   const c8* toolchain;
   spn_c_standard_t standard;
   spn_mode_t mode;
@@ -569,6 +571,17 @@ static const test_t tests [] = {
     .expect = { .err = SPN_ERR_PROFILE_LINKAGE },
   },
   {
+    .name = "explicit_shared_runtime_survives",
+    .profile = { .name = "default", .runtime = { { "shared" } } },
+    .host = PROFILE_HOST_LINUX_GNU,
+    .abi = SPN_ABI_GNU,
+    .expect = {
+      .target = { SPN_ARCH_X64, SPN_OS_LINUX },
+      .linkage = SPN_LIB_KIND_SHARED,
+      .runtime = SPN_RUNTIME_SHARED,
+    },
+  },
+  {
     .name = "manifest_foreign_abi_is_rejected",
     .profile = { .name = "default", .arch = SPN_ARCH_WASM32, .os = SPN_OS_WASI, .abi = { { "gnu" } } },
     .host = PROFILE_HOST_LINUX_GNU,
@@ -732,6 +745,7 @@ static spn_profile_decl_t desc_to_decl(sp_mem_t mem, const decl_t* d) {
     .toolchain = candidates(mem, d->toolchain),
     .abi = candidates(mem, d->abi),
     .linkage = candidates(mem, d->linkage),
+    .runtime = candidates(mem, d->runtime),
     .standard = candidates(mem, d->standard),
     .mode = candidates(mem, d->mode),
     .opt = candidates(mem, d->opt),
@@ -800,6 +814,9 @@ sp_test_each(profile, resolve, test_t, tests, .setup = spn_test_ctx_setup) {
   spn_toolchain_selection_t selection = { .toolchain = &info, .row.triple = { result.arch, result.os, it->abi ? it->abi : result.abi } };
   spn_profile_finalize(&result, &selection);
   sp_expect_eq(t, (u32)it->expect.linkage, (u32)result.linkage);
+  if (it->expect.runtime) {
+    sp_expect_eq(t, (u32)it->expect.runtime, (u32)result.runtime);
+  }
   return SP_OK;
 }
 
