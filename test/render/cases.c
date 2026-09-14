@@ -329,7 +329,7 @@ static cell_t cells [] = {
     .args = { "build", "--target", "wasm32-wasi-musl" },
   },
   {
-    .name = "err_profile_runtime",
+    .name = "err_profile_runtime_static",
     .project = "test/render/fixtures/errors/static_runtime",
     .args = { "build", "--target", "aarch64-macos-apple" },
   },

@@ -575,7 +575,7 @@ static const test_t tests [] = {
     .profile = { .name = "default", .runtime = { { "static" } } },
     .overrides = { .arch = SPN_ARCH_ARM64, .os = SPN_OS_MACOS },
     .host = PROFILE_HOST_LINUX_GNU,
-    .expect = { .err = SPN_ERR_PROFILE_RUNTIME },
+    .expect = { .err = SPN_ERR_PROFILE_RUNTIME_STATIC },
   },
   {
     .name = "explicit_shared_runtime_on_wasi_is_rejected",

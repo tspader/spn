@@ -56,7 +56,7 @@
     "profile_arch": { "ref": "profile" },
     "profile_abi": { "ref": "profile" },
     "profile_linkage": { "ref": "profile" },
-    "profile_runtime": { "ref": "profile" },
+    "profile_runtime_static": { "ref": "profile" },
     "profile_runtime_shared": { "ref": "profile" },
     "sanitizer_unsupported": { "ref": "sanitizer" },
     "sanitizer_static": { "ref": "sanitizer" },

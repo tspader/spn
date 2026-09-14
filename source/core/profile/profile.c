@@ -306,7 +306,7 @@ spn_err_t spn_profile_resolve(const spn_profile_override_t* override, spn_triple
   }
   if (merged.runtime == SPN_RUNTIME_STATIC && !spn_triple_runtime_static(pinned)) {
     return spn_err_emit(&spn, (spn_err_union_t) {
-      .kind = SPN_ERR_PROFILE_RUNTIME,
+      .kind = SPN_ERR_PROFILE_RUNTIME_STATIC,
       .profile = { .name = name, .target = pinned },
     });
   }
