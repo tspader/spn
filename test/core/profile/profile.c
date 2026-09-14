@@ -597,6 +597,7 @@ typedef struct {
   const c8* name;
   spn_triple_t target;
   spn_linkage_t linkage;
+  spn_runtime_t runtime;
   spn_sanitizer_set_t sanitizers;
   spn_triple_t host;
   query_expect_t expect;
@@ -622,6 +623,20 @@ static const query_test_t query_tests [] = {
     .linkage = SPN_LIB_KIND_SHARED,
     .host = PROFILE_HOST_LINUX_GNU,
     .expect = { .abis = { SPN_ABI_GNU, SPN_ABI_MUSL } },
+  },
+  {
+    .name = "native_shared_runtime_prefers_host_libc",
+    .target = { SPN_ARCH_X64, SPN_OS_LINUX },
+    .runtime = SPN_RUNTIME_SHARED,
+    .host = PROFILE_HOST_LINUX_GNU,
+    .expect = { .abis = { SPN_ABI_GNU, SPN_ABI_MUSL } },
+  },
+  {
+    .name = "native_static_runtime_prefers_musl",
+    .target = { SPN_ARCH_X64, SPN_OS_LINUX },
+    .runtime = SPN_RUNTIME_STATIC,
+    .host = PROFILE_HOST_LINUX_GNU,
+    .expect = { .abis = { SPN_ABI_MUSL, SPN_ABI_GNU } },
   },
   {
     .name = "request_carries_sanitizers_and_linkage",
@@ -833,6 +848,7 @@ sp_test_each(profile, query, query_test_t, query_tests) {
     .os = it->target.os,
     .abi = it->target.abi,
     .linkage = it->linkage,
+    .runtime = it->runtime,
     .sanitizers = it->sanitizers,
   };
 
@@ -842,6 +858,7 @@ sp_test_each(profile, query, query_test_t, query_tests) {
   sp_expect(t, spn_triple_equal(query.target, it->target));
   sp_expect_eq(t, query.sanitizers, it->sanitizers);
   sp_expect_eq(t, (u32)query.linkage, (u32)it->linkage);
+  sp_expect_eq(t, (u32)query.runtime, (u32)it->runtime);
 
   u32 abis = 0;
   sp_carr_detect_len(it->expect.abis, abis, it->expect.abis[abis]);
