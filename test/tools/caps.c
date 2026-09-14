@@ -140,25 +140,6 @@ static bool present(spn_arg_t program) {
   return found;
 }
 
-static sp_str_t toolchain_dir(sp_mem_t mem, const spn_toolchain_info_t* info) {
-  return sp_fs_parent_path(program_existing(mem, info->compiler.program));
-}
-
-sp_str_t test_toolchain_path(sp_mem_t mem) {
-  const spn_toolchain_info_t* info = test_toolchain()->info;
-  sp_str_t path = sp_os_env_get(sp_str_lit("PATH"));
-  switch (info->support.kind) {
-    case SPN_TOOLCHAIN_SUPPORT_LOCAL: {
-      return spn_search_prepend(host_rules(), mem, toolchain_dir(mem, info), path);
-    }
-    case SPN_TOOLCHAIN_SUPPORT_ARTIFACT:
-    case SPN_TOOLCHAIN_SUPPORT_NONE: {
-      return path;
-    }
-  }
-  sp_unreachable_return(path);
-}
-
 typedef struct {
   const c8* lane;
   spn_ld_dialect_t dialect;
