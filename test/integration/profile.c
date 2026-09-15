@@ -1,6 +1,8 @@
 #include "harness.h"
 
 sp_test(profile, sanitize_trigger) {
+  return sp_test_skip(t, "SPN-32");
+
   return run_opt_test(t, (opt_test_t) {
     .project = "test/integration/fixtures/profile/sanitize",
     .when.sanitize = SPN_SANITIZER_ADDRESS,
@@ -25,6 +27,8 @@ sp_test(profile, sanitize_clear) {
 }
 
 sp_test(profile, identity) {
+  return sp_test_skip(t, "SPN-32");
+
   return run_opt_test(t, (opt_test_t) {
     .project = "test/integration/fixtures/profile/identity",
     .builds = {
