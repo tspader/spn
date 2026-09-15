@@ -69,6 +69,11 @@ typedef enum {
 } spn_ld_family_t;
 
 typedef enum {
+  SPN_TOOLCHAIN_DETECT_NONE,
+  SPN_TOOLCHAIN_DETECT_MSVC,
+} spn_toolchain_detect_t;
+
+typedef enum {
   SPN_FORMAT_ELF,
   SPN_FORMAT_COFF,
   SPN_FORMAT_MACHO,

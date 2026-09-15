@@ -1,0 +1,7 @@
+[[toolchain]]
+name = "A"
+driver = "msvc"
+compiler = "cl"
+archiver = "lib"
+cxx = "cl"
+detect = "msvc"

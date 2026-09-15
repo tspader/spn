@@ -20,6 +20,7 @@ static const test_t tests [] = {
   { .name = "msvc_root_changes_hash",  .a = { SPN_SDK_MSVC, { "/X" }, SPN_ARCH_X64 },   .b = { SPN_SDK_MSVC, { "/Y" }, SPN_ARCH_X64 } },
   { .name = "arch_changes_hash",       .a = { SPN_SDK_MSVC, { "/X" }, SPN_ARCH_X64 },   .b = { SPN_SDK_MSVC, { "/X" }, SPN_ARCH_ARM64 } },
   { .name = "bin_changes_hash",        .a = { SPN_SDK_MSVC, { "/X" }, SPN_ARCH_X64 },   .b = { SPN_SDK_MSVC, { "/X" }, SPN_ARCH_X64, { "/X/bin" } } },
+  { .name = "version_changes_hash",    .a = { SPN_SDK_MSVC, { "/X" }, SPN_ARCH_X64 },   .b = { SPN_SDK_MSVC, { "/X" }, SPN_ARCH_X64, .version = "A" } },
 };
 
 sp_test_each(sdk_hash, hash, test_t, tests) {

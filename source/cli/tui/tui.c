@@ -1,3 +1,4 @@
+#include "spn/err.h"
 #include "spn/host.h"
 
 #include "io/io.h"
@@ -1216,10 +1217,19 @@ static sp_str_t render_event_detail(spn_tui_t* tui, sp_mem_t mem, spn_event_t* e
           }
           break;
         }
-        case SPN_ERR_TOOLCHAIN_HOST: {
+        case SPN_ERR_TOOLCHAIN_UNAVAILABLE_FOR_HOST: {
           sp_tty_fmt(
             &w,
             "Toolchain {} isn't available on {.yellow}",
+            sp_fmt_str(colored_name(w.color, mem, event->err.toolchain.name)),
+            sp_fmt_str(spn_triple_to_str(mem, event->err.toolchain.host))
+          );
+          break;
+        }
+        case SPN_ERR_TOOLCHAIN_NOT_INSTALLED: {
+          sp_tty_fmt(
+            &w,
+            "Toolchain {} isn't installed on {.yellow}",
             sp_fmt_str(colored_name(w.color, mem, event->err.toolchain.name)),
             sp_fmt_str(spn_triple_to_str(mem, event->err.toolchain.host))
           );
@@ -1638,7 +1648,8 @@ static void render_event_extra(sp_tty_t* w, spn_event_t* event) {
         case SPN_ERR_TOOLCHAIN_SYSROOT:
         case SPN_ERR_TOOLCHAIN_SDK_MACOS:
         case SPN_ERR_TOOLCHAIN_SDK_MSVC:
-        case SPN_ERR_TOOLCHAIN_HOST:
+        case SPN_ERR_TOOLCHAIN_UNAVAILABLE_FOR_HOST:
+        case SPN_ERR_TOOLCHAIN_NOT_INSTALLED:
         case SPN_ERR_TOOLCHAIN_UNKNOWN:
         case SPN_ERR_TOOLCHAIN_NONE: {
           write_toolchain_candidates(w, &event->err.toolchain);

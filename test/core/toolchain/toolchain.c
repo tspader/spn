@@ -3,7 +3,6 @@
 typedef struct {
   const c8* program;
   const c8* program_win;
-  const c8* str;
 } launcher_expect_t;
 
 typedef struct {
@@ -19,16 +18,6 @@ static const launcher_test_t tests [] = {
     .launcher = { .path = "B/A", .args = { "C" } },
     .root = "/R",
     .expect = { .program = "/R/B/A", .program_win = "/R/B/A.exe" },
-  },
-  {
-    .name = "to_str_program_only",
-    .launcher = { .name = "A" },
-    .expect = { .str = "A" },
-  },
-  {
-    .name = "to_str_joins_args",
-    .launcher = { .name = "A", .args = { "B", "C" } },
-    .expect = { .str = "A B C" },
   },
 };
 
@@ -79,10 +68,6 @@ sp_test_each(launcher, resolve, launcher_test_t, tests) {
     spn_path_t root = { .sub = sp_cstr_as_str(it->root) };
     spn_toolchain_launcher_t rooted = spn_toolchain_launcher_with_root(mem, launcher, root);
     sp_expect_str_eq_c(t, spn_arg_str(&roots, mem, rooted.program), program);
-  }
-
-  if (it->expect.str) {
-    sp_expect_str_eq_c(t, spn_toolchain_launcher_to_str(&roots, mem, launcher), it->expect.str);
   }
 
   return SP_OK;

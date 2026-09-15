@@ -25,6 +25,7 @@ static const parse_test_t tests [] = {
           .name = "A",
           .version = "1.0.0",
           .driver = SPN_CC_DRIVER_CLANG,
+          .source = SPN_TOOLCHAIN_SOURCE_DISTRIBUTION,
           .compiler = { .path = "A", .args = { "cc" } },
           .cxx = { .path = "A", .args = { "c++" } },
           .archiver = { .path = "A", .args = { "ar" } },
@@ -98,6 +99,40 @@ static const parse_test_t tests [] = {
         },
       },
     },
+  },
+  {
+    .name = "detected",
+    .file = "detected.toml",
+    .expect = {
+      .entries = 1,
+      .toolchains = {
+        {
+          .name = "A",
+          .host = true,
+          .driver = SPN_CC_DRIVER_MSVC,
+          .source = SPN_TOOLCHAIN_SOURCE_DETECTED,
+          .detect = SPN_TOOLCHAIN_DETECT_MSVC,
+          .compiler = { .path = "cl" },
+          .cxx = { .path = "cl" },
+          .archiver = { .path = "lib" },
+        },
+      },
+    },
+  },
+  {
+    .name = "detected_rejects_hosts",
+    .file = "detected_hosts.toml",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "detect_unknown",
+    .file = "detect_unknown.toml",
+    .expect = { .err = SPN_ERROR },
+  },
+  {
+    .name = "detected_rejects_sdk",
+    .file = "detected_sdk.toml",
+    .expect = { .err = SPN_ERROR },
   },
   {
     .name = "multiple_toolchains",
@@ -207,6 +242,7 @@ static const parse_test_t tests [] = {
         {
           .name = "A",
           .driver = SPN_CC_DRIVER_CLANG,
+          .source = SPN_TOOLCHAIN_SOURCE_DISTRIBUTION,
           .compiler = { .path = "A" },
           .archiver = { .path = "A" },
           .hosts = {
@@ -256,6 +292,7 @@ static const parse_test_t tests [] = {
         {
           .name = "A",
           .driver = SPN_CC_DRIVER_CLANG,
+          .source = SPN_TOOLCHAIN_SOURCE_DISTRIBUTION,
           .compiler = { .path = "A" },
           .archiver = { .path = "A" },
           .hosts = {

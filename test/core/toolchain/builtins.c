@@ -54,8 +54,8 @@ sp_test(builtins, well_formed) {
         }
         break;
       }
-      case SPN_TOOLCHAIN_SOURCE_MIXED: {
-        sp_unreachable_case();
+      case SPN_TOOLCHAIN_SOURCE_DETECTED: {
+        break;
       }
     }
   }

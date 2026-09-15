@@ -59,7 +59,7 @@ static spn_target_info_t lib_info(sp_mem_t mem, spn_tree_roots_t trees, const un
   return info;
 }
 
-static spn_build_unit_t* add_build(spn_session_t* s, spn_build_id_t id, const c8* root, spn_profile_info_t profile) {
+static spn_build_unit_t* add_build(spn_session_t* s, spn_build_id_t id, const c8* root, spn_profile_info_t profile, spn_toolchain_support_t support) {
   sp_om_insert(s->units.builds, id, sp_zero_struct(spn_build_unit_t));
   spn_build_unit_t* build = sp_om_back(s->units.builds);
   build->id = id;
@@ -75,6 +75,7 @@ static spn_build_unit_t* add_build(spn_session_t* s, spn_build_id_t id, const c8
   info->compiler.program = spn_arg_lit(sp_str_lit("cc"));
   info->cxx.program = spn_arg_lit(sp_str_lit("c++"));
   info->archiver.program = spn_arg_lit(sp_str_lit("ar"));
+  info->support = support;
 
   spn_toolchain_unit_t* toolchain = sp_alloc_type(s->mem, spn_toolchain_unit_t);
   toolchain->info = info;
@@ -119,8 +120,13 @@ spn_session_t* build_session(sp_mem_t mem, unit_graph_test_t* g) {
     profile.sdk = spn_sdk_at(mem, (spn_triple_t) { profile.arch, profile.os, profile.abi }, (spn_path_t) { .sub = sp_cstr_as_str(g->sdk) });
   }
 
-  s->units.target = add_build(s, 1, "/build/debug", profile);
-  s->units.metaprogram = add_build(s, 2, "/build/wasm32-wasi", profile);
+  spn_toolchain_support_t support = { .kind = SPN_TOOLCHAIN_SUPPORT_LOCAL };
+  if (g->sha256) {
+    support = (spn_toolchain_support_t) { .kind = SPN_TOOLCHAIN_SUPPORT_ARTIFACT, .artifact.sha256 = sp_str_view(g->sha256) };
+  }
+
+  s->units.target = add_build(s, 1, "/build/debug", profile, support);
+  s->units.metaprogram = add_build(s, 2, "/build/wasm32-wasi", profile, support);
 
   u32 count = 0;
   sp_carr_detect_len(g->pkgs, count, g->pkgs[count].name);

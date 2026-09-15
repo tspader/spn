@@ -28,7 +28,12 @@ static bool pathless(sp_str_t program) {
 }
 
 static bool searched(spn_toolchain_source_t source, sp_str_t program) {
-  return source != SPN_TOOLCHAIN_SOURCE_DISTRIBUTION && pathless(program);
+  switch (source) {
+    case SPN_TOOLCHAIN_SOURCE_LOCAL: return pathless(program);
+    case SPN_TOOLCHAIN_SOURCE_DISTRIBUTION:
+    case SPN_TOOLCHAIN_SOURCE_DETECTED: return false;
+  }
+  SP_UNREACHABLE_RETURN(false);
 }
 
 spn_path_check_t spn_toolchain_path(spn_toolchain_source_t source, spn_path_root_t base, sp_str_t str, spn_path_t* path) {
@@ -38,15 +43,15 @@ spn_path_check_t spn_toolchain_path(spn_toolchain_source_t source, spn_path_root
 
   bool absolute = sp_fs_is_absolute(str);
   switch (source) {
-    case SPN_TOOLCHAIN_SOURCE_DISTRIBUTION: {
+    case SPN_TOOLCHAIN_SOURCE_DISTRIBUTION:
+    case SPN_TOOLCHAIN_SOURCE_DETECTED: {
       if (absolute) {
         return SPN_PATH_ABSOLUTE;
       }
       *path = (spn_path_t) { .sub = str };
       return SPN_PATH_OK;
     }
-    case SPN_TOOLCHAIN_SOURCE_LOCAL:
-    case SPN_TOOLCHAIN_SOURCE_MIXED: {
+    case SPN_TOOLCHAIN_SOURCE_LOCAL: {
       if (absolute) {
         *path = (spn_path_t) { .sub = str };
         return SPN_PATH_OK;
@@ -216,20 +221,4 @@ bool spn_toolchain_driver_composes(spn_cc_driver_t driver, spn_ld_dialect_t dial
     case SPN_CC_DRIVER_NONE: sp_unreachable_case();
   }
   SP_UNREACHABLE_RETURN(false);
-}
-
-sp_str_t spn_toolchain_launcher_to_str(const spn_path_roots_t* roots, sp_mem_t mem, spn_toolchain_launcher_t launcher) {
-  sp_str_t program = spn_arg_str(roots, mem, launcher.program);
-  if (sp_da_empty(launcher.args)) {
-    return program;
-  }
-
-  sp_io_dyn_mem_writer_t w;
-  sp_io_dyn_mem_writer_init(mem, &w);
-  sp_io_write_str(&w.base, program, SP_NULLPTR);
-  sp_da_for(launcher.args, i) {
-    sp_io_write_c8(&w.base, ' ');
-    sp_io_write_str(&w.base, launcher.args[i], SP_NULLPTR);
-  }
-  return sp_io_dyn_mem_writer_take_str(&w);
 }

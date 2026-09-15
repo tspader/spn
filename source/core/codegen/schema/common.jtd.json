@@ -7,6 +7,7 @@
     "runtime": { "enum": ["static", "shared"] },
     "cc_driver": { "enum": ["gcc", "clang", "msvc", "zig"] },
     "ld_family": { "enum": ["gnu", "lld", "ld64", "msvc"] },
+    "toolchain_detect": { "enum": ["msvc"] },
     "sanitizer": { "enum": ["address", "thread", "undefined", "memory", "leak"] },
     "index_protocol": { "enum": ["git", "http", "dir"], "metadata": { "include": "index/types.h" } },
     "option_type": { "enum": ["bool", "enum"], "metadata": { "include": "when/types.h" } },
@@ -49,6 +50,7 @@
         "archiver": { "type": "string" },
         "driver": { "ref": "cc_driver" },
         "cxx": { "type": "string" },
+        "detect": { "ref": "toolchain_detect" },
         "host": { "values": { "ref": "artifact" } },
         "mirrors": { "type": "string" },
         "target": { "elements": { "ref": "toolchain_target" }, "metadata": { "shorthand": "kind" } }

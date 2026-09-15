@@ -38,7 +38,7 @@ driver = "msvc"
 compiler = "cl"
 archiver = "lib"
 cxx = "cl"
-host = { x86_64-windows = {}, aarch64-windows = {} }
+detect = "msvc"
 target = [
   { arch = "x86_64",  os = "windows", abi = "msvc", sanitizers = ["address"] },
   { arch = "aarch64", os = "windows", abi = "msvc" },

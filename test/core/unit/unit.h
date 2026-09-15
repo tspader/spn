@@ -53,6 +53,7 @@ typedef struct {
   spn_os_t os; // zero selects linux
   spn_abi_t abi; // zero selects the os default
   const c8* sdk;
+  const c8* sha256;
   unit_pkg_t pkgs [UNIT_TEST_MAX_PKGS]; // pkgs[0] is the root package
 } unit_graph_test_t;
 

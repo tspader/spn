@@ -19,11 +19,11 @@ static const test_t tests [] = {
   { "local_relative_under_base",          SPN_TOOLCHAIN_SOURCE_LOCAL,        SPN_PATH_ROOT_PROJECT, "S",      .expect = { .path = { "S", SPN_PATH_ROOT_PROJECT } } },
   { "local_relative_without_base",        SPN_TOOLCHAIN_SOURCE_LOCAL,        SPN_PATH_ROOT_NONE,    "S",      .expect = { .check = SPN_PATH_UNROOTED } },
   { "local_malformed",                    SPN_TOOLCHAIN_SOURCE_LOCAL,        SPN_PATH_ROOT_PROJECT, "./S",    .expect = { .check = SPN_PATH_MALFORMED } },
-  { "mixed_roots_like_local",             SPN_TOOLCHAIN_SOURCE_MIXED,        SPN_PATH_ROOT_PROJECT, "S",      .expect = { .path = { "S", SPN_PATH_ROOT_PROJECT } } },
   { "distribution_relative",              SPN_TOOLCHAIN_SOURCE_DISTRIBUTION, SPN_PATH_ROOT_NONE,    "S",      .expect = { .path = { "S" } } },
   { "distribution_relative_ignores_base", SPN_TOOLCHAIN_SOURCE_DISTRIBUTION, SPN_PATH_ROOT_PROJECT, "S/T",    .expect = { .path = { "S/T" } } },
   { "distribution_absolute",              SPN_TOOLCHAIN_SOURCE_DISTRIBUTION, SPN_PATH_ROOT_NONE,    "/S",     .expect = { .check = SPN_PATH_ABSOLUTE } },
   { "distribution_malformed",             SPN_TOOLCHAIN_SOURCE_DISTRIBUTION, SPN_PATH_ROOT_NONE,    "S/../T", .expect = { .check = SPN_PATH_MALFORMED } },
+  { "detected_relative",                  SPN_TOOLCHAIN_SOURCE_DETECTED,     SPN_PATH_ROOT_PROJECT, "S",      .expect = { .path = { "S" } } },
 };
 
 sp_test_each(path, classify, test_t, tests) {

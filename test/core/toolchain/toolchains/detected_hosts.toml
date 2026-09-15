@@ -1,0 +1,7 @@
+[[toolchain]]
+name = "A"
+driver = "msvc"
+compiler = "cl"
+archiver = "lib"
+detect = "msvc"
+host = { x86_64-windows = {} }

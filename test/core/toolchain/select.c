@@ -583,7 +583,7 @@ static const resolve_test_t resolve_tests [] = {
     .target = ARM_FREESTANDING,
     .abis = { SPN_ABI_BARE },
     .host = HOST_ARM_LINUX,
-    .expect = { .err = SPN_ERR_TOOLCHAIN_HOST, .candidates = { "B" } },
+    .expect = { .err = SPN_ERR_TOOLCHAIN_UNAVAILABLE_FOR_HOST, .candidates = { "B" } },
   },
   {
     .name = "host_error_without_abis_lists_listing_toolchains",
@@ -591,7 +591,16 @@ static const resolve_test_t resolve_tests [] = {
     .toolchain = "A",
     .target = ARM_LINUX,
     .host = HOST_ARM_LINUX,
-    .expect = { .err = SPN_ERR_TOOLCHAIN_HOST, .candidates = { "B" } },
+    .expect = { .err = SPN_ERR_TOOLCHAIN_UNAVAILABLE_FOR_HOST, .candidates = { "B" } },
+  },
+  {
+    .name = "detected_without_an_install_is_not_installed",
+    .file = "detected.toml",
+    .toolchain = "A",
+    .target = X64_WINDOWS,
+    .abis = { SPN_ABI_MSVC },
+    .host = HOST_X64_WINDOWS,
+    .expect = { .err = SPN_ERR_TOOLCHAIN_NOT_INSTALLED },
   },
 };
 

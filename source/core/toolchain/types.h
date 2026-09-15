@@ -44,6 +44,7 @@ typedef enum {
 
 typedef struct {
   spn_arch_t arch;
+  sp_str_t version;
   spn_path_t bin;
   struct {
     spn_path_t vc;
@@ -116,18 +117,22 @@ typedef struct {
 typedef enum {
   SPN_TOOLCHAIN_SOURCE_LOCAL,
   SPN_TOOLCHAIN_SOURCE_DISTRIBUTION,
-  SPN_TOOLCHAIN_SOURCE_MIXED,
+  SPN_TOOLCHAIN_SOURCE_DETECTED,
 } spn_toolchain_source_t;
 
 typedef enum {
   SPN_TOOLCHAIN_SUPPORT_NONE,
   SPN_TOOLCHAIN_SUPPORT_LOCAL,
   SPN_TOOLCHAIN_SUPPORT_ARTIFACT,
+  SPN_TOOLCHAIN_SUPPORT_DETECTED,
 } spn_toolchain_support_kind_t;
 
 typedef struct {
   spn_toolchain_support_kind_t kind;
-  spn_artifact_t artifact;
+  union {
+    spn_artifact_t artifact;
+    spn_err_t err;
+  };
 } spn_toolchain_support_t;
 
 typedef struct {
@@ -140,7 +145,10 @@ typedef struct {
   bool lld;
   sp_da(sp_str_t) link_args;
   spn_toolchain_source_t source;
-  sp_da(spn_toolchain_host_t) hosts;
+  union {
+    spn_toolchain_detect_t detect;
+    sp_da(spn_toolchain_host_t) hosts;
+  };
   sp_da(spn_toolchain_target_t) targets;
   bool host_row;
 } spn_toolchain_decl_t;

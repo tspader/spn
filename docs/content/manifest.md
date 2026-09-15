@@ -76,6 +76,7 @@ readme: false
 | `archiver` | `string` |
 | `driver` | `gcc` \| `clang` \| `msvc` \| `zig` |
 | `cxx` | `string` |
+| `detect` | `msvc` |
 | `host` | map of [`artifact`](#artifact) |
 | `mirrors` | `string` |
 | `target` | array of [`toolchain_target`](#toolchain_target) \| `string` |

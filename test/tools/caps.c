@@ -7,6 +7,7 @@
 #include "event/event.h"
 #include "profile/profile.h"
 #include "paths/paths.h"
+#include "spn/err.h"
 #include "toolchain/catalog.h"
 #include "toolchain/linker.h"
 #include "toolchain/search.h"
@@ -194,12 +195,29 @@ static sp_str_t missing_toolchain_program(sp_mem_t mem, const spn_toolchain_info
   return missing_lane_program(mem, info);
 }
 
+static const c8* select_reason(spn_err_t err) {
+  switch (err) {
+    case SPN_ERR_TOOLCHAIN_NONE: return "no toolchain can";
+    case SPN_ERR_TOOLCHAIN_UNAVAILABLE_FOR_HOST: return "doesn't run on this host";
+    case SPN_ERR_TOOLCHAIN_NOT_INSTALLED: return "isn't installed";
+    case SPN_ERR_TOOLCHAIN_TARGET: return "doesn't target it";
+    case SPN_ERR_TOOLCHAIN_SYSROOT: return "needs a sysroot";
+    case SPN_ERR_TOOLCHAIN_SDK_MACOS: return "needs the macOS SDK";
+    case SPN_ERR_TOOLCHAIN_SDK_MSVC: return "needs the MSVC SDK";
+    case SPN_ERR_TARGET_ABI: return "needs an abi";
+    case SPN_ERR_SANITIZER_UNSUPPORTED: return "doesn't ship those sanitizers";
+    case SPN_ERR_SANITIZER_STATIC: return "links it statically";
+    default: return "can't select it";
+  }
+}
+
 static sp_str_t lane_broken(sp_mem_t mem, const spn_toolchain_info_t* info) {
   switch (info->support.kind) {
     case SPN_TOOLCHAIN_SUPPORT_NONE: {
-      return sp_fmt(mem, "doesn't support {}", sp_fmt_str(spn_triple_to_str(mem, spn_triple_host()))).value;
+      return sp_cstr_as_str(select_reason(info->support.err));
     }
-    case SPN_TOOLCHAIN_SUPPORT_ARTIFACT: {
+    case SPN_TOOLCHAIN_SUPPORT_ARTIFACT:
+    case SPN_TOOLCHAIN_SUPPORT_DETECTED: {
       return sp_str_lit("");
     }
     case SPN_TOOLCHAIN_SUPPORT_LOCAL: {
@@ -278,21 +296,6 @@ sp_str_t test_probes(void) {
 const c8* test_lane_toolchain_arg(void) {
   const test_toolchain_t* toolchain = test_toolchain();
   return sp_cstr_equal(toolchain->name, "zig") ? SP_NULLPTR : toolchain->name;
-}
-
-static const c8* select_reason(spn_err_t err) {
-  switch (err) {
-    case SPN_ERR_TOOLCHAIN_NONE: return "no toolchain can";
-    case SPN_ERR_TOOLCHAIN_HOST: return "doesn't run on this host";
-    case SPN_ERR_TOOLCHAIN_TARGET: return "doesn't target it";
-    case SPN_ERR_TOOLCHAIN_SYSROOT: return "needs a sysroot";
-    case SPN_ERR_TOOLCHAIN_SDK_MACOS: return "needs the macOS SDK";
-    case SPN_ERR_TOOLCHAIN_SDK_MSVC: return "needs the MSVC SDK";
-    case SPN_ERR_TARGET_ABI: return "needs an abi";
-    case SPN_ERR_SANITIZER_UNSUPPORTED: return "doesn't ship those sanitizers";
-    case SPN_ERR_SANITIZER_STATIC: return "links it statically";
-    default: return "can't select it";
-  }
 }
 
 static spn_err_t lane_selects(sp_mem_t mem, const test_when_t* when, spn_triple_t target, spn_profile_info_t* profile, spn_toolchain_selection_t* selection) {

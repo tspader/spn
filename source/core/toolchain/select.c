@@ -243,7 +243,7 @@ static spn_err_t select_named(spn_toolchain_catalog_t* catalog, spn_toolchain_qu
     return emit(SPN_ERR_TOOLCHAIN_UNKNOWN, catalog, query, query.target, satisfying(catalog, query), SP_NULLPTR);
   }
   if (!usable(toolchain)) {
-    return emit(SPN_ERR_TOOLCHAIN_HOST, catalog, query, query.target, satisfying(catalog, query), SP_NULLPTR);
+    return emit(toolchain->support.err, catalog, query, query.target, satisfying(catalog, query), SP_NULLPTR);
   }
 
   reach_t reach = reach_best(catalog, toolchain, query, query.abis);
@@ -269,7 +269,7 @@ static spn_err_t incomplete_named(spn_toolchain_catalog_t* catalog, spn_toolchai
     return emit(SPN_ERR_TOOLCHAIN_UNKNOWN, catalog, query, query.target, listing(catalog, query.target), SP_NULLPTR);
   }
   if (!usable(toolchain)) {
-    return emit(SPN_ERR_TOOLCHAIN_HOST, catalog, query, query.target, listing(catalog, query.target), SP_NULLPTR);
+    return emit(toolchain->support.err, catalog, query, query.target, listing(catalog, query.target), SP_NULLPTR);
   }
 
   reach_t reach = reach_best(catalog, toolchain, query, completions(query.target.os));

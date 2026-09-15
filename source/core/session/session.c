@@ -143,17 +143,6 @@ sp_opt_spn_linkage_t spn_session_config_kind(spn_session_t* session, sp_str_t pk
   return requested;
 }
 
-void spn_session_export_toolchain_env(spn_session_t* s) {
-  sp_env_init(s->mem, &s->env);
-  spn_toolchain_unit_t* toolchain = s->units.target->toolchain;
-  sp_env_insert(&s->env, sp_str_lit("CC"), spn_toolchain_launcher_to_str(&spn.roots, s->mem, toolchain->cc.compiler));
-  sp_env_insert(&s->env, sp_str_lit("AR"), spn_toolchain_launcher_to_str(&spn.roots, s->mem, toolchain->cc.archiver));
-  sp_env_insert(&s->env, sp_str_lit("LD"), spn_toolchain_launcher_to_str(&spn.roots, s->mem, toolchain->cc.compiler));
-  if (!spn_arg_empty(toolchain->cc.cxx.program)) {
-    sp_env_insert(&s->env, sp_str_lit("CXX"), spn_toolchain_launcher_to_str(&spn.roots, s->mem, toolchain->cc.cxx));
-  }
-}
-
 spn_pkg_id_t spn_session_root_pkg(spn_session_t* session) {
   sp_ht_for_kv(session->resolve, it) {
     if (it.val->source == SPN_PKG_SOURCE_ROOT) {

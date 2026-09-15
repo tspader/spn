@@ -47,6 +47,7 @@ typedef struct {
   test_path_t root;
   spn_arch_t arch;
   test_path_t bin;
+  const c8* version;
 } fixture_sdk_t;
 
 typedef struct {
@@ -77,6 +78,8 @@ typedef struct {
   bool host;
   const c8* version;
   spn_cc_driver_t driver;
+  spn_toolchain_source_t source;
+  spn_toolchain_detect_t detect;
   fixture_launcher_t compiler;
   fixture_launcher_t cxx;
   fixture_launcher_t archiver;
@@ -117,6 +120,7 @@ static spn_sdk_t fixture_sdk(sp_mem_t mem, fixture_sdk_t sdk) {
     case SPN_SDK_MSVC: {
       spn_sdk_t msvc = spn_sdk_msvc(mem, fixture_path(sdk.root), sdk.arch);
       msvc.msvc.bin = fixture_path(sdk.bin);
+      msvc.msvc.version = sp_str_view(sdk.version);
       return msvc;
     }
   }
@@ -264,6 +268,7 @@ static sp_err_t fixture_check_decl(sp_test_t* t, const spn_toolchain_decl_t* dec
     sp_expect_str_eq_c(t, decl->version, expect.version);
   }
   sp_expect_eq(t, (u32)expect.driver, (u32)decl->driver);
+  sp_must_eq(t, (u32)expect.source, (u32)decl->source);
   sp_expect_eq(t, expect.lld, decl->lld);
   sp_expect_eq(t, expect.host, decl->host_row);
   if (fixture_check_launchers(t, decl->compiler, decl->cxx, decl->archiver, expect)) {
@@ -273,12 +278,22 @@ static sp_err_t fixture_check_decl(sp_test_t* t, const spn_toolchain_decl_t* dec
     return SP_ERR;
   }
 
-  u32 hosts = 0;
-  sp_carr_detect_len(expect.hosts, hosts, !fixture_triple_empty(expect.hosts[hosts].triple));
-  sp_must_eq(t, hosts, (u32)sp_da_size(decl->hosts));
-  sp_for(it, hosts) {
-    if (fixture_check_host(t, decl->hosts[it], expect.hosts[it])) {
-      return SP_ERR;
+  switch (decl->source) {
+    case SPN_TOOLCHAIN_SOURCE_DETECTED: {
+      sp_expect_eq(t, (u32)expect.detect, (u32)decl->detect);
+      break;
+    }
+    case SPN_TOOLCHAIN_SOURCE_LOCAL:
+    case SPN_TOOLCHAIN_SOURCE_DISTRIBUTION: {
+      u32 hosts = 0;
+      sp_carr_detect_len(expect.hosts, hosts, !fixture_triple_empty(expect.hosts[hosts].triple));
+      sp_must_eq(t, hosts, (u32)sp_da_size(decl->hosts));
+      sp_for(it, hosts) {
+        if (fixture_check_host(t, decl->hosts[it], expect.hosts[it])) {
+          return SP_ERR;
+        }
+      }
+      break;
     }
   }
 

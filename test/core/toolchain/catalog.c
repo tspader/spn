@@ -54,6 +54,7 @@ typedef struct {
   const c8* name;
   const c8* file;
   spn_triple_t host;
+  fixture_sdks_t sdks;
   const c8* toolchain;
   support_expect_t expect;
 } support_test_t;
@@ -380,6 +381,29 @@ static const support_test_t support_tests [] = {
     .toolchain = "A",
     .expect = { .kind = SPN_TOOLCHAIN_SUPPORT_NONE },
   },
+  {
+    .name = "detected_with_an_install",
+    .file = "detected.toml",
+    .host = HOST_X64_WINDOWS,
+    .sdks = { .msvc = { { { "/X" }, SPN_ARCH_X64 } } },
+    .toolchain = "A",
+    .expect = { .kind = SPN_TOOLCHAIN_SUPPORT_DETECTED },
+  },
+  {
+    .name = "detected_with_only_a_foreign_arch_install",
+    .file = "detected.toml",
+    .host = HOST_X64_WINDOWS,
+    .sdks = { .msvc = { { { "/X" }, SPN_ARCH_ARM64 } } },
+    .toolchain = "A",
+    .expect = { .kind = SPN_TOOLCHAIN_SUPPORT_DETECTED },
+  },
+  {
+    .name = "detected_without_an_install_is_none",
+    .file = "detected.toml",
+    .host = HOST_X64_WINDOWS,
+    .toolchain = "A",
+    .expect = { .kind = SPN_TOOLCHAIN_SUPPORT_NONE },
+  },
 };
 
 sp_test_each(catalog, add, add_test_t, add_tests) {
@@ -454,14 +478,16 @@ sp_test_each(catalog, bind, bind_test_t, bind_tests) {
 
 sp_test_each(catalog, support, support_test_t, support_tests) {
   spn_toolchain_catalog_t catalog = sp_zero;
-  if (fixture_catalog(t, &catalog, it->file, it->host, sp_zero_struct(spn_sdk_host_t))) {
+  if (fixture_catalog(t, &catalog, it->file, it->host, fixture_sdks(sp_test_arena(t), it->sdks))) {
     return SP_ERR;
   }
 
   spn_toolchain_info_t* info = spn_toolchain_catalog_get(&catalog, sp_cstr_as_str(it->toolchain));
   sp_must(t, info);
 
-  sp_expect_eq(t, (u32)it->expect.kind, (u32)info->support.kind);
-  sp_expect_str_eq_c(t, info->support.artifact.url, it->expect.artifact ? it->expect.artifact : "");
+  sp_must_eq(t, (u32)it->expect.kind, (u32)info->support.kind);
+  if (info->support.kind == SPN_TOOLCHAIN_SUPPORT_ARTIFACT) {
+    sp_expect_str_eq_c(t, info->support.artifact.url, it->expect.artifact);
+  }
   return SP_OK;
 }

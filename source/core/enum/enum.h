@@ -20,6 +20,8 @@ spn_cc_driver_t spn_cc_driver_from_str(sp_str_t str);
 sp_str_t        spn_cc_driver_to_str(spn_cc_driver_t driver);
 spn_ld_family_t spn_ld_family_from_str(sp_str_t str);
 sp_str_t        spn_ld_family_to_str(spn_ld_family_t family);
+spn_toolchain_detect_t spn_toolchain_detect_from_str(sp_str_t str);
+sp_str_t               spn_toolchain_detect_to_str(spn_toolchain_detect_t detect);
 sp_str_t        spn_ld_dialect_to_str(spn_ld_dialect_t dialect);
 sp_str_t        spn_format_to_str(spn_format_t format);
 spn_abi_t       spn_abi_from_str(sp_str_t str);

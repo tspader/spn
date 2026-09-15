@@ -55,7 +55,7 @@ static void lower_target_fields(spn_toml_loader_t* ctx, spn_toolchain_source_t s
     }
   }
   if (!sp_str_empty(cg->sdk)) {
-    if (spn_sdk_kind(target->triple) != SPN_SDK_NONE) {
+    if (source != SPN_TOOLCHAIN_SOURCE_DETECTED && spn_sdk_kind(target->triple) != SPN_SDK_NONE) {
       target->sdk = lower_sdk_path(ctx, source, base, cg->sdk);
     }
     else {
@@ -202,25 +202,12 @@ static sp_da(sp_str_t) lower_strs(spn_toml_loader_t* ctx, sp_da(sp_str_t) values
   return out;
 }
 
-static spn_toolchain_source_t lower_source(sp_da(spn_cg_toolchain_decl_host_entry_t) hosts) {
-  bool local = false;
-  bool distributed = false;
-  sp_da_for(hosts, it) {
-    if (sp_str_empty(hosts[it].value.url)) {
-      local = true;
-    }
-    else {
-      distributed = true;
-    }
-  }
-  if (local && distributed) {
-    return SPN_TOOLCHAIN_SOURCE_MIXED;
-  }
-  return distributed ? SPN_TOOLCHAIN_SOURCE_DISTRIBUTION : SPN_TOOLCHAIN_SOURCE_LOCAL;
-}
-
 static void lower_hosts(spn_toml_loader_t* ctx, const spn_cg_toolchain_decl_t* decl, spn_toolchain_decl_t* toolchain) {
-  toolchain->source = lower_source(decl->host);
+  bool distributed = false;
+  sp_da_for(decl->host, it) {
+    distributed |= !sp_str_empty(decl->host[it].value.url);
+  }
+  toolchain->source = distributed ? SPN_TOOLCHAIN_SOURCE_DISTRIBUTION : SPN_TOOLCHAIN_SOURCE_LOCAL;
   toolchain->hosts = sp_da_new(ctx->mem, spn_toolchain_host_t);
   spn_toml_loader_push_key(ctx, "host");
   sp_da_for(decl->host, it) {
@@ -231,7 +218,7 @@ static void lower_hosts(spn_toml_loader_t* ctx, const spn_cg_toolchain_decl_t* d
     if (url && !sha) {
       spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, "sha256");
     }
-    if (!url && (sha || toolchain->source == SPN_TOOLCHAIN_SOURCE_MIXED)) {
+    if (!url && (sha || distributed)) {
       spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_MISSING_KEY, "url");
     }
     spn_triple_t host = sp_zero;
@@ -275,7 +262,19 @@ spn_toolchain_decl_t spn_toolchain_lower(spn_toml_loader_t* ctx, u32 at, spn_pat
   toolchain.driver = sp_opt_is_null(decl->driver) ? SPN_CC_DRIVER_NONE : sp_opt_get(decl->driver);
   toolchain.link_args = lower_strs(ctx, decl->link_args);
 
-  lower_hosts(ctx, decl, &toolchain);
+  if (sp_opt_is_null(decl->detect)) {
+    lower_hosts(ctx, decl, &toolchain);
+  }
+  else {
+    toolchain.source = SPN_TOOLCHAIN_SOURCE_DETECTED;
+    toolchain.detect = sp_opt_get(decl->detect);
+    if (!toolchain.detect) {
+      spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "detect");
+    }
+    if (!sp_da_empty(decl->host)) {
+      spn_toml_loader_issue(ctx, SPN_ERR_CODEGEN_INVALID, "host");
+    }
+  }
 
   toolchain.compiler = lower_launcher(ctx, "compiler", toolchain.source, base, decl->compiler);
   toolchain.cxx = lower_launcher(ctx, "cxx", toolchain.source, base, decl->cxx);

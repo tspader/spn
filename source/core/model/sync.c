@@ -131,6 +131,11 @@ static spn_err_t setup_toolchain_unit(spn_toolchain_store_t* store, spn_toolchai
     case SPN_TOOLCHAIN_SUPPORT_ARTIFACT: {
       return setup_artifact(store, unit);
     }
+    case SPN_TOOLCHAIN_SUPPORT_DETECTED: {
+      spn_toolchain_info_t* toolchain = unit->info;
+      unit->cc = cc_toolchain(toolchain, toolchain->compiler, toolchain->cxx, toolchain->archiver);
+      return SPN_OK;
+    }
     case SPN_TOOLCHAIN_SUPPORT_NONE: {
       sp_unreachable_case();
     }
@@ -565,7 +570,6 @@ spn_err_t sync_packages(spn_op_t* op, bool* reresolve) {
     return SPN_OK;
   }
 
-  spn_session_export_toolchain_env(session);
   spn_try(check_unused_patches(session));
 
   spn_event_buffer_push(spn.events, (spn_event_t) {

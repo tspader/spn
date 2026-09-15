@@ -137,6 +137,23 @@ sp_str_t spn_ld_family_to_str(spn_ld_family_t family) {
   SP_UNREACHABLE_RETURN(sp_str_lit(""));
 }
 
+spn_toolchain_detect_t spn_toolchain_detect_from_str(sp_str_t str) {
+  if (sp_str_equal_cstr(str, "msvc")) {
+    return SPN_TOOLCHAIN_DETECT_MSVC;
+  }
+
+  return SPN_TOOLCHAIN_DETECT_NONE;
+}
+
+sp_str_t spn_toolchain_detect_to_str(spn_toolchain_detect_t detect) {
+  switch (detect) {
+    case SPN_TOOLCHAIN_DETECT_NONE: return sp_str_lit("");
+    case SPN_TOOLCHAIN_DETECT_MSVC: return sp_str_lit("msvc");
+  }
+
+  SP_UNREACHABLE_RETURN(sp_str_lit(""));
+}
+
 sp_str_t spn_ld_dialect_to_str(spn_ld_dialect_t dialect) {
   switch (dialect) {
     case SPN_LD_DIALECT_GNU:    return sp_str_lit("gnu");

@@ -29,7 +29,6 @@ struct spn_session_t {
   spn_project_t* project;
   sp_mem_t mem;
   spn_pkg_info_t* pkg;
-  sp_env_t env;
 
   spn_session_config_t config;
   spn_profile_info_t profile;

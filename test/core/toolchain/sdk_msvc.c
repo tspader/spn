@@ -1,6 +1,7 @@
 #include "toolchain.h"
 
 typedef struct {
+  const c8* version;
   const c8* bin;
   const c8* include [4];
   const c8* lib [3];
@@ -21,6 +22,7 @@ static const test_t tests [] = {
     .name = "roles_map_to_install_dirs",
     .kits = "C:/K/10", .kits_version = "10.0.1.0", .vs = "C:/V", .tools_version = "14.1", .arch = SPN_ARCH_X64,
     .expect = {
+      .version = "14.1",
       .bin = "C:/V/VC/Tools/MSVC/14.1/bin/Hostx64/x64",
       .include = { "C:/V/VC/Tools/MSVC/14.1/include", "C:/K/10/Include/10.0.1.0/ucrt", "C:/K/10/Include/10.0.1.0/um", "C:/K/10/Include/10.0.1.0/shared" },
       .lib = { "C:/V/VC/Tools/MSVC/14.1/Lib/x64", "C:/K/10/Lib/10.0.1.0/ucrt/x64", "C:/K/10/Lib/10.0.1.0/um/x64" },
@@ -30,6 +32,7 @@ static const test_t tests [] = {
     .name = "arm64_target_has_its_own_tools",
     .kits = "C:/K/10", .kits_version = "10.0.1.0", .vs = "C:/V", .tools_version = "14.1", .arch = SPN_ARCH_ARM64,
     .expect = {
+      .version = "14.1",
       .bin = "C:/V/VC/Tools/MSVC/14.1/bin/Hostx64/arm64",
       .include = { "C:/V/VC/Tools/MSVC/14.1/include", "C:/K/10/Include/10.0.1.0/ucrt", "C:/K/10/Include/10.0.1.0/um", "C:/K/10/Include/10.0.1.0/shared" },
       .lib = { "C:/V/VC/Tools/MSVC/14.1/Lib/arm64", "C:/K/10/Lib/10.0.1.0/ucrt/arm64", "C:/K/10/Lib/10.0.1.0/um/arm64" },
@@ -60,6 +63,7 @@ sp_test_each(sdk_msvc, from_install, test_t, tests) {
   sp_msvc_vs_t vs = { .version.tools = msvc_version(it->tools_version), .install_path = msvc_path(it->vs), .host = SP_MSVC_ARCH_X64, .target = msvc_arch(it->arch) };
   spn_sdk_msvc_t msvc = spn_sdk_from_msvc(sp_test_arena(t), &kits, &vs, it->arch);
   sp_expect_eq(t, (u32)it->arch, (u32)msvc.arch);
+  sp_expect_str_eq_c(t, msvc.version, it->expect.version);
   if (test_check_path(t, msvc.bin, (test_path_t) { it->expect.bin })) {
     return SP_ERR;
   }

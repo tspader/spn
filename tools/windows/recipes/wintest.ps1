@@ -42,11 +42,6 @@ Push-Location $Work
 Pop-Location
 if (-not (Test-Path "$Work\.git")) { throw "git init failed in $Work" }
 
-if ($Lane -eq 'msvc') {
-  Write-Host "== devenv (vcvarsall) =="
-  & "$Work\tools\devenv.ps1"
-}
-
 $env:SPN_TEST_TOOLCHAIN = $Lane
 $env:SPN_BARE_PROBES = $Probes
 Set-Location $Work

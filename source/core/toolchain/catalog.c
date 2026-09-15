@@ -22,6 +22,7 @@ static void push_row(sp_da(spn_toolchain_row_t)* rows, spn_toolchain_row_t row) 
 static spn_path_t sdk_root(spn_toolchain_catalog_t* catalog, spn_toolchain_support_t support, spn_path_t sdk) {
   switch (support.kind) {
     case SPN_TOOLCHAIN_SUPPORT_ARTIFACT: return sp_fs_is_absolute(sdk.sub) ? sdk : spn_path_join(catalog->mem, spn_toolchain_artifact_root(support.artifact), sdk.sub);
+    case SPN_TOOLCHAIN_SUPPORT_DETECTED:
     case SPN_TOOLCHAIN_SUPPORT_LOCAL:
     case SPN_TOOLCHAIN_SUPPORT_NONE: return sdk;
   }
@@ -119,22 +120,39 @@ static bool has_host(sp_da(spn_toolchain_host_t) hosts, spn_triple_t host) {
 }
 
 static spn_toolchain_support_t bind_support(spn_toolchain_catalog_t* catalog, const spn_toolchain_decl_t* decl) {
-  sp_da(spn_toolchain_host_t) hosts = decl->hosts;
   switch (decl->source) {
     case SPN_TOOLCHAIN_SOURCE_LOCAL: {
-      bool supported = sp_da_empty(hosts) || has_host(hosts, catalog->host);
-      return (spn_toolchain_support_t) { .kind = supported ? SPN_TOOLCHAIN_SUPPORT_LOCAL : SPN_TOOLCHAIN_SUPPORT_NONE };
+      if (sp_da_empty(decl->hosts) || has_host(decl->hosts, catalog->host)) {
+        return (spn_toolchain_support_t) {
+          .kind = SPN_TOOLCHAIN_SUPPORT_LOCAL
+        };
+      }
+      return (spn_toolchain_support_t) {
+        .kind = SPN_TOOLCHAIN_SUPPORT_NONE,
+        .err = SPN_ERR_TOOLCHAIN_UNAVAILABLE_FOR_HOST
+      };
     }
     case SPN_TOOLCHAIN_SOURCE_DISTRIBUTION: {
-      sp_da_for(hosts, it) {
-        if (spn_triple_match(hosts[it].triple, catalog->host)) {
-          return (spn_toolchain_support_t) { .kind = SPN_TOOLCHAIN_SUPPORT_ARTIFACT, .artifact = hosts[it].artifact };
+      sp_da_for(decl->hosts, it) {
+        if (spn_triple_match(decl->hosts[it].triple, catalog->host)) {
+          return (spn_toolchain_support_t) { .kind = SPN_TOOLCHAIN_SUPPORT_ARTIFACT, .artifact = decl->hosts[it].artifact };
         }
       }
-      return (spn_toolchain_support_t) { .kind = SPN_TOOLCHAIN_SUPPORT_NONE };
+      return (spn_toolchain_support_t) { .kind = SPN_TOOLCHAIN_SUPPORT_NONE, .err = SPN_ERR_TOOLCHAIN_UNAVAILABLE_FOR_HOST };
     }
-    case SPN_TOOLCHAIN_SOURCE_MIXED: {
-      sp_unreachable_case();
+    case SPN_TOOLCHAIN_SOURCE_DETECTED: {
+      switch (decl->detect) {
+        case SPN_TOOLCHAIN_DETECT_MSVC: {
+          if (sp_da_empty(catalog->sdks.msvc)) {
+            return (spn_toolchain_support_t) { .kind = SPN_TOOLCHAIN_SUPPORT_NONE, .err = SPN_ERR_TOOLCHAIN_NOT_INSTALLED };
+          }
+          return (spn_toolchain_support_t) { .kind = SPN_TOOLCHAIN_SUPPORT_DETECTED };
+        }
+        case SPN_TOOLCHAIN_DETECT_NONE: {
+          sp_unreachable_case();
+        }
+      }
+      sp_unreachable_return(sp_zero_struct(spn_toolchain_support_t));
     }
   }
   sp_unreachable_return(sp_zero_struct(spn_toolchain_support_t));
